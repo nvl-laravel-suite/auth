@@ -7,6 +7,8 @@ use Nvl\Auth\Actions\Passkeys\BeginPasskeyRegistrationAction;
 use Nvl\Auth\Actions\Passkeys\FinishPasskeyAuthenticationAction;
 use Nvl\Auth\Actions\Passkeys\FinishPasskeyRegistrationAction;
 use Nvl\Auth\Contracts\PasskeyCeremony;
+use Nvl\Auth\Data\Mutations\FinishPasskeyAuthenticationData;
+use Nvl\Auth\Data\Mutations\FinishPasskeyRegistrationData;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Services\SecretHasher;
@@ -22,14 +24,11 @@ it('persists verified passkeys and supplies stored material to the ceremony adap
     $registration = app(BeginPasskeyRegistrationAction::class)->execute($user);
     $passkey = app(FinishPasskeyRegistrationAction::class)->execute(
         $user,
-        $registration->ceremonyId,
-        ['valid' => true],
-        'Laptop',
+        new FinishPasskeyRegistrationData($registration->ceremonyId, ['valid' => true], 'Laptop')
     );
     $authentication = app(BeginPasskeyAuthenticationAction::class)->execute();
     $reference = app(FinishPasskeyAuthenticationAction::class)->execute(
-        $authentication->ceremonyId,
-        ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2],
+        new FinishPasskeyAuthenticationData($authentication->ceremonyId, ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2])
     );
     $adapter = app(PasskeyCeremony::class);
 
@@ -44,12 +43,11 @@ it('persists verified passkeys and supplies stored material to the ceremony adap
 it('commits a failed passkey ceremony attempt before returning its neutral failure', function (): void {
     $user = $this->user();
     $registration = app(BeginPasskeyRegistrationAction::class)->execute($user);
-    app(FinishPasskeyRegistrationAction::class)->execute($user, $registration->ceremonyId, ['valid' => true]);
+    app(FinishPasskeyRegistrationAction::class)->execute($user, new FinishPasskeyRegistrationData($registration->ceremonyId, ['valid' => true]));
     $authentication = app(BeginPasskeyAuthenticationAction::class)->execute();
 
     expect(fn () => app(FinishPasskeyAuthenticationAction::class)->execute(
-        $authentication->ceremonyId,
-        ['valid' => false, 'credential_id' => 'test-credential', 'signature_counter' => 2],
+        new FinishPasskeyAuthenticationData($authentication->ceremonyId, ['valid' => false, 'credential_id' => 'test-credential', 'signature_counter' => 2])
     ))->toThrow(AuthException::class);
 
     expect(Challenge::query()->where('type', 'passkey_authentication')->sole()->attempts)->toBe(1);
@@ -58,18 +56,17 @@ it('commits a failed passkey ceremony attempt before returning its neutral failu
 it('normalizes provider exceptions at the passkey boundary', function (): void {
     $user = $this->user();
     $registration = app(BeginPasskeyRegistrationAction::class)->execute($user);
-    app(FinishPasskeyRegistrationAction::class)->execute($user, $registration->ceremonyId, ['valid' => true]);
+    app(FinishPasskeyRegistrationAction::class)->execute($user, new FinishPasskeyRegistrationData($registration->ceremonyId, ['valid' => true]));
     $authentication = app(BeginPasskeyAuthenticationAction::class)->execute();
 
     try {
         app(FinishPasskeyAuthenticationAction::class)->execute(
-            $authentication->ceremonyId,
-            [
+            new FinishPasskeyAuthenticationData($authentication->ceremonyId, [
                 'valid' => true,
                 'runtime_failure' => true,
                 'credential_id' => 'test-credential',
                 'signature_counter' => 2,
-            ],
+            ])
         );
 
         throw new RuntimeException('The passkey provider failure was not normalized.');
@@ -82,14 +79,13 @@ it('normalizes provider exceptions at the passkey boundary', function (): void {
 it('enforces passkey uniqueness, credential limits, and user verification', function (): void {
     $user = $this->user();
     $registration = app(BeginPasskeyRegistrationAction::class)->execute($user);
-    app(FinishPasskeyRegistrationAction::class)->execute($user, $registration->ceremonyId, ['valid' => true]);
+    app(FinishPasskeyRegistrationAction::class)->execute($user, new FinishPasskeyRegistrationData($registration->ceremonyId, ['valid' => true]));
 
     $duplicate = app(BeginPasskeyRegistrationAction::class)->execute($user);
 
     expect(fn () => app(FinishPasskeyRegistrationAction::class)->execute(
         $user,
-        $duplicate->ceremonyId,
-        ['valid' => true],
+        new FinishPasskeyRegistrationData($duplicate->ceremonyId, ['valid' => true])
     ))->toThrow(AuthException::class, 'already registered')
         ->and(Challenge::query()
             ->where('type', 'passkey_registration')
@@ -105,13 +101,12 @@ it('enforces passkey uniqueness, credential limits, and user verification', func
     $authentication = app(BeginPasskeyAuthenticationAction::class)->execute();
 
     expect(fn () => app(FinishPasskeyAuthenticationAction::class)->execute(
-        $authentication->ceremonyId,
-        [
+        new FinishPasskeyAuthenticationData($authentication->ceremonyId, [
             'valid' => true,
             'credential_id' => 'test-credential',
             'signature_counter' => 2,
             'user_verified' => false,
-        ],
+        ])
     ))->toThrow(AuthException::class, 'rejected');
 });
 
@@ -129,7 +124,6 @@ it('normalizes passkey start failures and rejects oversized browser input', func
     $this->app->instance(PasskeyCeremony::class, new TestPasskeyCeremony);
 
     expect(fn () => app(FinishPasskeyAuthenticationAction::class)->execute(
-        'ceremony',
-        ['payload' => str_repeat('x', 131_073)],
+        new FinishPasskeyAuthenticationData('ceremony', ['payload' => str_repeat('x', 131_073)])
     ))->toThrow(AuthException::class, 'input');
 });

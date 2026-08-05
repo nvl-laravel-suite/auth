@@ -9,19 +9,19 @@ use Nvl\Auth\Actions\Rbac\CreateRoleAction;
 use Nvl\Auth\Actions\Rbac\ListRoleHierarchyAction;
 use Nvl\Auth\Actions\Rbac\ListRoleTemplatesAction;
 use Nvl\Auth\Actions\Rbac\ShowRbacAnalyticsAction;
-use Nvl\Auth\ValueObjects\PermissionData;
-use Nvl\Auth\ValueObjects\RoleData;
+use Nvl\Auth\Data\Mutations\StorePermissionData;
+use Nvl\Auth\Data\Mutations\StoreRoleData;
 
 it('owns role and permission CRUD foundations, cloning, hierarchy, templates, and analytics', function (): void {
     $actor = $this->user('rbac.owner@example.test');
-    app(CreatePermissionAction::class)->execute($actor, new PermissionData('catalog.read', group: 'catalog'));
-    app(CreatePermissionAction::class)->execute($actor, new PermissionData('catalog.write', group: 'catalog'));
-    $parent = app(CreateRoleAction::class)->execute($actor, new RoleData(
+    app(CreatePermissionAction::class)->execute($actor, new StorePermissionData('catalog.read', group: 'catalog'));
+    app(CreatePermissionAction::class)->execute($actor, new StorePermissionData('catalog.write', group: 'catalog'));
+    $parent = app(CreateRoleAction::class)->execute($actor, new StoreRoleData(
         name: 'catalog-manager',
         priority: 100,
         permissions: ['catalog.read', 'catalog.write'],
     ));
-    $child = app(CreateRoleAction::class)->execute($actor, new RoleData(
+    $child = app(CreateRoleAction::class)->execute($actor, new StoreRoleData(
         name: 'catalog-reader',
         parentId: $parent->id,
         priority: 50,

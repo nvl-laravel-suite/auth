@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Nvl\Auth\Actions\Passkeys\BeginPasskeyRegistrationAction;
 use Nvl\Auth\Actions\Passkeys\FinishPasskeyRegistrationAction;
 use Nvl\Auth\Actions\Passkeys\RevokePasskeyAction;
+use Nvl\Auth\Data\Mutations\FinishPasskeyRegistrationData;
 use Nvl\Auth\Models\Passkey;
 
 /**
@@ -33,18 +34,11 @@ final class PasskeyController extends AuthenticatedController
     /**
      * Finish passkey registration.
      */
-    public function finish(Request $request, FinishPasskeyRegistrationAction $action): JsonResponse
+    public function finish(FinishPasskeyRegistrationData $data, Request $request, FinishPasskeyRegistrationAction $action): JsonResponse
     {
-        $request->validate([
-            'ceremony_id' => ['required', 'string', 'max:191'],
-            'response' => ['required', 'array'],
-            'name' => ['sometimes', 'nullable', 'string', 'max:120'],
-        ]);
         $passkey = $action->execute(
             $this->subject($request),
-            $this->stringInput($request, 'ceremony_id'),
-            $this->associativeInput($request, 'response'),
-            $this->optionalStringInput($request, 'name'),
+            $data,
         );
 
         return response()->json([

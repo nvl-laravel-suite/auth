@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Nvl\Auth\Data\Mutations\StoreInvitationData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -25,7 +26,6 @@ use Nvl\Auth\Services\OpaqueTokenFactory;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
-use Nvl\Auth\ValueObjects\CreateInvitationData;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
@@ -50,7 +50,7 @@ final readonly class CreateInvitationAction
      * Issue one invitation.
      */
     public function execute(
-        CreateInvitationData $data,
+        StoreInvitationData $data,
         Authenticatable $actor,
     ): IssuedInvitation {
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Issue);

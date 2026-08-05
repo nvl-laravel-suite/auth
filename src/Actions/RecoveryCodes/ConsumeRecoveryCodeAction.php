@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Nvl\Auth\Data\Mutations\ConsumeRecoveryCodeData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
@@ -37,18 +38,18 @@ final readonly class ConsumeRecoveryCodeAction
      */
     public function execute(
         Authenticatable $subject,
-        #[SensitiveParameter] string $code,
+        #[SensitiveParameter] ConsumeRecoveryCodeData $data,
     ): RecoveryCode {
         $this->features->assertAllowed(AuthFeature::RecoveryCodes, FeatureOperation::Use);
         $reference = SubjectReference::fromAuthenticatable($subject);
         $connection = (new RecoveryCode)->getConnectionName();
 
-        return DB::connection($connection)->transaction(function () use ($code, $reference, $subject): RecoveryCode {
+        return DB::connection($connection)->transaction(function () use ($data, $reference, $subject): RecoveryCode {
             /** @var RecoveryCode|null $record */
             $record = RecoveryCode::query()
                 ->where('subject_type', $reference->type)
                 ->where('subject_id', $reference->identifier)
-                ->where('code_hash', $this->hasher->hash('recovery-code', Str::upper(trim($code))))
+                ->where('code_hash', $this->hasher->hash('recovery-code', Str::upper(trim($data->code))))
                 ->whereNull('used_at')
                 ->whereNull('revoked_at')
                 ->lockForUpdate()

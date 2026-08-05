@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Nvl\Auth\Actions\RecoveryCodes\ConsumeRecoveryCodeAction;
 use Nvl\Auth\Actions\RecoveryCodes\RegenerateRecoveryCodesAction;
 use Nvl\Auth\Actions\RecoveryCodes\RevokeRecoveryCodesAction;
+use Nvl\Auth\Data\Mutations\ConsumeRecoveryCodeData;
 
 /**
  * Handles authenticated recovery-code lifecycle transport.
@@ -32,10 +33,9 @@ final class RecoveryCodeController extends AuthenticatedController
     /**
      * Consume one recovery code.
      */
-    public function consume(Request $request, ConsumeRecoveryCodeAction $action): JsonResponse
+    public function consume(ConsumeRecoveryCodeData $data, Request $request, ConsumeRecoveryCodeAction $action): JsonResponse
     {
-        $request->validate(['code' => ['required', 'string', 'max:128']]);
-        $record = $action->execute($this->subject($request), $this->stringInput($request, 'code'));
+        $record = $action->execute($this->subject($request), $data);
 
         return response()->json(['data' => ['batch_id' => $record->batch_id], 'code' => 'recovery_code_consumed', 'message' => 'The recovery code was consumed.']);
     }

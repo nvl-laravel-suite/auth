@@ -10,6 +10,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Contracts\Auth\PasswordBroker as PasswordBrokerContract;
 use Nvl\Auth\Contracts\PasswordUpdater;
+use Nvl\Auth\Data\Mutations\ResetPasswordData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
@@ -41,22 +42,19 @@ final readonly class ResetPasswordAction
     /**
      * Reset a host-owned password through Laravel's broker.
      */
-    public function execute(
-        string $identifier,
-        string $token,
-        #[SensitiveParameter] string $password,
-    ): void {
+    public function execute(#[SensitiveParameter] ResetPasswordData $data): void
+    {
         $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Use);
         $identifierName = $this->configuration->string('identifier', 'email');
         $status = $this->pipeline->run(
             'password_reset',
             new AuthPipelineContext('password_reset', ['identifier_name' => $identifierName]),
-            function () use ($identifier, $identifierName, $password, $token): string {
+            function () use ($data, $identifierName): string {
                 $brokerName = $this->configuration->get('password_broker');
                 $broker = $this->brokers->broker(is_string($brokerName) ? $brokerName : null);
 
                 $status = $broker->reset(
-                    [$identifierName => $identifier, 'token' => $token, 'password' => $password],
+                    [$identifierName => $data->identifier, 'token' => $data->token, 'password' => $data->password],
                     function (CanResetPassword $subject, string $newPassword): void {
                         $this->passwords->update($subject, $newPassword);
 

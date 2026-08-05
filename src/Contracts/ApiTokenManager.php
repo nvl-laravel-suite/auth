@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Nvl\Auth\Contracts;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Nvl\Auth\Data\Mutations\ApiTokenData;
 use Nvl\Auth\Results\IssuedApiToken;
-use Nvl\Auth\ValueObjects\ApiTokenData;
 use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
 
 /**

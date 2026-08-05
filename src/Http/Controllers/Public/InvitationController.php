@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Nvl\Auth\Http\Controllers\Public;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Nvl\Auth\Actions\Invitations\AcceptInvitationAction;
 use Nvl\Auth\Actions\Invitations\PreviewInvitationAction;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
+use Nvl\Auth\Data\Mutations\AcceptInvitationData;
 use Nvl\Auth\Http\Controllers\Concerns\InteractsWithValidatedInput;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
@@ -23,18 +23,14 @@ final class InvitationController
      * Provision or resolve the host subject and consume the invitation.
      */
     public function accept(
-        Request $request,
+        AcceptInvitationData $data,
         PreviewInvitationAction $preview,
         InvitationSubjectResolver $subjects,
         AcceptInvitationAction $accept,
     ): JsonResponse {
-        $request->validate([
-            'token' => ['required', 'string', 'max:255'],
-            'registration' => ['sometimes', 'array'],
-        ]);
-        $token = $this->stringInput($request, 'token');
+        $token = $data->token;
         $invitation = $preview->execute($token);
-        $subject = $subjects->resolve($invitation, $this->associativeInput($request, 'registration'));
+        $subject = $subjects->resolve($invitation, $data->toRegistrationArray());
         $accepted = $accept->execute($token, $subject);
         $reference = SubjectReference::fromAuthenticatable($subject);
 

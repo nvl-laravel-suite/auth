@@ -10,6 +10,9 @@ use Nvl\Auth\Actions\Totp\ConfirmTotpEnrollmentAction;
 use Nvl\Auth\Actions\Totp\RevokeTotpCredentialAction;
 use Nvl\Auth\Actions\Totp\StartTotpEnrollmentAction;
 use Nvl\Auth\Actions\Totp\VerifyTotpAction;
+use Nvl\Auth\Data\Mutations\ConfirmTotpEnrollmentData;
+use Nvl\Auth\Data\Mutations\StartTotpEnrollmentData;
+use Nvl\Auth\Data\Mutations\VerifyTotpData;
 use Nvl\Auth\Models\TotpCredential;
 
 /**
@@ -20,16 +23,11 @@ final class TotpController extends AuthenticatedController
     /**
      * Start TOTP enrollment.
      */
-    public function start(Request $request, StartTotpEnrollmentAction $action): JsonResponse
+    public function start(StartTotpEnrollmentData $data, Request $request, StartTotpEnrollmentAction $action): JsonResponse
     {
-        $request->validate([
-            'account_name' => ['required', 'string', 'max:255'],
-            'name' => ['sometimes', 'nullable', 'string', 'max:120'],
-        ]);
         $result = $action->execute(
             $this->subject($request),
-            $this->stringInput($request, 'account_name'),
-            $this->optionalStringInput($request, 'name'),
+            $data,
         );
 
         return response()->json([
@@ -47,15 +45,15 @@ final class TotpController extends AuthenticatedController
      * Confirm TOTP enrollment.
      */
     public function confirm(
+        ConfirmTotpEnrollmentData $data,
         Request $request,
         TotpCredential $credential,
         ConfirmTotpEnrollmentAction $action,
     ): JsonResponse {
-        $request->validate(['code' => ['required', 'string', 'max:20']]);
         $confirmed = $action->execute(
             $this->subject($request),
             $credential,
-            $this->stringInput($request, 'code'),
+            $data,
         );
 
         return response()->json(['data' => ['credential_id' => $confirmed->identifier()], 'code' => 'totp_enrolled', 'message' => 'TOTP was enrolled.']);
@@ -64,10 +62,9 @@ final class TotpController extends AuthenticatedController
     /**
      * Verify a current TOTP proof.
      */
-    public function verify(Request $request, VerifyTotpAction $action): JsonResponse
+    public function verify(VerifyTotpData $data, Request $request, VerifyTotpAction $action): JsonResponse
     {
-        $request->validate(['code' => ['required', 'string', 'max:20']]);
-        $credential = $action->execute($this->subject($request), $this->stringInput($request, 'code'));
+        $credential = $action->execute($this->subject($request), $data);
 
         return response()->json(['data' => ['credential_id' => $credential->identifier()], 'code' => 'totp_verified', 'message' => 'TOTP was verified.']);
     }

@@ -6,9 +6,9 @@ namespace Nvl\Auth\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Contracts\ApiTokenManager;
+use Nvl\Auth\Data\Mutations\ApiTokenData;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Results\IssuedApiToken;
-use Nvl\Auth\ValueObjects\ApiTokenData;
 use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
 
 /**

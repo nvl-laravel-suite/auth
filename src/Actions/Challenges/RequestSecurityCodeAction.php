@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Challenges;
 
 use Carbon\CarbonImmutable;
+use Nvl\Auth\Data\Mutations\RequestSecurityCodeData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -33,8 +34,7 @@ final readonly class RequestSecurityCodeAction
      * @param  array<string, mixed>  $payload
      */
     public function execute(
-        string $recipient,
-        string $purpose,
+        RequestSecurityCodeData $data,
         ?SubjectReference $subject = null,
         array $payload = [],
         ?string $locale = null,
@@ -44,8 +44,8 @@ final readonly class RequestSecurityCodeAction
         return $this->challenges->execute(
             feature: AuthFeature::SecurityCodes,
             messageType: AuthMessageType::SecurityCode,
-            recipient: $recipient,
-            purpose: $purpose,
+            recipient: $data->recipient,
+            purpose: $data->purpose,
             expiresAt: CarbonImmutable::now()->addMinutes(
                 $this->configuration->integerBetween('features.security_codes.settings.ttl_minutes', 10, 1, 10_080),
             ),

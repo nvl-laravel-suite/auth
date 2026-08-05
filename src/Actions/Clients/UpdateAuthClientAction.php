@@ -6,13 +6,13 @@ namespace Nvl\Auth\Actions\Clients;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Data\Mutations\UpdateClientData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\AuthClient;
 use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
-use Nvl\Auth\ValueObjects\AuthClientData;
 
 /**
  * Updates one first-party authentication client.
@@ -34,7 +34,7 @@ final readonly class UpdateAuthClientAction
     public function execute(
         Authenticatable $actor,
         AuthClient $client,
-        AuthClientData $data,
+        UpdateClientData $data,
     ): AuthClient {
         $this->features->assertAllowed(AuthFeature::Clients, FeatureOperation::Update);
         $this->authorization->authorize($actor, 'nvl-auth.clients.update', $client);

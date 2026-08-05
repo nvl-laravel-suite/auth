@@ -2,37 +2,46 @@
 
 declare(strict_types=1);
 
-namespace Nvl\Auth\ValueObjects;
+namespace Nvl\Auth\Data\Mutations;
 
 use DateTimeZone;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Validation\Rules\Password;
 use InvalidArgumentException;
 use JsonException;
+use Nvl\Data\Traits\DataTransform;
+use Spatie\LaravelData\Attributes\MapInputName;
+use Spatie\LaravelData\Attributes\MapOutputName;
+use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Mappers\CamelCaseMapper;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
-/**
- * Carries validated input for one package principal.
- */
-final readonly class CreateUserData
+#[MapInputName(CamelCaseMapper::class)]
+#[MapOutputName(CamelCaseMapper::class)]
+#[TypeScript]
+/** Validated creation mutation for one managed principal. */
+final class StoreUserData extends Data
 {
+    use DataTransform;
+
     /**
-     * Create principal input.
-     *
      * @param  array<string, mixed>  $profile
      * @param  array<string, mixed>  $preferences
      * @param  list<string>  $roles
      * @param  list<string>  $permissions
      */
     public function __construct(
-        public string $name,
-        public string $email,
-        public ?string $password,
-        public bool $active = true,
+        public readonly string $name,
+        public readonly string $email,
+        public readonly ?string $password,
+        public readonly bool $active = true,
         public string $locale = 'en',
         public string $timezone = 'UTC',
-        public array $profile = [],
-        public array $preferences = [],
-        public array $roles = [],
-        public array $permissions = [],
-        public bool $emailVerified = false,
+        public readonly array $profile = [],
+        public readonly array $preferences = [],
+        public readonly array $roles = [],
+        public readonly array $permissions = [],
+        public readonly bool $emailVerified = false,
     ) {
         if (trim($this->name) === '' || mb_strlen($this->name) > 160) {
             throw new InvalidArgumentException('User names must contain between one and 160 characters.');
@@ -60,7 +69,11 @@ final readonly class CreateUserData
         $this->assertStringListIsBounded($this->permissions, 250, 'permissions');
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * Ensure a JSON-like user payload remains serializable and bounded.
+     *
+     * @param  array<string, mixed>  $payload
+     */
     private function assertJsonPayloadIsBounded(array $payload, string $field): void
     {
         try {
@@ -74,7 +87,11 @@ final readonly class CreateUserData
         }
     }
 
-    /** @param list<string> $values */
+    /**
+     * Ensure a string list remains distinct and bounded.
+     *
+     * @param  list<string>  $values
+     */
     private function assertStringListIsBounded(array $values, int $maximum, string $field): void
     {
         if (count($values) > $maximum) {
@@ -82,7 +99,6 @@ final readonly class CreateUserData
         }
 
         $seen = [];
-
         foreach ($values as $value) {
             if (trim($value) === '' || mb_strlen($value) > 160) {
                 throw new InvalidArgumentException("User {$field} values must contain between one and 160 characters.");
@@ -94,5 +110,29 @@ final readonly class CreateUserData
 
             $seen[$value] = true;
         }
+    }
+
+    /** @return array<string, list<mixed>> */
+    public static function rules(): array
+    {
+        $users = Config::string('nvl-auth.tables.users', 'nvl_auth_users');
+        $roles = Config::string('nvl-auth.tables.roles', 'nvl_auth_roles');
+        $permissions = Config::string('nvl-auth.tables.permissions', 'nvl_auth_permissions');
+
+        return [
+            'name' => ['required', 'string', 'max:160'],
+            'email' => ['required', 'email', 'max:254', "unique:{$users},email"],
+            'password' => ['nullable', Password::min(12)->letters()->numbers()],
+            'active' => ['sometimes', 'boolean'],
+            'emailVerified' => ['sometimes', 'boolean'],
+            'locale' => ['sometimes', 'string', 'max:12'],
+            'timezone' => ['sometimes', 'timezone:all'],
+            'profile' => ['sometimes', 'array', 'max:100'],
+            'preferences' => ['sometimes', 'array', 'max:100'],
+            'roles' => ['sometimes', 'array', 'max:100'],
+            'roles.*' => ['string', 'distinct', "exists:{$roles},name"],
+            'permissions' => ['sometimes', 'array', 'max:250'],
+            'permissions.*' => ['string', 'distinct', "exists:{$permissions},name"],
+        ];
     }
 }

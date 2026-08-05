@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Totp;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Data\Mutations\StartTotpEnrollmentData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\TotpCredential;
@@ -34,8 +35,7 @@ final readonly class StartTotpEnrollmentAction
      */
     public function execute(
         Authenticatable $subject,
-        string $accountName,
-        ?string $name = null,
+        StartTotpEnrollmentData $data,
     ): TotpEnrollment {
         $this->features->assertAllowed(AuthFeature::Totp, FeatureOperation::Enroll);
         $reference = SubjectReference::fromAuthenticatable($subject);
@@ -44,8 +44,7 @@ final readonly class StartTotpEnrollmentAction
         $connection = (new TotpCredential)->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use (
-            $accountName,
-            $name,
+            $data,
             $parameters,
             $reference,
             $secret,
@@ -59,7 +58,7 @@ final readonly class StartTotpEnrollmentAction
             $credential = TotpCredential::query()->create([
                 'subject_type' => $reference->type,
                 'subject_id' => $reference->identifier,
-                'name' => $name,
+                'name' => $data->name,
                 'secret' => $secret,
                 ...$parameters,
             ]);
@@ -73,7 +72,7 @@ final readonly class StartTotpEnrollmentAction
             return new TotpEnrollment(
                 $credential,
                 $secret,
-                $this->totp->provisioningUri($accountName, $secret),
+                $this->totp->provisioningUri($data->accountName, $secret),
             );
         }, 3);
     }

@@ -11,6 +11,10 @@ use Nvl\Auth\Actions\Challenges\ConsumeMagicLinkAction;
 use Nvl\Auth\Actions\Challenges\RequestMagicLinkAuthenticationAction;
 use Nvl\Auth\Actions\Challenges\RequestSecurityCodeAction;
 use Nvl\Auth\Actions\Challenges\VerifySecurityCodeAction;
+use Nvl\Auth\Data\Mutations\ConsumeMagicLinkData;
+use Nvl\Auth\Data\Mutations\RequestMagicLinkData;
+use Nvl\Auth\Data\Mutations\RequestSecurityCodeData;
+use Nvl\Auth\Data\Mutations\VerifySecurityCodeData;
 use Nvl\Auth\Http\Controllers\Concerns\InteractsWithValidatedInput;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
@@ -25,13 +29,11 @@ final class ChallengeController
      * Request a magic link without returning its secret.
      */
     public function requestMagicLink(
+        RequestMagicLinkData $data,
         Request $request,
         RequestMagicLinkAuthenticationAction $action,
     ): JsonResponse {
-        $request->validate([
-            'recipient' => ['required', 'string', 'max:320'],
-        ]);
-        $action->execute($this->stringInput($request, 'recipient'), $request->getPreferredLanguage());
+        $action->execute($data, $request->getPreferredLanguage());
 
         return response()->json(['data' => null, 'code' => 'magic_link_requested', 'message' => 'The magic link was requested.'], 202);
     }
@@ -40,18 +42,11 @@ final class ChallengeController
      * Consume a magic link and establish a session when it is subject-bound.
      */
     public function consumeMagicLink(
-        Request $request,
+        ConsumeMagicLinkData $data,
         ConsumeMagicLinkAction $action,
         EstablishAuthenticatedSessionAction $sessions,
     ): JsonResponse {
-        $request->validate([
-            'recipient' => ['required', 'string', 'max:320'],
-            'token' => ['required', 'string', 'max:255'],
-        ]);
-        $challenge = $action->execute(
-            $this->stringInput($request, 'recipient'),
-            $this->stringInput($request, 'token'),
-        );
+        $challenge = $action->execute($data);
 
         if (is_string($challenge->subject_type) && is_string($challenge->subject_id)) {
             $sessions->execute(new SubjectReference($challenge->subject_type, $challenge->subject_id));
@@ -63,15 +58,13 @@ final class ChallengeController
     /**
      * Request a numeric security code.
      */
-    public function requestSecurityCode(Request $request, RequestSecurityCodeAction $action): JsonResponse
-    {
-        $request->validate([
-            'recipient' => ['required', 'string', 'max:320'],
-            'purpose' => ['required', 'string', 'max:120'],
-        ]);
+    public function requestSecurityCode(
+        RequestSecurityCodeData $data,
+        Request $request,
+        RequestSecurityCodeAction $action
+    ): JsonResponse {
         $action->execute(
-            $this->stringInput($request, 'recipient'),
-            $this->stringInput($request, 'purpose'),
+            $data,
             locale: $request->getPreferredLanguage(),
         );
 
@@ -81,18 +74,9 @@ final class ChallengeController
     /**
      * Verify and consume a numeric security code.
      */
-    public function verifySecurityCode(Request $request, VerifySecurityCodeAction $action): JsonResponse
+    public function verifySecurityCode(VerifySecurityCodeData $data, VerifySecurityCodeAction $action): JsonResponse
     {
-        $request->validate([
-            'recipient' => ['required', 'string', 'max:320'],
-            'purpose' => ['required', 'string', 'max:120'],
-            'code' => ['required', 'string', 'max:20'],
-        ]);
-        $challenge = $action->execute(
-            $this->stringInput($request, 'recipient'),
-            $this->stringInput($request, 'purpose'),
-            $this->stringInput($request, 'code'),
-        );
+        $challenge = $action->execute($data);
 
         return response()->json([
             'data' => ['challenge_id' => $challenge->identifier()],

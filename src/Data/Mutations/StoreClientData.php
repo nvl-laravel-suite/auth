@@ -2,32 +2,38 @@
 
 declare(strict_types=1);
 
-namespace Nvl\Auth\ValueObjects;
+namespace Nvl\Auth\Data\Mutations;
 
 use InvalidArgumentException;
+use Nvl\Data\Traits\DataTransform;
+use Spatie\LaravelData\Attributes\MapInputName;
+use Spatie\LaravelData\Attributes\MapOutputName;
+use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Mappers\CamelCaseMapper;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
-/**
- * Carries normalized first-party Auth client configuration.
- */
-final readonly class AuthClientData
+#[MapInputName(CamelCaseMapper::class)]
+#[MapOutputName(CamelCaseMapper::class)]
+#[TypeScript]
+final class StoreClientData extends Data
 {
+    use DataTransform;
+
     /**
-     * Create client configuration.
-     *
      * @param  list<string>  $returnPaths
      * @param  list<string>  $allowedOrigins
      * @param  list<string>  $allowedFlows
      * @param  array<string, mixed>  $metadata
      */
     public function __construct(
-        public string $name,
-        public string $surface,
-        public string $baseUrl,
-        public array $returnPaths = [],
-        public array $allowedOrigins = [],
-        public array $allowedFlows = ['login'],
-        public array $metadata = [],
-        public bool $active = true,
+        public readonly string $name,
+        public readonly string $surface,
+        public readonly string $baseUrl,
+        public readonly array $returnPaths = [],
+        public readonly array $allowedOrigins = [],
+        public readonly array $allowedFlows = ['login'],
+        public readonly array $metadata = [],
+        public readonly bool $active = true,
     ) {
         if (trim($this->name) === '' || mb_strlen($this->name) > 120) {
             throw new InvalidArgumentException('Auth client names must contain between one and 120 characters.');
@@ -60,15 +66,11 @@ final readonly class AuthClientData
         }
 
         $encodedMetadata = json_encode($this->metadata);
-
         if (! is_string($encodedMetadata) || strlen($encodedMetadata) > 16_384) {
             throw new InvalidArgumentException('Auth client metadata must be JSON-serializable and no larger than 16 KiB.');
         }
     }
 
-    /**
-     * Determine whether a URL is safe for client redirect configuration.
-     */
     private static function validHttpUrl(string $url, bool $originOnly): bool
     {
         if (mb_strlen($url) > 2_048 || filter_var($url, FILTER_VALIDATE_URL) === false) {
@@ -90,9 +92,6 @@ final readonly class AuthClientData
         return ! $originOnly || ! isset($parts['path']) || $parts['path'] === '' || $parts['path'] === '/';
     }
 
-    /**
-     * Determine whether an untrusted return-path value is safe.
-     */
     private static function validReturnPath(mixed $path): bool
     {
         return is_string($path)
@@ -102,19 +101,31 @@ final readonly class AuthClientData
             && preg_match('/[\x00-\x1F\x7F\\\\]/', $path) !== 1;
     }
 
-    /**
-     * Determine whether an untrusted origin value is safe.
-     */
     private static function validOrigin(mixed $origin): bool
     {
         return is_string($origin) && self::validHttpUrl($origin, true);
     }
 
-    /**
-     * Determine whether an untrusted flow value is canonical.
-     */
     private static function validFlow(mixed $flow): bool
     {
         return is_string($flow) && preg_match('/\A[a-z][a-z0-9_.-]{0,79}\z/', $flow) === 1;
+    }
+
+    /** @return array<string, list<string>> */
+    public static function rules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:120'],
+            'surface' => ['required', 'string', 'max:40'],
+            'baseUrl' => ['required', 'url', 'max:2048'],
+            'returnPaths' => ['sometimes', 'array'],
+            'returnPaths.*' => ['string', 'max:2048'],
+            'allowedOrigins' => ['sometimes', 'array'],
+            'allowedOrigins.*' => ['url', 'max:2048'],
+            'allowedFlows' => ['sometimes', 'array'],
+            'allowedFlows.*' => ['string', 'max:80'],
+            'metadata' => ['sometimes', 'array'],
+            'active' => ['sometimes', 'boolean'],
+        ];
     }
 }

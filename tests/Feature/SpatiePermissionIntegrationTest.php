@@ -7,9 +7,9 @@ use Nvl\Auth\Actions\Invitations\CreateInvitationAction;
 use Nvl\Auth\Actions\Rbac\SynchronizePermissionCatalogAction;
 use Nvl\Auth\Actions\Rbac\SynchronizeRbacAction;
 use Nvl\Auth\Actions\Rbac\SynchronizeRoleTemplatesAction;
+use Nvl\Auth\Data\Mutations\StoreInvitationData;
 use Nvl\Auth\Tests\Fixtures\TestPermissionCatalog;
 use Nvl\Auth\Tests\Fixtures\TestRoleTemplates;
-use Nvl\Auth\ValueObjects\CreateInvitationData;
 
 it('synchronizes spatie catalogs and applies invitation role payloads', function (): void {
     config()->set('nvl-auth.features.rbac.enabled', true);
@@ -22,7 +22,7 @@ it('synchronizes spatie catalogs and applies invitation role payloads', function
     expect(app(SynchronizePermissionCatalogAction::class)->execute($actor))->toBe(2)
         ->and(app(SynchronizeRoleTemplatesAction::class)->execute($actor))->toBe(1);
 
-    $issued = app(CreateInvitationAction::class)->execute(new CreateInvitationData(
+    $issued = app(CreateInvitationAction::class)->execute(new StoreInvitationData(
         recipient: $consumer->email,
         roles: ['manager'],
     ), $actor);

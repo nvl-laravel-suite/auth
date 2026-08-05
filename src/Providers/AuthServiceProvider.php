@@ -47,6 +47,7 @@ use Nvl\Auth\Services\PermissionCatalogRegistry;
 use Nvl\Auth\Services\RoleTemplateRegistry;
 use Nvl\Auth\Services\UnavailableSocialIdentityProvider;
 use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
+use Nvl\Data\Services\TypeScriptSourceRegistry;
 
 /**
  * Registers the passive package layer and lazy feature integrations.
@@ -119,8 +120,11 @@ final class AuthServiceProvider extends ServiceProvider
     /**
      * Publish package resources and register operator commands.
      */
-    public function boot(AuthConfiguration $configuration): void
-    {
+    public function boot(
+        AuthConfiguration $configuration,
+        TypeScriptSourceRegistry $typeScriptSources,
+    ): void {
+        $typeScriptSources->register(__DIR__.'/..', 'nvl/auth');
         $this->configureOwnedIdentityStorage();
         $root = dirname(__DIR__, 2);
         $this->publishes([$root.'/config/nvl-auth.php' => config_path('nvl-auth.php')], 'auth-config');

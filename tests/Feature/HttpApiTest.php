@@ -33,10 +33,10 @@ it('serves the authorized client and audit management lifecycle', function (): v
     $created = $this->postJson('/api/v1/auth/clients', [
         'name' => 'Admin Portal',
         'surface' => 'web',
-        'base_url' => 'https://admin.example.test',
-        'return_paths' => ['/dashboard'],
-        'allowed_origins' => ['https://admin.example.test'],
-        'allowed_flows' => ['login'],
+        'baseUrl' => 'https://admin.example.test',
+        'returnPaths' => ['/dashboard'],
+        'allowedOrigins' => ['https://admin.example.test'],
+        'allowedFlows' => ['login'],
         'metadata' => ['owner' => 'platform'],
     ])->assertCreated()->assertJsonPath('code', 'client_created');
     $clientId = $created->json('data.id');

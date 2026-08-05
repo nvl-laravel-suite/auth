@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Nvl\Auth\Http\Controllers\Public;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Nvl\Auth\Actions\Authentication\EstablishAuthenticatedSessionAction;
 use Nvl\Auth\Actions\Passkeys\BeginPasskeyAuthenticationAction;
 use Nvl\Auth\Actions\Passkeys\FinishPasskeyAuthenticationAction;
+use Nvl\Auth\Data\Mutations\FinishPasskeyAuthenticationData;
 use Nvl\Auth\Http\Controllers\Concerns\InteractsWithValidatedInput;
 
 /**
@@ -36,18 +36,11 @@ final class PasskeyController
      * Finish a passkey assertion and establish a Laravel session.
      */
     public function finish(
-        Request $request,
+        FinishPasskeyAuthenticationData $data,
         FinishPasskeyAuthenticationAction $action,
         EstablishAuthenticatedSessionAction $sessions,
     ): JsonResponse {
-        $request->validate([
-            'ceremony_id' => ['required', 'string', 'max:191'],
-            'response' => ['required', 'array'],
-        ]);
-        $reference = $action->execute(
-            $this->stringInput($request, 'ceremony_id'),
-            $this->associativeInput($request, 'response'),
-        );
+        $reference = $action->execute($data);
         $sessions->execute($reference);
 
         return response()->json([

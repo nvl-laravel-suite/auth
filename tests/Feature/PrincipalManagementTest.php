@@ -16,48 +16,48 @@ use Nvl\Auth\Actions\Users\SuggestUsersAction;
 use Nvl\Auth\Actions\Users\SyncUserPermissionsAction;
 use Nvl\Auth\Actions\Users\SyncUserRolesAction;
 use Nvl\Auth\Actions\Users\UpdateProfileAction;
+use Nvl\Auth\Data\Mutations\LoginData;
+use Nvl\Auth\Data\Mutations\StorePermissionData;
+use Nvl\Auth\Data\Mutations\StoreRoleData;
+use Nvl\Auth\Data\Mutations\StoreUserData;
+use Nvl\Auth\Data\Mutations\UpdateProfileData;
 use Nvl\Auth\Enums\UserBulkOperation;
 use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\User;
-use Nvl\Auth\ValueObjects\CreateUserData;
-use Nvl\Auth\ValueObjects\PermissionData;
-use Nvl\Auth\ValueObjects\ProfileData;
-use Nvl\Auth\ValueObjects\RoleData;
 
 it('owns a complete principal lifecycle and fails disabled login closed', function (): void {
     $actor = $this->user('owner@example.test');
-    app(CreatePermissionAction::class)->execute($actor, new PermissionData('documents.read'));
-    app(CreatePermissionAction::class)->execute($actor, new PermissionData('documents.write'));
-    app(CreateRoleAction::class)->execute($actor, new RoleData('editor', permissions: ['documents.read']));
+    $permission = app(CreatePermissionAction::class)->execute($actor, new StorePermissionData('users.create', 'Create Principals'));
+    $role = app(CreateRoleAction::class)->execute($actor, new StoreRoleData('manage', 'Super Administrator', permissions: ['users.create']));
     Event::fake([PrincipalChanged::class]);
 
-    $user = app(CreateUserAction::class)->execute($actor, new CreateUserData(
+    $user = app(CreateUserAction::class)->execute($actor, new StoreUserData(
         name: 'Package User',
         email: 'package.user@example.test',
         password: 'SecurePassword123',
-        roles: ['editor'],
-        permissions: ['documents.write'],
+        roles: ['manage'],
+        permissions: ['users.create'],
         emailVerified: true,
     ));
 
     expect($user)->toBeInstanceOf(User::class)
         ->and($user->getTable())->toBe('nvl_auth_users')
         ->and(Hash::check('SecurePassword123', (string) $user->password))->toBeTrue()
-        ->and($user->hasRole('editor'))->toBeTrue()
-        ->and($user->hasDirectPermission('documents.write'))->toBeTrue();
+        ->and($user->hasRole('manage'))->toBeTrue()
+        ->and($user->hasDirectPermission('users.create'))->toBeTrue();
 
-    $user->createToken('nvl-auth:mobile', ['documents.read']);
+    $user->createToken('nvl-auth:mobile', ['users.create']);
     $disabled = app(SetUserActiveAction::class)->execute($actor, $user, false);
 
     expect($disabled->is_active)->toBeFalse()
         ->and($disabled->tokens()->count())->toBe(0)
-        ->and(fn () => app(LoginAction::class)->execute($user->email, 'SecurePassword123'))
+        ->and(fn () => app(LoginAction::class)->execute(new LoginData($user->email, 'SecurePassword123')))
         ->toThrow(AuthException::class, 'credentials');
 
     app(SetUserActiveAction::class)->execute($actor, $user, true);
     app(SyncUserRolesAction::class)->execute($actor, $user, []);
-    app(SyncUserPermissionsAction::class)->execute($actor, $user, ['documents.read']);
+    app(SyncUserPermissionsAction::class)->execute($actor, $user, ['users.create']);
     app(DeleteUserAction::class)->execute($actor, $user);
 
     expect($user->fresh()->trashed())->toBeTrue();
@@ -66,25 +66,25 @@ it('owns a complete principal lifecycle and fails disabled login closed', functi
 
     expect($restored->trashed())->toBeFalse()
         ->and($restored->is_active)->toBeTrue()
-        ->and($restored->hasDirectPermission('documents.read'))->toBeTrue();
+        ->and($restored->hasDirectPermission('users.create'))->toBeTrue();
 
     Event::assertDispatched(PrincipalChanged::class);
 });
 
 it('supports profile, suggestions, and bounded bulk lifecycle operations', function (): void {
     $actor = $this->user('profile.owner@example.test');
-    $first = app(CreateUserAction::class)->execute($actor, new CreateUserData(
+    $first = app(CreateUserAction::class)->execute($actor, new StoreUserData(
         name: 'Suggested Alpha',
         email: 'alpha@example.test',
         password: 'SecurePassword123',
     ));
-    $second = app(CreateUserAction::class)->execute($actor, new CreateUserData(
+    $second = app(CreateUserAction::class)->execute($actor, new StoreUserData(
         name: 'Suggested Beta',
         email: 'beta@example.test',
         password: 'SecurePassword123',
     ));
 
-    $profile = app(UpdateProfileAction::class)->execute($actor, new ProfileData(
+    $profile = app(UpdateProfileAction::class)->execute($actor, new UpdateProfileData(
         name: 'Updated Owner',
         locale: 'bg',
         timezone: 'Europe/Sofia',
@@ -108,15 +108,15 @@ it('supports profile, suggestions, and bounded bulk lifecycle operations', funct
 });
 
 it('rejects invalid direct principal and RBAC input before persistence', function (): void {
-    expect(fn (): CreateUserData => new CreateUserData(
+    expect(fn (): StoreUserData => new StoreUserData(
         name: 'Invalid Timezone',
         email: 'invalid.timezone@example.test',
         password: 'SecurePassword123',
         timezone: 'Not/A-Timezone',
     ))->toThrow(InvalidArgumentException::class, 'timezone')
-        ->and(fn (): RoleData => new RoleData(
+        ->and(fn (): StoreRoleData => new StoreRoleData(
             name: 'duplicated-permissions',
-            permissions: ['documents.read', 'documents.read'],
+            permissions: ['users.create', 'users.create'],
         ))->toThrow(InvalidArgumentException::class, 'distinct');
 
     expect(User::query()->where('email', 'invalid.timezone@example.test')->exists())->toBeFalse();

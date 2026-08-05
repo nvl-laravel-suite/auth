@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Users;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Data\Mutations\UpdateUserData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\PrincipalChanged;
@@ -15,7 +16,6 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\UserLocator;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Auth\ValueObjects\UpdateUserData;
 
 /**
  * Updates one package principal without changing its access assignment.

@@ -10,9 +10,9 @@ use Nvl\Auth\Actions\Invitations\CreateInvitationAction;
 use Nvl\Auth\Actions\Invitations\ListInvitationsAction;
 use Nvl\Auth\Actions\Invitations\ResendInvitationAction;
 use Nvl\Auth\Actions\Invitations\RevokeInvitationAction;
+use Nvl\Auth\Data\Mutations\StoreInvitationData;
 use Nvl\Auth\Http\Controllers\Account\AuthenticatedController;
 use Nvl\Auth\Models\Invitation;
-use Nvl\Auth\ValueObjects\CreateInvitationData;
 
 /**
  * Handles authorized invitation management transport.
@@ -32,27 +32,10 @@ final class InvitationController extends AuthenticatedController
     /**
      * Issue an invitation and emit its delivery event.
      */
-    public function store(Request $request, CreateInvitationAction $action): JsonResponse
+    public function store(StoreInvitationData $data, Request $request, CreateInvitationAction $action): JsonResponse
     {
-        $request->validate([
-            'recipient' => ['required', 'string', 'max:320'],
-            'type' => ['sometimes', 'string', 'max:80'],
-            'purpose' => ['sometimes', 'string', 'max:120'],
-            'roles' => ['sometimes', 'array'],
-            'roles.*' => ['string', 'max:255'],
-            'permissions' => ['sometimes', 'array'],
-            'permissions.*' => ['string', 'max:255'],
-            'metadata' => ['sometimes', 'array'],
-        ]);
-        $result = $action->execute(new CreateInvitationData(
-            recipient: $this->stringInput($request, 'recipient'),
-            type: $this->optionalStringInput($request, 'type') ?? 'registration',
-            purpose: $this->optionalStringInput($request, 'purpose') ?? 'registration',
-            roles: $this->stringListInput($request, 'roles'),
-            permissions: $this->stringListInput($request, 'permissions'),
-            metadata: $this->associativeInput($request, 'metadata'),
-            locale: $request->getPreferredLanguage(),
-        ), $this->subject($request));
+        $data->locale = $request->getPreferredLanguage();
+        $result = $action->execute($data, $this->subject($request));
 
         return response()->json([
             'data' => ['invitation_id' => $result->invitation->identifier(), 'expires_at' => $result->invitation->expires_at->toIso8601String()],

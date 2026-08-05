@@ -13,6 +13,24 @@ use LogicException;
 trait InteractsWithValidatedInput
 {
     /**
+     * Return request input with string keys for DTO validation.
+     *
+     * @return array<string, mixed>
+     */
+    protected function requestPayload(Request $request): array
+    {
+        $payload = [];
+
+        foreach ($request->all() as $key => $value) {
+            if (is_string($key)) {
+                $payload[$key] = $value;
+            }
+        }
+
+        return $payload;
+    }
+
+    /**
      * Return one required validated string.
      */
     protected function stringInput(Request $request, string $key): string

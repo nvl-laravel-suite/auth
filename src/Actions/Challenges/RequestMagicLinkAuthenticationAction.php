@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Challenges;
 
 use Nvl\Auth\Contracts\AuthIdentifierResolver;
+use Nvl\Auth\Data\Mutations\RequestMagicLinkData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Results\IssuedChallenge;
@@ -36,11 +37,11 @@ final readonly class RequestMagicLinkAuthenticationAction
     /**
      * Resolve an eligible subject and issue a bound login link when one exists.
      */
-    public function execute(string $identifier, ?string $locale = null): ?IssuedChallenge
+    public function execute(RequestMagicLinkData $data, ?string $locale = null): ?IssuedChallenge
     {
         $this->features->assertAllowed(AuthFeature::MagicLinks, FeatureOperation::Issue);
         $identifierName = $this->configuration->string('identifier', 'email');
-        $subject = $this->identifiers->resolve($identifierName, $identifier);
+        $subject = $this->identifiers->resolve($identifierName, $data->recipient);
 
         if ($subject === null) {
             $this->audits->record('magic_links.requested', metadata: ['matched' => false]);
@@ -50,7 +51,7 @@ final readonly class RequestMagicLinkAuthenticationAction
 
         $reference = SubjectReference::fromAuthenticatable($subject);
         $issued = $this->links->execute(
-            $identifier,
+            $data,
             subject: $reference,
             locale: $locale,
         );

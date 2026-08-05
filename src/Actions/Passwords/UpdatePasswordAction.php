@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Contracts\Hashing\Hasher;
 use Nvl\Auth\Contracts\PasswordUpdater;
+use Nvl\Auth\Data\Mutations\UpdatePasswordData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
@@ -36,16 +37,15 @@ final readonly class UpdatePasswordAction
      */
     public function execute(
         Authenticatable&CanResetPassword $subject,
-        #[SensitiveParameter] string $currentPassword,
-        #[SensitiveParameter] string $newPassword,
+        #[SensitiveParameter] UpdatePasswordData $data,
     ): void {
         $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Update);
 
-        if (! $this->hasher->check($currentPassword, (string) $subject->getAuthPassword())) {
+        if (! $this->hasher->check($data->currentPassword, (string) $subject->getAuthPassword())) {
             throw new AuthException('password_invalid', 'The current password is invalid.', 422);
         }
 
-        $this->passwords->update($subject, $newPassword);
+        $this->passwords->update($subject, $data->password);
         $this->audits->record(
             'password.updated',
             subject: SubjectReference::fromAuthenticatable($subject),

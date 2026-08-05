@@ -8,6 +8,7 @@ use Illuminate\Auth\AuthManager;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\StatefulGuard;
 use Nvl\Auth\Contracts\BrowserSession;
+use Nvl\Auth\Data\Mutations\LoginData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\UserAuthenticated;
@@ -44,9 +45,7 @@ final readonly class LoginAction
      * Authenticate one identifier and regenerate the Laravel session identifier.
      */
     public function execute(
-        string $identifier,
-        #[SensitiveParameter] string $password,
-        bool $remember = false,
+        #[SensitiveParameter] LoginData $data,
     ): Authenticatable {
         $this->features->assertAllowed(AuthFeature::Authentication, FeatureOperation::Use);
         $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Use);
@@ -60,7 +59,7 @@ final readonly class LoginAction
             );
         }
 
-        if (! $guard->attempt([$identifierName => $identifier, 'password' => $password], $remember)) {
+        if (! $guard->attempt([$identifierName => $data->identifier, 'password' => $data->password], $data->remember)) {
             $this->audits->record('authentication.failed', outcome: 'failure');
             throw new AuthException('credentials_invalid', 'The supplied credentials are invalid.', 422);
         }
@@ -90,7 +89,7 @@ final readonly class LoginAction
                 'login',
                 new AuthPipelineContext(
                     'login',
-                    ['identifier_name' => $identifierName, 'remember' => $remember],
+                    ['identifier_name' => $identifierName, 'remember' => $data->remember],
                     $reference,
                 ),
                 function () use ($reference, $subject): Authenticatable {

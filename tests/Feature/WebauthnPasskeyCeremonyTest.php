@@ -10,6 +10,8 @@ use Nvl\Auth\Actions\Passkeys\FinishPasskeyAuthenticationAction;
 use Nvl\Auth\Actions\Passkeys\FinishPasskeyRegistrationAction;
 use Nvl\Auth\Adapters\Passkeys\WebauthnPasskeyCeremony;
 use Nvl\Auth\Contracts\PasskeyCeremony;
+use Nvl\Auth\Data\Mutations\FinishPasskeyAuthenticationData;
+use Nvl\Auth\Data\Mutations\FinishPasskeyRegistrationData;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Providers\RouteServiceProvider;
 use Nvl\Auth\Services\AuthConfiguration;
@@ -58,17 +60,14 @@ it('registers and authenticates a real ES256 WebAuthn credential end to end', fu
     $registration = app(BeginPasskeyRegistrationAction::class)->execute($user);
     $passkey = app(FinishPasskeyRegistrationAction::class)->execute(
         $user,
-        $registration->ceremonyId,
-        $authenticator->registrationResponse($registration->options),
-        'Platform authenticator',
+        new FinishPasskeyRegistrationData($registration->ceremonyId, $authenticator->registrationResponse($registration->options), 'Platform authenticator')
     );
     $authentication = app(BeginPasskeyAuthenticationAction::class)->execute();
     $reference = app(FinishPasskeyAuthenticationAction::class)->execute(
-        $authentication->ceremonyId,
-        $authenticator->authenticationResponse(
+        new FinishPasskeyAuthenticationData($authentication->ceremonyId, $authenticator->authenticationResponse(
             $authentication->options,
-            $registration->options['user']['id'],
-        ),
+            $registration->options['user']['id']
+        ))
     );
 
     expect($passkey->credential_id)->toBe($authenticator->credentialId())
@@ -85,13 +84,11 @@ it('supports subject-scoped assertions without a returned user handle', function
     $registration = app(BeginPasskeyRegistrationAction::class)->execute($user);
     app(FinishPasskeyRegistrationAction::class)->execute(
         $user,
-        $registration->ceremonyId,
-        $authenticator->registrationResponse($registration->options),
+        new FinishPasskeyRegistrationData($registration->ceremonyId, $authenticator->registrationResponse($registration->options))
     );
     $authentication = app(BeginPasskeyAuthenticationAction::class)->execute($user);
     $reference = app(FinishPasskeyAuthenticationAction::class)->execute(
-        $authentication->ceremonyId,
-        $authenticator->authenticationResponse($authentication->options, null),
+        new FinishPasskeyAuthenticationData($authentication->ceremonyId, $authenticator->authenticationResponse($authentication->options, null))
     );
 
     expect($authentication->options['allowCredentials'])->toHaveCount(1)
@@ -104,17 +101,15 @@ it('accepts authenticators that do not implement signature counters', function (
     $registration = app(BeginPasskeyRegistrationAction::class)->execute($user);
     $passkey = app(FinishPasskeyRegistrationAction::class)->execute(
         $user,
-        $registration->ceremonyId,
-        $authenticator->registrationResponse($registration->options),
+        new FinishPasskeyRegistrationData($registration->ceremonyId, $authenticator->registrationResponse($registration->options))
     );
     $authentication = app(BeginPasskeyAuthenticationAction::class)->execute();
     $reference = app(FinishPasskeyAuthenticationAction::class)->execute(
-        $authentication->ceremonyId,
-        $authenticator->authenticationResponse(
+        new FinishPasskeyAuthenticationData($authentication->ceremonyId, $authenticator->authenticationResponse(
             $authentication->options,
             $registration->options['user']['id'],
             signatureCounter: 0,
-        ),
+        ))
     );
 
     expect($reference->identifier)->toBe((string) $user->getKey())
@@ -127,19 +122,17 @@ it('rejects wrong origins and invalid assertion signatures behind stable errors'
     $registration = app(BeginPasskeyRegistrationAction::class)->execute($user);
     app(FinishPasskeyRegistrationAction::class)->execute(
         $user,
-        $registration->ceremonyId,
-        $authenticator->registrationResponse($registration->options),
+        new FinishPasskeyRegistrationData($registration->ceremonyId, $authenticator->registrationResponse($registration->options))
     );
     $wrongOrigin = app(BeginPasskeyAuthenticationAction::class)->execute();
 
     try {
         app(FinishPasskeyAuthenticationAction::class)->execute(
-            $wrongOrigin->ceremonyId,
-            $authenticator->authenticationResponse(
+            new FinishPasskeyAuthenticationData($wrongOrigin->ceremonyId, $authenticator->authenticationResponse(
                 $wrongOrigin->options,
                 $registration->options['user']['id'],
                 origin: 'https://attacker.example',
-            ),
+            ))
         );
 
         throw new RuntimeException('The wrong WebAuthn origin was accepted.');
@@ -151,12 +144,11 @@ it('rejects wrong origins and invalid assertion signatures behind stable errors'
     $invalidSignature = app(BeginPasskeyAuthenticationAction::class)->execute();
 
     expect(fn () => app(FinishPasskeyAuthenticationAction::class)->execute(
-        $invalidSignature->ceremonyId,
-        $authenticator->authenticationResponse(
+        new FinishPasskeyAuthenticationData($invalidSignature->ceremonyId, $authenticator->authenticationResponse(
             $invalidSignature->options,
             $registration->options['user']['id'],
             validSignature: false,
-        ),
+        ))
     ))->toThrow(
         AuthException::class,
         'The passkey assertion was rejected.',
@@ -170,19 +162,17 @@ it('rejects invalid challenges RP hashes and required user verification', functi
 
     expect(fn () => app(FinishPasskeyRegistrationAction::class)->execute(
         $unverifiedUser,
-        $unverifiedRegistration->ceremonyId,
-        $authenticator->registrationResponse(
+        new FinishPasskeyRegistrationData($unverifiedRegistration->ceremonyId, $authenticator->registrationResponse(
             $unverifiedRegistration->options,
             userVerified: false,
-        ),
+        ))
     ))->toThrow(AuthException::class, 'The passkey registration was rejected.');
 
     $user = $this->user();
     $registration = app(BeginPasskeyRegistrationAction::class)->execute($user);
     app(FinishPasskeyRegistrationAction::class)->execute(
         $user,
-        $registration->ceremonyId,
-        $authenticator->registrationResponse($registration->options),
+        new FinishPasskeyRegistrationData($registration->ceremonyId, $authenticator->registrationResponse($registration->options))
     );
 
     foreach ([
@@ -193,12 +183,11 @@ it('rejects invalid challenges RP hashes and required user verification', functi
         $authentication = app(BeginPasskeyAuthenticationAction::class)->execute();
 
         expect(fn () => app(FinishPasskeyAuthenticationAction::class)->execute(
-            $authentication->ceremonyId,
-            $authenticator->authenticationResponse(
+            new FinishPasskeyAuthenticationData($authentication->ceremonyId, $authenticator->authenticationResponse(
                 $authentication->options,
                 $registration->options['user']['id'],
                 ...$overrides,
-            ),
+            ))
         ))->toThrow(AuthException::class, 'The passkey assertion was rejected.');
     }
 });
@@ -230,7 +219,7 @@ it('serves the complete built-in registration and authentication HTTP flow', fun
         ->and($registrationId)->toBeString();
 
     $this->postJson('/api/v1/auth/passkeys/registration', [
-        'ceremony_id' => $registrationId,
+        'ceremonyId' => $registrationId,
         'response' => $authenticator->registrationResponse($registrationOptions),
         'name' => 'HTTP passkey',
     ])->assertCreated()->assertJsonPath('code', 'passkey_registered');
@@ -245,7 +234,7 @@ it('serves the complete built-in registration and authentication HTTP flow', fun
         ->and($authenticationId)->toBeString();
 
     $this->postJson('/api/v1/auth/passkeys/authentication', [
-        'ceremony_id' => $authenticationId,
+        'ceremonyId' => $authenticationId,
         'response' => $authenticator->authenticationResponse(
             $authenticationOptions,
             $registrationOptions['user']['id'],

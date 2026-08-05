@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Data\Mutations\UpdatePermissionData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\RbacChanged;
@@ -15,7 +16,6 @@ use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
-use Nvl\Auth\ValueObjects\PermissionData;
 
 /** Updates one package permission. */
 final readonly class UpdatePermissionAction
@@ -29,7 +29,7 @@ final readonly class UpdatePermissionAction
     ) {}
 
     /** Persist one permission mutation. */
-    public function execute(Authenticatable $actor, Permission|string $permission, PermissionData $data): Permission
+    public function execute(Authenticatable $actor, Permission|string $permission, UpdatePermissionData $data): Permission
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
         $this->authorization->authorize($actor, 'nvl-auth.rbac.managePermissions');

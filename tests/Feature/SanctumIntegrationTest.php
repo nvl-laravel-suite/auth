@@ -8,7 +8,7 @@ use Nvl\Auth\Actions\ApiTokens\ListApiTokensAction;
 use Nvl\Auth\Actions\ApiTokens\RevokeAllApiTokensAction;
 use Nvl\Auth\Actions\ApiTokens\RotateApiTokenAction;
 use Nvl\Auth\Actions\ApiTokens\UpdateApiTokenAction;
-use Nvl\Auth\ValueObjects\ApiTokenData;
+use Nvl\Auth\Data\Mutations\ApiTokenData;
 
 it('manages tokens directly through sanctum without an auth projection', function (): void {
     config()->set('nvl-auth.features.api_tokens.enabled', true);

@@ -6,13 +6,13 @@ namespace Nvl\Auth\Actions\Clients;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Data\Mutations\StoreClientData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\AuthClient;
 use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
-use Nvl\Auth\ValueObjects\AuthClientData;
 
 /**
  * Creates one first-party authentication client.
@@ -31,7 +31,7 @@ final readonly class CreateAuthClientAction
     /**
      * Persist a new Auth client.
      */
-    public function execute(Authenticatable $actor, AuthClientData $data): AuthClient
+    public function execute(Authenticatable $actor, StoreClientData $data): AuthClient
     {
         $this->features->assertAllowed(AuthFeature::Clients, FeatureOperation::Issue);
         $this->authorization->authorize($actor, 'nvl-auth.clients.create');

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Nvl\Auth\Http\Controllers\Public;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Nvl\Auth\Actions\Clients\StartAuthClientAction;
+use Nvl\Auth\Data\Mutations\StartClientAuthData;
 use Nvl\Auth\Http\Controllers\Concerns\InteractsWithValidatedInput;
 
 /**
@@ -19,20 +19,9 @@ final class ClientController
     /**
      * Resolve an allowlisted client return URL.
      */
-    public function start(Request $request, StartAuthClientAction $action): JsonResponse
+    public function start(StartClientAuthData $data, StartAuthClientAction $action): JsonResponse
     {
-        $request->validate([
-            'client_id' => ['required', 'uuid'],
-            'flow' => ['required', 'string', 'max:80'],
-            'return_path' => ['required', 'string', 'max:2048'],
-            'origin' => ['sometimes', 'nullable', 'url', 'max:2048'],
-        ]);
-        $result = $action->execute(
-            $this->stringInput($request, 'client_id'),
-            $this->stringInput($request, 'flow'),
-            $this->stringInput($request, 'return_path'),
-            $this->optionalStringInput($request, 'origin'),
-        );
+        $result = $action->execute($data);
 
         return response()->json([
             'data' => ['client_id' => $result->client->identifier(), 'flow' => $result->flow, 'return_url' => $result->returnUrl],

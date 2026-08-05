@@ -12,7 +12,9 @@ use Nvl\Auth\Providers\AuthServiceProvider;
 use Nvl\Auth\Tests\Fixtures\AllowAllManagementAccess;
 use Nvl\Auth\Tests\Fixtures\TestSubjectResolver;
 use Nvl\Auth\Tests\Fixtures\TestUser;
+use Nvl\Data\Providers\DataServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
+use Spatie\LaravelData\LaravelDataServiceProvider;
 use Spatie\Permission\PermissionServiceProvider;
 
 /**
@@ -32,6 +34,8 @@ abstract class TestCase extends Orchestra
         return [
             PermissionServiceProvider::class,
             SanctumServiceProvider::class,
+            LaravelDataServiceProvider::class,
+            DataServiceProvider::class,
             AuthServiceProvider::class,
         ];
     }

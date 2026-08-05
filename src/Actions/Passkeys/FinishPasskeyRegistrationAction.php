@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\PasskeyCeremony;
+use Nvl\Auth\Data\Mutations\FinishPasskeyRegistrationData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
@@ -41,33 +42,27 @@ final readonly class FinishPasskeyRegistrationAction
 
     /**
      * Verify browser response data and persist credential material.
-     *
-     * @param  array<string, mixed>  $response
      */
     public function execute(
         Authenticatable $subject,
-        string $ceremonyId,
-        array $response,
-        ?string $name = null,
+        FinishPasskeyRegistrationData $data,
     ): Passkey {
         $this->features->assertAllowed(AuthFeature::Passkeys, FeatureOperation::Enroll);
-        $this->input->validate($ceremonyId, $response);
-        $this->input->validateName($name);
+        $this->input->validate($data->ceremonyId, $data->response);
+        $this->input->validateName($data->name);
         $reference = SubjectReference::fromAuthenticatable($subject);
         $connection = (new Challenge)->getConnectionName();
 
         try {
             $result = DB::connection($connection)->transaction(function () use (
-                $ceremonyId,
-                $name,
+                $data,
                 $reference,
-                $response,
                 $subject,
             ): Passkey|Throwable {
                 /** @var Challenge|null $challenge */
                 $challenge = Challenge::query()
                     ->where('type', 'passkey_registration')
-                    ->where('secret_hash', $this->hasher->hash('passkey-ceremony', $ceremonyId))
+                    ->where('secret_hash', $this->hasher->hash('passkey-ceremony', $data->ceremonyId))
                     ->lockForUpdate()
                     ->first();
 
@@ -99,7 +94,7 @@ final readonly class FinishPasskeyRegistrationAction
                 $state = is_array($challenge->payload) ? $challenge->payload : [];
 
                 try {
-                    $registration = $this->ceremony->finishRegistration($reference, $state, $response);
+                    $registration = $this->ceremony->finishRegistration($reference, $state, $data->response);
                 } catch (Throwable $exception) {
                     $challenge->increment('attempts');
 
@@ -113,7 +108,7 @@ final readonly class FinishPasskeyRegistrationAction
                 $passkey = Passkey::query()->create([
                     'subject_type' => $reference->type,
                     'subject_id' => $reference->identifier,
-                    'name' => $name,
+                    'name' => $data->name,
                     'credential_id' => $registration->credentialId,
                     'credential_id_hash' => $this->hasher->hash('passkey-credential', $registration->credentialId),
                     'public_key' => $registration->publicKey,
@@ -140,7 +135,7 @@ final readonly class FinishPasskeyRegistrationAction
                 throw $exception;
             }
 
-            $this->commitFailedAttempt($connection, $ceremonyId);
+            $this->commitFailedAttempt($connection, $data->ceremonyId);
 
             throw new AuthException(
                 'passkey_exists',

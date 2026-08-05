@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Http\Controllers\Account;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Nvl\Auth\Actions\ApiTokens\CreateApiTokenAction;
@@ -13,7 +12,7 @@ use Nvl\Auth\Actions\ApiTokens\RevokeAllApiTokensAction;
 use Nvl\Auth\Actions\ApiTokens\RevokeApiTokenAction;
 use Nvl\Auth\Actions\ApiTokens\RotateApiTokenAction;
 use Nvl\Auth\Actions\ApiTokens\UpdateApiTokenAction;
-use Nvl\Auth\ValueObjects\ApiTokenData;
+use Nvl\Auth\Data\Mutations\ApiTokenData;
 use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
 
 /**
@@ -34,9 +33,8 @@ final class ApiTokenController extends AuthenticatedController
     /**
      * Issue one provider token.
      */
-    public function store(Request $request, CreateApiTokenAction $action): JsonResponse
+    public function store(ApiTokenData $data, Request $request, CreateApiTokenAction $action): JsonResponse
     {
-        $data = $this->data($request);
         $issued = $action->execute($this->subject($request), $data);
 
         return response()->json([
@@ -50,11 +48,12 @@ final class ApiTokenController extends AuthenticatedController
      * Update one provider token.
      */
     public function update(
+        ApiTokenData $data,
         Request $request,
         string $tokenId,
         UpdateApiTokenAction $action,
     ): JsonResponse {
-        $token = $action->execute($this->subject($request), $tokenId, $this->data($request));
+        $token = $action->execute($this->subject($request), $tokenId, $data);
 
         return response()->json(['data' => $this->snapshot($token), 'code' => 'api_token_updated', 'message' => 'The API token was updated.']);
     }
@@ -63,11 +62,12 @@ final class ApiTokenController extends AuthenticatedController
      * Rotate one provider token.
      */
     public function rotate(
+        ApiTokenData $data,
         Request $request,
         string $tokenId,
         RotateApiTokenAction $action,
     ): JsonResponse {
-        $issued = $action->execute($this->subject($request), $tokenId, $this->data($request));
+        $issued = $action->execute($this->subject($request), $tokenId, $data);
 
         return response()->json([
             'data' => [...$this->snapshot($issued->token), 'plain_text_token' => $issued->plainTextToken],
@@ -97,26 +97,6 @@ final class ApiTokenController extends AuthenticatedController
         $count = $action->execute($this->subject($request));
 
         return response()->json(['data' => ['count' => $count], 'code' => 'api_tokens_revoked', 'message' => 'API tokens were revoked.']);
-    }
-
-    /**
-     * Validate and create token input.
-     */
-    private function data(Request $request): ApiTokenData
-    {
-        $request->validate([
-            'name' => ['required', 'string', 'max:120'],
-            'abilities' => ['required', 'array', 'min:1', 'max:100'],
-            'abilities.*' => ['required', 'string', 'max:120', 'distinct:strict'],
-            'expires_at' => ['sometimes', 'nullable', 'date', 'after:now'],
-        ]);
-        $expiresAt = $this->optionalStringInput($request, 'expires_at');
-
-        return new ApiTokenData(
-            $this->stringInput($request, 'name'),
-            $this->stringListInput($request, 'abilities'),
-            $expiresAt === null ? null : CarbonImmutable::parse($expiresAt),
-        );
     }
 
     /**

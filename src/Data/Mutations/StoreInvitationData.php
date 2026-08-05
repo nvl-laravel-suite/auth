@@ -2,29 +2,35 @@
 
 declare(strict_types=1);
 
-namespace Nvl\Auth\ValueObjects;
+namespace Nvl\Auth\Data\Mutations;
 
 use InvalidArgumentException;
+use Nvl\Data\Traits\DataTransform;
+use Spatie\LaravelData\Attributes\MapInputName;
+use Spatie\LaravelData\Attributes\MapOutputName;
+use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Mappers\CamelCaseMapper;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
-/**
- * Carries validated input for one invitation issuance.
- */
-final readonly class CreateInvitationData
+#[MapInputName(CamelCaseMapper::class)]
+#[MapOutputName(CamelCaseMapper::class)]
+#[TypeScript]
+final class StoreInvitationData extends Data
 {
+    use DataTransform;
+
     /**
-     * Create invitation input.
-     *
      * @param  list<string>  $roles
      * @param  list<string>  $permissions
      * @param  array<string, mixed>  $metadata
      */
     public function __construct(
-        public string $recipient,
-        public string $type = 'registration',
-        public string $purpose = 'registration',
-        public array $roles = [],
-        public array $permissions = [],
-        public array $metadata = [],
+        public readonly string $recipient,
+        public readonly string $type = 'registration',
+        public readonly string $purpose = 'registration',
+        public readonly array $roles = [],
+        public readonly array $permissions = [],
+        public readonly array $metadata = [],
         public ?string $locale = null,
     ) {
         if (trim($this->recipient) === '' || mb_strlen($this->recipient) > 320) {
@@ -43,17 +49,28 @@ final readonly class CreateInvitationData
         }
 
         $encodedMetadata = json_encode($this->metadata);
-
         if (! is_string($encodedMetadata) || strlen($encodedMetadata) > 16_384) {
             throw new InvalidArgumentException('Invitation metadata must be JSON-serializable and no larger than 16 KiB.');
         }
     }
 
-    /**
-     * Determine whether an untrusted role or permission name is valid.
-     */
     private static function validGrant(mixed $grant): bool
     {
         return is_string($grant) && trim($grant) !== '' && mb_strlen($grant) <= 255;
+    }
+
+    /** @return array<string, list<string>> */
+    public static function rules(): array
+    {
+        return [
+            'recipient' => ['required', 'string', 'max:320'],
+            'type' => ['sometimes', 'string', 'max:80'],
+            'purpose' => ['sometimes', 'string', 'max:120'],
+            'roles' => ['sometimes', 'array'],
+            'roles.*' => ['string', 'max:255'],
+            'permissions' => ['sometimes', 'array'],
+            'permissions.*' => ['string', 'max:255'],
+            'metadata' => ['sometimes', 'array'],
+        ];
     }
 }

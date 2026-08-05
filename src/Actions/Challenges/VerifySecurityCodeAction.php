@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Actions\Challenges;
 
+use Nvl\Auth\Data\Mutations\VerifySecurityCodeData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -26,16 +27,16 @@ final readonly class VerifySecurityCodeAction
     /**
      * Consume a matching security code.
      */
-    public function execute(string $recipient, string $purpose, string $code): Challenge
+    public function execute(VerifySecurityCodeData $data): Challenge
     {
         $this->features->assertAllowed(AuthFeature::SecurityCodes, FeatureOperation::Use);
 
         return $this->challenges->execute(
             AuthFeature::SecurityCodes,
             AuthMessageType::SecurityCode,
-            $recipient,
-            $purpose,
-            $code,
+            $data->recipient,
+            $data->purpose,
+            $data->code,
         );
     }
 }

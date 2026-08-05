@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Totp;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Data\Mutations\ConfirmTotpEnrollmentData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
@@ -37,13 +38,13 @@ final readonly class ConfirmTotpEnrollmentAction
     public function execute(
         Authenticatable $subject,
         TotpCredential $credential,
-        #[SensitiveParameter] string $code,
+        #[SensitiveParameter] ConfirmTotpEnrollmentData $data,
     ): TotpCredential {
         $this->features->assertAllowed(AuthFeature::Totp, FeatureOperation::Enroll);
         $reference = SubjectReference::fromAuthenticatable($subject);
 
         return DB::connection($credential->getConnectionName())->transaction(function () use (
-            $code,
+            $data,
             $credential,
             $reference,
             $subject,
@@ -58,7 +59,7 @@ final readonly class ConfirmTotpEnrollmentAction
                 throw new AuthException('totp_unavailable', 'The TOTP credential is unavailable.', 404);
             }
 
-            $timestep = $this->totp->acceptedTimestep($locked, $code);
+            $timestep = $this->totp->acceptedTimestep($locked, $data->code);
 
             if ($timestep === null) {
                 throw new AuthException('totp_invalid', 'The TOTP code is invalid.', 422);

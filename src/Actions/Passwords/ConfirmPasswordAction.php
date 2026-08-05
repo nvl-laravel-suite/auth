@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Passwords;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Hashing\Hasher;
 use Nvl\Auth\Contracts\BrowserSession;
+use Nvl\Auth\Data\Mutations\ConfirmPasswordData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
@@ -35,13 +36,13 @@ final readonly class ConfirmPasswordAction
      */
     public function execute(
         Authenticatable $subject,
-        #[SensitiveParameter] string $password,
+        #[SensitiveParameter] ConfirmPasswordData $data,
     ): void {
         $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Use);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Use);
         $reference = SubjectReference::fromAuthenticatable($subject);
 
-        if (! $this->hasher->check($password, (string) $subject->getAuthPassword())) {
+        if (! $this->hasher->check($data->password, (string) $subject->getAuthPassword())) {
             $this->audits->record(
                 'password.confirmation_failed',
                 outcome: 'failure',

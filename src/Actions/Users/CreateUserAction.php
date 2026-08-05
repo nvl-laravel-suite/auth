@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Users;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Data\Mutations\StoreUserData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\PrincipalChanged;
@@ -15,7 +16,6 @@ use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacManager;
-use Nvl\Auth\ValueObjects\CreateUserData;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
@@ -33,7 +33,7 @@ final readonly class CreateUserAction
     ) {}
 
     /** Persist a principal and optional RBAC assignment atomically. */
-    public function execute(Authenticatable $actor, CreateUserData $data): User
+    public function execute(Authenticatable $actor, StoreUserData $data): User
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Issue);
         $this->authorization->authorize($actor, 'nvl-auth.users.create');

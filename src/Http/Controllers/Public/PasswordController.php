@@ -8,6 +8,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Nvl\Auth\Actions\Passwords\RequestPasswordResetAction;
 use Nvl\Auth\Actions\Passwords\ResetPasswordAction;
+use Nvl\Auth\Data\Mutations\RequestPasswordResetData;
+use Nvl\Auth\Data\Mutations\ResetPasswordData;
 use Nvl\Auth\Http\Controllers\Concerns\InteractsWithValidatedInput;
 
 /**
@@ -21,11 +23,11 @@ final class PasswordController
      * Create a password broker token and emit a delivery request.
      */
     public function requestReset(
+        RequestPasswordResetData $data,
         Request $request,
         RequestPasswordResetAction $action,
     ): JsonResponse {
-        $request->validate(['identifier' => ['required', 'string', 'max:255']]);
-        $action->execute($this->stringInput($request, 'identifier'), $request->getPreferredLanguage());
+        $action->execute($data, $request->getPreferredLanguage());
 
         return response()->json([
             'data' => null,
@@ -37,18 +39,9 @@ final class PasswordController
     /**
      * Consume a password broker token.
      */
-    public function reset(Request $request, ResetPasswordAction $action): JsonResponse
+    public function reset(ResetPasswordData $data, ResetPasswordAction $action): JsonResponse
     {
-        $request->validate([
-            'identifier' => ['required', 'string', 'max:255'],
-            'token' => ['required', 'string', 'max:255'],
-            'password' => ['required', 'string', 'min:8', 'max:4096', 'confirmed'],
-        ]);
-        $action->execute(
-            $this->stringInput($request, 'identifier'),
-            $this->stringInput($request, 'token'),
-            $this->stringInput($request, 'password'),
-        );
+        $action->execute($data);
 
         return response()->json([
             'data' => null,

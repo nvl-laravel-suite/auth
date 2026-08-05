@@ -7,13 +7,13 @@ use Nvl\Auth\Actions\Invitations\AcceptInvitationAction;
 use Nvl\Auth\Actions\Invitations\CreateInvitationAction;
 use Nvl\Auth\Actions\Invitations\RevokeInvitationAction;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
+use Nvl\Auth\Data\Mutations\StoreInvitationData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\User;
-use Nvl\Auth\ValueObjects\CreateInvitationData;
 
 beforeEach(function (): void {
     config()->set('nvl-auth.features.invitations.enabled', true);
@@ -24,7 +24,7 @@ it('issues consumes and audits a simple invitation without delivery persistence'
     $actor = $this->user('actor@example.test');
     $consumer = $this->user('consumer@example.test');
     $issued = app(CreateInvitationAction::class)->execute(
-        new CreateInvitationData('consumer@example.test'),
+        new StoreInvitationData('consumer@example.test'),
         $actor,
     );
 
@@ -44,7 +44,7 @@ it('issues consumes and audits a simple invitation without delivery persistence'
 
 it('revokes invitations while the feature is disabled', function (): void {
     $actor = $this->user('actor@example.test');
-    $issued = app(CreateInvitationAction::class)->execute(new CreateInvitationData('invitee@example.test'), $actor);
+    $issued = app(CreateInvitationAction::class)->execute(new StoreInvitationData('invitee@example.test'), $actor);
     config()->set('nvl-auth.features.invitations.enabled', false);
 
     $revoked = app(RevokeInvitationAction::class)->execute($issued->invitation, $actor);
@@ -56,7 +56,7 @@ it('revokes invitations while the feature is disabled', function (): void {
 
 it('enforces one active invitation per recipient and purpose while preserving history', function (): void {
     $actor = $this->user('actor@example.test');
-    $data = new CreateInvitationData('invitee@example.test');
+    $data = new StoreInvitationData('invitee@example.test');
     $first = app(CreateInvitationAction::class)->execute($data, $actor);
 
     expect(fn () => app(CreateInvitationAction::class)->execute($data, $actor))
@@ -72,7 +72,7 @@ it('enforces one active invitation per recipient and purpose while preserving hi
 it('provisions the package principal out of the box for public invitation acceptance', function (): void {
     $actor = $this->user('invitation.owner@example.test');
     $issued = app(CreateInvitationAction::class)->execute(
-        new CreateInvitationData('new.invitee@example.test'),
+        new StoreInvitationData('new.invitee@example.test'),
         $actor,
     );
     $subject = app(InvitationSubjectResolver::class)->resolve($issued->invitation, [

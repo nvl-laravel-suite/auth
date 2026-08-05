@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Actions\Challenges;
 
+use Nvl\Auth\Data\Mutations\ConsumeMagicLinkData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -26,16 +27,16 @@ final readonly class ConsumeMagicLinkAction
     /**
      * Consume a matching magic link.
      */
-    public function execute(string $recipient, string $token, string $purpose = 'login'): Challenge
+    public function execute(ConsumeMagicLinkData $data, string $purpose = 'login'): Challenge
     {
         $this->features->assertAllowed(AuthFeature::MagicLinks, FeatureOperation::Use);
 
         return $this->challenges->execute(
             AuthFeature::MagicLinks,
             AuthMessageType::MagicLink,
-            $recipient,
+            $data->recipient,
             $purpose,
-            $token,
+            $data->token,
         );
     }
 }

@@ -29,7 +29,7 @@ it('serves configurable principal profile and RBAC APIs without Inertia', functi
 
     $permission = $this->postJson('/api/v1/auth/permissions', [
         'name' => 'articles.publish',
-        'display_name' => 'Publish articles',
+        'displayName' => 'Publish articles',
         'group' => 'articles',
         'system' => true,
     ])->assertCreated()->assertJsonPath('code', 'permission_created');
@@ -45,11 +45,13 @@ it('serves configurable principal profile and RBAC APIs without Inertia', functi
         'roles' => ['publisher'],
     ])->assertCreated()->assertJsonPath('code', 'user_created');
     $userId = $user->json('data.id');
+    $permissionId = $permission->json('data.id');
+    $roleId = $role->json('data.id');
 
     expect($permission->json('data.id'))->toBeString()
-        ->and($permission->json('data.is_system'))->toBeFalse()
+        ->and($permission->json('data.is_system'))->toBeTrue()
         ->and($role->json('data.id'))->toBeString()
-        ->and($role->json('data.is_system'))->toBeFalse()
+        ->and($role->json('data.is_system'))->toBeTrue()
         ->and($userId)->toBeString()
         ->and(Route::has('nvl.auth.account.profile.update'))->toBeTrue()
         ->and(Route::has('nvl.auth.management.users.bulk'))->toBeTrue()
@@ -58,6 +60,29 @@ it('serves configurable principal profile and RBAC APIs without Inertia', functi
     $this->getJson('/api/v1/auth/users?search=API%20User')
         ->assertOk()
         ->assertJsonPath('data.total', 1);
+    $this->getJson('/api/v1/auth/users?perPage=1')
+        ->assertOk()
+        ->assertJsonPath('data.per_page', 1);
+    $this->getJson('/api/v1/auth/roles?perPage=1')
+        ->assertOk()
+        ->assertJsonPath('data.per_page', 1);
+    $this->putJson("/api/v1/auth/permissions/{$permissionId}", [
+        'name' => 'articles.publish',
+        'displayName' => 'Publish articles',
+        'group' => 'articles',
+        'system' => true,
+    ])->assertOk()
+        ->assertJsonPath('code', 'permission_updated');
+    $this->putJson("/api/v1/auth/roles/{$roleId}", [
+        'name' => 'publisher',
+        'permissions' => ['articles.publish'],
+        'system' => true,
+    ])->assertOk()
+        ->assertJsonPath('code', 'role_updated');
+    $this->putJson("/api/v1/auth/users/{$userId}", [
+        'email' => 'api.user@example.test',
+    ])->assertOk()
+        ->assertJsonPath('code', 'user_updated');
     $this->patchJson('/api/v1/auth/profile', [
         'name' => 'API Owner Updated',
         'locale' => 'en',
@@ -71,4 +96,8 @@ it('serves configurable principal profile and RBAC APIs without Inertia', functi
     $this->getJson('/api/v1/auth/roles/analytics')
         ->assertOk()
         ->assertJsonPath('data.roles', 1);
+
+    $this->getJson('/api/v1/auth/users?perPage=0')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('perPage');
 });

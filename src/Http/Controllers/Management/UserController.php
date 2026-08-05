@@ -18,15 +18,16 @@ use Nvl\Auth\Actions\Users\SuggestUsersAction;
 use Nvl\Auth\Actions\Users\SyncUserPermissionsAction;
 use Nvl\Auth\Actions\Users\SyncUserRolesAction;
 use Nvl\Auth\Actions\Users\UpdateUserAction;
+use Nvl\Auth\Data\Mutations\StoreUserData;
+use Nvl\Auth\Data\Mutations\UpdateUserData;
+use Nvl\Auth\Data\Mutations\UpdateUserStatusData;
+use Nvl\Auth\Data\Queries\UserIndexQueryData;
+use Nvl\Auth\Data\Queries\UserSuggestionQueryData;
 use Nvl\Auth\Enums\UserBulkOperation;
 use Nvl\Auth\Http\Controllers\Account\AuthenticatedController;
 use Nvl\Auth\Http\Requests\BulkUserRequest;
-use Nvl\Auth\Http\Requests\StoreUserRequest;
 use Nvl\Auth\Http\Requests\SyncUserPermissionsRequest;
 use Nvl\Auth\Http\Requests\SyncUserRolesRequest;
-use Nvl\Auth\Http\Requests\UpdateUserRequest;
-use Nvl\Auth\ValueObjects\CreateUserData;
-use Nvl\Auth\ValueObjects\UpdateUserData;
 
 /** Handles package-owned principal management API transport. */
 final class UserController extends AuthenticatedController
@@ -34,20 +35,14 @@ final class UserController extends AuthenticatedController
     /** List principals. */
     public function index(Request $request, ListUsersAction $action): JsonResponse
     {
-        $request->validate([
-            'search' => ['sometimes', 'string', 'max:160'],
-            'active' => ['sometimes', 'boolean'],
-            'trashed' => ['sometimes', 'in:without,with,only'],
-            'role' => ['sometimes', 'string', 'max:160'],
-            'per_page' => ['sometimes', 'integer', 'between:1,100'],
-        ]);
+        $query = UserIndexQueryData::validateAndCreate($request->all());
         $page = $action->execute(
             $this->subject($request),
-            $this->optionalStringInput($request, 'search'),
-            $request->has('active') ? $request->boolean('active') : null,
-            $this->optionalStringInput($request, 'trashed') ?? 'without',
-            $this->optionalStringInput($request, 'role'),
-            (int) $request->integer('per_page', 25),
+            $query->search,
+            $query->active,
+            $query->trashed ?? 'without',
+            $query->role,
+            $query->perPage ?? 25,
         );
 
         return response()->json(['data' => $page, 'code' => 'users_listed', 'message' => 'Users were listed.']);
@@ -56,13 +51,13 @@ final class UserController extends AuthenticatedController
     /** Return minimal principal suggestions. */
     public function suggestions(Request $request, SuggestUsersAction $action): JsonResponse
     {
-        $request->validate(['search' => ['required', 'string', 'min:1', 'max:160'], 'limit' => ['sometimes', 'integer', 'between:1,100']]);
+        $query = UserSuggestionQueryData::validateAndCreate($request->all());
 
         return response()->json([
             'data' => $action->execute(
                 $this->subject($request),
-                $this->stringInput($request, 'search'),
-                $request->has('limit') ? (int) $request->integer('limit') : null,
+                $query->search,
+                $query->limit,
             ),
             'code' => 'user_suggestions_listed',
             'message' => 'User suggestions were listed.',
@@ -70,21 +65,16 @@ final class UserController extends AuthenticatedController
     }
 
     /** Create a principal. */
-    public function store(StoreUserRequest $request, CreateUserAction $action): JsonResponse
+    public function store(StoreUserData $data, Request $request, CreateUserAction $action): JsonResponse
     {
-        $user = $action->execute($this->subject($request), new CreateUserData(
-            name: $this->stringInput($request, 'name'),
-            email: $this->stringInput($request, 'email'),
-            password: $this->optionalStringInput($request, 'password'),
-            active: $request->missing('active') || $request->boolean('active'),
-            locale: $this->optionalStringInput($request, 'locale') ?? Config::string('nvl-auth.features.principal_management.settings.default_locale', 'en'),
-            timezone: $this->optionalStringInput($request, 'timezone') ?? Config::string('nvl-auth.features.principal_management.settings.default_timezone', 'UTC'),
-            profile: $this->associativeInput($request, 'profile'),
-            preferences: $this->associativeInput($request, 'preferences'),
-            roles: $this->stringListInput($request, 'roles'),
-            permissions: $this->stringListInput($request, 'permissions'),
-            emailVerified: $request->boolean('email_verified'),
-        ));
+        if (! $request->has('locale')) {
+            $data->locale = Config::string('nvl-auth.features.principal_management.settings.default_locale', 'en');
+        }
+        if (! $request->has('timezone')) {
+            $data->timezone = Config::string('nvl-auth.features.principal_management.settings.default_timezone', 'UTC');
+        }
+
+        $user = $action->execute($this->subject($request), $data);
 
         return response()->json(['data' => $user, 'code' => 'user_created', 'message' => 'The user was created.'], 201);
     }
@@ -100,27 +90,18 @@ final class UserController extends AuthenticatedController
     }
 
     /** Update one principal. */
-    public function update(UpdateUserRequest $request, string $user, UpdateUserAction $action): JsonResponse
+    public function update(Request $request, string $user, UpdateUserAction $action): JsonResponse
     {
-        $updated = $action->execute($this->subject($request), $user, new UpdateUserData(
-            name: $this->optionalStringInput($request, 'name'),
-            email: $this->optionalStringInput($request, 'email'),
-            password: $this->optionalStringInput($request, 'password'),
-            locale: $this->optionalStringInput($request, 'locale'),
-            timezone: $this->optionalStringInput($request, 'timezone'),
-            profile: $request->has('profile') ? $this->associativeInput($request, 'profile') : null,
-            preferences: $request->has('preferences') ? $this->associativeInput($request, 'preferences') : null,
-            emailVerified: $request->has('email_verified') ? $request->boolean('email_verified') : null,
-        ));
+        $data = UpdateUserData::validateForUpdate($this->requestPayload($request), $user);
+        $updated = $action->execute($this->subject($request), $user, $data);
 
         return response()->json(['data' => $updated, 'code' => 'user_updated', 'message' => 'The user was updated.']);
     }
 
     /** Enable or disable one principal. */
-    public function status(Request $request, string $user, SetUserActiveAction $action): JsonResponse
+    public function status(UpdateUserStatusData $data, Request $request, string $user, SetUserActiveAction $action): JsonResponse
     {
-        $request->validate(['active' => ['required', 'boolean']]);
-        $updated = $action->execute($this->subject($request), $user, $request->boolean('active'));
+        $updated = $action->execute($this->subject($request), $user, $data->active);
 
         return response()->json([
             'data' => $updated,

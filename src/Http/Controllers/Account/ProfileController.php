@@ -8,8 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Nvl\Auth\Actions\Users\ShowProfileAction;
 use Nvl\Auth\Actions\Users\UpdateProfileAction;
-use Nvl\Auth\Http\Requests\UpdateProfileRequest;
-use Nvl\Auth\ValueObjects\ProfileData;
+use Nvl\Auth\Data\Mutations\UpdateProfileData;
 
 /** Handles package-owned self-service profile transport. */
 final class ProfileController extends AuthenticatedController
@@ -24,16 +23,9 @@ final class ProfileController extends AuthenticatedController
         ]);
     }
 
-    /** Update the authenticated principal profile. */
-    public function update(UpdateProfileRequest $request, UpdateProfileAction $action): JsonResponse
+    public function update(UpdateProfileData $data, Request $request, UpdateProfileAction $action): JsonResponse
     {
-        $user = $action->execute($this->subject($request), new ProfileData(
-            name: $this->stringInput($request, 'name'),
-            locale: $this->stringInput($request, 'locale'),
-            timezone: $this->stringInput($request, 'timezone'),
-            profile: $this->associativeInput($request, 'profile'),
-            preferences: $this->associativeInput($request, 'preferences'),
-        ));
+        $user = $action->execute($this->subject($request), $data);
 
         return response()->json([
             'data' => $user,

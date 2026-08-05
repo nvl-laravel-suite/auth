@@ -9,6 +9,7 @@ use Illuminate\Auth\Passwords\PasswordBrokerManager;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Support\Str;
+use Nvl\Auth\Data\Mutations\RequestPasswordResetData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -40,17 +41,17 @@ final readonly class RequestPasswordResetAction
     /**
      * Request a reset without revealing whether the identifier exists.
      */
-    public function execute(string $identifier, ?string $locale = null): void
+    public function execute(RequestPasswordResetData $data, ?string $locale = null): void
     {
         $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Issue);
         $identifierName = $this->configuration->string('identifier', 'email');
         $this->pipeline->run(
             'password_reset_requested',
             new AuthPipelineContext('password_reset_requested', ['identifier_name' => $identifierName]),
-            function () use ($identifier, $identifierName, $locale): void {
+            function () use ($data, $identifierName, $locale): void {
                 $brokerName = $this->configuration->get('password_broker');
                 $broker = $this->brokers->broker(is_string($brokerName) ? $brokerName : null);
-                $subject = $broker->getUser([$identifierName => $identifier]);
+                $subject = $broker->getUser([$identifierName => $data->identifier]);
 
                 if (! $subject instanceof CanResetPassword) {
                     $this->audits->record('password.reset_requested', metadata: ['matched' => false]);
@@ -72,7 +73,7 @@ final readonly class RequestPasswordResetAction
                     feature: AuthFeature::Password,
                     type: AuthMessageType::PasswordReset,
                     recipient: $subject->getEmailForPasswordReset(),
-                    payload: ['token' => $token, 'identifier' => $identifier],
+                    payload: ['token' => $token, 'identifier' => $data->identifier],
                     expiresAt: $expiresAt,
                     locale: $locale,
                 ));

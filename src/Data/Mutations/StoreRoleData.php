@@ -2,31 +2,40 @@
 
 declare(strict_types=1);
 
-namespace Nvl\Auth\ValueObjects;
+namespace Nvl\Auth\Data\Mutations;
 
+use Illuminate\Support\Facades\Config;
+use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 use JsonException;
+use Nvl\Data\Traits\DataTransform;
+use Spatie\LaravelData\Attributes\MapInputName;
+use Spatie\LaravelData\Attributes\MapOutputName;
+use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Mappers\CamelCaseMapper;
+use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
-/**
- * Carries role details and its canonical permission assignment.
- */
-final readonly class RoleData
+#[MapInputName(CamelCaseMapper::class)]
+#[MapOutputName(CamelCaseMapper::class)]
+#[TypeScript]
+/** Validated creation mutation for one managed role. */
+final class StoreRoleData extends Data
 {
+    use DataTransform;
+
     /**
-     * Create role input.
-     *
      * @param  list<string>  $permissions
      * @param  array<string, mixed>  $metadata
      */
     public function __construct(
-        public string $name,
-        public ?string $displayName = null,
-        public ?string $description = null,
-        public ?string $parentId = null,
-        public int $priority = 0,
-        public bool $system = false,
-        public array $permissions = [],
-        public array $metadata = [],
+        public readonly string $name,
+        public readonly ?string $displayName = null,
+        public readonly ?string $description = null,
+        public readonly ?string $parentId = null,
+        public readonly int $priority = 0,
+        public readonly bool $system = false,
+        public readonly array $permissions = [],
+        public readonly array $metadata = [],
     ) {
         if (trim($this->name) === '' || mb_strlen($this->name) > 160) {
             throw new InvalidArgumentException('Role names must contain between one and 160 characters.');
@@ -53,7 +62,6 @@ final readonly class RoleData
         }
 
         $seen = [];
-
         foreach ($this->permissions as $permission) {
             if (trim($permission) === '' || mb_strlen($permission) > 160) {
                 throw new InvalidArgumentException('Role permission names must contain between one and 160 characters.');
@@ -67,13 +75,37 @@ final readonly class RoleData
         }
 
         try {
-            $metadata = json_encode($this->metadata, JSON_THROW_ON_ERROR);
+            $encodedMetadata = json_encode($this->metadata, JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw new InvalidArgumentException('Role metadata must be JSON serializable.', previous: $exception);
         }
 
-        if (strlen($metadata) > 65_535) {
+        if (strlen($encodedMetadata) > 65_535) {
             throw new InvalidArgumentException('Role metadata must not exceed 65,535 encoded bytes.');
         }
+    }
+
+    /** @return array<string, list<mixed>> */
+    public static function rules(): array
+    {
+        $roles = Config::string('nvl-auth.tables.roles', 'nvl_auth_roles');
+        $permissions = Config::string('nvl-auth.tables.permissions', 'nvl_auth_permissions');
+        $guard = Config::string('nvl-auth.features.rbac.settings.guard', 'web');
+
+        return [
+            'name' => [
+                'required',
+                'string',
+                'max:160',
+                Rule::unique($roles, 'name')->where('guard_name', $guard),
+            ],
+            'displayName' => ['nullable', 'string', 'max:160'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'parentId' => ['nullable', 'uuid', "exists:{$roles},id"],
+            'priority' => ['sometimes', 'integer', 'between:-100000,100000'],
+            'permissions' => ['sometimes', 'array', 'max:500'],
+            'permissions.*' => ['string', 'distinct', "exists:{$permissions},name"],
+            'metadata' => ['sometimes', 'array', 'max:100'],
+        ];
     }
 }

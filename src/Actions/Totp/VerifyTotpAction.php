@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Totp;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Data\Mutations\VerifyTotpData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
@@ -36,13 +37,13 @@ final readonly class VerifyTotpAction
      */
     public function execute(
         Authenticatable $subject,
-        #[SensitiveParameter] string $code,
+        #[SensitiveParameter] VerifyTotpData $data,
     ): TotpCredential {
         $this->features->assertAllowed(AuthFeature::Totp, FeatureOperation::Use);
         $reference = SubjectReference::fromAuthenticatable($subject);
         $connection = (new TotpCredential)->getConnectionName();
 
-        $result = DB::connection($connection)->transaction(function () use ($code, $reference, $subject): AuthException|TotpCredential {
+        $result = DB::connection($connection)->transaction(function () use ($data, $reference, $subject): AuthException|TotpCredential {
             $credentials = TotpCredential::query()
                 ->where('subject_type', $reference->type)
                 ->where('subject_id', $reference->identifier)
@@ -52,7 +53,7 @@ final readonly class VerifyTotpAction
                 ->get();
 
             foreach ($credentials as $credential) {
-                $timestep = $this->totp->acceptedTimestep($credential, $code);
+                $timestep = $this->totp->acceptedTimestep($credential, $data->code);
 
                 if ($timestep === null) {
                     continue;

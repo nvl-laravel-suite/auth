@@ -16,11 +16,12 @@ use Nvl\Auth\Actions\Rbac\ListRoleTemplatesAction;
 use Nvl\Auth\Actions\Rbac\ShowRbacAnalyticsAction;
 use Nvl\Auth\Actions\Rbac\ShowRoleAction;
 use Nvl\Auth\Actions\Rbac\UpdateRoleAction;
+use Nvl\Auth\Data\Mutations\StoreRoleData;
+use Nvl\Auth\Data\Mutations\UpdateRoleData;
+use Nvl\Auth\Data\Queries\RoleIndexQueryData;
 use Nvl\Auth\Http\Controllers\Account\AuthenticatedController;
 use Nvl\Auth\Http\Requests\ApplyRoleTemplateRequest;
 use Nvl\Auth\Http\Requests\CloneRoleRequest;
-use Nvl\Auth\Http\Requests\StoreRoleRequest;
-use Nvl\Auth\ValueObjects\RoleData;
 
 /** Handles package-owned role, hierarchy, template, and analytics transport. */
 final class RoleController extends AuthenticatedController
@@ -28,10 +29,10 @@ final class RoleController extends AuthenticatedController
     /** List roles. */
     public function index(Request $request, ListRolesAction $action): JsonResponse
     {
-        $request->validate(['search' => ['sometimes', 'string', 'max:160'], 'per_page' => ['sometimes', 'integer', 'between:1,100']]);
+        $query = RoleIndexQueryData::validateAndCreate($request->all());
 
         return response()->json([
-            'data' => $action->execute($this->subject($request), $this->optionalStringInput($request, 'search'), (int) $request->integer('per_page', 25)),
+            'data' => $action->execute($this->subject($request), $query->search, $query->perPage ?? 25),
             'code' => 'roles_listed',
             'message' => 'Roles were listed.',
         ]);
@@ -56,10 +57,10 @@ final class RoleController extends AuthenticatedController
     }
 
     /** Create a role. */
-    public function store(StoreRoleRequest $request, CreateRoleAction $action): JsonResponse
+    public function store(StoreRoleData $data, Request $request, CreateRoleAction $action): JsonResponse
     {
         return response()->json([
-            'data' => $action->execute($this->subject($request), $this->data($request)),
+            'data' => $action->execute($this->subject($request), $data),
             'code' => 'role_created',
             'message' => 'The role was created.',
         ], 201);
@@ -72,9 +73,11 @@ final class RoleController extends AuthenticatedController
     }
 
     /** Update one role. */
-    public function update(StoreRoleRequest $request, string $role, UpdateRoleAction $action): JsonResponse
+    public function update(Request $request, string $role, UpdateRoleAction $action): JsonResponse
     {
-        return response()->json(['data' => $action->execute($this->subject($request), $role, $this->data($request)), 'code' => 'role_updated', 'message' => 'The role was updated.']);
+        $data = UpdateRoleData::validateForUpdate($this->requestPayload($request), $role);
+
+        return response()->json(['data' => $action->execute($this->subject($request), $role, $data), 'code' => 'role_updated', 'message' => 'The role was updated.']);
     }
 
     /** Clone one role. */
@@ -108,20 +111,5 @@ final class RoleController extends AuthenticatedController
         $action->execute($this->subject($request), $role);
 
         return response()->json(['data' => null, 'code' => 'role_deleted', 'message' => 'The role was deleted.']);
-    }
-
-    /** Build role input from validated transport data. */
-    private function data(StoreRoleRequest $request): RoleData
-    {
-        return new RoleData(
-            name: $this->stringInput($request, 'name'),
-            displayName: $this->optionalStringInput($request, 'display_name'),
-            description: $this->optionalStringInput($request, 'description'),
-            parentId: $this->optionalStringInput($request, 'parent_id'),
-            priority: (int) $request->integer('priority', 0),
-            system: false,
-            permissions: $this->stringListInput($request, 'permissions'),
-            metadata: $this->associativeInput($request, 'metadata'),
-        );
     }
 }

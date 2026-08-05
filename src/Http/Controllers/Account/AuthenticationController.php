@@ -12,6 +12,8 @@ use Nvl\Auth\Actions\Authentication\LogoutAction;
 use Nvl\Auth\Actions\Authentication\RequestEmailVerificationAction;
 use Nvl\Auth\Actions\Passwords\ConfirmPasswordAction;
 use Nvl\Auth\Actions\Passwords\UpdatePasswordAction;
+use Nvl\Auth\Data\Mutations\ConfirmPasswordData;
+use Nvl\Auth\Data\Mutations\UpdatePasswordData;
 use Nvl\Auth\Exceptions\AuthException;
 
 /**
@@ -32,12 +34,11 @@ final class AuthenticationController extends AuthenticatedController
     /**
      * Change the current subject's password.
      */
-    public function updatePassword(Request $request, UpdatePasswordAction $action): JsonResponse
-    {
-        $request->validate([
-            'current_password' => ['required', 'string', 'max:4096'],
-            'password' => ['required', 'string', 'min:8', 'max:4096', 'confirmed'],
-        ]);
+    public function updatePassword(
+        UpdatePasswordData $data,
+        Request $request,
+        UpdatePasswordAction $action,
+    ): JsonResponse {
         $subject = $this->subject($request);
 
         if (! $subject instanceof CanResetPassword) {
@@ -46,8 +47,7 @@ final class AuthenticationController extends AuthenticatedController
 
         $action->execute(
             $subject,
-            $this->stringInput($request, 'current_password'),
-            $this->stringInput($request, 'password'),
+            $data,
         );
 
         return response()->json(['data' => null, 'code' => 'password_updated', 'message' => 'The password was updated.']);
@@ -56,10 +56,9 @@ final class AuthenticationController extends AuthenticatedController
     /**
      * Confirm the current password in Laravel's browser session.
      */
-    public function confirmPassword(Request $request, ConfirmPasswordAction $action): JsonResponse
+    public function confirmPassword(ConfirmPasswordData $data, Request $request, ConfirmPasswordAction $action): JsonResponse
     {
-        $request->validate(['password' => ['required', 'string', 'max:4096']]);
-        $action->execute($this->subject($request), $this->stringInput($request, 'password'));
+        $action->execute($this->subject($request), $data);
 
         return response()->json([
             'data' => null,

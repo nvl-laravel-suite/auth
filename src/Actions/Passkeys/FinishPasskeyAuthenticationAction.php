@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Passkeys;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\PasskeyCeremony;
+use Nvl\Auth\Data\Mutations\FinishPasskeyAuthenticationData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
@@ -40,20 +41,18 @@ final readonly class FinishPasskeyAuthenticationAction
 
     /**
      * Verify one browser assertion and return the owning host subject reference.
-     *
-     * @param  array<string, mixed>  $response
      */
-    public function execute(string $ceremonyId, array $response): SubjectReference
+    public function execute(FinishPasskeyAuthenticationData $data): SubjectReference
     {
         $this->features->assertAllowed(AuthFeature::Passkeys, FeatureOperation::Use);
-        $this->input->validate($ceremonyId, $response);
+        $this->input->validate($data->ceremonyId, $data->response);
         $connection = (new Challenge)->getConnectionName();
 
-        $result = DB::connection($connection)->transaction(function () use ($ceremonyId, $response): SubjectReference|Throwable {
+        $result = DB::connection($connection)->transaction(function () use ($data): SubjectReference|Throwable {
             /** @var Challenge|null $challenge */
             $challenge = Challenge::query()
                 ->where('type', 'passkey_authentication')
-                ->where('secret_hash', $this->hasher->hash('passkey-ceremony', $ceremonyId))
+                ->where('secret_hash', $this->hasher->hash('passkey-ceremony', $data->ceremonyId))
                 ->lockForUpdate()
                 ->first();
 
@@ -64,7 +63,7 @@ final readonly class FinishPasskeyAuthenticationAction
             $state = is_array($challenge->payload) ? $challenge->payload : [];
 
             try {
-                $credentialId = $this->ceremony->credentialId($response);
+                $credentialId = $this->ceremony->credentialId($data->response);
             } catch (Throwable $exception) {
                 $challenge->increment('attempts');
 
@@ -95,7 +94,7 @@ final readonly class FinishPasskeyAuthenticationAction
             try {
                 $assertion = $this->ceremony->finishAuthentication(
                     $state,
-                    $response,
+                    $data->response,
                     new PasskeyCredential(
                         credentialId: $passkey->credential_id,
                         publicKey: $passkey->public_key,

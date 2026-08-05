@@ -11,6 +11,8 @@ use Nvl\Auth\Actions\Authentication\RequestEmailVerificationAction;
 use Nvl\Auth\Actions\Authentication\VerifyEmailAction;
 use Nvl\Auth\Actions\Passwords\ConfirmPasswordAction;
 use Nvl\Auth\Contracts\AuthAuditContextProvider;
+use Nvl\Auth\Data\Mutations\ConfirmPasswordData;
+use Nvl\Auth\Data\Mutations\LoginData;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Events\UserAuthenticated;
 use Nvl\Auth\Events\UserLoggedOut;
@@ -22,7 +24,7 @@ use Nvl\Auth\Tests\Fixtures\RejectLoginStage;
 it('logs in and out through the configured Laravel stateful guard', function (): void {
     $user = $this->user();
     Event::fake([UserAuthenticated::class, UserLoggedOut::class]);
-    $authenticated = app(LoginAction::class)->execute($user->email, 'correct-password');
+    $authenticated = app(LoginAction::class)->execute(new LoginData($user->email, 'correct-password'));
 
     expect($authenticated->getAuthIdentifier())->toBe($user->getAuthIdentifier())
         ->and(Auth::guard('web')->check())->toBeTrue()
@@ -67,10 +69,10 @@ it('confirms the current password through Laravel session authority', function (
     $request = app('request');
     $request->setLaravelSession(app('session')->driver());
 
-    expect(fn () => app(ConfirmPasswordAction::class)->execute($user, 'wrong-password'))
+    expect(fn () => app(ConfirmPasswordAction::class)->execute($user, new ConfirmPasswordData('wrong-password')))
         ->toThrow(AuthException::class, 'invalid');
 
-    app(ConfirmPasswordAction::class)->execute($user, 'correct-password');
+    app(ConfirmPasswordAction::class)->execute($user, new ConfirmPasswordData('correct-password'));
 
     expect($request->session()->get('auth.password_confirmed_at'))->toBeInt()
         ->and(AuthAudit::query()->where('action', 'password.confirmed')->exists())->toBeTrue();
@@ -81,7 +83,7 @@ it('runs the login pipeline after credential resolution and logs out rejected su
     RejectLoginStage::$subject = null;
     config()->set('nvl-auth.pipelines.login', [RejectLoginStage::class]);
 
-    expect(fn () => app(LoginAction::class)->execute($user->email, 'correct-password'))
+    expect(fn () => app(LoginAction::class)->execute(new LoginData($user->email, 'correct-password')))
         ->toThrow(AuthException::class, 'rejected');
 
     expect(RejectLoginStage::$subject?->identifier)->toBe((string) $user->getKey())
@@ -90,7 +92,7 @@ it('runs the login pipeline after credential resolution and logs out rejected su
 
 it('authorizes audit detail access with decrypted metadata', function (): void {
     $user = $this->user();
-    app(LoginAction::class)->execute($user->email, 'correct-password');
+    app(LoginAction::class)->execute(new LoginData($user->email, 'correct-password'));
     $audit = AuthAudit::query()->where('action', 'authentication.succeeded')->sole();
 
     expect(app(ShowAuthAuditAction::class)->execute($user, $audit)->is($audit))->toBeTrue()

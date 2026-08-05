@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Data\Mutations\StoreRoleData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\RbacChanged;
@@ -17,7 +18,6 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
 use Nvl\Auth\Services\RoleHierarchy;
-use Nvl\Auth\ValueObjects\RoleData;
 
 /** Creates one package role and permission assignment. */
 final readonly class CreateRoleAction
@@ -34,7 +34,7 @@ final readonly class CreateRoleAction
     ) {}
 
     /** Persist one role. */
-    public function execute(Authenticatable $actor, RoleData $data): Role
+    public function execute(Authenticatable $actor, StoreRoleData $data): Role
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Issue);
         $this->authorization->authorize($actor, 'nvl-auth.rbac.manageRoles');

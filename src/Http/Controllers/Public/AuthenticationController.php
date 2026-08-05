@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Nvl\Auth\Http\Controllers\Public;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Nvl\Auth\Actions\Authentication\LoginAction;
+use Nvl\Auth\Data\Mutations\LoginData;
 use Nvl\Auth\Http\Controllers\Concerns\InteractsWithValidatedInput;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
@@ -20,18 +20,9 @@ final class AuthenticationController
     /**
      * Authenticate one browser user.
      */
-    public function login(Request $request, LoginAction $action): JsonResponse
+    public function login(LoginData $data, LoginAction $action): JsonResponse
     {
-        $request->validate([
-            'identifier' => ['required', 'string', 'max:255'],
-            'password' => ['required', 'string', 'max:4096'],
-            'remember' => ['sometimes', 'boolean'],
-        ]);
-        $subject = $action->execute(
-            $this->stringInput($request, 'identifier'),
-            $this->stringInput($request, 'password'),
-            $request->boolean('remember'),
-        );
+        $subject = $action->execute($data);
         $reference = SubjectReference::fromAuthenticatable($subject);
 
         return response()->json([

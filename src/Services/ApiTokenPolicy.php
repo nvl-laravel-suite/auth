@@ -6,8 +6,8 @@ namespace Nvl\Auth\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Contracts\ApiTokenAbilityProvider;
+use Nvl\Auth\Data\Mutations\ApiTokenData;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Auth\ValueObjects\ApiTokenData;
 
 /**
  * Enforces the host's API-token ability catalog.

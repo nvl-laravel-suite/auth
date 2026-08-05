@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Users;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Data\Mutations\UpdateProfileData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\PrincipalChanged;
@@ -13,7 +14,6 @@ use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\UserLocator;
-use Nvl\Auth\ValueObjects\ProfileData;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
@@ -29,7 +29,7 @@ final readonly class UpdateProfileAction
     ) {}
 
     /** Persist self-service profile changes. */
-    public function execute(Authenticatable $subject, ProfileData $data): User
+    public function execute(Authenticatable $subject, UpdateProfileData $data): User
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Update);
         $user = $this->users->authenticated($subject);

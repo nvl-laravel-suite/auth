@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Challenges;
 
 use Carbon\CarbonImmutable;
+use Nvl\Auth\Data\Mutations\RequestMagicLinkData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -33,8 +34,7 @@ final readonly class RequestMagicLinkAction
      * @param  array<string, mixed>  $payload
      */
     public function execute(
-        string $recipient,
-        string $purpose = 'login',
+        RequestMagicLinkData $data,
         ?SubjectReference $subject = null,
         array $payload = [],
         ?string $locale = null,
@@ -44,8 +44,8 @@ final readonly class RequestMagicLinkAction
         return $this->challenges->execute(
             feature: AuthFeature::MagicLinks,
             messageType: AuthMessageType::MagicLink,
-            recipient: $recipient,
-            purpose: $purpose,
+            recipient: $data->recipient,
+            purpose: $data->purpose ?? 'login',
             expiresAt: CarbonImmutable::now()->addMinutes(
                 $this->configuration->integerBetween('features.magic_links.settings.ttl_minutes', 15, 1, 10_080),
             ),

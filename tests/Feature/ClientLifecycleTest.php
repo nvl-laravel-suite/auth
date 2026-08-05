@@ -8,10 +8,11 @@ use Nvl\Auth\Actions\Clients\RecordAuthClientSessionAction;
 use Nvl\Auth\Actions\Clients\SetAuthClientActiveAction;
 use Nvl\Auth\Actions\Clients\ShowAuthClientAction;
 use Nvl\Auth\Actions\Clients\StartAuthClientAction;
+use Nvl\Auth\Data\Mutations\StartClientAuthData;
+use Nvl\Auth\Data\Mutations\StoreClientData;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\AuthClientSession;
-use Nvl\Auth\ValueObjects\AuthClientData;
 
 beforeEach(function (): void {
     config()->set('nvl-auth.features.clients.enabled', true);
@@ -19,7 +20,7 @@ beforeEach(function (): void {
 
 it('manages clients and correlates rather than replaces Laravel sessions', function (): void {
     $actor = $this->user('actor@example.test');
-    $client = app(CreateAuthClientAction::class)->execute($actor, new AuthClientData(
+    $client = app(CreateAuthClientAction::class)->execute($actor, new StoreClientData(
         name: 'Admin Portal',
         surface: 'web',
         baseUrl: 'https://admin.example.test',
@@ -28,10 +29,12 @@ it('manages clients and correlates rather than replaces Laravel sessions', funct
         allowedFlows: ['login'],
     ));
     $start = app(StartAuthClientAction::class)->execute(
-        (string) $client->getKey(),
-        'login',
-        '/dashboard',
-        'https://admin.example.test',
+        new StartClientAuthData(
+            (string) $client->getKey(),
+            'login',
+            '/dashboard',
+            'https://admin.example.test',
+        )
     );
     $session = app(RecordAuthClientSessionAction::class)->execute(
         $client,
@@ -66,7 +69,7 @@ it('manages clients and correlates rather than replaces Laravel sessions', funct
 
 it('requires configured origins and rejects correlations for inactive clients', function (): void {
     $actor = $this->user('manager@example.test');
-    $client = app(CreateAuthClientAction::class)->execute($actor, new AuthClientData(
+    $client = app(CreateAuthClientAction::class)->execute($actor, new StoreClientData(
         name: 'Portal',
         surface: 'web',
         baseUrl: 'https://portal.example.test',
@@ -75,9 +78,11 @@ it('requires configured origins and rejects correlations for inactive clients', 
     ));
 
     expect(fn () => app(StartAuthClientAction::class)->execute(
-        $client->identifier(),
-        'login',
-        '/home',
+        new StartClientAuthData(
+            $client->identifier(),
+            'login',
+            '/home',
+        )
     ))->toThrow(AuthException::class, 'origin');
 
     app(SetAuthClientActiveAction::class)->execute($actor, $client, false);
