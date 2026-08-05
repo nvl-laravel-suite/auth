@@ -1,0 +1,19 @@
+includes:
+    - ../../../vendor/larastan/larastan/extension.neon
+    - ../../../vendor/nesbot/carbon/extension.neon
+
+parameters:
+    excludePaths:
+        analyseAndScan:
+            - .temp/*
+
+    paths:
+        - src
+        - database/factories
+        - database/migrations
+
+    level: max
+
+    checkModelProperties: true
+
+    tmpDir: .temp/phpstan

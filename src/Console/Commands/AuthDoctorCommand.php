@@ -1,0 +1,897 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Nvl\Auth\Console\Commands;
+
+use Illuminate\Console\Command;
+use Illuminate\Contracts\Auth\Access\Gate as GateContract;
+use Illuminate\Contracts\Config\Repository as ConfigRepository;
+use Illuminate\Contracts\Container\Container;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Schema;
+use Nvl\Auth\Adapters\ApiTokens\SanctumApiTokenManager;
+use Nvl\Auth\Contracts\ApiTokenAbilityProvider;
+use Nvl\Auth\Contracts\ApiTokenManager;
+use Nvl\Auth\Contracts\AuthAuditContextProvider;
+use Nvl\Auth\Contracts\AuthIdentifierResolver;
+use Nvl\Auth\Contracts\AuthManagementAccess;
+use Nvl\Auth\Contracts\AuthPipelineStage;
+use Nvl\Auth\Contracts\AuthSubjectResolver;
+use Nvl\Auth\Contracts\BrowserSession;
+use Nvl\Auth\Contracts\InvitationSubjectResolver;
+use Nvl\Auth\Contracts\PasskeyCeremony;
+use Nvl\Auth\Contracts\PasswordUpdater;
+use Nvl\Auth\Contracts\SocialIdentityProvider;
+use Nvl\Auth\Contracts\SocialSubjectResolver;
+use Nvl\Auth\Enums\AuthFeature;
+use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
+use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Services\FeatureManifest;
+use Nvl\Auth\Services\LaravelGateAuthManagementAccess;
+use Nvl\Auth\Services\SocialProviderConfiguration;
+use Nvl\Auth\Services\UnavailableApiTokenManager;
+use Nvl\Auth\Services\UnavailableAuthSubjectResolver;
+use Nvl\Auth\Services\UnavailableInvitationSubjectResolver;
+use Nvl\Auth\Services\UnavailableSocialIdentityProvider;
+use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
+use Nvl\Auth\ValueObjects\FeatureDefinition;
+use ReflectionMethod;
+use Throwable;
+
+/**
+ * Validates schema ownership and enabled integration readiness.
+ */
+final class AuthDoctorCommand extends Command
+{
+    private const PIPELINES = [
+        'login',
+        'logout',
+        'password_reset_requested',
+        'password_reset',
+        'invitation_issued',
+        'invitation_accepted',
+        'client_started',
+        'api_token_issued',
+    ];
+
+    private const CONFIGURABLE_TABLES = [
+        'nvl_auth_users' => 'users',
+        'nvl_auth_permissions' => 'permissions',
+        'nvl_auth_roles' => 'roles',
+        'nvl_auth_model_has_permissions' => 'model_has_permissions',
+        'nvl_auth_model_has_roles' => 'model_has_roles',
+        'nvl_auth_role_has_permissions' => 'role_has_permissions',
+        'nvl_auth_personal_access_tokens' => 'personal_access_tokens',
+        'nvl_auth_password_reset_tokens' => 'password_reset_tokens',
+    ];
+
+    private const TABLE_COLUMNS = [
+        'nvl_auth_users' => ['id', 'name', 'email', 'email_verified_at', 'password', 'is_active', 'locale', 'timezone', 'profile', 'preferences', 'last_login_at', 'last_login_ip', 'locked_until', 'remember_token', 'created_at', 'updated_at', 'deleted_at'],
+        'nvl_auth_permissions' => ['id', 'name', 'guard_name', 'display_name', 'description', 'group', 'is_system', 'metadata', 'created_at', 'updated_at'],
+        'nvl_auth_roles' => ['id', 'name', 'guard_name', 'display_name', 'description', 'parent_id', 'priority', 'is_system', 'metadata', 'created_at', 'updated_at'],
+        'nvl_auth_model_has_permissions' => ['permission_id', 'model_type', 'model_id'],
+        'nvl_auth_model_has_roles' => ['role_id', 'model_type', 'model_id'],
+        'nvl_auth_role_has_permissions' => ['permission_id', 'role_id'],
+        'nvl_auth_personal_access_tokens' => ['id', 'tokenable_type', 'tokenable_id', 'name', 'token', 'abilities', 'last_used_at', 'expires_at', 'created_at', 'updated_at'],
+        'nvl_auth_password_reset_tokens' => ['email', 'token', 'created_at'],
+        'nvl_auth_clients' => ['id', 'name', 'surface', 'base_url', 'return_paths', 'allowed_origins', 'allowed_flows', 'metadata', 'is_active', 'last_used_at', 'created_at', 'updated_at'],
+        'nvl_auth_client_sessions' => ['id', 'client_id', 'subject_type', 'subject_id', 'session_id_hash', 'ip_address', 'user_agent', 'metadata', 'authenticated_at', 'last_seen_at', 'ended_at', 'end_reason', 'created_at', 'updated_at'],
+        'nvl_auth_invitations' => ['id', 'token_hash', 'active_key', 'recipient', 'recipient_hash', 'type', 'purpose', 'inviter_type', 'inviter_id', 'accepted_by_type', 'accepted_by_id', 'roles', 'permissions', 'metadata', 'resend_count', 'last_sent_at', 'expires_at', 'accepted_at', 'revoked_at', 'created_at', 'updated_at'],
+        'nvl_auth_challenges' => ['id', 'type', 'purpose', 'subject_type', 'subject_id', 'recipient_hash', 'secret_hash', 'active_key', 'payload', 'attempts', 'max_attempts', 'expires_at', 'consumed_at', 'revoked_at', 'created_at', 'updated_at'],
+        'nvl_auth_totp_credentials' => ['id', 'subject_type', 'subject_id', 'name', 'secret', 'algorithm', 'digits', 'period', 'allowed_drift', 'last_accepted_timestep', 'confirmed_at', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'],
+        'nvl_auth_passkeys' => ['id', 'subject_type', 'subject_id', 'name', 'credential_id', 'credential_id_hash', 'public_key', 'user_handle', 'signature_counter', 'transports', 'backup_eligible', 'backed_up', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'],
+        'nvl_auth_recovery_codes' => ['id', 'batch_id', 'subject_type', 'subject_id', 'code_hash', 'used_at', 'revoked_at', 'created_at', 'updated_at'],
+        'nvl_auth_social_identities' => ['id', 'subject_type', 'subject_id', 'provider', 'provider_user_id', 'provider_user_id_hash', 'email', 'profile', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'],
+        'nvl_auth_audits' => ['id', 'action', 'outcome', 'subject_type', 'subject_id', 'actor_type', 'actor_id', 'client_id', 'ip_address', 'user_agent', 'request_id', 'metadata', 'created_at', 'updated_at'],
+    ];
+
+    private const LEGACY_TABLES = [
+        'auth_clients',
+        'auth_client_sessions',
+        'auth_invitations',
+        'auth_challenges',
+        'auth_totp_credentials',
+        'auth_passkeys',
+        'auth_recovery_codes',
+        'auth_social_identities',
+        'auth_audits',
+        'auth_principals',
+        'auth_contacts',
+        'auth_flows',
+        'auth_sessions',
+        'auth_api_tokens',
+        'auth_deliveries',
+        'auth_delivery_attempts',
+        'auth_delivery_payloads',
+        'auth_security_events',
+        'auth_security_event_contexts',
+        'auth_outbox_messages',
+        'auth_maintenance_checkpoints',
+        'auth_recovery_password_updates',
+    ];
+
+    /** @var string */
+    protected $signature = 'nvl:auth:doctor
+        {--strict : Fail for configured integrations owned by disabled features}
+        {--format=text : Output format: text or json}';
+
+    /** @var string */
+    protected $description = 'Validate NVL Auth schema and enabled feature readiness';
+
+    /**
+     * Execute package readiness diagnostics.
+     */
+    public function handle(
+        AuthConfiguration $configuration,
+        FeatureManifest $manifest,
+        FeatureGate $features,
+        Router $router,
+        Container $container,
+    ): int {
+        $format = $this->option('format');
+
+        if (! is_string($format) || ! in_array($format, ['text', 'json'], true)) {
+            $this->components->error('The --format option must be text or json.');
+
+            return self::INVALID;
+        }
+
+        $checks = [];
+        $connection = $configuration->get('connection');
+        $schema = Schema::connection(is_string($connection) && $connection !== '' ? $connection : null);
+
+        foreach (self::TABLE_COLUMNS as $defaultTable => $columns) {
+            $table = $this->configuredTable($configuration, $defaultTable);
+            $exists = $schema->hasTable($table);
+            $checks[] = $this->check("schema.{$table}", $exists, "Required table [{$table}] is missing.");
+            $checks[] = $this->check(
+                "schema.{$table}.columns",
+                $exists && $schema->hasColumns($table, $columns),
+                "Required table [{$table}] is partial or outdated.",
+            );
+        }
+
+        foreach (self::LEGACY_TABLES as $table) {
+            if ($schema->hasTable($table)) {
+                $checks[] = $this->check("legacy.{$table}", false, "Legacy overreaching table [{$table}] still exists.");
+            }
+        }
+
+        $appKey = config('app.key');
+        $checks[] = $this->check('security.app_key', is_string($appKey) && $appKey !== '', 'APP_KEY is required for hashing and encrypted casts.');
+        $checks[] = $this->check(
+            'configuration.pipelines',
+            $this->pipelinesReady($configuration, $container),
+            'Auth pipelines contain an unknown pipeline or invalid stage.',
+        );
+        $checks[] = $this->check(
+            'configuration.models',
+            $this->ownedModelsReady($container),
+            'Configured User, Role, Permission, or PersonalAccessToken models do not extend their package model.',
+        );
+
+        if ($configuration->boolean('features.principal_management.settings.use_as_auth_model', true)) {
+            $checks[] = $this->check(
+                'configuration.auth_provider',
+                $this->authProviderReady($configuration, $container),
+                'The configured guard provider is not using the selected package User model.',
+            );
+        }
+
+        if ((bool) $this->option('strict')) {
+            foreach ($this->dormantIntegrations($configuration) as $path) {
+                $checks[] = $this->check(
+                    "dormant.{$path}",
+                    false,
+                    "Disabled features must not retain integration configuration [{$path}] in strict mode.",
+                );
+            }
+        }
+
+        if ($configuration->featureEnabled(AuthFeature::Password)) {
+            $checks[] = $this->check(
+                'contract.password_updater',
+                $this->integration($container, PasswordUpdater::class) instanceof PasswordUpdater,
+                'Password operations require a valid password updater.',
+            );
+        }
+
+        if ($configuration->featureEnabled(AuthFeature::Sessions)) {
+            $checks[] = $this->check(
+                'contract.browser_session',
+                $this->integration($container, BrowserSession::class) instanceof BrowserSession,
+                'Session operations require a valid browser-session adapter.',
+            );
+        }
+
+        if ($configuration->featureEnabled(AuthFeature::Audit)) {
+            $checks[] = $this->check(
+                'contract.audit_context',
+                $this->integration($container, AuthAuditContextProvider::class) instanceof AuthAuditContextProvider,
+                'Audit recording requires a valid context provider.',
+            );
+        }
+
+        if ($configuration->featureEnabled(AuthFeature::MagicLinks)) {
+            $checks[] = $this->check(
+                'contract.identifier_resolver',
+                $this->integration($container, AuthIdentifierResolver::class) instanceof AuthIdentifierResolver,
+                'Magic-link authentication requires a valid identifier resolver.',
+            );
+        }
+
+        if ($configuration->featureEnabled(AuthFeature::EmailVerification)) {
+            $checks[] = $this->check(
+                'contract.email_verification_subject_resolver',
+                $this->integration($container, AuthSubjectResolver::class) instanceof AuthSubjectResolver,
+                'Public email verification requires a valid subject resolver.',
+            );
+        }
+
+        foreach ($manifest->definitions() as $definition) {
+            if (! $configuration->featureEnabled($definition->feature)) {
+                continue;
+            }
+
+            foreach ($definition->dependencies as $dependency) {
+                $checks[] = $this->check(
+                    "dependency.{$definition->feature->value}.{$dependency->value}",
+                    $configuration->featureEnabled($dependency),
+                    "Feature [{$definition->feature->value}] requires [{$dependency->value}].",
+                );
+            }
+
+            foreach ($definition->routeDependencies as $surface => $dependencies) {
+                if (! $this->routeSurfaceConfigured($configuration, $definition->feature, $surface)) {
+                    continue;
+                }
+
+                foreach ($dependencies as $dependency) {
+                    $checks[] = $this->check(
+                        "route_dependency.{$definition->feature->value}.{$surface}.{$dependency->value}",
+                        $configuration->featureEnabled($dependency),
+                        "Feature [{$definition->feature->value}] {$surface} routes require [{$dependency->value}].",
+                    );
+                }
+            }
+        }
+
+        if ($configuration->featureEnabled(AuthFeature::ApiTokens)) {
+            $apiTokens = $this->integration($container, ApiTokenManager::class);
+            $abilityProvider = $this->integration($container, ApiTokenAbilityProvider::class);
+            $checks[] = $this->check('adapter.api_tokens', $apiTokens !== null && ! $apiTokens instanceof UnavailableApiTokenManager, 'API tokens require a configured provider adapter.');
+            $checks[] = $this->check(
+                'contract.api_token_abilities',
+                $this->apiTokenAbilitiesReady($configuration, $abilityProvider),
+                'API tokens require a non-empty static ability catalog or a custom ability provider.',
+            );
+
+            if ($apiTokens instanceof SanctumApiTokenManager) {
+                $namespace = $configuration->get('features.api_tokens.settings.namespace');
+                $checks[] = $this->check(
+                    'configuration.api_token_namespace',
+                    is_string($namespace)
+                        && preg_match('/\A[a-z0-9][a-z0-9_.-]{0,39}\z/', $namespace) === 1,
+                    'The Sanctum adapter requires a valid package token namespace.',
+                );
+                $checks[] = $this->check(
+                    'schema.personal_access_tokens',
+                    $this->sanctumStorageReady(),
+                    'The Sanctum adapter requires package-owned nvl_auth_personal_access_tokens storage.',
+                );
+            }
+        }
+
+        if ($configuration->featureEnabled(AuthFeature::SocialIdentities)) {
+            $socialIdentities = $this->integration($container, SocialIdentityProvider::class);
+            $socialSubjects = $this->integration($container, SocialSubjectResolver::class);
+            $checks[] = $this->check('adapter.social_identities', $socialIdentities !== null && ! $socialIdentities instanceof UnavailableSocialIdentityProvider, 'Social identities require a configured acquisition adapter.');
+            $checks[] = $this->check('contract.social_subject_resolver', $socialSubjects !== null && ! $socialSubjects instanceof UnavailableSocialSubjectResolver, 'Social login requires a configured principal resolver.');
+            $checks[] = $this->check(
+                'social.providers',
+                $this->hasConfiguredSocialProvider($configuration, $container),
+                'Social identities require at least one configured provider.',
+            );
+        }
+
+        if ($configuration->featureEnabled(AuthFeature::Passkeys)) {
+            $passkeys = $this->integration($container, PasskeyCeremony::class);
+            $subjects = $this->integration($container, AuthSubjectResolver::class);
+            $checks[] = $this->check(
+                'adapter.passkeys',
+                $passkeys instanceof PasskeyCeremony,
+                'The configured or built-in passkey ceremony implementation could not be resolved.',
+            );
+            $checks[] = $this->check('contract.auth_subject_resolver', $subjects !== null && ! $subjects instanceof UnavailableAuthSubjectResolver, 'Passwordless login requires a configured principal resolver.');
+            $relyingPartyId = $configuration->get('features.passkeys.settings.relying_party_id');
+            $origins = $configuration->get('features.passkeys.settings.origins', []);
+            $checks[] = $this->check(
+                'passkeys.relying_party_id',
+                $this->validRelyingPartyId($relyingPartyId),
+                'Passkeys require a valid hostname-only relying-party ID.',
+            );
+            $checks[] = $this->check(
+                'passkeys.origins',
+                $this->validOrigins($origins, $relyingPartyId),
+                'Passkeys require HTTPS origins matching the relying-party ID.',
+            );
+            $maximumCredentials = $configuration->get('features.passkeys.settings.max_credentials_per_subject');
+            $checks[] = $this->check(
+                'passkeys.max_credentials_per_subject',
+                is_int($maximumCredentials) && $maximumCredentials >= 1 && $maximumCredentials <= 100,
+                'Passkeys require a credential limit between 1 and 100.',
+            );
+            $checks[] = $this->check(
+                'passkeys.require_user_verification',
+                is_bool($configuration->get('features.passkeys.settings.require_user_verification')),
+                'Passkey user-verification policy must be boolean.',
+            );
+            $checks[] = $this->check(
+                'passkeys.relying_party_name',
+                $this->boundedString($configuration->get('features.passkeys.settings.relying_party_name'), 255),
+                'Passkeys require a relying-party name of at most 255 characters.',
+            );
+            $checks[] = $this->check(
+                'passkeys.allow_subdomains',
+                is_bool($configuration->get('features.passkeys.settings.allow_subdomains')),
+                'Passkey subdomain policy must be boolean.',
+            );
+            $timeout = $configuration->get('features.passkeys.settings.timeout_ms');
+            $ttl = $configuration->get('features.passkeys.settings.ceremony_ttl_seconds');
+            $checks[] = $this->check(
+                'passkeys.timeout_ms',
+                is_int($timeout) && $timeout >= 1_000 && $timeout <= 600_000,
+                'Passkey browser timeout must be between 1,000 and 600,000 milliseconds.',
+            );
+            $checks[] = $this->check(
+                'passkeys.ceremony_ttl_seconds',
+                is_int($ttl)
+                    && $ttl >= 60
+                    && $ttl <= 900
+                    && is_int($timeout)
+                    && $ttl * 1_000 >= $timeout,
+                'Passkey ceremony TTL must be 60 to 900 seconds and cover the browser timeout.',
+            );
+            $checks[] = $this->check(
+                'passkeys.resident_key',
+                in_array(
+                    $configuration->get('features.passkeys.settings.resident_key'),
+                    ['required', 'preferred', 'discouraged'],
+                    true,
+                ),
+                'Passkey resident-key policy must be required, preferred, or discouraged.',
+            );
+            $checks[] = $this->check(
+                'passkeys.username_attribute',
+                $this->boundedString($configuration->get('features.passkeys.settings.username_attribute'), 255),
+                'Passkeys require a configured principal username attribute.',
+            );
+            $checks[] = $this->check(
+                'passkeys.display_name_attribute',
+                $this->boundedString($configuration->get('features.passkeys.settings.display_name_attribute'), 255),
+                'Passkeys require a configured principal display-name attribute.',
+            );
+            $checks[] = $this->check(
+                'passkeys.user_handle_key',
+                $this->validPasskeyUserHandleKey($configuration, $container),
+                'Passkeys require at least 32 bytes of user-handle key material or Laravel APP_KEY.',
+            );
+        }
+
+        if ($configuration->featureEnabled(AuthFeature::Invitations)
+            && $this->routeSurfaceConfigured($configuration, AuthFeature::Invitations, 'public')) {
+            $invitationSubjects = $this->integration($container, InvitationSubjectResolver::class);
+            $checks[] = $this->check('contract.invitation_subject_resolver', $invitationSubjects !== null && ! $invitationSubjects instanceof UnavailableInvitationSubjectResolver, 'Public invitations require a configured principal resolver.');
+        }
+
+        if ($configuration->featureEnabled(AuthFeature::Rbac)) {
+            $spatieTables = $this->spatieTables();
+            $checks[] = $this->check(
+                'configuration.spatie_tables',
+                count($spatieTables) === 5,
+                'RBAC requires the complete Spatie Permission table configuration.',
+            );
+
+            foreach ($spatieTables as $table) {
+                $checks[] = $this->check(
+                    "schema.spatie.{$table}",
+                    $schema->hasTable($table),
+                    "RBAC requires Spatie Permission table [{$table}].",
+                );
+            }
+        }
+
+        foreach ($this->managementAbilities($configuration, $manifest) as $ability) {
+            $checks[] = $this->check(
+                "authorization.{$ability}",
+                $this->managementAbilityReady($configuration, $container, $ability),
+                "Management routes require package RBAC or Laravel Gate authorization for [{$ability}].",
+            );
+        }
+
+        $expectedRoutes = $this->expectedRoutes($configuration, $manifest, $features);
+        $actualRoutes = array_values(array_filter(
+            array_keys($router->getRoutes()->getRoutesByName()),
+            static fn (string $name): bool => str_starts_with($name, 'nvl.auth.'),
+        ));
+        sort($expectedRoutes);
+        sort($actualRoutes);
+        $checks[] = $this->check(
+            'routes.inventory',
+            $expectedRoutes === $actualRoutes,
+            'Auth route inventory differs from configuration; rebuild route and configuration caches.',
+        );
+
+        $failed = count(array_filter($checks, static fn (array $check): bool => ! $check['passed']));
+
+        if ($format === 'json') {
+            $this->line((string) json_encode(['ready' => $failed === 0, 'checks' => $checks], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+        } else {
+            $this->table(['Check', 'Result', 'Message'], array_map(static fn (array $check): array => [
+                $check['name'],
+                $check['passed'] ? 'PASS' : 'FAIL',
+                $check['message'],
+            ], $checks));
+        }
+
+        return $failed === 0 ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * Inspect Sanctum's configured token model without making it a core dependency.
+     */
+    private function sanctumStorageReady(): bool
+    {
+        $sanctum = 'Laravel\\Sanctum\\Sanctum';
+
+        if (! class_exists($sanctum)) {
+            return false;
+        }
+
+        try {
+            $modelClass = (new ReflectionMethod($sanctum, 'personalAccessTokenModel'))->invoke(null);
+
+            if (! is_string($modelClass) || ! class_exists($modelClass)) {
+                return false;
+            }
+
+            $model = new $modelClass;
+
+            return $model instanceof Model
+                && Schema::connection($model->getConnectionName())->hasTable($model->getTable());
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Build one diagnostic check.
+     *
+     * @return array{name: string, passed: bool, message: string}
+     */
+    private function check(string $name, bool $passed, string $failure): array
+    {
+        return ['name' => $name, 'passed' => $passed, 'message' => $passed ? 'Ready.' : $failure];
+    }
+
+    /** Resolve a configurable identity/provider table name. */
+    private function configuredTable(AuthConfiguration $configuration, string $default): string
+    {
+        $key = self::CONFIGURABLE_TABLES[$default] ?? null;
+
+        if ($key === null) {
+            return $default;
+        }
+
+        $configured = $configuration->get("tables.{$key}", $default);
+
+        return is_string($configured) && trim($configured) !== ''
+            ? trim($configured)
+            : $default;
+    }
+
+    /** Determine whether every configured package model has a valid base type. */
+    private function ownedModelsReady(Container $container): bool
+    {
+        try {
+            $models = $container->make(AuthModelRegistry::class);
+
+            return class_exists($models->userClass())
+                && class_exists($models->roleClass())
+                && class_exists($models->permissionClass())
+                && class_exists($models->personalAccessTokenClass());
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /** Ensure Laravel's configured guard provider resolves the selected User. */
+    private function authProviderReady(AuthConfiguration $configuration, Container $container): bool
+    {
+        try {
+            $models = $container->make(AuthModelRegistry::class);
+            $guard = $configuration->get('guard', 'web');
+            $provider = is_string($guard) ? config("auth.guards.{$guard}.provider") : null;
+            $configured = is_string($provider) ? config("auth.providers.{$provider}.model") : null;
+
+            return is_string($configured)
+                && $configured === $models->userClass();
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Resolve an optional integration without crashing diagnostics.
+     *
+     * @param  class-string  $contract
+     */
+    private function integration(Container $container, string $contract): ?object
+    {
+        try {
+            $integration = $container->make($contract);
+
+            return is_object($integration) ? $integration : null;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Determine whether the closed pipeline tree contains resolvable stages.
+     */
+    private function pipelinesReady(AuthConfiguration $configuration, Container $container): bool
+    {
+        $pipelines = $configuration->get('pipelines', []);
+
+        if (! is_array($pipelines) || array_keys($pipelines) !== self::PIPELINES) {
+            return false;
+        }
+
+        foreach ($pipelines as $stages) {
+            if (! is_array($stages)) {
+                return false;
+            }
+
+            foreach ($stages as $stage) {
+                if (! is_string($stage) || ! is_a($stage, AuthPipelineStage::class, true)) {
+                    return false;
+                }
+
+                try {
+                    if (! $container->make($stage) instanceof AuthPipelineStage) {
+                        return false;
+                    }
+                } catch (Throwable) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Return non-empty service configuration owned by disabled features.
+     *
+     * @return list<string>
+     */
+    private function dormantIntegrations(AuthConfiguration $configuration): array
+    {
+        $paths = [];
+
+        foreach (AuthFeature::cases() as $feature) {
+            if ($configuration->featureEnabled($feature)) {
+                continue;
+            }
+
+            $services = $configuration->get("features.{$feature->value}.services", []);
+
+            if (! is_array($services)) {
+                $paths[] = "features.{$feature->value}.services";
+
+                continue;
+            }
+
+            foreach ($services as $service => $value) {
+                if ($value === null || $value === '' || $value === []) {
+                    continue;
+                }
+
+                $paths[] = "features.{$feature->value}.services.{$service}";
+            }
+        }
+
+        return $paths;
+    }
+
+    /**
+     * Return abilities required by effective management route families.
+     *
+     * @return list<string>
+     */
+    private function managementAbilities(
+        AuthConfiguration $configuration,
+        FeatureManifest $manifest,
+    ): array {
+        $abilities = [];
+
+        foreach ($manifest->definitions() as $definition) {
+            if (! $configuration->featureEnabled($definition->feature)
+                || ! $this->routeSurfaceConfigured($configuration, $definition->feature, 'management')) {
+                continue;
+            }
+
+            foreach ($definition->managementAbilities as $ability) {
+                $abilities[$ability] = true;
+            }
+        }
+
+        return array_keys($abilities);
+    }
+
+    /**
+     * Determine whether package RBAC or the configured Gate owns an ability.
+     */
+    private function managementAbilityReady(
+        AuthConfiguration $configuration,
+        Container $container,
+        string $ability,
+    ): bool {
+        $access = $this->integration($container, AuthManagementAccess::class);
+
+        if (! $access instanceof AuthManagementAccess) {
+            return false;
+        }
+
+        if (! $access instanceof LaravelGateAuthManagementAccess) {
+            return true;
+        }
+
+        $gate = $this->integration($container, GateContract::class);
+
+        if ($gate instanceof GateContract && $gate->has($ability)) {
+            return true;
+        }
+
+        $superAdminRole = $configuration->get('features.rbac.settings.super_admin_role');
+
+        return $configuration->featureEnabled(AuthFeature::Rbac)
+            && is_string($superAdminRole)
+            && trim($superAdminRole) !== '';
+    }
+
+    /**
+     * Determine whether API-token ability policy is intentionally configured.
+     */
+    private function apiTokenAbilitiesReady(
+        AuthConfiguration $configuration,
+        ?object $provider,
+    ): bool {
+        if (! $provider instanceof ApiTokenAbilityProvider) {
+            return false;
+        }
+
+        if (! $provider instanceof ConfiguredApiTokenAbilityProvider) {
+            return true;
+        }
+
+        $abilities = $configuration->get('features.api_tokens.settings.abilities', []);
+
+        if (! is_array($abilities) || $abilities === []) {
+            return false;
+        }
+
+        foreach ($abilities as $ability) {
+            if (! is_string($ability) || trim($ability) === '' || mb_strlen($ability) > 120) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Determine whether the route surface is globally and locally configured.
+     */
+    private function routeSurfaceConfigured(
+        AuthConfiguration $configuration,
+        AuthFeature $feature,
+        string $surface,
+    ): bool {
+        return $configuration->enabled()
+            && $configuration->boolean('routes.enabled', false)
+            && $configuration->boolean("routes.{$surface}.enabled", false)
+            && $configuration->featureRoutesEnabled($feature, $surface);
+    }
+
+    /**
+     * Determine whether at least one social provider has a usable identifier.
+     */
+    private function hasConfiguredSocialProvider(
+        AuthConfiguration $configuration,
+        Container $container,
+    ): bool {
+        $providers = $configuration->get('features.social_identities.settings.providers', []);
+        $providerConfiguration = $this->integration($container, SocialProviderConfiguration::class);
+
+        if (! is_array($providers)
+            || $providers === []
+            || ! $providerConfiguration instanceof SocialProviderConfiguration) {
+            return false;
+        }
+
+        try {
+            foreach (array_keys($providers) as $provider) {
+                if (! is_string($provider) || preg_match('/\A[a-z][a-z0-9_.-]{0,79}\z/', $provider) !== 1) {
+                    return false;
+                }
+
+                $providerConfiguration->provider($provider);
+            }
+        } catch (Throwable) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Return the configured Spatie Permission table inventory.
+     *
+     * @return list<string>
+     */
+    private function spatieTables(): array
+    {
+        $configured = config('permission.table_names', []);
+
+        if (! is_array($configured)) {
+            return [];
+        }
+
+        return array_values(array_filter([
+            $configured['roles'] ?? null,
+            $configured['permissions'] ?? null,
+            $configured['model_has_permissions'] ?? null,
+            $configured['model_has_roles'] ?? null,
+            $configured['role_has_permissions'] ?? null,
+        ], static fn (mixed $table): bool => is_string($table) && trim($table) !== ''));
+    }
+
+    /**
+     * Build the canonical route names expected for the current configuration.
+     *
+     * @return list<string>
+     */
+    private function expectedRoutes(
+        AuthConfiguration $configuration,
+        FeatureManifest $manifest,
+        FeatureGate $features,
+    ): array {
+        if (! $configuration->enabled() || ! $configuration->boolean('routes.enabled', false)) {
+            return [];
+        }
+
+        $routes = [];
+
+        foreach ($manifest->definitions() as $definition) {
+            if (! $features->allows($definition->feature, FeatureOperation::Read)) {
+                continue;
+            }
+
+            foreach ($definition->routeNames as $surface => $names) {
+                if (! $configuration->boolean("routes.{$surface}.enabled", false)
+                    || ! $configuration->featureRoutesEnabled($definition->feature, $surface)
+                    || ! $this->routeDependenciesAvailable($definition, $surface, $features)) {
+                    continue;
+                }
+
+                foreach ($names as $name) {
+                    $routes[] = "nvl.auth.{$surface}.{$name}";
+                }
+            }
+        }
+
+        return $routes;
+    }
+
+    /**
+     * Determine whether every route-only dependency is effective.
+     */
+    private function routeDependenciesAvailable(
+        FeatureDefinition $definition,
+        string $surface,
+        FeatureGate $features,
+    ): bool {
+        foreach ($definition->dependenciesForSurface($surface) as $dependency) {
+            if (! $features->allows($dependency, FeatureOperation::Read)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Determine whether passkey origins are a non-empty HTTPS URL list.
+     */
+    private function validOrigins(mixed $origins, mixed $relyingPartyId): bool
+    {
+        if (! is_array($origins)
+            || $origins === []
+            || ! is_string($relyingPartyId)
+            || ! $this->validRelyingPartyId($relyingPartyId)) {
+            return false;
+        }
+
+        foreach ($origins as $origin) {
+            $host = is_string($origin) ? parse_url($origin, PHP_URL_HOST) : null;
+            $path = is_string($origin) ? parse_url($origin, PHP_URL_PATH) : null;
+
+            if (! is_string($origin)
+                || filter_var($origin, FILTER_VALIDATE_URL) === false
+                || parse_url($origin, PHP_URL_SCHEME) !== 'https'
+                || ! is_string($host)
+                || ($host !== $relyingPartyId && ! str_ends_with($host, ".{$relyingPartyId}"))
+                || (is_string($path) && $path !== '' && $path !== '/')
+                || parse_url($origin, PHP_URL_USER) !== null
+                || parse_url($origin, PHP_URL_QUERY) !== null
+                || parse_url($origin, PHP_URL_FRAGMENT) !== null) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Determine whether a passkey relying-party identifier is a hostname.
+     */
+    private function validRelyingPartyId(mixed $relyingPartyId): bool
+    {
+        return is_string($relyingPartyId)
+            && mb_strlen($relyingPartyId) <= 253
+            && preg_match('/\A(?=.{1,253}\z)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\z/', $relyingPartyId) === 1;
+    }
+
+    /**
+     * Determine whether one configuration value is a bounded non-empty string.
+     */
+    private function boundedString(mixed $value, int $maximum): bool
+    {
+        return is_string($value)
+            && trim($value) !== ''
+            && $value === trim($value)
+            && mb_strlen($value) <= $maximum;
+    }
+
+    /**
+     * Validate explicit or Laravel-derived passkey user-handle key material.
+     */
+    private function validPasskeyUserHandleKey(
+        AuthConfiguration $configuration,
+        Container $container,
+    ): bool {
+        $configured = $configuration->get('features.passkeys.settings.user_handle_key');
+        $application = $container->make(ConfigRepository::class);
+        $key = is_string($configured) && trim($configured) !== ''
+            ? $configured
+            : $application->get('app.key');
+
+        if (! is_string($key) || trim($key) === '') {
+            return false;
+        }
+
+        if (str_starts_with($key, 'base64:')) {
+            $decoded = base64_decode(substr($key, 7), true);
+            $key = is_string($decoded) ? $decoded : '';
+        }
+
+        return strlen($key) >= 32;
+    }
+}

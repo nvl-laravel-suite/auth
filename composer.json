@@ -1,0 +1,108 @@
+{
+    "name": "nvl/auth",
+    "description": "Configurable, extensible authentication features for Laravel",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "laravel",
+        "authentication",
+        "authorization",
+        "invitations",
+        "magic-links",
+        "passkeys",
+        "totp"
+    ],
+    "require": {
+        "php": "^8.3",
+        "ext-ctype": "*",
+        "ext-filter": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "laravel/framework": "^12.0 || ^13.0",
+        "laravel/sanctum": "^4.3",
+        "nesbot/carbon": "^2.72 || ^3.0",
+        "paragonie/constant_time_encoding": "^2.6 || ^3.0",
+        "pragmarx/google2fa": "^9.0",
+        "spatie/laravel-permission": "^8.0",
+        "symfony/http-foundation": "^7.2 || ^8.0",
+        "symfony/serializer": "^7.2 || ^8.0",
+        "symfony/uid": "^7.2 || ^8.0",
+        "web-auth/webauthn-lib": "5.3.*"
+    },
+    "require-dev": {
+        "ext-openssl": "*",
+        "ext-pcntl": "*",
+        "larastan/larastan": "^3.10",
+        "laravel/pint": "^1.27",
+        "laravel/socialite": "^5.29",
+        "mockery/mockery": "^1.6",
+        "orchestra/testbench": "^10.0 || ^11.0",
+        "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-laravel": "^4.0",
+        "spomky-labs/cbor-php": "^3.0",
+        "web-auth/cose-lib": "^4.2.3"
+    },
+    "suggest": {
+        "bacon/bacon-qr-code": "Renders server-side QR codes for TOTP provisioning when a headless URI is not sufficient.",
+        "laravel/socialite": "Enables the optional OAuth identity adapter.",
+        "nvl/activity": "Can consume the package's after-commit audit and authentication events.",
+        "nvl/mail-notifications": "Can consume AuthDeliveryRequested events and deliver the typed payloads."
+    },
+    "autoload": {
+        "psr-4": {
+            "Nvl\\Auth\\": "src/",
+            "Nvl\\Auth\\Database\\Factories\\": "database/factories/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Nvl\\Auth\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "analyse": "phpstan analyse --memory-limit=2G",
+        "format": "pint --parallel --format agent",
+        "format:test": "pint --parallel --test --format agent",
+        "quality": [
+            "@format:test",
+            "@analyse",
+            "@test:parallel"
+        ],
+        "test": "pest --compact",
+        "test:feature": "pest --compact --testsuite=feature",
+        "test:unit": "pest --compact --testsuite=unit",
+        "test:parallel": "pest --compact --parallel --processes=4"
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.x-dev"
+        },
+        "laravel": {
+            "providers": [
+                "Nvl\\Auth\\Providers\\AuthServiceProvider"
+            ],
+            "aliases": []
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        },
+        "sort-packages": true
+    },
+    "archive": {
+        "exclude": [
+            "/.temp",
+            "/build",
+            "/coverage",
+            "/.phpunit.cache",
+            "/.phpunit.result.cache",
+            "/phpstan.neon.dist",
+            "/phpunit.path-coverage.xml",
+            "/phpunit.xml.dist",
+            "/tests"
+        ]
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

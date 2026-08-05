@@ -1,0 +1,4 @@
+interface:
+  display_name: "NVL Auth"
+  short_description: "Build reusable feature-owned Laravel authentication"
+  default_prompt: "Use $nvl-auth to implement or review configurable Auth Actions, routes, invitations, clients, authenticators, Sanctum and Spatie adapters, pipelines, and typed host delivery events without duplicating host-owned systems."

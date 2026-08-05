@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+         executionOrder="random"
+         failOnWarning="true"
+         failOnRisky="true"
+         failOnEmptyTestSuite="true"
+         beStrictAboutOutputDuringTests="true"
+         cacheDirectory=".temp/phpunit">
+    <testsuites>
+        <testsuite name="foundation">
+            <directory suffix="Test.php">tests/Bootstrap</directory>
+            <directory suffix="Test.php">tests/Disabled</directory>
+            <directory suffix="Test.php">tests/Unit</directory>
+            <file>tests/Feature/ProviderConfigurationTest.php</file>
+        </testsuite>
+        <testsuite name="authentication">
+            <directory suffix="Test.php">tests/Feature/Flows</directory>
+            <directory suffix="Test.php">tests/Feature/Passwords</directory>
+            <file>tests/Feature/PublicMailboxChallengesTest.php</file>
+        </testsuite>
+        <testsuite name="authenticators">
+            <directory suffix="Test.php">tests/Feature/Authenticators</directory>
+        </testsuite>
+        <testsuite name="identity">
+            <directory suffix="Test.php">tests/Feature/Contacts</directory>
+            <directory suffix="Test.php">tests/Feature/Identity</directory>
+        </testsuite>
+        <testsuite name="social-identities">
+            <directory suffix="Test.php">tests/Feature/SocialIdentities</directory>
+        </testsuite>
+        <testsuite name="invitations">
+            <directory suffix="Test.php">tests/Feature/Invitations</directory>
+        </testsuite>
+        <testsuite name="recovery">
+            <directory suffix="Test.php">tests/Feature/Recovery</directory>
+        </testsuite>
+        <testsuite name="cross-device">
+            <directory suffix="Test.php">tests/Feature/CrossDevice</directory>
+        </testsuite>
+        <testsuite name="sessions">
+            <directory suffix="Test.php">tests/Feature/Sessions</directory>
+        </testsuite>
+        <testsuite name="audit-delivery">
+            <file>tests/Feature/AuditAndDeliveryTest.php</file>
+            <file>tests/Feature/DeliveryLifecycleTest.php</file>
+            <file>tests/Feature/ExpirationSecurityEventsTest.php</file>
+            <file>tests/Feature/SecurityEventIdentityTest.php</file>
+            <file>tests/Feature/SecurityEventLedgerTest.php</file>
+            <file>tests/Feature/SecurityNotificationSchedulerTest.php</file>
+        </testsuite>
+        <testsuite name="persistence">
+            <directory suffix="Test.php">tests/Feature/Persistence</directory>
+        </testsuite>
+        <testsuite name="operations">
+            <directory suffix="Test.php">tests/Feature/Operations</directory>
+        </testsuite>
+        <testsuite name="http">
+            <directory suffix="Test.php">tests/Http</directory>
+            <directory suffix="Test.php">tests/RouteGates</directory>
+        </testsuite>
+        <testsuite name="infrastructure">
+            <directory suffix="Test.php">tests/Integration</directory>
+        </testsuite>
+    </testsuites>
+    <coverage pathCoverage="true"/>
+    <php>
+        <ini name="memory_limit" value="3G"/>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_KEY" value="base64:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE="/>
+        <env name="CACHE_STORE" value="array"/>
+        <env name="DB_CONNECTION" value="sqlite"/>
+        <env name="DB_DATABASE" value=":memory:"/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+    </php>
+</phpunit>

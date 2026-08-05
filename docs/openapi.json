@@ -1,0 +1,263 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "NVL Auth HTTP API",
+    "version": "0.2.0",
+    "description": "All operations are optional and controlled by package, surface, feature, and feature-route flags."
+  },
+  "servers": [{"url": "/api/v1/auth"}],
+  "paths": {
+    "/login": {"post": {"operationId": "nvl.auth.public.login", "x-nvl-feature": "authentication", "x-nvl-feature-operation": "use", "x-nvl-route-surface": "public", "x-nvl-feature-dependencies": ["password", "sessions"], "requestBody": {"$ref": "#/components/requestBodies/Login"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/password/forgot": {"post": {"operationId": "nvl.auth.public.password.request", "x-nvl-feature": "password", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "public", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/Identifier"}, "responses": {"202": {"$ref": "#/components/responses/Accepted"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/password/reset": {"post": {"operationId": "nvl.auth.public.password.reset", "x-nvl-feature": "password", "x-nvl-feature-operation": "use", "x-nvl-route-surface": "public", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/PasswordReset"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/email/verify/{id}/{hash}": {
+      "parameters": [{"$ref": "#/components/parameters/id"}, {"$ref": "#/components/parameters/hash"}, {"$ref": "#/components/parameters/subjectType"}],
+      "get": {"operationId": "nvl.auth.public.email.verify", "x-nvl-feature": "email_verification", "x-nvl-feature-operation": "use", "x-nvl-route-surface": "public", "x-nvl-feature-dependencies": ["authentication"], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/magic-links": {"post": {"operationId": "nvl.auth.public.magic_links.request", "x-nvl-feature": "magic_links", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "public", "x-nvl-feature-dependencies": ["authentication", "sessions"], "requestBody": {"$ref": "#/components/requestBodies/Recipient"}, "responses": {"202": {"$ref": "#/components/responses/Accepted"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/magic-links/consume": {"post": {"operationId": "nvl.auth.public.magic_links.consume", "x-nvl-feature": "magic_links", "x-nvl-feature-operation": "use", "x-nvl-route-surface": "public", "x-nvl-feature-dependencies": ["authentication", "sessions"], "requestBody": {"$ref": "#/components/requestBodies/MagicLinkConsume"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/security-codes": {"post": {"operationId": "nvl.auth.public.security_codes.request", "x-nvl-feature": "security_codes", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "public", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/SecurityCodeRequest"}, "responses": {"202": {"$ref": "#/components/responses/Accepted"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/security-codes/verify": {"post": {"operationId": "nvl.auth.public.security_codes.verify", "x-nvl-feature": "security_codes", "x-nvl-feature-operation": "use", "x-nvl-route-surface": "public", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/SecurityCodeVerify"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/invitations/accept": {"post": {"operationId": "nvl.auth.public.invitations.accept", "x-nvl-feature": "invitations", "x-nvl-feature-operation": "use", "x-nvl-route-surface": "public", "x-nvl-feature-dependencies": [], "requestBody": {"$ref": "#/components/requestBodies/InvitationAccept"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/passkeys/authentication/options": {"post": {"operationId": "nvl.auth.public.passkeys.authentication.options", "x-nvl-feature": "passkeys", "x-nvl-feature-operation": "use", "x-nvl-route-surface": "public", "x-nvl-feature-dependencies": ["authentication", "sessions"], "responses": {"200": {"$ref": "#/components/responses/Success"}}}},
+    "/passkeys/authentication": {"post": {"operationId": "nvl.auth.public.passkeys.authentication.finish", "x-nvl-feature": "passkeys", "x-nvl-feature-operation": "use", "x-nvl-route-surface": "public", "x-nvl-feature-dependencies": ["authentication", "sessions"], "requestBody": {"$ref": "#/components/requestBodies/PasskeyFinish"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/social/{provider}/redirect": {
+      "parameters": [{"$ref": "#/components/parameters/provider"}],
+      "get": {"operationId": "nvl.auth.public.social.redirect", "x-nvl-feature": "social_identities", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "public", "x-nvl-feature-dependencies": ["authentication", "sessions"], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/social/{provider}/callback": {
+      "parameters": [{"$ref": "#/components/parameters/provider"}],
+      "get": {"operationId": "nvl.auth.public.social.callback", "x-nvl-feature": "social_identities", "x-nvl-feature-operation": "use", "x-nvl-route-surface": "public", "x-nvl-feature-dependencies": ["authentication", "sessions"], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/clients/start": {"post": {"operationId": "nvl.auth.public.clients.start", "x-nvl-feature": "clients", "x-nvl-feature-operation": "use", "x-nvl-route-surface": "public", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/ClientStart"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/logout": {"post": {"operationId": "nvl.auth.account.logout", "x-nvl-feature": "authentication", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}},
+    "/password": {"put": {"operationId": "nvl.auth.account.password.update", "x-nvl-feature": "password", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication", "sessions"], "requestBody": {"$ref": "#/components/requestBodies/PasswordUpdate"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/password/confirm": {"post": {"operationId": "nvl.auth.account.password.confirm", "x-nvl-feature": "password", "x-nvl-feature-operation": "use", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication", "sessions"], "requestBody": {"$ref": "#/components/requestBodies/PasswordConfirm"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/email/verification": {"post": {"operationId": "nvl.auth.account.email.request", "x-nvl-feature": "email_verification", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "responses": {"202": {"$ref": "#/components/responses/Accepted"}}}},
+    "/totp/enroll": {"post": {"operationId": "nvl.auth.account.totp.enroll", "x-nvl-feature": "totp", "x-nvl-feature-operation": "enroll", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/TotpEnroll"}, "responses": {"201": {"$ref": "#/components/responses/Created"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/totp/{credential}/confirm": {
+      "parameters": [{"$ref": "#/components/parameters/credential"}],
+      "post": {"operationId": "nvl.auth.account.totp.confirm", "x-nvl-feature": "totp", "x-nvl-feature-operation": "enroll", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/Code"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}
+    },
+    "/totp/verify": {"post": {"operationId": "nvl.auth.account.totp.verify", "x-nvl-feature": "totp", "x-nvl-feature-operation": "use", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/Code"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/totp/{credential}": {
+      "parameters": [{"$ref": "#/components/parameters/credential"}],
+      "delete": {"operationId": "nvl.auth.account.totp.revoke", "x-nvl-feature": "totp", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/passkeys/registration/options": {"post": {"operationId": "nvl.auth.account.passkeys.registration.options", "x-nvl-feature": "passkeys", "x-nvl-feature-operation": "enroll", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "responses": {"200": {"$ref": "#/components/responses/Success"}}}},
+    "/passkeys/registration": {"post": {"operationId": "nvl.auth.account.passkeys.registration.finish", "x-nvl-feature": "passkeys", "x-nvl-feature-operation": "enroll", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/PasskeyFinish"}, "responses": {"201": {"$ref": "#/components/responses/Created"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/passkeys/{passkey}": {
+      "parameters": [{"$ref": "#/components/parameters/passkey"}],
+      "delete": {"operationId": "nvl.auth.account.passkeys.revoke", "x-nvl-feature": "passkeys", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/recovery-codes/regenerate": {"post": {"operationId": "nvl.auth.account.recovery_codes.regenerate", "x-nvl-feature": "recovery_codes", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "responses": {"201": {"$ref": "#/components/responses/Created"}}}},
+    "/recovery-codes/consume": {"post": {"operationId": "nvl.auth.account.recovery_codes.consume", "x-nvl-feature": "recovery_codes", "x-nvl-feature-operation": "use", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/Code"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/recovery-codes": {"delete": {"operationId": "nvl.auth.account.recovery_codes.revoke", "x-nvl-feature": "recovery_codes", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "responses": {"200": {"$ref": "#/components/responses/Success"}}}},
+    "/social/{provider}/link": {
+      "parameters": [{"$ref": "#/components/parameters/provider"}],
+      "get": {"operationId": "nvl.auth.account.social.link", "x-nvl-feature": "social_identities", "x-nvl-feature-operation": "enroll", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/social/{provider}/link/callback": {
+      "parameters": [{"$ref": "#/components/parameters/provider"}],
+      "get": {"operationId": "nvl.auth.account.social.link.callback", "x-nvl-feature": "social_identities", "x-nvl-feature-operation": "enroll", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/social-identities/{socialIdentity}": {
+      "parameters": [{"$ref": "#/components/parameters/socialIdentity"}],
+      "delete": {"operationId": "nvl.auth.account.social.destroy", "x-nvl-feature": "social_identities", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/api-tokens": {
+      "get": {"operationId": "nvl.auth.account.api_tokens.index", "x-nvl-feature": "api_tokens", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "responses": {"200": {"$ref": "#/components/responses/Success"}}},
+      "post": {"operationId": "nvl.auth.account.api_tokens.store", "x-nvl-feature": "api_tokens", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/ApiToken"}, "responses": {"201": {"$ref": "#/components/responses/Created"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}},
+      "delete": {"operationId": "nvl.auth.account.api_tokens.destroy_all", "x-nvl-feature": "api_tokens", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/api-tokens/{tokenId}": {
+      "parameters": [{"$ref": "#/components/parameters/tokenId"}],
+      "put": {"operationId": "nvl.auth.account.api_tokens.update", "x-nvl-feature": "api_tokens", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/ApiToken"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}},
+      "delete": {"operationId": "nvl.auth.account.api_tokens.destroy", "x-nvl-feature": "api_tokens", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/api-tokens/{tokenId}/rotate": {
+      "parameters": [{"$ref": "#/components/parameters/tokenId"}],
+      "post": {"operationId": "nvl.auth.account.api_tokens.rotate", "x-nvl-feature": "api_tokens", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/ApiToken"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}
+    },
+    "/invitations": {
+      "get": {"operationId": "nvl.auth.management.invitations.index", "x-nvl-feature": "invitations", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}},
+      "post": {"operationId": "nvl.auth.management.invitations.store", "x-nvl-feature": "invitations", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "requestBody": {"$ref": "#/components/requestBodies/InvitationCreate"}, "responses": {"201": {"$ref": "#/components/responses/Created"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}
+    },
+    "/invitations/{invitation}/resend": {
+      "parameters": [{"$ref": "#/components/parameters/invitation"}],
+      "post": {"operationId": "nvl.auth.management.invitations.resend", "x-nvl-feature": "invitations", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/invitations/{invitation}": {
+      "parameters": [{"$ref": "#/components/parameters/invitation"}],
+      "delete": {"operationId": "nvl.auth.management.invitations.destroy", "x-nvl-feature": "invitations", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/clients": {
+      "get": {"operationId": "nvl.auth.management.clients.index", "x-nvl-feature": "clients", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": ["authentication"], "responses": {"200": {"$ref": "#/components/responses/Success"}}},
+      "post": {"operationId": "nvl.auth.management.clients.store", "x-nvl-feature": "clients", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/ClientMutation"}, "responses": {"201": {"$ref": "#/components/responses/Created"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}
+    },
+    "/clients/{client}": {
+      "parameters": [{"$ref": "#/components/parameters/client"}],
+      "get": {"operationId": "nvl.auth.management.clients.show", "x-nvl-feature": "clients", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": ["authentication"], "responses": {"200": {"$ref": "#/components/responses/Success"}}},
+      "put": {"operationId": "nvl.auth.management.clients.update", "x-nvl-feature": "clients", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/ClientMutation"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}},
+      "delete": {"operationId": "nvl.auth.management.clients.destroy", "x-nvl-feature": "clients", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": ["authentication"], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/clients/{client}/status": {
+      "parameters": [{"$ref": "#/components/parameters/client"}],
+      "patch": {"operationId": "nvl.auth.management.clients.status", "x-nvl-feature": "clients", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/ClientStatus"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}
+    },
+    "/profile": {
+      "get": {"operationId": "nvl.auth.account.profile.show", "x-nvl-feature": "principal_management", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}},
+      "patch": {"operationId": "nvl.auth.account.profile.update", "x-nvl-feature": "principal_management", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": [], "requestBody": {"$ref": "#/components/requestBodies/ProfileMutation"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}
+    },
+    "/users": {
+      "get": {"operationId": "nvl.auth.management.users.index", "x-nvl-feature": "principal_management", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}},
+      "post": {"operationId": "nvl.auth.management.users.store", "x-nvl-feature": "principal_management", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "requestBody": {"$ref": "#/components/requestBodies/UserMutation"}, "responses": {"201": {"$ref": "#/components/responses/Created"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}
+    },
+    "/users/suggestions": {"get": {"operationId": "nvl.auth.management.users.suggestions", "x-nvl-feature": "principal_management", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}},
+    "/users/bulk": {"post": {"operationId": "nvl.auth.management.users.bulk", "x-nvl-feature": "principal_management", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "requestBody": {"$ref": "#/components/requestBodies/UserBulk"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/users/{user}": {
+      "parameters": [{"$ref": "#/components/parameters/user"}],
+      "get": {"operationId": "nvl.auth.management.users.show", "x-nvl-feature": "principal_management", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}},
+      "put": {"operationId": "nvl.auth.management.users.update", "x-nvl-feature": "principal_management", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "requestBody": {"$ref": "#/components/requestBodies/UserMutation"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}},
+      "delete": {"operationId": "nvl.auth.management.users.destroy", "x-nvl-feature": "principal_management", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/users/{user}/status": {"parameters": [{"$ref": "#/components/parameters/user"}], "patch": {"operationId": "nvl.auth.management.users.status", "x-nvl-feature": "principal_management", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "requestBody": {"$ref": "#/components/requestBodies/ClientStatus"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/users/{user}/roles": {"parameters": [{"$ref": "#/components/parameters/user"}], "put": {"operationId": "nvl.auth.management.users.roles", "x-nvl-feature": "principal_management", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "requestBody": {"$ref": "#/components/requestBodies/RoleAssignment"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/users/{user}/permissions": {"parameters": [{"$ref": "#/components/parameters/user"}], "put": {"operationId": "nvl.auth.management.users.permissions", "x-nvl-feature": "principal_management", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "requestBody": {"$ref": "#/components/requestBodies/PermissionAssignment"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/users/{user}/restore": {"parameters": [{"$ref": "#/components/parameters/user"}], "post": {"operationId": "nvl.auth.management.users.restore", "x-nvl-feature": "principal_management", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}},
+    "/roles": {
+      "get": {"operationId": "nvl.auth.management.roles.index", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}},
+      "post": {"operationId": "nvl.auth.management.roles.store", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "requestBody": {"$ref": "#/components/requestBodies/RoleMutation"}, "responses": {"201": {"$ref": "#/components/responses/Created"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}
+    },
+    "/roles/hierarchy": {"get": {"operationId": "nvl.auth.management.roles.hierarchy", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}},
+    "/roles/templates": {"get": {"operationId": "nvl.auth.management.roles.templates", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}},
+    "/roles/analytics": {"get": {"operationId": "nvl.auth.management.roles.analytics", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}},
+    "/roles/apply-template": {"post": {"operationId": "nvl.auth.management.roles.apply_template", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "requestBody": {"$ref": "#/components/requestBodies/RoleTemplate"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/roles/{role}": {
+      "parameters": [{"$ref": "#/components/parameters/role"}],
+      "get": {"operationId": "nvl.auth.management.roles.show", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}},
+      "put": {"operationId": "nvl.auth.management.roles.update", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "requestBody": {"$ref": "#/components/requestBodies/RoleMutation"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}},
+      "delete": {"operationId": "nvl.auth.management.roles.destroy", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/roles/{role}/clone": {"parameters": [{"$ref": "#/components/parameters/role"}], "post": {"operationId": "nvl.auth.management.roles.clone", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "requestBody": {"$ref": "#/components/requestBodies/RoleClone"}, "responses": {"201": {"$ref": "#/components/responses/Created"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/permissions": {
+      "get": {"operationId": "nvl.auth.management.permissions.index", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}},
+      "post": {"operationId": "nvl.auth.management.permissions.store", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "requestBody": {"$ref": "#/components/requestBodies/PermissionMutation"}, "responses": {"201": {"$ref": "#/components/responses/Created"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}
+    },
+    "/permissions/{permission}": {
+      "parameters": [{"$ref": "#/components/parameters/permission"}],
+      "get": {"operationId": "nvl.auth.management.permissions.show", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}},
+      "put": {"operationId": "nvl.auth.management.permissions.update", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "requestBody": {"$ref": "#/components/requestBodies/PermissionMutation"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}},
+      "delete": {"operationId": "nvl.auth.management.permissions.destroy", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    },
+    "/rbac/synchronize": {"post": {"operationId": "nvl.auth.management.rbac.synchronize", "x-nvl-feature": "rbac", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}},
+    "/audits": {"get": {"operationId": "nvl.auth.management.audits.index", "x-nvl-feature": "audit", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}},
+    "/audits/{authAudit}": {
+      "parameters": [{"$ref": "#/components/parameters/authAudit"}],
+      "get": {"operationId": "nvl.auth.management.audits.show", "x-nvl-feature": "audit", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
+    }
+  },
+  "components": {
+    "parameters": {
+      "id": {"name": "id", "in": "path", "required": true, "schema": {"type": "string"}},
+      "hash": {"name": "hash", "in": "path", "required": true, "schema": {"type": "string"}},
+      "subjectType": {"name": "subject_type", "in": "query", "required": true, "schema": {"type": "string", "maxLength": 160}},
+      "provider": {"name": "provider", "in": "path", "required": true, "schema": {"type": "string"}},
+      "credential": {"name": "credential", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "passkey": {"name": "passkey", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "socialIdentity": {"name": "socialIdentity", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "tokenId": {"name": "tokenId", "in": "path", "required": true, "schema": {"type": "string"}},
+      "invitation": {"name": "invitation", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "client": {"name": "client", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "user": {"name": "user", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "role": {"name": "role", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "permission": {"name": "permission", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "authAudit": {"name": "authAudit", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+    },
+    "securitySchemes": {
+      "sessionCookie": {"type": "apiKey", "in": "cookie", "name": "laravel_session", "description": "Configured Laravel stateful guard cookie; the host may rename it."},
+      "bearerToken": {"type": "http", "scheme": "bearer", "description": "Host account/management middleware may accept Sanctum or another bearer-token authority."}
+    },
+    "schemas": {
+      "Envelope": {
+        "type": "object",
+        "required": ["data", "code", "message"],
+        "properties": {
+          "data": {},
+          "code": {"type": "string"},
+          "message": {"type": "string"}
+        }
+      },
+      "LaravelValidationError": {
+        "type": "object",
+        "required": ["message", "errors"],
+        "properties": {
+          "message": {"type": "string"},
+          "errors": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}}
+        }
+      },
+      "Login": {"type": "object", "required": ["identifier", "password"], "properties": {"identifier": {"type": "string", "maxLength": 255}, "password": {"type": "string", "maxLength": 4096, "writeOnly": true}, "remember": {"type": "boolean", "default": false}}},
+      "Identifier": {"type": "object", "required": ["identifier"], "properties": {"identifier": {"type": "string", "maxLength": 255}}},
+      "Recipient": {"type": "object", "required": ["recipient"], "properties": {"recipient": {"type": "string", "maxLength": 320}}},
+      "PasswordReset": {"type": "object", "required": ["identifier", "token", "password", "password_confirmation"], "properties": {"identifier": {"type": "string", "maxLength": 255}, "token": {"type": "string", "maxLength": 255, "writeOnly": true}, "password": {"type": "string", "minLength": 8, "maxLength": 4096, "writeOnly": true}, "password_confirmation": {"type": "string", "minLength": 8, "maxLength": 4096, "writeOnly": true}}},
+      "MagicLinkConsume": {"type": "object", "required": ["recipient", "token"], "properties": {"recipient": {"type": "string", "maxLength": 320}, "token": {"type": "string", "maxLength": 255, "writeOnly": true}}},
+      "SecurityCodeRequest": {"type": "object", "required": ["recipient", "purpose"], "properties": {"recipient": {"type": "string", "maxLength": 320}, "purpose": {"type": "string", "maxLength": 120}}},
+      "SecurityCodeVerify": {"type": "object", "required": ["recipient", "purpose", "code"], "properties": {"recipient": {"type": "string", "maxLength": 320}, "purpose": {"type": "string", "maxLength": 120}, "code": {"type": "string", "maxLength": 20, "writeOnly": true}}},
+      "InvitationAccept": {"type": "object", "required": ["token"], "properties": {"token": {"type": "string", "maxLength": 255, "writeOnly": true}, "registration": {"type": "object", "additionalProperties": true}}},
+      "PasskeyFinish": {"type": "object", "required": ["ceremony_id", "response"], "properties": {"ceremony_id": {"type": "string", "maxLength": 191}, "response": {"type": "object", "additionalProperties": true, "description": "WebAuthn browser response; JSON encoding is limited to 128 KiB."}, "name": {"type": ["string", "null"], "maxLength": 120}}},
+      "ClientStart": {"type": "object", "required": ["client_id", "flow", "return_path"], "properties": {"client_id": {"type": "string", "format": "uuid"}, "flow": {"type": "string", "maxLength": 80}, "return_path": {"type": "string", "maxLength": 2048}, "origin": {"type": ["string", "null"], "format": "uri", "maxLength": 2048}}},
+      "PasswordUpdate": {"type": "object", "required": ["current_password", "password", "password_confirmation"], "properties": {"current_password": {"type": "string", "maxLength": 4096, "writeOnly": true}, "password": {"type": "string", "minLength": 8, "maxLength": 4096, "writeOnly": true}, "password_confirmation": {"type": "string", "minLength": 8, "maxLength": 4096, "writeOnly": true}}},
+      "PasswordConfirm": {"type": "object", "required": ["password"], "properties": {"password": {"type": "string", "maxLength": 4096, "writeOnly": true}}},
+      "TotpEnroll": {"type": "object", "required": ["account_name"], "properties": {"account_name": {"type": "string", "maxLength": 255}, "name": {"type": ["string", "null"], "maxLength": 120}}},
+      "Code": {"type": "object", "required": ["code"], "properties": {"code": {"type": "string", "maxLength": 128, "writeOnly": true}}},
+      "ApiToken": {"type": "object", "required": ["name", "abilities"], "properties": {"name": {"type": "string", "maxLength": 120}, "abilities": {"type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "maxLength": 120}}, "expires_at": {"type": ["string", "null"], "format": "date-time"}}},
+      "InvitationCreate": {"type": "object", "required": ["recipient"], "properties": {"recipient": {"type": "string", "maxLength": 320}, "type": {"type": "string", "maxLength": 80, "default": "registration"}, "purpose": {"type": "string", "maxLength": 120, "default": "registration"}, "roles": {"type": "array", "items": {"type": "string", "maxLength": 255}}, "permissions": {"type": "array", "items": {"type": "string", "maxLength": 255}}, "metadata": {"type": "object", "additionalProperties": true}}},
+      "ClientMutation": {"type": "object", "required": ["name", "surface", "base_url"], "properties": {"name": {"type": "string", "maxLength": 120}, "surface": {"type": "string", "maxLength": 40}, "base_url": {"type": "string", "format": "uri", "maxLength": 2048}, "return_paths": {"type": "array", "items": {"type": "string", "maxLength": 2048}}, "allowed_origins": {"type": "array", "items": {"type": "string", "format": "uri", "maxLength": 2048}}, "allowed_flows": {"type": "array", "items": {"type": "string", "maxLength": 80}}, "metadata": {"type": "object", "additionalProperties": true}, "active": {"type": "boolean", "default": true}}},
+      "ClientStatus": {"type": "object", "required": ["active"], "properties": {"active": {"type": "boolean"}}},
+      "ProfileMutation": {"type": "object", "required": ["name", "locale", "timezone"], "properties": {"name": {"type": "string", "maxLength": 160}, "locale": {"type": "string", "maxLength": 12}, "timezone": {"type": "string", "maxLength": 64}, "profile": {"type": "object", "additionalProperties": true}, "preferences": {"type": "object", "additionalProperties": true}}},
+      "UserMutation": {"type": "object", "properties": {"name": {"type": "string", "maxLength": 160}, "email": {"type": "string", "format": "email", "maxLength": 254}, "password": {"type": ["string", "null"], "minLength": 12, "writeOnly": true}, "active": {"type": "boolean"}, "email_verified": {"type": "boolean"}, "locale": {"type": "string", "maxLength": 12}, "timezone": {"type": "string", "maxLength": 64}, "profile": {"type": "object", "additionalProperties": true}, "preferences": {"type": "object", "additionalProperties": true}, "roles": {"type": "array", "items": {"type": "string"}}, "permissions": {"type": "array", "items": {"type": "string"}}}},
+      "UserBulk": {"type": "object", "required": ["operation", "user_ids"], "properties": {"operation": {"type": "string", "enum": ["enable", "disable", "delete", "restore"]}, "user_ids": {"type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "format": "uuid"}}}},
+      "RoleAssignment": {"type": "object", "required": ["roles"], "properties": {"roles": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}}},
+      "PermissionAssignment": {"type": "object", "required": ["permissions"], "properties": {"permissions": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}}},
+      "RoleMutation": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string", "maxLength": 160}, "display_name": {"type": ["string", "null"], "maxLength": 160}, "description": {"type": ["string", "null"], "maxLength": 2000}, "parent_id": {"type": ["string", "null"], "format": "uuid"}, "priority": {"type": "integer"}, "permissions": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}, "metadata": {"type": "object", "additionalProperties": true}}},
+      "RoleClone": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string", "maxLength": 160}, "display_name": {"type": ["string", "null"], "maxLength": 160}}},
+      "RoleTemplate": {"type": "object", "required": ["template"], "properties": {"template": {"type": "string", "maxLength": 160}}},
+      "PermissionMutation": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string", "maxLength": 160}, "display_name": {"type": ["string", "null"], "maxLength": 160}, "description": {"type": ["string", "null"], "maxLength": 2000}, "group": {"type": ["string", "null"], "maxLength": 120}, "metadata": {"type": "object", "additionalProperties": true}}}
+    },
+    "requestBodies": {
+      "Login": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Login"}}}},
+      "Identifier": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Identifier"}}}},
+      "Recipient": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Recipient"}}}},
+      "PasswordReset": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PasswordReset"}}}},
+      "MagicLinkConsume": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MagicLinkConsume"}}}},
+      "SecurityCodeRequest": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SecurityCodeRequest"}}}},
+      "SecurityCodeVerify": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SecurityCodeVerify"}}}},
+      "InvitationAccept": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/InvitationAccept"}}}},
+      "PasskeyFinish": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PasskeyFinish"}}}},
+      "ClientStart": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ClientStart"}}}},
+      "PasswordUpdate": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PasswordUpdate"}}}},
+      "PasswordConfirm": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PasswordConfirm"}}}},
+      "TotpEnroll": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TotpEnroll"}}}},
+      "Code": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Code"}}}},
+      "ApiToken": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiToken"}}}},
+      "InvitationCreate": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/InvitationCreate"}}}},
+      "ClientMutation": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ClientMutation"}}}},
+      "ClientStatus": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ClientStatus"}}}}
+      ,"ProfileMutation": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProfileMutation"}}}}
+      ,"UserMutation": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserMutation"}}}}
+      ,"UserBulk": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserBulk"}}}}
+      ,"RoleAssignment": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoleAssignment"}}}}
+      ,"PermissionAssignment": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PermissionAssignment"}}}}
+      ,"RoleMutation": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoleMutation"}}}}
+      ,"RoleClone": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoleClone"}}}}
+      ,"RoleTemplate": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoleTemplate"}}}}
+      ,"PermissionMutation": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PermissionMutation"}}}}
+    },
+    "responses": {
+      "Success": {"description": "Successful Auth operation", "headers": {"Cache-Control": {"schema": {"type": "string", "const": "no-store, private"}}, "Referrer-Policy": {"schema": {"type": "string", "const": "no-referrer"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope"}}}},
+      "Created": {"description": "Auth resource created", "headers": {"Cache-Control": {"schema": {"type": "string", "const": "no-store, private"}}, "Referrer-Policy": {"schema": {"type": "string", "const": "no-referrer"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope"}}}},
+      "Accepted": {"description": "Auth request accepted without account disclosure", "headers": {"Cache-Control": {"schema": {"type": "string", "const": "no-store, private"}}, "Referrer-Policy": {"schema": {"type": "string", "const": "no-referrer"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope"}}}},
+      "ValidationFailure": {"description": "Laravel validation failure or neutral credential rejection", "content": {"application/json": {"schema": {"oneOf": [{"$ref": "#/components/schemas/LaravelValidationError"}, {"$ref": "#/components/schemas/Envelope"}]}}}}
+    }
+  }
+}
