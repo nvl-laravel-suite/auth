@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Passwords;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Auth\Passwords\PasswordBrokerManager;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword;
@@ -51,6 +52,11 @@ final readonly class RequestPasswordResetAction
             function () use ($data, $identifierName, $locale): void {
                 $brokerName = $this->configuration->get('password_broker');
                 $broker = $this->brokers->broker(is_string($brokerName) ? $brokerName : null);
+
+                if (! $broker instanceof PasswordBroker) {
+                    throw new \LogicException('The configured password broker must use Laravel\'s password broker implementation.');
+                }
+
                 $subject = $broker->getUser([$identifierName => $data->identifier]);
 
                 if (! $subject instanceof CanResetPassword) {

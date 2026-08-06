@@ -55,13 +55,13 @@ return new class extends Migration
             $table->index(['group', 'guard_name'], 'nvl_auth_permissions_group_guard_index');
         });
 
-        $schema->create($tables['roles'], function (Blueprint $table) use ($tables): void {
+        $schema->create($tables['roles'], function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->string('name', 160);
             $table->string('guard_name', 80);
             $table->string('display_name', 160)->nullable();
             $table->text('description')->nullable();
-            $table->foreignUuid('parent_id')->nullable()->constrained($tables['roles'])->nullOnDelete();
+            $table->uuid('parent_id')->nullable();
             $table->integer('priority')->default(0);
             $table->boolean('is_system')->default(false);
             $table->json('metadata')->nullable();
@@ -69,6 +69,16 @@ return new class extends Migration
 
             $table->unique(['name', 'guard_name'], 'nvl_auth_roles_name_guard_unique');
             $table->index(['parent_id', 'priority'], 'nvl_auth_roles_hierarchy_index');
+        });
+
+        // PostgreSQL compiles self-referencing foreign keys before primary-key
+        // commands inside one create-table blueprint. Add the relation only
+        // after the referenced primary key has been created.
+        $schema->table($tables['roles'], function (Blueprint $table) use ($tables): void {
+            $table->foreign('parent_id', 'nvl_auth_roles_parent_id_foreign')
+                ->references('id')
+                ->on($tables['roles'])
+                ->nullOnDelete();
         });
 
         $schema->create($tables['model_has_permissions'], function (Blueprint $table) use ($tables): void {
