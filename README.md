@@ -16,7 +16,7 @@ push, or another transport without coupling Auth to delivery infrastructure.
 ## Installation
 
 ```bash
-composer require nvl/auth
+composer require nvl/laravel-suite:^1.0
 php artisan vendor:publish --tag=auth-config
 php artisan vendor:publish --tag=auth-migrations
 php artisan vendor:publish --tag=auth-skills
