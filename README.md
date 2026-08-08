@@ -2,6 +2,16 @@
 
 [← NVL Laravel Suite](../../../README.md)
 
+## Quick reference
+
+| Item | Value |
+|---|---|
+| Installed through | `composer require nvl/laravel-suite:^1.0` |
+| Module identifier | `nvl/auth` |
+| PHP namespace | `Nvl\Auth` |
+| Service provider | `Nvl\Auth\Providers\AuthServiceProvider` |
+| Configuration | `config/nvl-auth.php` |
+
 ## Purpose
 
 NVL Auth is a reusable Laravel authentication platform with an optional,
