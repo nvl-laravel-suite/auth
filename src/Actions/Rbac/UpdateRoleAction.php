@@ -6,13 +6,13 @@ namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Data\Mutations\UpdateRoleData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\RbacChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Role;
-use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;

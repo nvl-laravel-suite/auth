@@ -7,17 +7,21 @@ namespace Nvl\Auth\Actions\Authentication;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\StatefulGuard;
+use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\BrowserSession;
+use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Data\Mutations\LoginData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Events\AuthenticationAttempted;
+use Nvl\Auth\Events\AuthenticationRejected;
 use Nvl\Auth\Events\UserAuthenticated;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Pipelines\AuthPipeline;
-use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\PrincipalEligibility;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use SensitiveParameter;
@@ -39,6 +43,7 @@ final readonly class LoginAction
         private AuthPipeline $pipeline,
         private AuthAuditRecorder $audits,
         private PrincipalEligibility $eligibility,
+        private SuccessfulLoginMetadataRecorder $loginMetadata,
     ) {}
 
     /**
@@ -46,6 +51,7 @@ final readonly class LoginAction
      */
     public function execute(
         #[SensitiveParameter] LoginData $data,
+        ?AuthenticationRequestContext $requestContext = null,
     ): Authenticatable {
         $this->features->assertAllowed(AuthFeature::Authentication, FeatureOperation::Use);
         $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Use);
@@ -59,8 +65,11 @@ final readonly class LoginAction
             );
         }
 
+        AuthenticationAttempted::dispatch($identifierName, $data->identifier);
+
         if (! $guard->attempt([$identifierName => $data->identifier, 'password' => $data->password], $data->remember)) {
             $this->audits->record('authentication.failed', outcome: 'failure');
+            AuthenticationRejected::dispatch($identifierName, $data->identifier, 'credentials_invalid');
             throw new AuthException('credentials_invalid', 'The supplied credentials are invalid.', 422);
         }
 
@@ -76,11 +85,17 @@ final readonly class LoginAction
         } catch (AuthException $exception) {
             $guard->logout();
             $this->audits->record('authentication.failed', outcome: 'failure');
+            AuthenticationRejected::dispatch(
+                $identifierName,
+                $data->identifier,
+                $exception->errorCode,
+                SubjectReference::fromAuthenticatable($subject),
+            );
 
             throw $exception;
         }
 
-        $this->eligibility->recordSuccessfulAuthentication($subject);
+        $this->loginMetadata->record($subject, $requestContext ?? new AuthenticationRequestContext);
 
         $reference = SubjectReference::fromAuthenticatable($subject);
 
@@ -107,6 +122,12 @@ final readonly class LoginAction
                 outcome: 'failure',
                 subject: $reference,
                 actor: $subject,
+            );
+            AuthenticationRejected::dispatch(
+                $identifierName,
+                $data->identifier,
+                'pipeline_rejected',
+                $reference,
             );
 
             throw $exception;

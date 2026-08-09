@@ -6,11 +6,11 @@ namespace Nvl\Auth\Actions\Clients;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Data\Mutations\UpdateClientData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\AuthClient;
-use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 

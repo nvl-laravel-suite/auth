@@ -15,6 +15,9 @@
         <testsuite name="feature">
             <directory suffix="Test.php">tests/Feature</directory>
         </testsuite>
+        <testsuite name="provider">
+            <directory suffix="Test.php">tests/Provider</directory>
+        </testsuite>
     </testsuites>
     <php>
         <ini name="memory_limit" value="512M"/>

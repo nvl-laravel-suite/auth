@@ -6,6 +6,12 @@ All notable changes to `nvl/auth` are documented here.
 
 ### Changed
 
+- Made disabled provider registration passive for host authentication,
+  authorization, Sanctum, password-broker, and migration state.
+- Added configurable audit persistence and successful-login metadata contracts.
+- Added authentication attempt and rejection events, including request-context
+  metadata for successful logins.
+- Documented the physical schema contract retained by configurable Auth models.
 - Rebuilt the package around sixteen independently enabled authentication
   features and one canonical feature/route manifest.
 - Added the concrete, extensible package User model with profile, search,

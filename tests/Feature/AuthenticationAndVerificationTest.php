@@ -14,27 +14,59 @@ use Nvl\Auth\Contracts\AuthAuditContextProvider;
 use Nvl\Auth\Data\Mutations\ConfirmPasswordData;
 use Nvl\Auth\Data\Mutations\LoginData;
 use Nvl\Auth\Events\AuthDeliveryRequested;
+use Nvl\Auth\Events\AuthenticationAttempted;
+use Nvl\Auth\Events\AuthenticationRejected;
 use Nvl\Auth\Events\UserAuthenticated;
 use Nvl\Auth\Events\UserLoggedOut;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Services\AuthAuditRecorder;
+use Nvl\Auth\Tests\Fixtures\HostAuditRecorder;
 use Nvl\Auth\Tests\Fixtures\RejectLoginStage;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 
 it('logs in and out through the configured Laravel stateful guard', function (): void {
     $user = $this->user();
-    Event::fake([UserAuthenticated::class, UserLoggedOut::class]);
-    $authenticated = app(LoginAction::class)->execute(new LoginData($user->email, 'correct-password'));
+    Event::fake([
+        AuthenticationAttempted::class,
+        UserAuthenticated::class,
+        UserLoggedOut::class,
+    ]);
+    $authenticated = app(LoginAction::class)->execute(
+        new LoginData($user->email, 'correct-password'),
+        new AuthenticationRequestContext(ipAddress: '203.0.113.10'),
+    );
 
     expect($authenticated->getAuthIdentifier())->toBe($user->getAuthIdentifier())
         ->and(Auth::guard('web')->check())->toBeTrue()
+        ->and($user->refresh()->last_login_ip)->toBe('203.0.113.10')
         ->and(AuthAudit::query()->where('action', 'authentication.succeeded')->exists())->toBeTrue();
 
     app(LogoutAction::class)->execute();
 
     expect(Auth::guard('web')->check())->toBeFalse();
+    Event::assertDispatched(AuthenticationAttempted::class);
     Event::assertDispatched(UserAuthenticated::class);
     Event::assertDispatched(UserLoggedOut::class);
+});
+
+it('emits a transport-neutral rejection event and records through a host audit adapter', function (): void {
+    $recorder = new HostAuditRecorder;
+    $this->app->instance(Nvl\Auth\Contracts\AuthAuditRecorder::class, $recorder);
+    Event::fake([AuthenticationAttempted::class, AuthenticationRejected::class]);
+
+    expect(fn () => app(LoginAction::class)->execute(new LoginData('missing@example.test', 'wrong-password')))
+        ->toThrow(AuthException::class, 'invalid');
+
+    expect($recorder->facts)->toHaveCount(1)
+        ->and($recorder->facts[0]['action'])->toBe('authentication.failed');
+
+    Event::assertDispatched(AuthenticationAttempted::class);
+    Event::assertDispatched(
+        AuthenticationRejected::class,
+        static fn (AuthenticationRejected $event): bool => $event->reason === 'credentials_invalid'
+            && $event->identifier === 'missing@example.test',
+    );
 });
 
 it('bounds untrusted audit request context', function (): void {

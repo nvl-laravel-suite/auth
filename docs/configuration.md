@@ -13,6 +13,7 @@ php artisan vendor:publish --tag=auth-config
 | `enabled` | `true` | global functional ingress switch |
 | `connection` | `null` | package operational database connection |
 | `migrations.enabled` | `true` | load the complete package schema |
+| `migrations.load_when_disabled` | `false` | explicitly load migrations while global Auth ingress is disabled |
 | `guard` | `web` | stateful Laravel guard used by browser authentication |
 | `password_broker` | provider default | Laravel password broker configured to the package token table |
 | `identifier` | `email` | login and broker credential attribute |
@@ -24,6 +25,10 @@ php artisan vendor:publish --tag=auth-config
 
 Choose the connection and table layout before installation. Changing either
 after rows exist is a coordinated data migration, not a runtime feature toggle.
+When `enabled=false`, Auth leaves the host Laravel user provider, password
+broker, Spatie Permission storage, Sanctum token model, and migration inventory
+unchanged. Set `migrations.load_when_disabled=true` only for an intentional
+schema-first rollout.
 
 ## Feature shape
 
@@ -105,7 +110,7 @@ middleware; a plain stateless `api` stack cannot persist a browser login.
 
 | Feature | Important settings/services |
 |---|---|
-| authentication | optional identifier and subject resolvers |
+| authentication | optional identifier/subject resolvers and successful-login metadata recorder |
 | principal management | User class, auth-provider switch, locale/timezone, page/suggestion limits |
 | password | optional updater, reset TTL |
 | email verification | TTL |
@@ -118,7 +123,7 @@ middleware; a plain stateless `api` stack cannot persist a browser login.
 | social identities | acquisition/subject resolvers and provider allowlist |
 | API tokens | token model/manager, ability provider/catalog, namespace |
 | RBAC | Role/Permission classes, catalog/template providers, guard, super-admin role |
-| audit | IP and user-agent capture |
+| audit | recorder implementation, IP and user-agent capture |
 
 ## Passkeys
 
@@ -130,8 +135,9 @@ display attributes, and a stable user-handle key (or stable `APP_KEY`).
 
 ## API tokens
 
-Sanctum and the package `PersonalAccessToken` model are configured automatically.
-Enable the feature and declare the bounded ability catalog:
+Sanctum and the package `PersonalAccessToken` model are configured only while
+global Auth ingress and the API-token feature are enabled. Enable the feature
+and declare the bounded ability catalog:
 
 ```php
 'api_tokens' => [

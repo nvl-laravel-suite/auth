@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Nvl\Auth\Http\Controllers\Public;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Nvl\Auth\Actions\Authentication\LoginAction;
 use Nvl\Auth\Data\Mutations\LoginData;
 use Nvl\Auth\Http\Controllers\Concerns\InteractsWithValidatedInput;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
@@ -20,9 +22,13 @@ final class AuthenticationController
     /**
      * Authenticate one browser user.
      */
-    public function login(LoginData $data, LoginAction $action): JsonResponse
+    public function login(LoginData $data, Request $request, LoginAction $action): JsonResponse
     {
-        $subject = $action->execute($data);
+        $subject = $action->execute($data, new AuthenticationRequestContext(
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent(),
+            requestId: $request->headers->get('X-Request-ID'),
+        ));
         $reference = SubjectReference::fromAuthenticatable($subject);
 
         return response()->json([

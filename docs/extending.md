@@ -8,9 +8,16 @@ authentication behavior.
 
 Subclass `Nvl\Auth\Models\User` to add application relationships, scopes, casts,
 or domain interfaces, then configure that subclass under
-`features.principal_management.models.user`. Do not replace package identity
-columns or the UUID key contract. The same pattern is available for Role,
-Permission, and PersonalAccessToken through their feature `models` keys.
+`features.principal_management.models.user`. Model configuration is behavioral
+extension, not storage-schema adaptation: subclasses must retain the package
+tables' physical columns and UUID key contract. User reserves `profile`,
+`preferences`, `is_active`, `last_login_at`, `last_login_ip`, and `locked_until`;
+Role reserves `priority`, `is_system`, and `metadata`; Permission reserves
+`group`, `is_system`, and `metadata`. A host with conflicting columns or a
+`profile()` relationship should keep package principal-management/RBAC writes
+disabled until it adopts the package schema or provides a compatible bridge.
+The same subclass pattern is available for Role, Permission, and
+PersonalAccessToken through their feature `models` keys.
 
 The model registry validates configured inheritance and every package Action
 resolves the configured model, so API and direct PHP use remain aligned.
@@ -73,9 +80,18 @@ application has another business authorization system.
 - use the built-in Sanctum manager or implement `ApiTokenManager`; implement
   `ApiTokenAbilityProvider` for subject-specific ability policy.
 
-## Identity/session/audit ports
+## Identity, session, metadata, and audit ports
 
 The defaults resolve package Users and Laravel browser sessions. Applications
 with nonstandard lookup/session behavior may replace `AuthIdentifierResolver`,
 `AuthSubjectResolver`, `BrowserSession`, or `AuthAuditContextProvider` while the
-feature Actions remain the public business API.
+feature Actions remain the public business API. Replace
+`SuccessfulLoginMetadataRecorder` to map timestamps and request context onto a
+host-owned principal schema. Replace `AuthAuditRecorder` to persist package
+audit facts into an existing host audit store; the package Eloquent audit model
+and `nvl_auth_audits` table are not required by that adapter.
+
+Password login emits `AuthenticationAttempted`, `AuthenticationRejected`,
+`UserAuthenticated`, and `UserLoggedOut`. Attempt/rejection events include the
+identifier but never the credential secret, so listeners must apply the host's
+PII retention policy.

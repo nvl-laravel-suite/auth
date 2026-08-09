@@ -56,9 +56,11 @@ configured package namespace.
 - `ListAuthAuditsAction`, `ShowAuthAuditAction`
 - `PruneAuthStateAction`
 
-`AuthAuditRecorder` is an internal reusable service used after successful or
-failed package transitions. When audit is enabled it may record containment work
-even while functional ingress is off.
+The `AuthAuditRecorder` contract is used after successful or failed package
+transitions. Configure a host implementation under
+`features.audit.services.recorder` to retain an existing audit schema. When
+audit is enabled it may record containment work even while functional ingress
+is off.
 
 ## Contracts
 
@@ -71,7 +73,7 @@ Public extension contracts are in `Nvl\Auth\Contracts`:
 - API-token ability provider;
 - permission and role catalog providers;
 - management access;
-- browser-session and audit-context adapters;
+- browser-session, successful-login metadata, audit-recorder, and audit-context adapters;
 - pipeline stage.
 
 ## Admission
@@ -85,5 +87,7 @@ status for package routes.
 
 - `AuthDeliveryRequested(AuthDeliveryRequest)`
 - `AuthAuditRecorded(auditId)`
+- `AuthenticationAttempted(identifierName, identifier)`
+- `AuthenticationRejected(identifierName, identifier, reason, ?SubjectReference)`
 - `UserAuthenticated(SubjectReference)`
 - `UserLoggedOut(?SubjectReference)`

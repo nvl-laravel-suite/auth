@@ -6,11 +6,11 @@ namespace Nvl\Auth\Actions\Clients;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthClientSession;
-use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\ValueObjects\SubjectReference;
 

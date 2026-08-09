@@ -7,6 +7,7 @@ namespace Nvl\Auth\Services;
 use Illuminate\Contracts\Auth\Authenticatable;
 use JsonException;
 use Nvl\Auth\Contracts\AuthAuditContextProvider;
+use Nvl\Auth\Contracts\AuthAuditRecorder as AuthAuditRecorderContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Events\AuthAuditRecorded;
 use Nvl\Auth\Exceptions\AuthException;
@@ -16,7 +17,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 /**
  * Records package audit facts when the audit feature is enabled.
  */
-final readonly class AuthAuditRecorder
+final readonly class AuthAuditRecorder implements AuthAuditRecorderContract
 {
     /**
      * Create the audit recorder.

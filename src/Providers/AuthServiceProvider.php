@@ -20,6 +20,7 @@ use Nvl\Auth\Console\Commands\PruneAuthStateCommand;
 use Nvl\Auth\Contracts\ApiTokenAbilityProvider;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthAuditContextProvider;
+use Nvl\Auth\Contracts\AuthAuditRecorder as AuthAuditRecorderContract;
 use Nvl\Auth\Contracts\AuthIdentifierResolver;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
@@ -31,14 +32,18 @@ use Nvl\Auth\Contracts\PermissionCatalogProvider;
 use Nvl\Auth\Contracts\RoleTemplateProvider;
 use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
+use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
+use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Models\User;
+use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
 use Nvl\Auth\Services\EloquentPasswordUpdater;
+use Nvl\Auth\Services\EloquentSuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\FeatureManifest;
 use Nvl\Auth\Services\LaravelGateAuthManagementAccess;
@@ -47,6 +52,7 @@ use Nvl\Auth\Services\PermissionCatalogRegistry;
 use Nvl\Auth\Services\RoleTemplateRegistry;
 use Nvl\Auth\Services\UnavailableSocialIdentityProvider;
 use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
+use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
 
 /**
@@ -60,6 +66,7 @@ final class AuthServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigurationRecursively();
+        $this->app->register(DataServiceProvider::class);
         $this->configureOwnedIdentityStorage();
         $this->app->singleton(AuthConfiguration::class);
         $this->app->singleton(AuthModelRegistry::class);
@@ -67,6 +74,11 @@ final class AuthServiceProvider extends ServiceProvider
         $this->app->singleton(FeatureGate::class);
         $this->app->singleton(BrowserSession::class, LaravelBrowserSession::class);
         $this->app->singleton(AuthAuditContextProvider::class, LaravelRequestAuditContextProvider::class);
+        $this->bindConfiguredContract(
+            AuthAuditRecorderContract::class,
+            'features.audit.services.recorder',
+            AuthAuditRecorder::class,
+        );
         $this->app->singleton(AuthManagementAccess::class, LaravelGateAuthManagementAccess::class);
         $this->bindConfiguredContract(
             PasswordUpdater::class,
@@ -82,6 +94,11 @@ final class AuthServiceProvider extends ServiceProvider
             AuthIdentifierResolver::class,
             'features.authentication.services.identifier_resolver',
             LaravelGuardIdentifierResolver::class,
+        );
+        $this->bindConfiguredContract(
+            SuccessfulLoginMetadataRecorder::class,
+            'features.authentication.services.login_metadata_recorder',
+            EloquentSuccessfulLoginMetadataRecorder::class,
         );
         $this->bindConfiguredContract(
             ApiTokenManager::class,
@@ -131,12 +148,15 @@ final class AuthServiceProvider extends ServiceProvider
         $this->publishes([$root.'/database/migrations' => database_path('migrations')], 'auth-migrations');
         $this->publishes([$root.'/resources/boost/skills' => base_path('.agents/skills')], 'auth-skills');
 
-        if ($configuration->boolean('migrations.enabled', true)) {
+        if ($configuration->boolean('migrations.enabled', true)
+            && ($configuration->enabled() || $configuration->boolean('migrations.load_when_disabled', false))) {
             $this->loadMigrationsFrom($root.'/database/migrations');
         }
 
-        $models = $this->app->make(AuthModelRegistry::class);
-        Sanctum::usePersonalAccessTokenModel($models->personalAccessTokenClass());
+        if ($configuration->enabled() && $configuration->featureEnabled(AuthFeature::ApiTokens)) {
+            $models = $this->app->make(AuthModelRegistry::class);
+            Sanctum::usePersonalAccessTokenModel($models->personalAccessTokenClass());
+        }
 
         if ($this->app->runningInConsole()) {
             $this->commands([
@@ -171,7 +191,12 @@ final class AuthServiceProvider extends ServiceProvider
     {
         $configuration = $this->app->make(ConfigRepository::class);
 
-        if ((bool) $configuration->get('nvl-auth.features.principal_management.settings.use_as_auth_model', true)) {
+        if (! (bool) $configuration->get('nvl-auth.enabled', true)) {
+            return;
+        }
+
+        if ((bool) $configuration->get('nvl-auth.features.principal_management.enabled', true)
+            && (bool) $configuration->get('nvl-auth.features.principal_management.settings.use_as_auth_model', true)) {
             $guard = $configuration->get('nvl-auth.guard', 'web');
             $provider = is_string($guard)
                 ? $configuration->get("auth.guards.{$guard}.provider")
@@ -185,8 +210,10 @@ final class AuthServiceProvider extends ServiceProvider
                 $configuration->set("auth.providers.{$provider}.model", $userModel);
             }
 
-            $broker = $configuration->get('nvl-auth.password_broker')
-                ?? $configuration->get('auth.defaults.passwords');
+            $broker = (bool) $configuration->get('nvl-auth.features.password.enabled', true)
+                ? $configuration->get('nvl-auth.password_broker')
+                    ?? $configuration->get('auth.defaults.passwords')
+                : null;
 
             if (is_string($broker) && trim($broker) !== '') {
                 $configuration->set(
@@ -201,7 +228,8 @@ final class AuthServiceProvider extends ServiceProvider
             }
         }
 
-        if (! (bool) $configuration->get('nvl-auth.features.rbac.settings.use_package_storage', true)) {
+        if (! (bool) $configuration->get('nvl-auth.features.rbac.enabled', true)
+            || ! (bool) $configuration->get('nvl-auth.features.rbac.settings.use_package_storage', true)) {
             return;
         }
 

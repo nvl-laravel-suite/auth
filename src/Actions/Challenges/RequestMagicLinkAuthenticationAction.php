@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Actions\Challenges;
 
+use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthIdentifierResolver;
 use Nvl\Auth\Data\Mutations\RequestMagicLinkData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Results\IssuedChallenge;
-use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\ValueObjects\SubjectReference;

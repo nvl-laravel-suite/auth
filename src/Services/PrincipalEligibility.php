@@ -22,14 +22,4 @@ final class PrincipalEligibility
             throw new AuthException('credentials_invalid', 'The supplied credentials are invalid.', 422);
         }
     }
-
-    /**
-     * Persist package-owned successful-login metadata when applicable.
-     */
-    public function recordSuccessfulAuthentication(Authenticatable $subject): void
-    {
-        if ($subject instanceof User) {
-            $subject->forceFill(['last_login_at' => now()])->save();
-        }
-    }
 }

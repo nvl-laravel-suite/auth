@@ -36,10 +36,13 @@ php artisan migrate
 php artisan nvl:auth:doctor
 ```
 
-Package discovery registers `AuthServiceProvider`. With the default
+Package discovery registers the root Suite provider, which selects
+`AuthServiceProvider` through `config/nvl-suite.php`. With the default
 configuration NVL Auth supplies the application's authentication User model,
 password-reset repository, Spatie Role and Permission models, and Sanctum
-PersonalAccessToken model. Routes remain off until explicitly enabled.
+PersonalAccessToken model. Routes remain off until explicitly enabled. When
+global Auth ingress is disabled, provider registration is passive and does not
+replace host Auth, Permission, Sanctum, or migration state.
 
 ## Ownership
 
@@ -195,8 +198,10 @@ template, provider, delivery retry, and provider callback concerns.
 
 ## Storage
 
-The complete schema is always installed, independently of feature and route
-flags. It contains 17 UUID-first, `nvl_auth_`-prefixed tables: User, RBAC and
+The complete schema is installed while Auth is globally enabled, independently
+of individual feature and route flags. A globally disabled provider does not
+load migrations unless `migrations.load_when_disabled=true` is explicitly set.
+The schema contains 17 UUID-first, `nvl_auth_`-prefixed tables: User, RBAC and
 pivots, Sanctum tokens, password resets, clients/session correlations,
 invitations, challenges, TOTP, passkeys, recovery codes, social identities, and
 audits. It intentionally contains no mail delivery, notification, queue,

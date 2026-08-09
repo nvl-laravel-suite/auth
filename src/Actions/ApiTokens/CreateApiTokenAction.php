@@ -6,13 +6,13 @@ namespace Nvl\Auth\Actions\ApiTokens;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Contracts\ApiTokenManager;
+use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Data\Mutations\ApiTokenData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Results\IssuedApiToken;
 use Nvl\Auth\Services\ApiTokenPolicy;
-use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;

@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\AuthClientSession;
@@ -16,7 +17,6 @@ use Nvl\Auth\Models\Passkey;
 use Nvl\Auth\Models\RecoveryCode;
 use Nvl\Auth\Models\SocialIdentity;
 use Nvl\Auth\Models\TotpCredential;
-use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 

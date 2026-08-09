@@ -18,6 +18,7 @@ return [
     'connection' => env('NVL_AUTH_DB_CONNECTION'),
     'migrations' => [
         'enabled' => true,
+        'load_when_disabled' => false,
     ],
 
     /*
@@ -42,7 +43,11 @@ return [
         'authentication' => [
             'enabled' => env('NVL_AUTH_AUTHENTICATION_ENABLED', true),
             'routes' => ['public' => ['enabled' => false], 'account' => ['enabled' => false]],
-            'services' => ['subject_resolver' => null, 'identifier_resolver' => null],
+            'services' => [
+                'subject_resolver' => null,
+                'identifier_resolver' => null,
+                'login_metadata_recorder' => null,
+            ],
             'settings' => [],
         ],
         'principal_management' => [
@@ -164,6 +169,7 @@ return [
         'audit' => [
             'enabled' => env('NVL_AUTH_AUDIT_ENABLED', true),
             'routes' => ['management' => ['enabled' => false]],
+            'services' => ['recorder' => null],
             'settings' => ['capture_ip' => true, 'capture_user_agent' => true],
         ],
     ],

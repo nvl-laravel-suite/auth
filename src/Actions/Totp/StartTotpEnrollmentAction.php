@@ -6,12 +6,12 @@ namespace Nvl\Auth\Actions\Totp;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Data\Mutations\StartTotpEnrollmentData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Results\TotpEnrollment;
-use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\TotpEngine;
 use Nvl\Auth\ValueObjects\SubjectReference;

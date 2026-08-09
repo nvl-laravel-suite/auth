@@ -6,12 +6,12 @@ namespace Nvl\Auth\Actions\Passwords;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Hashing\Hasher;
+use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\BrowserSession;
 use Nvl\Auth\Data\Mutations\ConfirmPasswordData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use SensitiveParameter;
