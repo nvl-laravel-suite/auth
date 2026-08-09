@@ -4,6 +4,8 @@ All notable changes to `nvl/auth` are documented here.
 
 ## Unreleased
 
+## 1.0.1 - 2026-08-09
+
 ### Changed
 
 - Made disabled provider registration passive for host authentication,
