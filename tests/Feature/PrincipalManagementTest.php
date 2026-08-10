@@ -15,6 +15,7 @@ use Nvl\Auth\Actions\Users\BulkUpdateUsersAction;
 use Nvl\Auth\Actions\Users\CreateUserAction;
 use Nvl\Auth\Actions\Users\DeleteOwnAccountAction;
 use Nvl\Auth\Actions\Users\DeleteUserAction;
+use Nvl\Auth\Actions\Users\ListUsersAction;
 use Nvl\Auth\Actions\Users\RestoreUserAction;
 use Nvl\Auth\Actions\Users\SetUserActiveAction;
 use Nvl\Auth\Actions\Users\SuggestUsersAction;
@@ -127,6 +128,39 @@ it('supports profile, suggestions, and bounded bulk lifecycle operations', funct
         ->and($second->fresh()->remember_token)->not->toBe('second-remember')
         ->and($first->tokens()->count())->toBe(0)
         ->and($second->tokens()->count())->toBe(0);
+});
+
+it('keeps eager-loaded principal list queries independent of fixture size', function (): void {
+    $actor = $this->user('query-actor@example.test');
+    $measure = function () use ($actor): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $page = app(ListUsersAction::class)->execute($actor, perPage: 100);
+        $queryCount = count(DB::getQueryLog());
+
+        foreach ($page->items() as $user) {
+            $user->roles->count();
+            $user->permissions->count();
+        }
+
+        expect(DB::getQueryLog())->toHaveCount($queryCount);
+        DB::disableQueryLog();
+
+        return $queryCount;
+    };
+
+    $this->user('query-user-1@example.test');
+    $singleQueryCount = $measure();
+
+    foreach (range(2, 25) as $index) {
+        $this->user("query-user-{$index}@example.test");
+    }
+
+    $populatedQueryCount = $measure();
+
+    expect($singleQueryCount)->toBeLessThanOrEqual(4)
+        ->and($populatedQueryCount)->toBe($singleQueryCount);
 });
 
 it('contains browser credentials during actorless domain deactivation', function (): void {
