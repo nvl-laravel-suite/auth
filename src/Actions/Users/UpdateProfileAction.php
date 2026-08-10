@@ -11,7 +11,6 @@ use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\UpdateProfileData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
-use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\FeatureGate;
@@ -38,13 +37,7 @@ final readonly class UpdateProfileAction
         $user = $this->users->authenticated($subject);
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($data, $user): User {
-            $user->forceFill($this->attributes->map([
-                PrincipalAttribute::Name->value => trim($data->name),
-                PrincipalAttribute::Locale->value => trim($data->locale),
-                PrincipalAttribute::Timezone->value => trim($data->timezone),
-                PrincipalAttribute::Profile->value => $data->profile,
-                PrincipalAttribute::Preferences->value => $data->preferences,
-            ]))->save();
+            $user->update($this->attributes->map($data->toArray()));
             $reference = SubjectReference::fromAuthenticatable($user);
             $this->audits->record('profile.updated', subject: $reference, actor: $user);
             PrincipalChanged::dispatch($this->attributes->identifier($user), 'profile_updated');

@@ -43,7 +43,9 @@ final class ConfiguredPrincipalAttributeMapper implements PrincipalAttributeMapp
         $mapped = [];
 
         foreach ($canonicalAttributes as $canonical => $value) {
-            $attribute = PrincipalAttribute::tryFrom($canonical);
+            $attribute = $canonical === 'emailVerified'
+                ? PrincipalAttribute::EmailVerifiedAt
+                : PrincipalAttribute::tryFrom($canonical);
 
             if (! $attribute instanceof PrincipalAttribute) {
                 throw AuthException::invalidConfiguration(
@@ -51,7 +53,11 @@ final class ConfiguredPrincipalAttributeMapper implements PrincipalAttributeMapp
                 );
             }
 
-            $mapped[$this->column($attribute)] = $value;
+            $mapped[$this->column($attribute)] = $this->normalizeMutationValue(
+                $attribute,
+                $canonical,
+                $value,
+            );
         }
 
         return $mapped;
@@ -121,5 +127,27 @@ final class ConfiguredPrincipalAttributeMapper implements PrincipalAttributeMapp
         return $attribute === PrincipalAttribute::Active
             ? 'is_active'
             : $attribute->value;
+    }
+
+    private function normalizeMutationValue(
+        PrincipalAttribute $attribute,
+        string $canonical,
+        mixed $value,
+    ): mixed {
+        if ($canonical === 'emailVerified') {
+            return $value === true ? now() : null;
+        }
+
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        return match ($attribute) {
+            PrincipalAttribute::Email => mb_strtolower(trim($value)),
+            PrincipalAttribute::Name,
+            PrincipalAttribute::Locale,
+            PrincipalAttribute::Timezone => trim($value),
+            default => $value,
+        };
     }
 }

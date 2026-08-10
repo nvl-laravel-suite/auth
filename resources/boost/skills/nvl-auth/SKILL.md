@@ -42,9 +42,12 @@ or an application-specific model/namespace to Auth.
 10. Keep the configured principal attribute map aligned across models, Actions,
     validation, authentication, adoption, and Doctor. Reject physical
     attribute/relationship collisions.
-11. Adopt legacy principals only through a versioned dry-run-first manifest
+11. Persist validated principal DTO arrays as one mapped payload. Use
+    `Optional` for sparse updates; never rebuild partial writes property by
+    property or treat omitted values as `null`.
+12. Adopt legacy principals only through a versioned dry-run-first manifest
     that reconciles counts, identifiers, hashes, tokens, and declared host FKs.
-12. Run focused Pest, full Pest, PHPStan max, and Pint.
+13. Run focused Pest, full Pest, PHPStan max, and Pint.
 
 ## Features
 

@@ -50,17 +50,9 @@ final readonly class CreateUserAction
         $connection = (new $class)->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($actor, $class, $data): User {
-            $user = $class::query()->create($this->attributes->map([
-                PrincipalAttribute::Name->value => trim($data->name),
-                PrincipalAttribute::Email->value => mb_strtolower(trim($data->email)),
-                PrincipalAttribute::Password->value => $data->password,
-                PrincipalAttribute::Active->value => $data->active,
-                PrincipalAttribute::Locale->value => $data->locale,
-                PrincipalAttribute::Timezone->value => $data->timezone,
-                PrincipalAttribute::Profile->value => $data->profile,
-                PrincipalAttribute::Preferences->value => $data->preferences,
-                PrincipalAttribute::EmailVerifiedAt->value => $data->emailVerified ? now() : null,
-            ]));
+            $user = $class::query()->create($this->attributes->map(
+                $data->except('roles', 'permissions')->toArray(),
+            ));
             $this->rbac->assign($user, $data->roles, $data->permissions);
             $reference = SubjectReference::fromAuthenticatable($user);
             $this->audits->record('user.created', subject: $reference, actor: $actor);

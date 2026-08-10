@@ -8,10 +8,12 @@ use Nvl\Auth\Actions\Authentication\LoginAction;
 use Nvl\Auth\Actions\Users\CreateUserAction;
 use Nvl\Auth\Actions\Users\SetUserActiveAction;
 use Nvl\Auth\Actions\Users\UpdateProfileAction;
+use Nvl\Auth\Actions\Users\UpdateUserAction;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\LoginData;
 use Nvl\Auth\Data\Mutations\StoreUserData;
 use Nvl\Auth\Data\Mutations\UpdateProfileData;
+use Nvl\Auth\Data\Mutations\UpdateUserData;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Tests\Fixtures\MappedPrincipal;
@@ -78,6 +80,19 @@ it('maps package principal mutations without shadowing a host profile relationsh
         profile: ['phone' => '+359111111111'],
         preferences: ['theme' => 'light'],
     ));
+    $updated = app(UpdateUserAction::class)->execute(
+        $actor,
+        $updated,
+        UpdateUserData::validateForUpdate([
+            'name' => 'Sparse Update',
+        ], (string) $updated->getKey()),
+    );
+    $updated = app(UpdateProfileAction::class)->execute(
+        $updated,
+        UpdateProfileData::validateAndCreate([
+            'preferences' => ['theme' => 'system'],
+        ]),
+    );
     app(SetUserActiveAction::class)->execute($actor, $updated, false);
     $attributes = app(PrincipalAttributeMapper::class);
     $authenticated = app(LoginAction::class)->execute(new LoginData(
@@ -88,7 +103,9 @@ it('maps package principal mutations without shadowing a host profile relationsh
 
     expect($updated->fresh()->profile)->toBeInstanceOf(MappedPrincipalProfile::class)
         ->and($updated->getAttribute('auth_profile'))->toBe(['phone' => '+359111111111'])
-        ->and($updated->getAttribute('auth_preferences'))->toBe(['theme' => 'light'])
+        ->and($updated->getAttribute('name'))->toBe('Sparse Update')
+        ->and($updated->getAttribute('locale'))->toBe('bg')
+        ->and($updated->getAttribute('auth_preferences'))->toBe(['theme' => 'system'])
         ->and($attributes->value($updated->fresh(), PrincipalAttribute::Active))->toBeFalse()
         ->and($authenticated->getAuthIdentifier())->toBe($actor->getKey());
 });

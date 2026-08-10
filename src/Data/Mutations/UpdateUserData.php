@@ -15,6 +15,7 @@ use Spatie\LaravelData\Attributes\MapInputName;
 use Spatie\LaravelData\Attributes\MapOutputName;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Mappers\CamelCaseMapper;
+use Spatie\LaravelData\Optional;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -27,45 +28,45 @@ final class UpdateUserData extends Data
     use DataTransform;
 
     /**
-     * @param  array<string, mixed>|null  $profile
-     * @param  array<string, mixed>|null  $preferences
+     * @param  array<string, mixed>|Optional  $profile
+     * @param  array<string, mixed>|Optional  $preferences
      */
     public function __construct(
-        public readonly ?string $name = null,
-        public readonly ?string $email = null,
-        public readonly ?string $password = null,
-        public ?string $locale = null,
-        public ?string $timezone = null,
-        public readonly ?array $profile = null,
-        public readonly ?array $preferences = null,
-        public readonly ?bool $emailVerified = null,
+        public readonly string|Optional $name = new Optional,
+        public readonly string|Optional $email = new Optional,
+        public readonly string|Optional|null $password = new Optional,
+        public string|Optional $locale = new Optional,
+        public string|Optional $timezone = new Optional,
+        public readonly array|Optional $profile = new Optional,
+        public readonly array|Optional $preferences = new Optional,
+        public readonly bool|Optional $emailVerified = new Optional,
     ) {
-        if ($this->name !== null && (trim($this->name) === '' || mb_strlen($this->name) > 160)) {
+        if (is_string($this->name) && (trim($this->name) === '' || mb_strlen($this->name) > 160)) {
             throw new InvalidArgumentException('User names must contain between one and 160 characters.');
         }
 
-        if ($this->email !== null
+        if (is_string($this->email)
             && (filter_var($this->email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($this->email) > 254)) {
             throw new InvalidArgumentException('A valid user email address is required.');
         }
 
-        if ($this->password !== null && mb_strlen($this->password) < 12) {
+        if (is_string($this->password) && mb_strlen($this->password) < 12) {
             throw new InvalidArgumentException('User passwords must contain at least 12 characters.');
         }
 
-        if ($this->locale !== null && ! preg_match('/^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$/', $this->locale)) {
+        if (is_string($this->locale) && ! preg_match('/^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$/', $this->locale)) {
             throw new InvalidArgumentException('A valid user locale is required.');
         }
 
-        if ($this->timezone !== null && ! in_array($this->timezone, DateTimeZone::listIdentifiers(), true)) {
+        if (is_string($this->timezone) && ! in_array($this->timezone, DateTimeZone::listIdentifiers(), true)) {
             throw new InvalidArgumentException('A valid user timezone is required.');
         }
 
-        if ($this->profile !== null) {
+        if (is_array($this->profile)) {
             $this->assertJsonPayloadIsBounded($this->profile, 'profile');
         }
 
-        if ($this->preferences !== null) {
+        if (is_array($this->preferences)) {
             $this->assertJsonPayloadIsBounded($this->preferences, 'preferences');
         }
     }

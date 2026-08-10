@@ -15,6 +15,9 @@ All notable changes to `nvl/auth` are documented here.
   reconciliation command for features enabled after initial installation.
 - Made Doctor reject physical principal columns that shadow Eloquent
   relationships on the configured User model.
+- Made principal create/update Actions persist complete validated DTO payloads
+  through the attribute mapper; update DTOs use `Optional` so omitted fields
+  remain unchanged while explicit values are applied without duplicate wiring.
 
 ## 1.0.1 - 2026-08-09
 

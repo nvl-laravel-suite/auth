@@ -101,6 +101,11 @@ identifiers. A custom `PrincipalAttributeMapper` may replace the configured
 mapper, but its mapping must remain consistent with the model's configured
 attribute map.
 
+Principal write Actions pass the DTO's complete validated array through this
+mapper and into Eloquent mass assignment. Partial mutation DTOs represent
+missing properties with `Optional`, so an omitted field is never rewritten to
+a default or `null`; explicit nullable values remain intentional updates.
+
 Never map a column to the name of an Eloquent relationship. Also ensure the
 physical principal table has no otherwise-unused column with that relationship
 name: Eloquent attributes shadow relations even when the package map points

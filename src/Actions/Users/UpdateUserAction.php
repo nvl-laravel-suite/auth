@@ -11,7 +11,6 @@ use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\UpdateUserData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
-use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\FeatureGate;
@@ -41,23 +40,8 @@ final readonly class UpdateUserAction
         $user = $this->users->find($user, true);
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $data, $user): User {
-            $attributes = [];
-
-            foreach (['name', 'password', 'locale', 'timezone', 'profile', 'preferences'] as $attribute) {
-                if ($data->{$attribute} !== null) {
-                    $attributes[$attribute] = $data->{$attribute};
-                }
-            }
-
-            if ($data->email !== null) {
-                $attributes['email'] = mb_strtolower(trim($data->email));
-            }
-
-            if ($data->emailVerified !== null) {
-                $attributes[PrincipalAttribute::EmailVerifiedAt->value] = $data->emailVerified ? now() : null;
-            }
-
-            $user->forceFill($this->attributes->map($attributes))->save();
+            $attributes = $data->toArray();
+            $user->update($this->attributes->map($attributes));
             $reference = SubjectReference::fromAuthenticatable($user);
             $this->audits->record('user.updated', subject: $reference, actor: $actor, metadata: [
                 'attributes' => array_keys($attributes),
