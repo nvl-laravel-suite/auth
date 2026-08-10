@@ -31,6 +31,7 @@ push, or another transport without coupling Auth to delivery infrastructure.
 composer require nvl/laravel-suite:^1.0
 php artisan vendor:publish --tag=auth-config
 php artisan vendor:publish --tag=auth-skills
+php artisan vendor:publish --tag=auth-adoption
 php artisan migrate
 php artisan nvl:auth:schema
 php artisan nvl:auth:doctor
