@@ -9,6 +9,7 @@ use Nvl\Auth\Actions\Rbac\CreateRoleAction;
 use Nvl\Auth\Actions\Rbac\ListRoleHierarchyAction;
 use Nvl\Auth\Actions\Rbac\ListRoleTemplatesAction;
 use Nvl\Auth\Actions\Rbac\ShowRbacAnalyticsAction;
+use Nvl\Auth\Data\Mutations\ApplyRoleTemplateData;
 use Nvl\Auth\Data\Mutations\StorePermissionData;
 use Nvl\Auth\Data\Mutations\StoreRoleData;
 
@@ -30,7 +31,7 @@ it('owns role and permission CRUD foundations, cloning, hierarchy, templates, an
     $clone = app(CloneRoleAction::class)->execute($actor, $child, 'catalog-observer');
     $actor->assignRole($parent);
     $templates = app(ListRoleTemplatesAction::class)->execute($actor);
-    $template = app(ApplyRoleTemplateAction::class)->execute($actor, 'auth-auditor');
+    $template = app(ApplyRoleTemplateAction::class)->execute($actor, new ApplyRoleTemplateData('auth-auditor'));
     $hierarchy = app(ListRoleHierarchyAction::class)->execute($actor);
     $parentNode = collect($hierarchy)->firstWhere('id', $parent->id);
     $childNode = collect($parentNode['children'] ?? [])->firstWhere('id', $child->id);
@@ -38,7 +39,7 @@ it('owns role and permission CRUD foundations, cloning, hierarchy, templates, an
 
     expect($clone->hasPermissionTo('catalog.read'))->toBeTrue()
         ->and($clone->is_system)->toBeFalse()
-        ->and($templates)->toHaveKeys(['super-admin', 'auth-auditor', 'auth-user-manager'])
+        ->and(collect($templates)->pluck('key')->all())->toBe(['auth-auditor', 'auth-user-manager', 'super-admin'])
         ->and($template->is_system)->toBeTrue()
         ->and($template->hasPermissionTo('nvl-auth.audits.view'))->toBeTrue()
         ->and($parentNode)->toBeArray()

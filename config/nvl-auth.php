@@ -1,11 +1,15 @@
 <?php
 
 declare(strict_types=1);
+
+use Nvl\Auth\Adapters\Laravel\LaravelPrincipalSessionContainment;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\PersonalAccessToken;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\ConfiguredPrincipalAttributeMapper;
+use Nvl\Auth\Services\DenySystemMutationAccess;
+use Nvl\Auth\Services\EloquentRbacPrincipalAccess;
 use Nvl\Auth\Services\PackagePermissionCatalog;
 use Nvl\Auth\Services\PackageRoleTemplates;
 
@@ -31,6 +35,9 @@ return [
     'guard' => env('NVL_AUTH_GUARD', 'web'),
     'password_broker' => env('NVL_AUTH_PASSWORD_BROKER'),
     'identifier' => env('NVL_AUTH_IDENTIFIER', 'email'),
+    'services' => [
+        'system_mutation_access' => DenySystemMutationAccess::class,
+    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -60,6 +67,7 @@ return [
             'services' => [
                 'attribute_mapper' => ConfiguredPrincipalAttributeMapper::class,
                 'account_confirmation' => null,
+                'session_containment' => LaravelPrincipalSessionContainment::class,
             ],
             'settings' => [
                 'use_as_auth_model' => true,
@@ -184,10 +192,12 @@ return [
             'models' => [
                 'role' => Role::class,
                 'permission' => Permission::class,
+                'principal' => null,
             ],
             'services' => [
                 'permission_catalogs' => [PackagePermissionCatalog::class],
                 'role_templates' => [PackageRoleTemplates::class],
+                'principal_access' => EloquentRbacPrincipalAccess::class,
             ],
             'settings' => [
                 'guard' => env('NVL_AUTH_RBAC_GUARD', 'web'),

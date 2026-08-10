@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use LogicException;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
 
@@ -54,15 +55,28 @@ final readonly class RbacSynchronizer
         $roleClass = $this->models->roleClass();
         $permissionClass = $this->models->permissionClass();
 
-        foreach ($roles as $name => $permissions) {
-            $role = $roleClass::findOrCreate($name, $guard);
+        foreach ($roles as $template) {
+            $parent = $template->parentRole !== null
+                ? $roleClass::findOrCreate($template->parentRole, $guard)
+                : null;
+            $parentId = $parent?->getKey();
 
-            if ($role instanceof Role && ! $role->is_system) {
-                $role->forceFill(['is_system' => true])->save();
+            if ($parentId !== null && ! is_string($parentId)) {
+                throw new LogicException('Configured RBAC role identifiers must be strings.');
+            }
+
+            $mutation = $template->toMutation(parentId: $parentId);
+            $role = $roleClass::findOrCreate($mutation->name, $guard);
+
+            if ($role instanceof Role) {
+                $attributes = $mutation->except('permissions')->toModelPatch();
+                $attributes['is_system'] = $attributes['system'];
+                unset($attributes['system']);
+                $role->fill($attributes)->save();
             }
             $permissionModels = [];
 
-            foreach ($permissions as $permission) {
+            foreach ($mutation->permissions as $permission) {
                 $permissionModels[] = $permissionClass::findOrCreate($permission, $guard);
             }
 

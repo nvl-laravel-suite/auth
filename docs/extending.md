@@ -75,6 +75,12 @@ application permissions and canonical roles. Keep the package providers in the
 configured arrays so Auth API abilities remain available. Synchronization is
 deterministic, transactional, and never deletes unrelated records.
 
+`RoleTemplateProvider::roles()` returns `RoleTemplate` values. Each template
+may define its canonical role name, display name, description, system flag,
+parent role, priority, permissions, and metadata. `ApplyRoleTemplateData` may
+select another bounded target role name while retaining the template metadata
+and permissions.
+
 The default management access contract authorizes the configured super-admin
 role or delegates to Laravel Gate. Replace `AuthManagementAccess` only when the
 application has another business authorization system.
@@ -99,6 +105,14 @@ feature Actions remain the public business API. Replace
 host-owned principal schema. Replace `AuthAuditRecorder` to persist package
 audit facts into an existing host audit store; the package Eloquent audit model
 and `nvl_auth_audits` table are not required by that adapter.
+
+RBAC-only consumers may replace `RbacPrincipalAccess` and configure an
+independent RBAC principal model without enabling principal management.
+Actorless bootstrap and domain workflows must pass `SystemMutationContext` and
+be granted by a host `SystemMutationAccess` implementation; the package default
+denies every such call. Replace `PrincipalSessionContainment` to compose
+host-defined client sessions while preserving API-token, remember-token, and
+Laravel database-session containment.
 
 Password login emits `AuthenticationAttempted`, `AuthenticationRejected`,
 `UserAuthenticated`, and `UserLoggedOut`. Attempt/rejection events include the

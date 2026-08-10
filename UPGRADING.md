@@ -101,6 +101,21 @@ dropping old tables.
 
 ## Users, RBAC, and tokens
 
+RBAC-only hosts may now configure `features.rbac.models.principal` and replace
+`features.rbac.services.principal_access` without enabling package principal
+management. `SyncUserRolesAction` and `SyncUserPermissionsAction` now receive
+`SyncUserRolesData` and `SyncUserPermissionsData`; they no longer receive raw
+lists. `ApplyRoleTemplateAction` now receives `ApplyRoleTemplateData`, and
+`RoleTemplateProvider::roles()` must return `RoleTemplate` values instead of a
+`role => permissions` map.
+
+Actorless bootstrap and domain transitions require a `SystemMutationContext`
+with a reason and correlation identifier. They fail closed until the host
+replaces `SystemMutationAccess`. Configure a custom
+`PrincipalSessionContainment` when sessions exist outside Sanctum, remember
+credentials, and Laravel's database session table; a replacement owns the
+complete containment contract.
+
 The package User is the default Laravel auth-provider model. Move identity,
 profile, status, and login state into `nvl_auth_users`. When the application
 needs cross-module relationships, subclass the package User and configure the

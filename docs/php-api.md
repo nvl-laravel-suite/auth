@@ -71,6 +71,11 @@ authenticate a request.
 - API token list/create/update/rotate/revoke/revoke-all
 - atomic complete RBAC synchronization, plus granular permission-catalog and
   role-template synchronization Actions
+- bootstrap-safe `BootstrapRbacAction(SystemMutationContext)` with a typed
+  `RbacSynchronizationResult`
+- DTO-based host-principal role and direct-permission synchronization through
+  replaceable `RbacPrincipalAccess`
+- rich role-template listing/application with caller-selected target role names
 
 Provider adapters remain authoritative. The package does not expose a duplicate
 token or role model. The Sanctum adapter exposes only tokens carrying its
@@ -99,7 +104,8 @@ Public extension contracts are in `Nvl\Auth\Contracts`:
 - social identity and API-token provider adapters;
 - API-token ability provider;
 - permission and role catalog providers;
-- management access;
+- management and denied-by-default system-mutation access;
+- RBAC principal access and principal-session containment;
 - browser-session, successful-login metadata, audit-recorder, and audit-context adapters;
 - pipeline stage.
 
@@ -113,6 +119,8 @@ status for package routes.
 ## Events
 
 - `AuthDeliveryRequested(AuthDeliveryRequest)`
+- `RbacAssignmentChanged` for every package-owned initial, invitation, role-sync,
+  and direct-permission-sync assignment
 - `AuthAuditRecorded(auditId)`
 - `AuthenticationAttempted(identifierName, identifier)`
 - `AuthenticationRejected(identifierName, identifier, reason, ?SubjectReference)`

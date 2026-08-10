@@ -6,7 +6,6 @@ namespace Nvl\Auth\Actions\Users;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Nvl\Auth\Contracts\AccountConfirmation;
@@ -51,9 +50,11 @@ final readonly class UpdateProfileAction
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($data, $user): User {
             $attributes = $data->except('currentPassword')->toArray();
-            $emailChanged = array_key_exists('email', $attributes)
-                && mb_strtolower(trim((string) $attributes['email']))
-                    !== mb_strtolower(trim((string) $this->attributes->value($user, PrincipalAttribute::Email)));
+            $submittedEmail = $attributes['email'] ?? null;
+            $currentEmail = $this->attributes->value($user, PrincipalAttribute::Email);
+            $emailChanged = is_string($submittedEmail)
+                && is_string($currentEmail)
+                && mb_strtolower(trim($submittedEmail)) !== mb_strtolower(trim($currentEmail));
 
             if ($emailChanged) {
                 if ($data->currentPassword instanceof Optional) {
@@ -62,7 +63,7 @@ final readonly class UpdateProfileAction
 
                 $this->confirmation->assertConfirmed($user, $data->currentPassword);
                 $this->features->assertAllowed(AuthFeature::EmailVerification, FeatureOperation::Issue);
-                $normalizedEmail = mb_strtolower(trim((string) $attributes['email']));
+                $normalizedEmail = mb_strtolower(trim($submittedEmail));
 
                 if ($user::query()
                     ->where($this->attributes->column(PrincipalAttribute::Email), $normalizedEmail)
@@ -94,10 +95,6 @@ final readonly class UpdateProfileAction
     /** Emit the post-commit verification delivery for one changed email address. */
     private function requestEmailVerification(User $user, UpdateProfileData $data): void
     {
-        if (! $user instanceof MustVerifyEmail) {
-            throw AuthException::invalidConfiguration('Email-changing principals must implement MustVerifyEmail.');
-        }
-
         $expiresAt = CarbonImmutable::now()->addMinutes(
             $this->configuration->integerBetween('features.email_verification.settings.ttl_minutes', 60, 1, 10_080),
         );

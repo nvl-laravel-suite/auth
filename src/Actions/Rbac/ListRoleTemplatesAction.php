@@ -21,12 +21,19 @@ final readonly class ListRoleTemplatesAction
         private RoleTemplateRegistry $templates,
     ) {}
 
-    /** @return array<string, list<string>> */
+    /**
+     * Return every validated template with presentation and hierarchy metadata.
+     *
+     * @return list<array<string, mixed>>
+     */
     public function execute(Authenticatable $actor): array
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
         $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
 
-        return $this->templates->roles();
+        return array_values(array_map(
+            static fn ($template): array => $template->toArray(),
+            $this->templates->roles(),
+        ));
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Adapters\Socialite;
 
+use Laravel\Socialite\AbstractUser;
 use Laravel\Socialite\Contracts\Factory;
 use Laravel\Socialite\Contracts\Provider;
 use Laravel\Socialite\Two\AbstractProvider;
@@ -66,6 +67,12 @@ final readonly class SocialiteIdentityProvider implements SocialIdentityProvider
         }
 
         $email = $user->getEmail();
+        if (! $user instanceof AbstractUser) {
+            throw AuthException::invalidConfiguration(
+                "Socialite provider [{$provider}] must return a standard Socialite user with raw claims.",
+            );
+        }
+
         $raw = $user->getRaw();
         $verificationSource = null;
         $emailVerified = false;

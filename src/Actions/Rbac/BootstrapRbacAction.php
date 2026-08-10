@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Actions\Rbac;
 
-use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Enums\AuthFeature;
@@ -13,21 +12,22 @@ use Nvl\Auth\Results\RbacSynchronizationResult;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\FeatureGate;
-use Nvl\Auth\Services\ManagementAuthorizer;
+use Nvl\Auth\Services\MutationAuthorizer;
 use Nvl\Auth\Services\RbacSynchronizer;
+use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
- * Atomically synchronizes the complete contributed Spatie RBAC catalog.
+ * Bootstraps RBAC storage without fabricating a privileged human principal.
  */
-final readonly class SynchronizeRbacAction
+final readonly class BootstrapRbacAction
 {
     /**
-     * Create the complete RBAC synchronization use case.
+     * Create the trusted bootstrap synchronization use case.
      */
     public function __construct(
         private FeatureGate $features,
-        private ManagementAuthorizer $authorization,
+        private MutationAuthorizer $authorization,
         private AuthConfiguration $configuration,
         private AuthModelRegistry $models,
         private RbacSynchronizer $synchronizer,
@@ -36,15 +36,16 @@ final readonly class SynchronizeRbacAction
     ) {}
 
     /**
-     * Synchronize permission catalogs and role templates in one transaction.
+     * Synchronize all RBAC contributions through a trusted installation context.
      */
-    public function execute(Authenticatable $actor): RbacSynchronizationResult
+    public function execute(SystemMutationContext $context): RbacSynchronizationResult
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.synchronize');
+        $actor = $this->authorization->authorize($context, 'nvl-auth.rbac.bootstrap');
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
         $permissionClass = $this->models->permissionClass();
         $connection = (new $permissionClass)->getConnectionName();
+        $this->registrar->forgetCachedPermissions();
 
         $result = DB::connection($connection)->transaction(function () use ($guard): RbacSynchronizationResult {
             return new RbacSynchronizationResult(
@@ -56,9 +57,9 @@ final readonly class SynchronizeRbacAction
 
         $this->registrar->forgetCachedPermissions();
         $this->audits->record(
-            'rbac.synchronized',
+            'rbac.bootstrapped',
             actor: $actor,
-            metadata: $result->jsonSerialize(),
+            metadata: [...$result->jsonSerialize(), ...$context->auditMetadata()],
         );
 
         return $result;

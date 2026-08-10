@@ -31,6 +31,18 @@ All notable changes to `nvl/auth` are documented here.
 - Added compound magic-link challenges with one single-use link token and
   numeric fallback code plus direct challenge-ID callbacks. Delivery requests
   now reject feature/message-type mismatches.
+- Decoupled RBAC principal lookup and assignment from package principal
+  management through `RbacPrincipalAccess`; role and permission replacement
+  Actions now consume validated DTOs and emit `RbacAssignmentChanged` from the
+  common assignment boundary, including creation and invitation grants.
+- Added validated rich role templates with display, description, system,
+  hierarchy, priority, metadata, and caller-selected target-role support.
+- Added `BootstrapRbacAction`, deterministic synchronization reports, and a
+  denied-by-default `SystemMutationAccess` boundary for traceable actorless
+  bootstrap, domain RBAC, and principal lifecycle transitions.
+- Added replaceable `PrincipalSessionContainment` across disable, delete,
+  restore, and bulk lifecycle paths. The Laravel adapter revokes package API
+  tokens, rotates remember credentials, and removes database sessions.
 
 ## 1.0.1 - 2026-08-09
 

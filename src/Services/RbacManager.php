@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace Nvl\Auth\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Database\Eloquent\Model;
+use Nvl\Auth\Contracts\RbacPrincipalAccess;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Events\RbacAssignmentChanged;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Auth\Models\Invitation;
+use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Applies package RBAC payloads through Spatie Permission's configured model trait.
@@ -22,6 +23,8 @@ final readonly class RbacManager
     public function __construct(
         private FeatureGate $features,
         private AuthModelRegistry $models,
+        private RbacPrincipalAccess $principals,
+        private PermissionRegistrar $registrar,
     ) {}
 
     /**
@@ -41,35 +44,75 @@ final readonly class RbacManager
 
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
 
-        if (! $subject instanceof Model
-            || ! method_exists($subject, 'assignRole')
-            || ! method_exists($subject, 'givePermissionTo')) {
-            throw AuthException::invalidConfiguration(
-                'RBAC payloads require the configured principal to use Spatie Permission HasRoles.',
-            );
-        }
-
         $roleClass = $this->models->roleClass();
         $permissionClass = $this->models->permissionClass();
         $connections = [
-            (new Invitation)->getConnection()->getName(),
-            $subject->getConnection()->getName(),
+            $this->principals->connectionName($subject),
             (new $roleClass)->getConnection()->getName(),
             (new $permissionClass)->getConnection()->getName(),
         ];
 
         if (count(array_unique($connections)) !== 1) {
             throw AuthException::invalidConfiguration(
-                'Invitation RBAC payloads require Auth principals, roles, and permissions on one database connection.',
+                'RBAC assignments require principals, roles, and permissions on one database connection.',
             );
         }
 
-        if ($roles !== []) {
-            $subject->assignRole($roles);
-        }
+        $this->principals->assign($subject, $roles, $permissions);
+        $this->registrar->forgetCachedPermissions();
+        RbacAssignmentChanged::dispatch(
+            $this->principals->identifier($subject),
+            'assigned',
+            $roles,
+            $permissions,
+        );
+    }
 
-        if ($permissions !== []) {
-            $subject->givePermissionTo($permissions);
-        }
+    /**
+     * Replace one principal's roles through the common assignment boundary.
+     *
+     * @param  list<string>  $roles
+     * @param  array<string, mixed>  $metadata
+     */
+    public function syncRoles(Authenticatable $subject, array $roles, array $metadata = []): void
+    {
+        $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
+        $this->principals->syncRoles($subject, $roles);
+        $this->registrar->forgetCachedPermissions();
+        RbacAssignmentChanged::dispatch(
+            $this->principals->identifier($subject),
+            'roles_synchronized',
+            $roles,
+            metadata: $metadata,
+        );
+    }
+
+    /**
+     * Replace one principal's direct permissions through the common assignment boundary.
+     *
+     * @param  list<string>  $permissions
+     * @param  array<string, mixed>  $metadata
+     */
+    public function syncPermissions(Authenticatable $subject, array $permissions, array $metadata = []): void
+    {
+        $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
+        $this->principals->syncPermissions($subject, $permissions);
+        $this->registrar->forgetCachedPermissions();
+        RbacAssignmentChanged::dispatch(
+            $this->principals->identifier($subject),
+            'permissions_synchronized',
+            permissions: $permissions,
+            metadata: $metadata,
+        );
+    }
+
+    /**
+     * Reload one principal with requested RBAC relations.
+     *
+     * @param  list<string>  $relations
+     */
+    public function refresh(Authenticatable $subject, array $relations = []): Authenticatable
+    {
+        return $this->principals->refresh($subject, $relations);
     }
 }

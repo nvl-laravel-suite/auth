@@ -14,6 +14,7 @@ use Nvl\Auth\Data\Mutations\LoginData;
 use Nvl\Auth\Data\Mutations\StoreUserData;
 use Nvl\Auth\Data\Mutations\UpdateProfileData;
 use Nvl\Auth\Data\Mutations\UpdateUserData;
+use Nvl\Auth\Data\Mutations\UpdateUserStatusData;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Tests\Fixtures\MappedPrincipal;
@@ -93,7 +94,7 @@ it('maps package principal mutations without shadowing a host profile relationsh
             'preferences' => ['theme' => 'system'],
         ]),
     );
-    app(SetUserActiveAction::class)->execute($actor, $updated, false);
+    app(SetUserActiveAction::class)->execute($actor, $updated, new UpdateUserStatusData(false));
     $attributes = app(PrincipalAttributeMapper::class);
     $authenticated = app(LoginAction::class)->execute(new LoginData(
         identifier: 'mapped.owner@example.test',

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Nvl\Auth\Services;
 
 use Nvl\Auth\Contracts\RoleTemplateProvider;
+use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\ValueObjects\RoleTemplate;
 
 /**
  * Merges host role templates deterministically.
@@ -21,24 +23,21 @@ final readonly class RoleTemplateRegistry
     /**
      * Return merged role templates.
      *
-     * @return array<string, list<string>>
+     * @return array<string, RoleTemplate>
      */
     public function roles(): array
     {
         $roles = [];
 
         foreach ($this->providers as $provider) {
-            foreach ($provider->roles() as $role => $permissions) {
-                if (trim($role) === '') {
-                    continue;
+            foreach ($provider->roles() as $template) {
+                if (array_key_exists($template->key, $roles)) {
+                    throw AuthException::invalidConfiguration(
+                        "Role template keys must be unique; [{$template->key}] was contributed more than once.",
+                    );
                 }
 
-                $current = $roles[$role] ?? [];
-                $roles[$role] = array_values(array_unique([
-                    ...$current,
-                    ...array_values(array_filter($permissions, static fn (string $permission): bool => trim($permission) !== '')),
-                ]));
-                sort($roles[$role]);
+                $roles[$template->key] = $template;
             }
         }
 

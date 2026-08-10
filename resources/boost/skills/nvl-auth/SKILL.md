@@ -60,6 +60,16 @@ or an application-specific model/namespace to Auth.
     `InvitationIssuanceContext`; never hydrate it from public input.
 18. Query encrypted invitation recipients only by exact blind index. Never
     decrypt and scan for substring search.
+19. Keep RBAC principal lookup/assignment behind `RbacPrincipalAccess`; RBAC
+    assignment does not require package principal management.
+20. Return validated `RoleTemplate` values from providers and apply them through
+    `ApplyRoleTemplateData`; do not pass raw template maps or role names into
+    write Actions.
+21. Actorless RBAC/lifecycle mutations require `SystemMutationContext` and host
+    `SystemMutationAccess` approval. Never fabricate a human actor.
+22. Contain disable/delete/restore transitions through
+    `PrincipalSessionContainment`, including API tokens, remember credentials,
+    database sessions, and host session stores.
 
 ## Features
 

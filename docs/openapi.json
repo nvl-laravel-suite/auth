@@ -223,7 +223,7 @@
       "PermissionAssignment": {"type": "object", "required": ["permissions"], "properties": {"permissions": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}}},
       "RoleMutation": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string", "maxLength": 160}, "display_name": {"type": ["string", "null"], "maxLength": 160}, "description": {"type": ["string", "null"], "maxLength": 2000}, "parent_id": {"type": ["string", "null"], "format": "uuid"}, "priority": {"type": "integer"}, "permissions": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}, "metadata": {"type": "object", "additionalProperties": true}}},
       "RoleClone": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string", "maxLength": 160}, "display_name": {"type": ["string", "null"], "maxLength": 160}}},
-      "RoleTemplate": {"type": "object", "required": ["template"], "properties": {"template": {"type": "string", "maxLength": 160}}},
+      "RoleTemplate": {"type": "object", "required": ["template"], "properties": {"template": {"type": "string", "maxLength": 160}, "roleName": {"type": ["string", "null"], "maxLength": 160}}},
       "PermissionMutation": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string", "maxLength": 160}, "display_name": {"type": ["string", "null"], "maxLength": 160}, "description": {"type": ["string", "null"], "maxLength": 2000}, "group": {"type": ["string", "null"], "maxLength": 120}, "metadata": {"type": "object", "additionalProperties": true}}}
     },
     "requestBodies": {

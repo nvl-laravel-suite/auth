@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Contracts;
 
+use Nvl\Auth\ValueObjects\RoleTemplate;
+
 /**
  * Contributes guard-aware role templates backed by Spatie Permission.
  */
 interface RoleTemplateProvider
 {
     /**
-     * Return role names mapped to their permission names.
+     * Return validated role templates.
      *
-     * @return array<string, list<string>>
+     * @return list<RoleTemplate>
      */
     public function roles(): array;
 }

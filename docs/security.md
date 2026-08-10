@@ -82,6 +82,19 @@ to share one connection so the acceptance transaction cannot partially commit.
 Public registration resolves or creates the principal, applies RBAC, consumes
 the invitation, and runs acceptance hooks inside that one transaction.
 
+Actorless RBAC and principal lifecycle Actions require a bounded
+`SystemMutationContext` and host `SystemMutationAccess` approval. The default
+policy denies every system mutation. Reasons and correlation identifiers are
+included in package audits and events; an optional real actor remains optional
+and is never fabricated.
+
+Disabling, deleting, restoring, and equivalent bulk containment transitions use
+`PrincipalSessionContainment` inside the lifecycle transaction. The Laravel
+adapter revokes package Sanctum tokens, rotates the remember credential, and,
+when the database session driver is active, deletes every row for the principal.
+Hosts replacing the adapter must preserve these guarantees while adding their
+own client-session stores.
+
 Invitation recipient and host-context lookup are exact HMAC blind-index
 matches. Substring recipient search is deliberately unsupported; decrypting and
 scanning rows in memory is not a safe package fallback.

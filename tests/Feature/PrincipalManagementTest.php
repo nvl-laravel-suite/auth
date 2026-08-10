@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Actions\Authentication\LoginAction;
 use Nvl\Auth\Actions\Rbac\CreatePermissionAction;
 use Nvl\Auth\Actions\Rbac\CreateRoleAction;
@@ -23,18 +26,24 @@ use Nvl\Auth\Data\Mutations\LoginData;
 use Nvl\Auth\Data\Mutations\StorePermissionData;
 use Nvl\Auth\Data\Mutations\StoreRoleData;
 use Nvl\Auth\Data\Mutations\StoreUserData;
+use Nvl\Auth\Data\Mutations\SyncUserPermissionsData;
+use Nvl\Auth\Data\Mutations\SyncUserRolesData;
 use Nvl\Auth\Data\Mutations\UpdateProfileData;
+use Nvl\Auth\Data\Mutations\UpdateUserStatusData;
 use Nvl\Auth\Enums\UserBulkOperation;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Events\PrincipalChanged;
+use Nvl\Auth\Events\RbacAssignmentChanged;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\User;
+use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 it('owns a complete principal lifecycle and fails disabled login closed', function (): void {
     $actor = $this->user('owner@example.test');
     $permission = app(CreatePermissionAction::class)->execute($actor, new StorePermissionData('users.create', 'Create Principals'));
     $role = app(CreateRoleAction::class)->execute($actor, new StoreRoleData('manage', 'Super Administrator', permissions: ['users.create']));
-    Event::fake([PrincipalChanged::class]);
+    Event::fake([PrincipalChanged::class, RbacAssignmentChanged::class]);
 
     $user = app(CreateUserAction::class)->execute($actor, new StoreUserData(
         name: 'Package User',
@@ -52,16 +61,16 @@ it('owns a complete principal lifecycle and fails disabled login closed', functi
         ->and($user->hasDirectPermission('users.create'))->toBeTrue();
 
     $user->createToken('nvl-auth:mobile', ['users.create']);
-    $disabled = app(SetUserActiveAction::class)->execute($actor, $user, false);
+    $disabled = app(SetUserActiveAction::class)->execute($actor, $user, new UpdateUserStatusData(false));
 
     expect($disabled->is_active)->toBeFalse()
         ->and($disabled->tokens()->count())->toBe(0)
         ->and(fn () => app(LoginAction::class)->execute(new LoginData($user->email, 'SecurePassword123')))
         ->toThrow(AuthException::class, 'credentials');
 
-    app(SetUserActiveAction::class)->execute($actor, $user, true);
-    app(SyncUserRolesAction::class)->execute($actor, $user, []);
-    app(SyncUserPermissionsAction::class)->execute($actor, $user, ['users.create']);
+    app(SetUserActiveAction::class)->execute($actor, $user, new UpdateUserStatusData(true));
+    app(SyncUserRolesAction::class)->execute($actor, $user, new SyncUserRolesData([]));
+    app(SyncUserPermissionsAction::class)->execute($actor, $user, new SyncUserPermissionsData(['users.create']));
     app(DeleteUserAction::class)->execute($actor, $user);
 
     expect($user->fresh()->trashed())->toBeTrue();
@@ -73,6 +82,7 @@ it('owns a complete principal lifecycle and fails disabled login closed', functi
         ->and($restored->hasDirectPermission('users.create'))->toBeTrue();
 
     Event::assertDispatched(PrincipalChanged::class);
+    Event::assertDispatched(RbacAssignmentChanged::class, 3);
 });
 
 it('supports profile, suggestions, and bounded bulk lifecycle operations', function (): void {
@@ -87,6 +97,10 @@ it('supports profile, suggestions, and bounded bulk lifecycle operations', funct
         email: 'beta@example.test',
         password: 'SecurePassword123',
     ));
+    $first->forceFill(['remember_token' => 'first-remember'])->save();
+    $second->forceFill(['remember_token' => 'second-remember'])->save();
+    $first->createToken('nvl-auth:first', ['profile:read']);
+    $second->createToken('nvl-auth:second', ['profile:read']);
 
     $profile = app(UpdateProfileAction::class)->execute($actor, new UpdateProfileData(
         name: 'Updated Owner',
@@ -108,7 +122,59 @@ it('supports profile, suggestions, and bounded bulk lifecycle operations', funct
         ->and($suggestions)->toHaveCount(2)
         ->and($result->affected)->toBe(2)
         ->and($first->fresh()->is_active)->toBeFalse()
-        ->and($second->fresh()->is_active)->toBeFalse();
+        ->and($second->fresh()->is_active)->toBeFalse()
+        ->and($first->fresh()->remember_token)->not->toBe('first-remember')
+        ->and($second->fresh()->remember_token)->not->toBe('second-remember')
+        ->and($first->tokens()->count())->toBe(0)
+        ->and($second->tokens()->count())->toBe(0);
+});
+
+it('contains browser credentials during actorless domain deactivation', function (): void {
+    config()->set('session.driver', 'database');
+    config()->set('session.connection', 'testing');
+    config()->set('session.table', 'sessions');
+    Schema::connection('testing')->create('sessions', function (Blueprint $table): void {
+        $table->string('id')->primary();
+        $table->uuid('user_id')->nullable()->index();
+        $table->text('payload');
+        $table->integer('last_activity');
+    });
+    $user = $this->user('domain-transition@example.test');
+    $user->forceFill(['remember_token' => 'remember-me'])->save();
+    $user->createToken('nvl-auth:browser', ['profile:read']);
+    DB::connection('testing')->table('sessions')->insert([
+        'id' => 'existing-browser-session',
+        'user_id' => $user->id,
+        'payload' => 'payload',
+        'last_activity' => now()->timestamp,
+    ]);
+
+    try {
+        $updated = app(SetUserActiveAction::class)->execute(
+            new SystemMutationContext('Compliance failure', 'compliance-456', metadata: ['case' => '456']),
+            $user,
+            new UpdateUserStatusData(false),
+        );
+
+        $audit = AuthAudit::query()->where('action', 'user.disabled')->firstOrFail();
+
+        expect($updated->is_active)->toBeFalse()
+            ->and($updated->remember_token)->not->toBe('remember-me')
+            ->and($updated->tokens()->count())->toBe(0)
+            ->and(DB::connection('testing')->table('sessions')->where('user_id', $user->id)->exists())->toBeFalse()
+            ->and($audit->actor_id)->toBeNull()
+            ->and($audit->metadata['system']['correlation_id'])->toBe('compliance-456');
+
+        $reenabled = app(SetUserActiveAction::class)->execute(
+            new SystemMutationContext('Compliance restored', 'compliance-456-restored'),
+            $user,
+            new UpdateUserStatusData(true),
+        );
+
+        expect($reenabled->is_active)->toBeTrue();
+    } finally {
+        Schema::connection('testing')->dropIfExists('sessions');
+    }
 });
 
 it('rejects invalid direct principal and RBAC input before persistence', function (): void {

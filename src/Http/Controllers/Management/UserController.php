@@ -20,6 +20,8 @@ use Nvl\Auth\Actions\Users\SyncUserRolesAction;
 use Nvl\Auth\Actions\Users\UpdateUserAction;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\StoreUserData;
+use Nvl\Auth\Data\Mutations\SyncUserPermissionsData;
+use Nvl\Auth\Data\Mutations\SyncUserRolesData;
 use Nvl\Auth\Data\Mutations\UpdateUserData;
 use Nvl\Auth\Data\Mutations\UpdateUserStatusData;
 use Nvl\Auth\Data\Queries\UserIndexQueryData;
@@ -28,8 +30,6 @@ use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Enums\UserBulkOperation;
 use Nvl\Auth\Http\Controllers\Account\AuthenticatedController;
 use Nvl\Auth\Http\Requests\BulkUserRequest;
-use Nvl\Auth\Http\Requests\SyncUserPermissionsRequest;
-use Nvl\Auth\Http\Requests\SyncUserRolesRequest;
 
 /** Handles package-owned principal management API transport. */
 final class UserController extends AuthenticatedController
@@ -108,7 +108,7 @@ final class UserController extends AuthenticatedController
         SetUserActiveAction $action,
         PrincipalAttributeMapper $attributes,
     ): JsonResponse {
-        $updated = $action->execute($this->subject($request), $user, $data->active);
+        $updated = $action->execute($this->subject($request), $user, $data);
         $active = (bool) $attributes->value($updated, PrincipalAttribute::Active);
 
         return response()->json([
@@ -146,20 +146,20 @@ final class UserController extends AuthenticatedController
     }
 
     /** Replace one principal's roles. */
-    public function roles(SyncUserRolesRequest $request, string $user, SyncUserRolesAction $action): JsonResponse
+    public function roles(SyncUserRolesData $data, Request $request, string $user, SyncUserRolesAction $action): JsonResponse
     {
         return response()->json([
-            'data' => $action->execute($this->subject($request), $user, $this->stringListInput($request, 'roles')),
+            'data' => $action->execute($this->subject($request), $user, $data),
             'code' => 'user_roles_synchronized',
             'message' => 'The user roles were synchronized.',
         ]);
     }
 
     /** Replace one principal's direct permissions. */
-    public function permissions(SyncUserPermissionsRequest $request, string $user, SyncUserPermissionsAction $action): JsonResponse
+    public function permissions(SyncUserPermissionsData $data, Request $request, string $user, SyncUserPermissionsAction $action): JsonResponse
     {
         return response()->json([
-            'data' => $action->execute($this->subject($request), $user, $this->stringListInput($request, 'permissions')),
+            'data' => $action->execute($this->subject($request), $user, $data),
             'code' => 'user_permissions_synchronized',
             'message' => 'The user permissions were synchronized.',
         ]);

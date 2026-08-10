@@ -12,6 +12,7 @@ use Nvl\Auth\Adapters\ApiTokens\SanctumApiTokenManager;
 use Nvl\Auth\Adapters\Laravel\EloquentAuthSubjectResolver;
 use Nvl\Auth\Adapters\Laravel\LaravelBrowserSession;
 use Nvl\Auth\Adapters\Laravel\LaravelGuardIdentifierResolver;
+use Nvl\Auth\Adapters\Laravel\LaravelPrincipalSessionContainment;
 use Nvl\Auth\Adapters\Laravel\LaravelRequestAuditContextProvider;
 use Nvl\Auth\Adapters\Passkeys\WebauthnPasskeyCeremony;
 use Nvl\Auth\Console\Commands\AdoptPrincipalsCommand;
@@ -35,10 +36,13 @@ use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PermissionCatalogProvider;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Contracts\PrincipalSessionContainment;
+use Nvl\Auth\Contracts\RbacPrincipalAccess;
 use Nvl\Auth\Contracts\RoleTemplateProvider;
 use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
+use Nvl\Auth\Contracts\SystemMutationAccess;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
@@ -50,7 +54,9 @@ use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\AuthSchemaManager;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
 use Nvl\Auth\Services\ConfiguredPrincipalAttributeMapper;
+use Nvl\Auth\Services\DenySystemMutationAccess;
 use Nvl\Auth\Services\EloquentPasswordUpdater;
+use Nvl\Auth\Services\EloquentRbacPrincipalAccess;
 use Nvl\Auth\Services\EloquentSuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\FeatureManifest;
@@ -106,6 +112,21 @@ final class AuthServiceProvider extends ServiceProvider
             AccountConfirmation::class,
             'features.principal_management.services.account_confirmation',
             PasswordAccountConfirmation::class,
+        );
+        $this->bindConfiguredContract(
+            PrincipalSessionContainment::class,
+            'features.principal_management.services.session_containment',
+            LaravelPrincipalSessionContainment::class,
+        );
+        $this->bindConfiguredContract(
+            RbacPrincipalAccess::class,
+            'features.rbac.services.principal_access',
+            EloquentRbacPrincipalAccess::class,
+        );
+        $this->bindConfiguredContract(
+            SystemMutationAccess::class,
+            'services.system_mutation_access',
+            DenySystemMutationAccess::class,
         );
         $this->bindConfiguredContract(
             AuthSubjectResolver::class,

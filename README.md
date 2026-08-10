@@ -195,6 +195,15 @@ password-reset path uses it. Sensitive self-service mutations use
 can replace `features.invitations.services.registration_mapper` to map validated
 registration extensions to their configured principal model.
 
+RBAC assignment is independently configurable through
+`features.rbac.models.principal` and
+`features.rbac.services.principal_access`, so a host can use package roles and
+permissions without enabling package-shaped principal CRUD. Actorless bootstrap
+or domain transitions require a traceable `SystemMutationContext` and an
+explicit host `SystemMutationAccess` grant. Destructive lifecycle Actions invoke
+the replaceable `PrincipalSessionContainment` contract for API tokens, remember
+credentials, Laravel database sessions, and host extensions.
+
 ## Passkeys and tokens
 
 Passkeys work without a host ceremony class. Enable the feature and configure a

@@ -7,16 +7,15 @@ namespace Nvl\Auth\Actions\Users;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
-use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Contracts\RbacPrincipalAccess;
+use Nvl\Auth\Data\Mutations\SyncUserPermissionsData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
-use Nvl\Auth\Events\RbacChanged;
-use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\FeatureGate;
-use Nvl\Auth\Services\ManagementAuthorizer;
-use Nvl\Auth\Services\UserLocator;
+use Nvl\Auth\Services\MutationAuthorizer;
+use Nvl\Auth\Services\RbacManager;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
  * Replaces one principal's direct permission assignment.
@@ -26,55 +25,31 @@ final readonly class SyncUserPermissionsAction
     /** Create the permission assignment use case. */
     public function __construct(
         private FeatureGate $features,
-        private ManagementAuthorizer $authorization,
-        private UserLocator $users,
+        private MutationAuthorizer $authorization,
+        private RbacPrincipalAccess $principals,
+        private RbacManager $rbac,
         private AuthAuditRecorder $audits,
-        private PrincipalAttributeMapper $attributes,
     ) {}
 
-    /**
-     * Synchronize direct permission names atomically.
-     *
-     * @param  list<string>  $permissions
-     */
-    public function execute(Authenticatable $actor, User|string $user, array $permissions): User
-    {
-        $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Update);
+    /** Synchronize one validated direct permission assignment atomically. */
+    public function execute(
+        Authenticatable|SystemMutationContext $authority,
+        Authenticatable|string $user,
+        SyncUserPermissionsData $data,
+    ): Authenticatable {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
-        $this->authorization->authorize($actor, 'nvl-auth.users.manageAccess');
-        $this->assertValidNames($permissions, 250, 'permissions');
-        $user = $this->users->find($user);
+        $actor = $this->authorization->authorize($authority, 'nvl-auth.users.manageAccess', $user);
+        $metadata = $this->authorization->metadata($authority);
+        $user = $this->principals->find($user);
 
-        return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $permissions, $user): User {
-            $user->syncPermissions($permissions);
+        return DB::connection($this->principals->connectionName($user))->transaction(function () use ($actor, $data, $metadata, $user): Authenticatable {
+            $this->rbac->syncPermissions($user, $data->permissions, $metadata);
             $this->audits->record('user.permissions_synchronized', subject: SubjectReference::fromAuthenticatable($user), actor: $actor, metadata: [
-                'permissions' => $permissions,
+                'permissions' => $data->permissions,
+                ...$metadata,
             ]);
-            RbacChanged::dispatch('user', $this->attributes->identifier($user), 'permissions_synchronized', ['permissions' => $permissions]);
 
-            return $user->refresh()->load('permissions');
+            return $this->rbac->refresh($user, ['permissions']);
         }, 3);
-    }
-
-    /** @param list<string> $names */
-    private function assertValidNames(array $names, int $maximum, string $field): void
-    {
-        if (count($names) > $maximum) {
-            throw new AuthException('invalid_access_assignment', "User {$field} must be a list of at most {$maximum} names.", 422);
-        }
-
-        $seen = [];
-
-        foreach ($names as $name) {
-            if (trim($name) === '' || mb_strlen($name) > 160) {
-                throw new AuthException('invalid_access_assignment', "User {$field} names must contain between one and 160 characters.", 422);
-            }
-
-            if (isset($seen[$name])) {
-                throw new AuthException('invalid_access_assignment', "User {$field} names must be distinct.", 422);
-            }
-
-            $seen[$name] = true;
-        }
     }
 }

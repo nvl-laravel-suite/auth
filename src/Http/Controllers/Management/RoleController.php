@@ -16,11 +16,11 @@ use Nvl\Auth\Actions\Rbac\ListRoleTemplatesAction;
 use Nvl\Auth\Actions\Rbac\ShowRbacAnalyticsAction;
 use Nvl\Auth\Actions\Rbac\ShowRoleAction;
 use Nvl\Auth\Actions\Rbac\UpdateRoleAction;
+use Nvl\Auth\Data\Mutations\ApplyRoleTemplateData;
 use Nvl\Auth\Data\Mutations\StoreRoleData;
 use Nvl\Auth\Data\Mutations\UpdateRoleData;
 use Nvl\Auth\Data\Queries\RoleIndexQueryData;
 use Nvl\Auth\Http\Controllers\Account\AuthenticatedController;
-use Nvl\Auth\Http\Requests\ApplyRoleTemplateRequest;
 use Nvl\Auth\Http\Requests\CloneRoleRequest;
 
 /** Handles package-owned role, hierarchy, template, and analytics transport. */
@@ -96,10 +96,10 @@ final class RoleController extends AuthenticatedController
     }
 
     /** Apply one canonical role template. */
-    public function applyTemplate(ApplyRoleTemplateRequest $request, ApplyRoleTemplateAction $action): JsonResponse
+    public function applyTemplate(ApplyRoleTemplateData $data, Request $request, ApplyRoleTemplateAction $action): JsonResponse
     {
         return response()->json([
-            'data' => $action->execute($this->subject($request), $this->stringInput($request, 'template')),
+            'data' => $action->execute($this->subject($request), $data),
             'code' => 'role_template_applied',
             'message' => 'The role template was applied.',
         ]);

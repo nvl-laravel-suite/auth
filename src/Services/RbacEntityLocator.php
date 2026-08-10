@@ -32,6 +32,19 @@ final readonly class RbacEntityLocator
     }
 
     /**
+     * Resolve one role by guard and canonical name.
+     */
+    public function roleByName(string $name, string $guard): Role
+    {
+        $class = $this->models->roleClass();
+
+        return $class::query()
+            ->where('name', $name)
+            ->where('guard_name', $guard)
+            ->firstOrFail();
+    }
+
+    /**
      * Resolve a permission model or identifier.
      */
     public function permission(Permission|string $permission): Permission

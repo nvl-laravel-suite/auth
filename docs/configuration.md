@@ -209,6 +209,10 @@ Applications extend, rather than replace, the catalogs with providers:
             Nvl\Auth\Services\PackageRoleTemplates::class,
             App\Auth\ApplicationRoles::class,
         ],
+        'principal_access' => Nvl\Auth\Services\EloquentRbacPrincipalAccess::class,
+    ],
+    'models' => [
+        'principal' => App\Models\User::class,
     ],
     'settings' => [
         'guard' => 'web',
@@ -221,6 +225,17 @@ Applications extend, rather than replace, the catalogs with providers:
 Synchronization upserts declared records and assignments without deleting
 unrelated records. System records can only be created by trusted PHP catalogs or
 templates, never by public management request input.
+
+The RBAC principal model and access contract are independent of
+`principal_management`. The default Eloquent adapter requires an
+`Authenticatable` model using Spatie `HasRoles`; replace `RbacPrincipalAccess`
+for another locator or assignment boundary.
+
+Actorless mutations are denied by default. Configure
+`services.system_mutation_access` with a host `SystemMutationAccess`
+implementation, then pass a `SystemMutationContext` containing a bounded reason
+and correlation identifier. Use `BootstrapRbacAction` for installation/seeding;
+the actor-authorized synchronization Actions remain the runtime management API.
 
 ## Social providers
 

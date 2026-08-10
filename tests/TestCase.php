@@ -8,8 +8,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\SanctumServiceProvider;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
+use Nvl\Auth\Contracts\SystemMutationAccess;
 use Nvl\Auth\Providers\AuthServiceProvider;
 use Nvl\Auth\Tests\Fixtures\AllowAllManagementAccess;
+use Nvl\Auth\Tests\Fixtures\AllowAllSystemMutationAccess;
 use Nvl\Auth\Tests\Fixtures\TestSubjectResolver;
 use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Data\Providers\DataServiceProvider;
@@ -73,6 +75,7 @@ abstract class TestCase extends Orchestra
 
         $this->app->singleton(AuthManagementAccess::class, AllowAllManagementAccess::class);
         $this->app->singleton(AuthSubjectResolver::class, TestSubjectResolver::class);
+        $this->app->singleton(SystemMutationAccess::class, AllowAllSystemMutationAccess::class);
     }
 
     /**
