@@ -8,8 +8,10 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Enums\UserBulkOperation;
 use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Exceptions\AuthException;
@@ -30,6 +32,7 @@ final readonly class BulkUpdateUsersAction
         private ManagementAuthorizer $authorization,
         private UserLocator $users,
         private AuthAuditRecorder $audits,
+        private PrincipalAttributeMapper $attributes,
     ) {}
 
     /**
@@ -73,15 +76,19 @@ final readonly class BulkUpdateUsersAction
             /** @var User $user */
             foreach ($users as $user) {
                 match ($operation) {
-                    UserBulkOperation::Enable => $user->forceFill(['is_active' => true])->save(),
+                    UserBulkOperation::Enable => $user->forceFill($this->attributes->map([
+                        PrincipalAttribute::Active->value => true,
+                    ]))->save(),
                     UserBulkOperation::Disable => $this->disable($user),
                     UserBulkOperation::Delete => $this->delete($user),
                     UserBulkOperation::Restore => $user->restore(),
                 };
-                PrincipalChanged::dispatch($user->id, $operation->value);
+                PrincipalChanged::dispatch($this->attributes->identifier($user), $operation->value);
             }
 
-            $affectedUserIds = array_values($users->map(static fn (User $user): string => $user->id)->all());
+            $affectedUserIds = array_values($users->map(
+                fn (User $user): string => $this->attributes->identifier($user),
+            )->all());
             $this->audits->record('users.bulk_'.$operation->value, actor: $actor, metadata: [
                 'user_ids' => $affectedUserIds,
                 'affected' => $users->count(),
@@ -96,7 +103,9 @@ final readonly class BulkUpdateUsersAction
     {
         $user->tokens()->delete();
 
-        return $user->forceFill(['is_active' => false])->save();
+        return $user->forceFill($this->attributes->map([
+            PrincipalAttribute::Active->value => false,
+        ]))->save();
     }
 
     /** Soft-delete one principal and revoke its tokens. */

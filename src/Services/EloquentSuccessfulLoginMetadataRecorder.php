@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Nvl\Auth\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
+use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 
@@ -14,6 +16,8 @@ use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
  */
 final class EloquentSuccessfulLoginMetadataRecorder implements SuccessfulLoginMetadataRecorder
 {
+    public function __construct(private readonly PrincipalAttributeMapper $attributes) {}
+
     /**
      * Record package-owned login metadata when the subject uses the package schema.
      */
@@ -25,12 +29,12 @@ final class EloquentSuccessfulLoginMetadataRecorder implements SuccessfulLoginMe
             return;
         }
 
-        $metadata = ['last_login_at' => now()];
+        $metadata = [PrincipalAttribute::LastLoginAt->value => now()];
 
         if ($context->ipAddress !== null) {
-            $metadata['last_login_ip'] = $context->ipAddress;
+            $metadata[PrincipalAttribute::LastLoginIp->value] = $context->ipAddress;
         }
 
-        $subject->forceFill($metadata)->save();
+        $subject->forceFill($this->attributes->map($metadata))->save();
     }
 }

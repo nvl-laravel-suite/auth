@@ -7,9 +7,11 @@ namespace Nvl\Auth\Actions\Users;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\UpdateUserData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\FeatureGate;
@@ -28,6 +30,7 @@ final readonly class UpdateUserAction
         private ManagementAuthorizer $authorization,
         private UserLocator $users,
         private AuthAuditRecorder $audits,
+        private PrincipalAttributeMapper $attributes,
     ) {}
 
     /** Persist a partial principal mutation. */
@@ -51,15 +54,15 @@ final readonly class UpdateUserAction
             }
 
             if ($data->emailVerified !== null) {
-                $attributes['email_verified_at'] = $data->emailVerified ? now() : null;
+                $attributes[PrincipalAttribute::EmailVerifiedAt->value] = $data->emailVerified ? now() : null;
             }
 
-            $user->fill($attributes)->save();
+            $user->forceFill($this->attributes->map($attributes))->save();
             $reference = SubjectReference::fromAuthenticatable($user);
             $this->audits->record('user.updated', subject: $reference, actor: $actor, metadata: [
                 'attributes' => array_keys($attributes),
             ]);
-            PrincipalChanged::dispatch($user->id, 'updated', ['attributes' => array_keys($attributes)]);
+            PrincipalChanged::dispatch($this->attributes->identifier($user), 'updated', ['attributes' => array_keys($attributes)]);
 
             return $user->refresh()->load(['roles', 'permissions']);
         }, 3);

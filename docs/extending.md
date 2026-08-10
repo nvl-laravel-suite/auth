@@ -8,19 +8,28 @@ authentication behavior.
 
 Subclass `Nvl\Auth\Models\User` to add application relationships, scopes, casts,
 or domain interfaces, then configure that subclass under
-`features.principal_management.models.user`. Model configuration is behavioral
-extension, not storage-schema adaptation: subclasses must retain the package
-tables' physical columns and UUID key contract. User reserves `profile`,
-`preferences`, `is_active`, `last_login_at`, `last_login_ip`, and `locked_until`;
-Role reserves `priority`, `is_system`, and `metadata`; Permission reserves
-`group`, `is_system`, and `metadata`. A host with conflicting columns or a
-`profile()` relationship should keep package principal-management/RBAC writes
-disabled until it adopts the package schema or provides a compatible bridge.
-The same subclass pattern is available for Role, Permission, and
-PersonalAccessToken through their feature `models` keys.
+`features.principal_management.models.user`. Map package principal semantics to
+the subclass's physical schema through
+`features.principal_management.settings.attributes`. The mapping covers ID,
+name, email, verification, password, active state, locale/timezone,
+profile/preferences metadata, login/lock state, remember token, timestamps, and
+soft deletion. UUID principal identity remains required.
+
+Eloquent attributes shadow relationships. If the subclass declares
+`profile(): Relation`, map package profile metadata to a namespaced column such
+as `auth_profile` and ensure the physical table has no `profile` column.
+Doctor checks the actual principal table and rejects collisions. Role reserves
+`priority`, `is_system`, and `metadata`; Permission reserves `group`,
+`is_system`, and `metadata`. The same subclass pattern is available for Role,
+Permission, and PersonalAccessToken through their feature `models` keys.
 
 The model registry validates configured inheritance and every package Action
 resolves the configured model, so API and direct PHP use remain aligned.
+
+For an existing first-party principal table, use the manifest-driven adoption
+bridge rather than an ad hoc copy. It validates UUIDs, normalized unique emails,
+counts, hashes, extension columns, password-reset tokens, and declared host
+foreign keys before writing. See [principal adoption](principal-adoption.md).
 
 ## Invitations
 

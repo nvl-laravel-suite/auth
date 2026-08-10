@@ -21,6 +21,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\Contracts\HasApiTokens as HasApiTokensContract;
 use Laravel\Sanctum\HasApiTokens;
 use Nvl\Auth\Database\Factories\UserFactory;
+use Nvl\Auth\Enums\PrincipalAttribute;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
@@ -91,12 +92,58 @@ class User extends Authenticatable implements CanResetPasswordContract, HasApiTo
         'last_login_ip',
     ];
 
-    /** @var array<string, mixed> */
-    protected $attributes = [
-        'is_active' => true,
-        'locale' => 'en',
-        'timezone' => 'UTC',
-    ];
+    /**
+     * Create a principal with defaults aligned to the configured field map.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function __construct(array $attributes = [])
+    {
+        $this->attributes = [
+            $this->principalColumn(PrincipalAttribute::Active) => true,
+            $this->principalColumn(PrincipalAttribute::Locale) => 'en',
+            $this->principalColumn(PrincipalAttribute::Timezone) => 'UTC',
+        ];
+
+        parent::__construct($attributes);
+    }
+
+    /**
+     * Resolve mass-assignable fields through the configured principal map.
+     *
+     * @return list<string>
+     */
+    public function getFillable(): array
+    {
+        return array_map($this->principalColumn(...), [
+            PrincipalAttribute::Name,
+            PrincipalAttribute::Email,
+            PrincipalAttribute::EmailVerifiedAt,
+            PrincipalAttribute::Password,
+            PrincipalAttribute::Active,
+            PrincipalAttribute::Locale,
+            PrincipalAttribute::Timezone,
+            PrincipalAttribute::Profile,
+            PrincipalAttribute::Preferences,
+            PrincipalAttribute::LastLoginAt,
+            PrincipalAttribute::LastLoginIp,
+            PrincipalAttribute::LockedUntil,
+        ]);
+    }
+
+    /**
+     * Resolve hidden fields through the configured principal map.
+     *
+     * @return list<string>
+     */
+    public function getHidden(): array
+    {
+        return array_map($this->principalColumn(...), [
+            PrincipalAttribute::Password,
+            PrincipalAttribute::RememberToken,
+            PrincipalAttribute::LastLoginIp,
+        ]);
+    }
 
     /**
      * Resolve the configured package table without preventing model extension.
@@ -122,12 +169,70 @@ class User extends Authenticatable implements CanResetPasswordContract, HasApiTo
             : parent::getConnectionName();
     }
 
+    public function getKeyName(): string
+    {
+        return $this->principalColumn(PrincipalAttribute::Id);
+    }
+
+    public function getAuthPasswordName(): string
+    {
+        return $this->principalColumn(PrincipalAttribute::Password);
+    }
+
+    public function getEmailForVerification(): string
+    {
+        $email = $this->getAttribute($this->principalColumn(PrincipalAttribute::Email));
+
+        return is_string($email) ? $email : '';
+    }
+
+    public function getEmailForPasswordReset(): string
+    {
+        return $this->getEmailForVerification();
+    }
+
+    public function hasVerifiedEmail(): bool
+    {
+        return $this->getAttribute(
+            $this->principalColumn(PrincipalAttribute::EmailVerifiedAt),
+        ) !== null;
+    }
+
+    public function markEmailAsVerified(): bool
+    {
+        return $this->forceFill([
+            $this->principalColumn(PrincipalAttribute::EmailVerifiedAt) => $this->freshTimestamp(),
+        ])->save();
+    }
+
+    public function getRememberTokenName(): string
+    {
+        return $this->principalColumn(PrincipalAttribute::RememberToken);
+    }
+
+    public function getCreatedAtColumn(): ?string
+    {
+        return $this->principalColumn(PrincipalAttribute::CreatedAt);
+    }
+
+    public function getUpdatedAtColumn(): ?string
+    {
+        return $this->principalColumn(PrincipalAttribute::UpdatedAt);
+    }
+
+    public function getDeletedAtColumn(): string
+    {
+        return $this->principalColumn(PrincipalAttribute::DeletedAt);
+    }
+
     /**
      * Return the locale preferred by Laravel notifications and external consumers.
      */
     public function preferredLocale(): string
     {
-        return $this->locale;
+        $locale = $this->getAttribute($this->principalColumn(PrincipalAttribute::Locale));
+
+        return is_string($locale) && $locale !== '' ? $locale : 'en';
     }
 
     /**
@@ -135,9 +240,14 @@ class User extends Authenticatable implements CanResetPasswordContract, HasApiTo
      */
     public function isAuthenticationAllowed(): bool
     {
-        return $this->is_active
-            && $this->deleted_at === null
-            && ($this->locked_until === null || $this->locked_until->isPast());
+        $active = $this->getAttribute($this->principalColumn(PrincipalAttribute::Active));
+        $deletedAt = $this->getAttribute($this->principalColumn(PrincipalAttribute::DeletedAt));
+        $lockedUntil = $this->getAttribute($this->principalColumn(PrincipalAttribute::LockedUntil));
+
+        return (bool) $active
+            && $deletedAt === null
+            && ($lockedUntil === null
+                || ($lockedUntil instanceof CarbonImmutable && $lockedUntil->isPast()));
     }
 
     /**
@@ -149,9 +259,10 @@ class User extends Authenticatable implements CanResetPasswordContract, HasApiTo
     public function scopeAuthenticationAllowed(Builder $query): Builder
     {
         return $query
-            ->where('is_active', true)
-            ->where(static function (Builder $locks): void {
-                $locks->whereNull('locked_until')->orWhere('locked_until', '<=', now());
+            ->where($this->principalColumn(PrincipalAttribute::Active), true)
+            ->where(function (Builder $locks): void {
+                $lockedUntil = $this->principalColumn(PrincipalAttribute::LockedUntil);
+                $locks->whereNull($lockedUntil)->orWhere($lockedUntil, '<=', now());
             });
     }
 
@@ -223,15 +334,27 @@ class User extends Authenticatable implements CanResetPasswordContract, HasApiTo
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'immutable_datetime',
-            'password' => 'hashed',
-            'is_active' => 'boolean',
-            'profile' => 'array',
-            'preferences' => 'array',
-            'last_login_at' => 'immutable_datetime',
-            'last_login_ip' => 'encrypted',
-            'locked_until' => 'immutable_datetime',
-            'deleted_at' => 'immutable_datetime',
+            $this->principalColumn(PrincipalAttribute::EmailVerifiedAt) => 'immutable_datetime',
+            $this->principalColumn(PrincipalAttribute::Password) => 'hashed',
+            $this->principalColumn(PrincipalAttribute::Active) => 'boolean',
+            $this->principalColumn(PrincipalAttribute::Profile) => 'array',
+            $this->principalColumn(PrincipalAttribute::Preferences) => 'array',
+            $this->principalColumn(PrincipalAttribute::LastLoginAt) => 'immutable_datetime',
+            $this->principalColumn(PrincipalAttribute::LastLoginIp) => 'encrypted',
+            $this->principalColumn(PrincipalAttribute::LockedUntil) => 'immutable_datetime',
+            $this->principalColumn(PrincipalAttribute::DeletedAt) => 'immutable_datetime',
         ];
+    }
+
+    private function principalColumn(PrincipalAttribute $attribute): string
+    {
+        $configured = config(
+            "nvl-auth.features.principal_management.settings.attributes.{$attribute->value}",
+            $attribute === PrincipalAttribute::Active ? 'is_active' : $attribute->value,
+        );
+
+        return is_string($configured) && $configured !== ''
+            ? $configured
+            : ($attribute === PrincipalAttribute::Active ? 'is_active' : $attribute->value);
     }
 }

@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Users;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\RbacChanged;
@@ -28,6 +29,7 @@ final readonly class SyncUserRolesAction
         private ManagementAuthorizer $authorization,
         private UserLocator $users,
         private AuthAuditRecorder $audits,
+        private PrincipalAttributeMapper $attributes,
     ) {}
 
     /**
@@ -48,7 +50,7 @@ final readonly class SyncUserRolesAction
             $this->audits->record('user.roles_synchronized', subject: SubjectReference::fromAuthenticatable($user), actor: $actor, metadata: [
                 'roles' => $roles,
             ]);
-            RbacChanged::dispatch('user', $user->id, 'roles_synchronized', ['roles' => $roles]);
+            RbacChanged::dispatch('user', $this->attributes->identifier($user), 'roles_synchronized', ['roles' => $roles]);
 
             return $user->refresh()->load('roles');
         }, 3);

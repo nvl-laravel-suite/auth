@@ -1,4 +1,47 @@
-# Upgrading to the package-owned identity release
+# Upgrading NVL Auth
+
+## Unreleased from 1.0.1
+
+### Feature-aware schema
+
+Fresh migrations now create only tables required by features enabled at
+migration time. A 1.0.1 installation keeps any already-created dormant tables;
+the upgrade does not drop them. Before enabling a new feature, run:
+
+```bash
+php artisan nvl:auth:schema
+php artisan nvl:auth:schema --apply
+php artisan nvl:auth:doctor --strict
+```
+
+If migrations are host-owned, republish to a temporary location, merge the new
+idempotent feature guards into the maintained host copies, run `php artisan
+migrate`, then use `nvl:auth:schema` to verify the result. Schema `--apply` fails
+closed while `migrations.enabled=false` so it cannot bypass host ownership. Do
+not switch `migrations.install_all` on in production; it exists for controlled
+full-schema test and rehearsal environments.
+
+### Existing first-party Users
+
+Publish `auth-adoption` and use the staged, dry-run-first workflow in
+[principal adoption](docs/principal-adoption.md). The versioned manifest maps
+legacy principal columns, extension columns, password-reset tokens, and
+application foreign keys. IDs must remain UUIDs. Password and reset-token hashes
+are preserved rather than rehashed.
+
+Do not drop source tables on the first run. Reconcile counts, authentication,
+password reset, domain relationships, and Doctor output before changing
+`drop_sources` to true.
+
+### Custom principal models
+
+Publish the new configuration and preserve the complete
+`features.principal_management.settings.attributes` map. Map package semantics
+to physical host columns, including namespaced metadata columns when the model
+has relationships such as `profile()`. Doctor now fails when any physical
+principal column shadows a declared Eloquent relationship.
+
+## Package-owned identity release
 
 This pre-1.0 release intentionally replaces the prior host-owned identity/RBAC
 layout. There is no runtime compatibility shim.

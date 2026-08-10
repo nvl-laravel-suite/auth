@@ -12,8 +12,9 @@ php artisan vendor:publish --tag=auth-config
 |---|---|---|
 | `enabled` | `true` | global functional ingress switch |
 | `connection` | `null` | package operational database connection |
-| `migrations.enabled` | `true` | load the complete package schema |
+| `migrations.enabled` | `true` | load feature-aware package migrations |
 | `migrations.load_when_disabled` | `false` | explicitly load migrations while global Auth ingress is disabled |
+| `migrations.install_all` | `false` | force the full inventory only in controlled test/rehearsal environments |
 | `guard` | `web` | stateful Laravel guard used by browser authentication |
 | `password_broker` | provider default | Laravel password broker configured to the package token table |
 | `identifier` | `email` | login and broker credential attribute |
@@ -28,7 +29,8 @@ after rows exist is a coordinated data migration, not a runtime feature toggle.
 When `enabled=false`, Auth leaves the host Laravel user provider, password
 broker, Spatie Permission storage, Sanctum token model, and migration inventory
 unchanged. Set `migrations.load_when_disabled=true` only for an intentional
-schema-first rollout.
+schema-first rollout. Do not enable `migrations.install_all` in a normal host
+deployment; use `nvl:auth:schema` when a later feature needs new tables.
 
 ## Feature shape
 
@@ -54,8 +56,8 @@ normal direct Actions and routes. Unknown scalar modes are rejected.
 ## Principal management
 
 The default package User is immediately usable. Configuration controls the
-model class, Laravel auth-provider integration, default locale/timezone,
-pagination maximum, and suggestion limit.
+model class, Laravel auth-provider integration, physical principal attributes,
+default locale/timezone, pagination maximum, and suggestion limit.
 
 ```php
 'principal_management' => [
@@ -65,6 +67,9 @@ pagination maximum, and suggestion limit.
         'management' => ['enabled' => true],
     ],
     'models' => ['user' => App\Models\User::class], // subclass package User
+    'services' => [
+        'attribute_mapper' => Nvl\Auth\Services\ConfiguredPrincipalAttributeMapper::class,
+    ],
     'settings' => [
         'use_as_auth_model' => true,
         'default_locale' => 'en',
@@ -72,6 +77,15 @@ pagination maximum, and suggestion limit.
         'per_page' => 25,
         'maximum_per_page' => 100,
         'suggestion_limit' => 20,
+        'attributes' => [
+            'id' => 'id',
+            'name' => 'name',
+            'email' => 'email',
+            'active' => 'active',
+            'profile' => 'auth_profile',
+            'preferences' => 'auth_preferences',
+            // Keep every other key from the published configuration.
+        ],
     ],
 ],
 ```
@@ -79,6 +93,18 @@ pagination maximum, and suggestion limit.
 Set `use_as_auth_model=false` only when intentionally integrating a different
 Laravel user provider; then the configured resolvers and compatible model
 contracts become the application's responsibility.
+
+The `attributes` map must explicitly retain all canonical keys from the
+published configuration. Package models, Actions, validation, authentication,
+login metadata, and Doctor use the map. Column names must be unique safe
+identifiers. A custom `PrincipalAttributeMapper` may replace the configured
+mapper, but its mapping must remain consistent with the model's configured
+attribute map.
+
+Never map a column to the name of an Eloquent relationship. Also ensure the
+physical principal table has no otherwise-unused column with that relationship
+name: Eloquent attributes shadow relations even when the package map points
+elsewhere. `nvl:auth:doctor` detects these physical collisions.
 
 ## Routes
 
@@ -111,7 +137,7 @@ middleware; a plain stateless `api` stack cannot persist a browser login.
 | Feature | Important settings/services |
 |---|---|
 | authentication | optional identifier/subject resolvers and successful-login metadata recorder |
-| principal management | User class, auth-provider switch, locale/timezone, page/suggestion limits |
+| principal management | User class, auth-provider switch, attribute mapper/columns, locale/timezone, page/suggestion limits |
 | password | optional updater, reset TTL |
 | email verification | TTL |
 | magic links | TTL and maximum attempts |

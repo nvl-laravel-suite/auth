@@ -11,6 +11,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Support\Str;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\RequestPasswordResetData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
@@ -34,6 +35,7 @@ final readonly class RequestPasswordResetAction
     public function __construct(
         private FeatureGate $features,
         private AuthConfiguration $configuration,
+        private PrincipalAttributeMapper $principalAttributes,
         private PasswordBrokerManager $brokers,
         private AuthPipeline $pipeline,
         private AuthAuditRecorder $audits,
@@ -45,7 +47,9 @@ final readonly class RequestPasswordResetAction
     public function execute(RequestPasswordResetData $data, ?string $locale = null): void
     {
         $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Issue);
-        $identifierName = $this->configuration->string('identifier', 'email');
+        $identifierName = $this->principalAttributes->identifierColumn(
+            $this->configuration->string('identifier', 'email'),
+        );
         $this->pipeline->run(
             'password_reset_requested',
             new AuthPipelineContext('password_reset_requested', ['identifier_name' => $identifierName]),

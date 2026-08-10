@@ -14,7 +14,9 @@ use Nvl\Auth\Adapters\Laravel\LaravelBrowserSession;
 use Nvl\Auth\Adapters\Laravel\LaravelGuardIdentifierResolver;
 use Nvl\Auth\Adapters\Laravel\LaravelRequestAuditContextProvider;
 use Nvl\Auth\Adapters\Passkeys\WebauthnPasskeyCeremony;
+use Nvl\Auth\Console\Commands\AdoptPrincipalsCommand;
 use Nvl\Auth\Console\Commands\AuthDoctorCommand;
+use Nvl\Auth\Console\Commands\InstallAuthSchemaCommand;
 use Nvl\Auth\Console\Commands\ListAuthFeaturesCommand;
 use Nvl\Auth\Console\Commands\PruneAuthStateCommand;
 use Nvl\Auth\Contracts\ApiTokenAbilityProvider;
@@ -29,6 +31,7 @@ use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PermissionCatalogProvider;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\RoleTemplateProvider;
 use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
@@ -41,7 +44,9 @@ use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\AuthSchemaManager;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
+use Nvl\Auth\Services\ConfiguredPrincipalAttributeMapper;
 use Nvl\Auth\Services\EloquentPasswordUpdater;
 use Nvl\Auth\Services\EloquentSuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Services\FeatureGate;
@@ -70,6 +75,7 @@ final class AuthServiceProvider extends ServiceProvider
         $this->configureOwnedIdentityStorage();
         $this->app->singleton(AuthConfiguration::class);
         $this->app->singleton(AuthModelRegistry::class);
+        $this->app->singleton(AuthSchemaManager::class);
         $this->app->singleton(FeatureManifest::class);
         $this->app->singleton(FeatureGate::class);
         $this->app->singleton(BrowserSession::class, LaravelBrowserSession::class);
@@ -84,6 +90,11 @@ final class AuthServiceProvider extends ServiceProvider
             PasswordUpdater::class,
             'features.password.services.updater',
             EloquentPasswordUpdater::class,
+        );
+        $this->bindConfiguredContract(
+            PrincipalAttributeMapper::class,
+            'features.principal_management.services.attribute_mapper',
+            ConfiguredPrincipalAttributeMapper::class,
         );
         $this->bindConfiguredContract(
             AuthSubjectResolver::class,
@@ -147,6 +158,9 @@ final class AuthServiceProvider extends ServiceProvider
         $this->publishes([$root.'/config/nvl-auth.php' => config_path('nvl-auth.php')], 'auth-config');
         $this->publishesMigrations([$root.'/database/migrations' => database_path('migrations')], 'auth-migrations');
         $this->publishes([$root.'/resources/boost/skills' => base_path('.agents/skills')], 'auth-skills');
+        $this->publishes([
+            $root.'/resources/adoption/principals.v1.example.json' => base_path('nvl-auth.principals.json'),
+        ], 'auth-adoption');
 
         if ($configuration->boolean('migrations.enabled', true)
             && ($configuration->enabled() || $configuration->boolean('migrations.load_when_disabled', false))) {
@@ -160,7 +174,9 @@ final class AuthServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
+                AdoptPrincipalsCommand::class,
                 AuthDoctorCommand::class,
+                InstallAuthSchemaCommand::class,
                 ListAuthFeaturesCommand::class,
                 PruneAuthStateCommand::class,
             ]);

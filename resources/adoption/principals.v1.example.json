@@ -1,0 +1,58 @@
+{
+    "version": 1,
+    "connection": null,
+    "staging": [
+        {
+            "source_table": "users",
+            "staging_table": "legacy_users"
+        },
+        {
+            "source_table": "password_reset_tokens",
+            "staging_table": "legacy_password_reset_tokens"
+        }
+    ],
+    "principals": {
+        "table": "legacy_users",
+        "expected_count": 0,
+        "columns": {
+            "id": "id",
+            "name": "name",
+            "email": "email",
+            "email_verified_at": "email_verified_at",
+            "password": "password",
+            "active": "active",
+            "locale": "locale",
+            "timezone": "timezone",
+            "profile": null,
+            "preferences": null,
+            "last_login_at": "last_login_at",
+            "last_login_ip": "last_login_ip",
+            "locked_until": null,
+            "remember_token": "remember_token",
+            "created_at": "created_at",
+            "updated_at": "updated_at",
+            "deleted_at": "deleted_at"
+        },
+        "extension_columns": {
+            "domain_reference": "domain_reference"
+        }
+    },
+    "password_reset_tokens": {
+        "table": "legacy_password_reset_tokens",
+        "expected_count": 0,
+        "columns": {
+            "email": "email",
+            "token": "token",
+            "created_at": "created_at"
+        }
+    },
+    "foreign_keys": [
+        {
+            "table": "domain_records",
+            "column": "user_id",
+            "name": "domain_records_user_id_foreign",
+            "on_delete": "restrict"
+        }
+    ],
+    "drop_sources": false
+}

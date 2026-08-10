@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Challenges;
 
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthIdentifierResolver;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\RequestMagicLinkData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -29,6 +30,7 @@ final readonly class RequestMagicLinkAuthenticationAction
     public function __construct(
         private FeatureGate $features,
         private AuthConfiguration $configuration,
+        private PrincipalAttributeMapper $principalAttributes,
         private AuthIdentifierResolver $identifiers,
         private RequestMagicLinkAction $links,
         private AuthAuditRecorder $audits,
@@ -40,7 +42,9 @@ final readonly class RequestMagicLinkAuthenticationAction
     public function execute(RequestMagicLinkData $data, ?string $locale = null): ?IssuedChallenge
     {
         $this->features->assertAllowed(AuthFeature::MagicLinks, FeatureOperation::Issue);
-        $identifierName = $this->configuration->string('identifier', 'email');
+        $identifierName = $this->principalAttributes->identifierColumn(
+            $this->configuration->string('identifier', 'email'),
+        );
         $subject = $this->identifiers->resolve($identifierName, $data->recipient);
 
         if ($subject === null) {

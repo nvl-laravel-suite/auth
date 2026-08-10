@@ -11,6 +11,7 @@ use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Contracts\Auth\PasswordBroker as PasswordBrokerContract;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\PasswordUpdater;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\ResetPasswordData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -33,6 +34,7 @@ final readonly class ResetPasswordAction
     public function __construct(
         private FeatureGate $features,
         private AuthConfiguration $configuration,
+        private PrincipalAttributeMapper $principalAttributes,
         private PasswordBrokerManager $brokers,
         private PasswordUpdater $passwords,
         private AuthPipeline $pipeline,
@@ -45,7 +47,9 @@ final readonly class ResetPasswordAction
     public function execute(#[SensitiveParameter] ResetPasswordData $data): void
     {
         $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Use);
-        $identifierName = $this->configuration->string('identifier', 'email');
+        $identifierName = $this->principalAttributes->identifierColumn(
+            $this->configuration->string('identifier', 'email'),
+        );
         $status = $this->pipeline->run(
             'password_reset',
             new AuthPipelineContext('password_reset', ['identifier_name' => $identifierName]),

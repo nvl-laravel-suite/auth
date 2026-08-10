@@ -47,7 +47,7 @@ mutating state, so direct PHP usage is protected exactly like the HTTP API.
 
 `AuthServiceProvider` always merges configuration, registers models/contracts,
 configures Laravel authentication, password broker, Sanctum, and Spatie, loads
-the complete migrations, publishes package assets, and registers operational
+feature-aware migrations, publishes package assets, and registers operational
 commands. Optional feature adapters remain lazy.
 
 `RouteServiceProvider` loads only effective feature route families. Global,
@@ -64,14 +64,17 @@ containment can remain callable after a feature or ingress switch is disabled.
 
 ## Persistence and transactions
 
-The two baseline migrations create all 17 tables independently of runtime
-activation. Actions own use-case transactions on the package connection;
+The two baseline migrations create only tables owned by enabled features.
+`nvl:auth:schema` safely re-enters those idempotent migrations when a later
+feature is enabled. Actions own use-case transactions on the package connection;
 cross-table user/RBAC/invitation mutations are kept on that connection so they
-can remain atomic. Configuration flags never create, drop, or truncate data.
+can remain atomic. Feature flags alone never create, drop, or truncate data.
 
 ## Extension points
 
 - configured User, Role, Permission, and PersonalAccessToken subclasses;
+- configurable principal attribute mapping and a replaceable mapper contract;
+- manifest-driven legacy-principal adoption with explicit host foreign keys;
 - named `AuthPipelineStage` lists;
 - identity, invitation, and social subject resolvers;
 - password updater and management authorization ports;

@@ -8,6 +8,8 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\User;
@@ -24,6 +26,7 @@ final readonly class PackageInvitationSubjectResolver implements InvitationSubje
     public function __construct(
         private AuthModelRegistry $models,
         private AuthConfiguration $configuration,
+        private PrincipalAttributeMapper $attributes,
     ) {}
 
     /** {@inheritDoc} */
@@ -31,7 +34,9 @@ final readonly class PackageInvitationSubjectResolver implements InvitationSubje
     {
         $email = mb_strtolower(trim($invitation->recipient));
         $class = $this->models->userClass();
-        $existing = $class::query()->where('email', $email)->first();
+        $existing = $class::query()
+            ->where($this->attributes->column(PrincipalAttribute::Email), $email)
+            ->first();
 
         if ($existing instanceof User) {
             return $existing;
@@ -53,20 +58,22 @@ final readonly class PackageInvitationSubjectResolver implements InvitationSubje
 
         try {
             return DB::connection($connection)->transaction(function () use ($class, $email, $input, $name, $password): User {
-                return $class::query()->create([
-                    'name' => trim($name),
-                    'email' => $email,
-                    'password' => $password,
-                    'is_active' => true,
-                    'locale' => $this->boundedString($input['locale'] ?? null, 12)
+                return $class::query()->create($this->attributes->map([
+                    PrincipalAttribute::Name->value => trim($name),
+                    PrincipalAttribute::Email->value => $email,
+                    PrincipalAttribute::Password->value => $password,
+                    PrincipalAttribute::Active->value => true,
+                    PrincipalAttribute::Locale->value => $this->boundedString($input['locale'] ?? null, 12)
                         ?? $this->configuration->string('features.principal_management.settings.default_locale', 'en'),
-                    'timezone' => $this->boundedString($input['timezone'] ?? null, 64)
+                    PrincipalAttribute::Timezone->value => $this->boundedString($input['timezone'] ?? null, 64)
                         ?? $this->configuration->string('features.principal_management.settings.default_timezone', 'UTC'),
-                    'profile' => is_array($input['profile'] ?? null) ? $input['profile'] : [],
-                ]);
+                    PrincipalAttribute::Profile->value => is_array($input['profile'] ?? null) ? $input['profile'] : [],
+                ]));
             }, 3);
         } catch (QueryException $exception) {
-            $concurrent = $class::query()->where('email', $email)->first();
+            $concurrent = $class::query()
+                ->where($this->attributes->column(PrincipalAttribute::Email), $email)
+                ->first();
 
             if ($concurrent instanceof User) {
                 return $concurrent;

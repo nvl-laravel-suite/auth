@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Enums\AuthFeature;
+use Nvl\Auth\Services\AuthSchemaManager;
 
 it('installs exactly the seventeen namespaced auth-owned tables', function (): void {
     $owned = [
@@ -52,17 +53,62 @@ it('installs exactly the seventeen namespaced auth-owned tables', function (): v
     }
 });
 
-it('installs the complete schema even when ingress and every feature are disabled', function (): void {
+it('installs only enabled feature schema and safely installs later capabilities', function (): void {
+    $features = require dirname(__DIR__, 2).'/database/migrations/2026_08_02_000000_create_nvl_auth_tables.php';
+    $identity = require dirname(__DIR__, 2).'/database/migrations/2026_08_01_000000_create_nvl_auth_identity_tables.php';
+    $features->down();
+    $identity->down();
     config()->set('nvl-auth.enabled', false);
+    config()->set('nvl-auth.migrations.install_all', false);
 
     foreach (AuthFeature::cases() as $feature) {
         config()->set("nvl-auth.features.{$feature->value}.enabled", false);
     }
 
-    expect(Schema::hasTable('nvl_auth_users'))->toBeTrue()
-        ->and(Schema::hasTable('nvl_auth_roles'))->toBeTrue()
-        ->and(Schema::hasTable('nvl_auth_clients'))->toBeTrue()
-        ->and(Schema::hasTable('nvl_auth_audits'))->toBeTrue();
+    $identity->up();
+    $features->up();
+
+    expect(Schema::hasTable('nvl_auth_users'))->toBeFalse()
+        ->and(Schema::hasTable('nvl_auth_roles'))->toBeFalse()
+        ->and(Schema::hasTable('nvl_auth_totp_credentials'))->toBeFalse();
+
+    config()->set('nvl-auth.features.principal_management.enabled', true);
+    config()->set('nvl-auth.features.totp.enabled', true);
+    $plan = app(AuthSchemaManager::class)->execute();
+    $applied = app(AuthSchemaManager::class)->execute(true);
+
+    expect($plan['missing'])->toBe(['nvl_auth_users', 'nvl_auth_totp_credentials'])
+        ->and($applied['created'])->toBe(['nvl_auth_users', 'nvl_auth_totp_credentials'])
+        ->and(Schema::hasTable('nvl_auth_users'))->toBeTrue()
+        ->and(Schema::hasTable('nvl_auth_totp_credentials'))->toBeTrue()
+        ->and(Schema::hasTable('nvl_auth_passkeys'))->toBeFalse();
+
+    foreach (AuthFeature::cases() as $feature) {
+        config()->set("nvl-auth.features.{$feature->value}.enabled", true);
+    }
+
+    app(AuthSchemaManager::class)->execute(true);
+    config()->set('nvl-auth.migrations.install_all', true);
+});
+
+it('registers the feature-aware schema installation command', function (): void {
+    $this->artisan('nvl:auth:schema', ['--format' => 'json'])
+        ->assertSuccessful();
+});
+
+it('does not bypass host-owned migration mode during schema apply', function (): void {
+    $features = require dirname(__DIR__, 2).'/database/migrations/2026_08_02_000000_create_nvl_auth_tables.php';
+    $features->down();
+    config()->set('nvl-auth.migrations.enabled', false);
+
+    expect(fn (): array => app(AuthSchemaManager::class)->execute(true))
+        ->toThrow(
+            RuntimeException::class,
+            'Auth schema apply is unavailable while migrations are host-owned.',
+        );
+
+    config()->set('nvl-auth.migrations.enabled', true);
+    $features->up();
 });
 
 it('rolls the complete package schema down and back up cleanly', function (): void {

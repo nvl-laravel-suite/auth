@@ -42,6 +42,10 @@ it('registers timestamp-aware migration publishing and warns about duplicate own
         AuthServiceProvider::class,
         'auth-migrations',
     ))->not->toBeEmpty()
+        ->and(AuthServiceProvider::pathsToPublish(
+            AuthServiceProvider::class,
+            'auth-adoption',
+        ))->toHaveCount(1)
         ->and($publishableMigrationPaths)->toContain($migrationPath);
 
     $published = database_path(

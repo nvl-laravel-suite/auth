@@ -7,9 +7,11 @@ namespace Nvl\Auth\Actions\Users;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\StoreUserData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthModelRegistry;
@@ -30,6 +32,7 @@ final readonly class CreateUserAction
         private AuthModelRegistry $models,
         private RbacManager $rbac,
         private AuthAuditRecorder $audits,
+        private PrincipalAttributeMapper $attributes,
     ) {}
 
     /** Persist a principal and optional RBAC assignment atomically. */
@@ -47,21 +50,23 @@ final readonly class CreateUserAction
         $connection = (new $class)->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($actor, $class, $data): User {
-            $user = $class::query()->create([
-                'name' => trim($data->name),
-                'email' => mb_strtolower(trim($data->email)),
-                'password' => $data->password,
-                'is_active' => $data->active,
-                'locale' => $data->locale,
-                'timezone' => $data->timezone,
-                'profile' => $data->profile,
-                'preferences' => $data->preferences,
-                'email_verified_at' => $data->emailVerified ? now() : null,
-            ]);
+            $user = $class::query()->create($this->attributes->map([
+                PrincipalAttribute::Name->value => trim($data->name),
+                PrincipalAttribute::Email->value => mb_strtolower(trim($data->email)),
+                PrincipalAttribute::Password->value => $data->password,
+                PrincipalAttribute::Active->value => $data->active,
+                PrincipalAttribute::Locale->value => $data->locale,
+                PrincipalAttribute::Timezone->value => $data->timezone,
+                PrincipalAttribute::Profile->value => $data->profile,
+                PrincipalAttribute::Preferences->value => $data->preferences,
+                PrincipalAttribute::EmailVerifiedAt->value => $data->emailVerified ? now() : null,
+            ]));
             $this->rbac->assign($user, $data->roles, $data->permissions);
             $reference = SubjectReference::fromAuthenticatable($user);
             $this->audits->record('user.created', subject: $reference, actor: $actor);
-            PrincipalChanged::dispatch($user->id, 'created', ['email' => $user->email]);
+            PrincipalChanged::dispatch($this->attributes->identifier($user), 'created', [
+                'email' => $this->attributes->value($user, PrincipalAttribute::Email),
+            ]);
 
             return $user->refresh()->load(['roles', 'permissions']);
         }, 3);

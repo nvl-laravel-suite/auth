@@ -94,10 +94,12 @@ final class UpdateUserData extends Data
             ? $payload['_currentUserId']
             : null;
         $table = Config::string('nvl-auth.tables.users', 'nvl_auth_users');
+        $id = Config::string('nvl-auth.features.principal_management.settings.attributes.id', 'id');
+        $email = Config::string('nvl-auth.features.principal_management.settings.attributes.email', 'email');
 
         return [
             'name' => ['sometimes', 'string', 'max:160'],
-            'email' => ['sometimes', 'email', 'max:254', Rule::unique($table, 'email')->ignore($userId)],
+            'email' => ['sometimes', 'email', 'max:254', Rule::unique($table, $email)->ignore($userId, $id)],
             'password' => ['sometimes', 'nullable', Password::min(12)->letters()->numbers()],
             'emailVerified' => ['sometimes', 'boolean'],
             'locale' => ['sometimes', 'string', 'max:12'],

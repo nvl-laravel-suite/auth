@@ -33,12 +33,18 @@ or an application-specific model/namespace to Auth.
 5. Keep optional adapters lazy and fail closed through an unavailable adapter.
 6. Add HTTP routes only through the owning feature/surface family and preserve
    `nvl-auth.feature` middleware.
-7. Install the complete 17-table `nvl_auth_` schema independently of feature
-   flags while global Auth is enabled. A globally disabled provider must remain
-   passive unless migration loading is explicitly requested.
+7. Install only tables required by enabled features. When a feature is enabled
+   later, plan and reconcile with `nvl:auth:schema`; keep migrations idempotent.
+   A globally disabled provider must remain passive unless migration loading is
+   explicitly requested.
 8. Emit delivery through `AuthDeliveryRequested`; do not send it in Auth.
 9. Update manifest route names, HTTP docs, OpenAPI, and contract tests together.
-10. Run focused Pest, full Pest, PHPStan max, and Pint.
+10. Keep the configured principal attribute map aligned across models, Actions,
+    validation, authentication, adoption, and Doctor. Reject physical
+    attribute/relationship collisions.
+11. Adopt legacy principals only through a versioned dry-run-first manifest
+    that reconciles counts, identifiers, hashes, tokens, and declared host FKs.
+12. Run focused Pest, full Pest, PHPStan max, and Pint.
 
 ## Features
 

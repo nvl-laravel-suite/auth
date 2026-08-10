@@ -10,7 +10,7 @@ php artisan nvl:auth:doctor
 
 Doctor checks:
 
-- all nine package tables and their complete required columns on the configured connection;
+- tables required by currently enabled features and their complete required columns on the configured connection;
 - known legacy overreaching tables;
 - `APP_KEY`;
 - enabled feature dependencies;
@@ -22,6 +22,7 @@ Doctor checks:
 - passkey RP/origin, timeout, resident-key, and user-verification policy;
 - public invitation resolver readiness;
 - configured versus loaded Auth route inventory.
+- physical principal columns that shadow relationships on the configured User.
 
 `--format=json` emits machine-readable checks and a top-level `ready` boolean.
 `--strict` additionally fails for dormant service/adapter configuration owned by
@@ -35,7 +36,40 @@ php artisan nvl:auth:features --format=json
 ```
 
 The command shows configured/effective state, dependencies, and route surfaces
-for all fifteen manifest entries.
+for all sixteen manifest entries.
+
+## Feature schema
+
+Run the dry-run-first schema reconciler after changing feature configuration:
+
+```bash
+php artisan nvl:auth:schema
+php artisan nvl:auth:schema --apply
+php artisan nvl:auth:doctor
+```
+
+The plan contains only tables required by enabled features. In automatic vendor
+mode, apply re-enters the idempotent package migrations, creates missing tables,
+and fails if reconciliation is incomplete. In host-owned mode
+(`migrations.enabled=false`), apply fails closed: update and run the maintained
+published migrations, then rerun the plan and Doctor.
+
+## Legacy principal adoption
+
+Publish and edit the versioned sample manifest, then follow the staged workflow:
+
+```bash
+php artisan vendor:publish --tag=auth-adoption
+php artisan nvl:auth:adopt-principals nvl-auth.principals.json --stage
+php artisan nvl:auth:adopt-principals nvl-auth.principals.json --stage --apply
+php artisan nvl:auth:schema --apply
+php artisan nvl:auth:adopt-principals nvl-auth.principals.json
+php artisan nvl:auth:adopt-principals nvl-auth.principals.json --apply
+php artisan nvl:auth:doctor --strict
+```
+
+Every mutation is opt-in. See [principal adoption](principal-adoption.md) for
+preconditions, reconciliation, and the forward-only rollback boundary.
 
 ## Pruning
 
@@ -64,6 +98,7 @@ Schedule::command('nvl:auth:prune')
 ```bash
 php artisan optimize:clear
 php artisan migrate --force
+php artisan nvl:auth:schema --apply
 php artisan config:cache
 php artisan route:cache
 php artisan queue:restart

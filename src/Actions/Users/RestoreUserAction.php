@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Users;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\PrincipalChanged;
@@ -27,6 +28,7 @@ final readonly class RestoreUserAction
         private ManagementAuthorizer $authorization,
         private UserLocator $users,
         private AuthAuditRecorder $audits,
+        private PrincipalAttributeMapper $attributes,
     ) {}
 
     /** Restore one principal without silently re-enabling it. */
@@ -39,7 +41,7 @@ final readonly class RestoreUserAction
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $user): User {
             $user->restore();
             $this->audits->record('user.restored', subject: SubjectReference::fromAuthenticatable($user), actor: $actor);
-            PrincipalChanged::dispatch($user->id, 'restored');
+            PrincipalChanged::dispatch($this->attributes->identifier($user), 'restored');
 
             return $user->refresh();
         }, 3);

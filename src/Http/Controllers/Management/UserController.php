@@ -18,11 +18,13 @@ use Nvl\Auth\Actions\Users\SuggestUsersAction;
 use Nvl\Auth\Actions\Users\SyncUserPermissionsAction;
 use Nvl\Auth\Actions\Users\SyncUserRolesAction;
 use Nvl\Auth\Actions\Users\UpdateUserAction;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\StoreUserData;
 use Nvl\Auth\Data\Mutations\UpdateUserData;
 use Nvl\Auth\Data\Mutations\UpdateUserStatusData;
 use Nvl\Auth\Data\Queries\UserIndexQueryData;
 use Nvl\Auth\Data\Queries\UserSuggestionQueryData;
+use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Enums\UserBulkOperation;
 use Nvl\Auth\Http\Controllers\Account\AuthenticatedController;
 use Nvl\Auth\Http\Requests\BulkUserRequest;
@@ -99,14 +101,20 @@ final class UserController extends AuthenticatedController
     }
 
     /** Enable or disable one principal. */
-    public function status(UpdateUserStatusData $data, Request $request, string $user, SetUserActiveAction $action): JsonResponse
-    {
+    public function status(
+        UpdateUserStatusData $data,
+        Request $request,
+        string $user,
+        SetUserActiveAction $action,
+        PrincipalAttributeMapper $attributes,
+    ): JsonResponse {
         $updated = $action->execute($this->subject($request), $user, $data->active);
+        $active = (bool) $attributes->value($updated, PrincipalAttribute::Active);
 
         return response()->json([
             'data' => $updated,
-            'code' => $updated->is_active ? 'user_enabled' : 'user_disabled',
-            'message' => $updated->is_active ? 'The user was enabled.' : 'The user was disabled.',
+            'code' => $active ? 'user_enabled' : 'user_disabled',
+            'message' => $active ? 'The user was enabled.' : 'The user was disabled.',
         ]);
     }
 

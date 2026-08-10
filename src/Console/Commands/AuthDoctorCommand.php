@@ -9,6 +9,8 @@ use Illuminate\Contracts\Auth\Access\Gate as GateContract;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Schema\Builder;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Adapters\ApiTokens\SanctumApiTokenManager;
@@ -23,12 +25,15 @@ use Nvl\Auth\Contracts\BrowserSession;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Contracts\PasswordUpdater;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\AuthSchemaManager;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\FeatureManifest;
@@ -41,6 +46,7 @@ use Nvl\Auth\Services\UnavailableSocialIdentityProvider;
 use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
 use Nvl\Auth\ValueObjects\FeatureDefinition;
 use ReflectionMethod;
+use ReflectionNamedType;
 use Throwable;
 
 /**
@@ -132,6 +138,8 @@ final class AuthDoctorCommand extends Command
         FeatureGate $features,
         Router $router,
         Container $container,
+        AuthSchemaManager $schemaManager,
+        PrincipalAttributeMapper $principalAttributes,
     ): int {
         $format = $this->option('format');
 
@@ -158,8 +166,22 @@ final class AuthDoctorCommand extends Command
         $connection = $configuration->get('connection');
         $schema = Schema::connection(is_string($connection) && $connection !== '' ? $connection : null);
 
+        $requiredTables = $schemaManager->requiredTables();
+
         foreach (self::TABLE_COLUMNS as $defaultTable => $columns) {
             $table = $this->configuredTable($configuration, $defaultTable);
+
+            if (! in_array($table, $requiredTables, true)) {
+                continue;
+            }
+
+            if ($defaultTable === 'nvl_auth_users') {
+                $columns = array_map(
+                    $principalAttributes->column(...),
+                    PrincipalAttribute::cases(),
+                );
+            }
+
             $exists = $schema->hasTable($table);
             $checks[] = $this->check("schema.{$table}", $exists, "Required table [{$table}] is missing.");
             $checks[] = $this->check(
@@ -186,6 +208,19 @@ final class AuthDoctorCommand extends Command
             'configuration.models',
             $this->ownedModelsReady($container),
             'Configured User, Role, Permission, or PersonalAccessToken models do not extend their package model.',
+        );
+        $principalTable = $this->configuredTable($configuration, 'nvl_auth_users');
+        $attributeCollisions = $configuration->featureEnabled(AuthFeature::PrincipalManagement)
+            && $schema->hasTable($principalTable)
+                ? $this->principalAttributeCollisions($container, $schema, $principalTable)
+                : [];
+        $checks[] = $this->check(
+            'configuration.principal_attributes',
+            $attributeCollisions === [],
+            sprintf(
+                'Physical principal columns collide with Eloquent relationships: %s.',
+                implode(', ', $attributeCollisions),
+            ),
         );
 
         if ($configuration->boolean('features.principal_management.settings.use_as_auth_model', true)) {
@@ -932,6 +967,37 @@ final class AuthDoctorCommand extends Command
             && trim($value) !== ''
             && $value === trim($value)
             && mb_strlen($value) <= $maximum;
+    }
+
+    /**
+     * Return physical principal columns that are also declared Eloquent relationships.
+     *
+     * @return list<string>
+     */
+    private function principalAttributeCollisions(
+        Container $container,
+        Builder $schema,
+        string $table,
+    ): array {
+        $models = $container->make(AuthModelRegistry::class);
+        $class = $models->userClass();
+        $collisions = [];
+
+        foreach ($schema->getColumnListing($table) as $column) {
+            if (! method_exists($class, $column)) {
+                continue;
+            }
+
+            $returnType = (new ReflectionMethod($class, $column))->getReturnType();
+
+            if ($returnType instanceof ReflectionNamedType
+                && ! $returnType->isBuiltin()
+                && is_a($returnType->getName(), Relation::class, true)) {
+                $collisions[] = $column;
+            }
+        }
+
+        return $collisions;
     }
 
     /**

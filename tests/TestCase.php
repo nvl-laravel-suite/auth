@@ -54,6 +54,8 @@ abstract class TestCase extends Orchestra
         $app['config']->set('auth.providers.users', ['driver' => 'eloquent', 'model' => TestUser::class]);
         $app['config']->set('auth.passwords.users', ['provider' => 'users', 'table' => 'password_reset_tokens', 'expire' => 60, 'throttle' => 0]);
         $app['config']->set('nvl-auth.features.principal_management.models.user', TestUser::class);
+
+        $app['config']->set('nvl-auth.migrations.install_all', true);
         $app['config']->set('nvl-auth.features.api_tokens.enabled', true);
         $app['config']->set('nvl-auth.features.api_tokens.settings.abilities', ['profile:read']);
         $app['config']->set('nvl-auth.routes.enabled', false);

@@ -6,6 +6,15 @@ All notable changes to `nvl/auth` are documented here.
 
 - Registered migration publication through Laravel's timestamp-aware API and
   made Doctor warn when automatic vendor loading overlaps a published host copy.
+- Added versioned, dry-run-first legacy principal adoption with staging,
+  password-reset-token preservation, extension columns, host foreign-key
+  reconciliation, bounded validation, and explicit source cleanup.
+- Added canonical-to-physical principal attribute mapping across the package
+  model, Actions, validation, authentication metadata, and diagnostics.
+- Made Auth migrations feature-aware and idempotent, with a schema planning and
+  reconciliation command for features enabled after initial installation.
+- Made Doctor reject physical principal columns that shadow Eloquent
+  relationships on the configured User model.
 
 ## 1.0.1 - 2026-08-09
 

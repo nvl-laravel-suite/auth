@@ -5,6 +5,7 @@ use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\PersonalAccessToken;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Models\User;
+use Nvl\Auth\Services\ConfiguredPrincipalAttributeMapper;
 use Nvl\Auth\Services\PackagePermissionCatalog;
 use Nvl\Auth\Services\PackageRoleTemplates;
 
@@ -19,6 +20,7 @@ return [
     'migrations' => [
         'enabled' => true,
         'load_when_disabled' => false,
+        'install_all' => false,
     ],
 
     /*
@@ -54,6 +56,7 @@ return [
             'enabled' => env('NVL_AUTH_PRINCIPAL_MANAGEMENT_ENABLED', true),
             'routes' => ['account' => ['enabled' => false], 'management' => ['enabled' => false]],
             'models' => ['user' => User::class],
+            'services' => ['attribute_mapper' => ConfiguredPrincipalAttributeMapper::class],
             'settings' => [
                 'use_as_auth_model' => true,
                 'default_locale' => env('APP_LOCALE', 'en'),
@@ -61,6 +64,25 @@ return [
                 'per_page' => 25,
                 'maximum_per_page' => 100,
                 'suggestion_limit' => 20,
+                'attributes' => [
+                    'id' => 'id',
+                    'name' => 'name',
+                    'email' => 'email',
+                    'email_verified_at' => 'email_verified_at',
+                    'password' => 'password',
+                    'active' => 'is_active',
+                    'locale' => 'locale',
+                    'timezone' => 'timezone',
+                    'profile' => 'profile',
+                    'preferences' => 'preferences',
+                    'last_login_at' => 'last_login_at',
+                    'last_login_ip' => 'last_login_ip',
+                    'locked_until' => 'locked_until',
+                    'remember_token' => 'remember_token',
+                    'created_at' => 'created_at',
+                    'updated_at' => 'updated_at',
+                    'deleted_at' => 'deleted_at',
+                ],
             ],
         ],
         'password' => [
@@ -206,6 +228,11 @@ return [
 
     'cleanup' => [
         'retention_days' => env('NVL_AUTH_RETENTION_DAYS', 30),
+    ],
+
+    'adoption' => [
+        'maximum_manifest_bytes' => 1_048_576,
+        'maximum_records' => 10_000,
     ],
 
     /*

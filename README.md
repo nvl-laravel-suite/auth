@@ -32,6 +32,7 @@ composer require nvl/laravel-suite:^1.0
 php artisan vendor:publish --tag=auth-config
 php artisan vendor:publish --tag=auth-skills
 php artisan migrate
+php artisan nvl:auth:schema
 php artisan nvl:auth:doctor
 ```
 
@@ -56,6 +57,12 @@ Choose exactly one migration owner:
 
 Never run both sources. Laravel retimestamps files published through the migration tag. `php artisan nvl:auth:doctor` reports a warning when automatic loading remains enabled and `database/migrations` contains a timestamp-independent name matching a package migration; `--strict` promotes that warning to failure.
 
+Migrations create only the tables required by features enabled at migration
+time. Before enabling another feature in an existing installation, deploy its
+configuration, run `php artisan nvl:auth:schema`, review the missing-table plan,
+then run `php artisan nvl:auth:schema --apply`. The apply command reuses the
+idempotent package migrations and verifies that every required table exists.
+
 ## Ownership
 
 | Concern | Authority |
@@ -72,7 +79,9 @@ Never run both sources. Laravel retimestamps files published through the migrati
 The default `Nvl\Auth\Models\User` is a complete authenticatable model. A
 consumer that needs application relationships subclasses it and changes only
 `features.principal_management.models.user`; package Actions and routes continue
-to operate on the configured class.
+to operate on the configured class. Host schemas may map every package principal
+attribute to a different physical column through
+`features.principal_management.settings.attributes`.
 
 ## Features
 
@@ -210,10 +219,10 @@ template, provider, delivery retry, and provider callback concerns.
 
 ## Storage
 
-The complete schema is installed while Auth is globally enabled, independently
-of individual feature and route flags. A globally disabled provider does not
-load migrations unless `migrations.load_when_disabled=true` is explicitly set.
-The schema contains 17 UUID-first, `nvl_auth_`-prefixed tables: User, RBAC and
+Package migrations install only schema owned by features enabled at migration
+time. A globally disabled provider does not load migrations unless
+`migrations.load_when_disabled=true` is explicitly set. Across all features the
+inventory contains 17 UUID-first, `nvl_auth_`-prefixed tables: User, RBAC and
 pivots, Sanctum tokens, password resets, clients/session correlations,
 invitations, challenges, TOTP, passkeys, recovery codes, social identities, and
 audits. It intentionally contains no mail delivery, notification, queue,
@@ -226,6 +235,8 @@ See [schema](docs/schema.md) for the exact inventory.
 ```bash
 php artisan nvl:auth:features
 php artisan nvl:auth:features --format=json
+php artisan nvl:auth:schema
+php artisan nvl:auth:schema --apply
 php artisan nvl:auth:doctor --strict
 php artisan nvl:auth:prune --dry-run
 php artisan nvl:auth:prune
@@ -240,6 +251,7 @@ php artisan nvl:auth:prune
 - [HTTP API](docs/http-api.md)
 - [Delivery events](docs/delivery.md)
 - [Extending](docs/extending.md)
+- [Principal adoption](docs/principal-adoption.md)
 - [Operations](docs/operations.md)
 - [Schema](docs/schema.md)
 - [Security](docs/security.md)

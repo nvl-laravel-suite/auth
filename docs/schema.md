@@ -1,8 +1,13 @@
 # Schema
 
-NVL Auth owns 17 UUID-first tables. Both package migrations run regardless of
-feature flags or HTTP ingress, so installations are deterministic and any
-feature can be enabled later without a schema deployment.
+NVL Auth owns a possible inventory of 17 UUID-first tables. Both package
+migrations are idempotent and create only the tables required by features
+enabled at migration time. Route switches never affect schema selection.
+
+Run `php artisan nvl:auth:schema` before deploying newly enabled features. The
+dry run reports required, existing, and missing tables. After review,
+`php artisan nvl:auth:schema --apply` creates and verifies only the missing
+feature-owned schema.
 
 | Table | Purpose | Sensitive handling |
 |---|---|---|
@@ -24,6 +29,14 @@ feature can be enabled later without a schema deployment.
 | `nvl_auth_social_identities` | provider-to-principal links | provider identity and claims encrypted; blind index hashed |
 | `nvl_auth_audits` | bounded authentication/action facts and payload metadata | IP, UA, and metadata encrypted |
 
+Principal management owns Users; password owns reset tokens; RBAC owns its five
+catalog/pivot tables; API tokens own Sanctum tokens; clients own clients and
+client sessions; invitations own invitations; magic links/security codes share
+challenges; TOTP, passkeys, recovery codes, and social identities each own their
+credential table. Audit owns audits and also requires clients for optional
+client correlation. Authentication, email verification, and browser-session
+admission add no independent tables.
+
 ## Deliberately absent tables
 
 The package does not create shadow browser sessions, mail notifications,
@@ -39,6 +52,9 @@ still use `subject_type` plus `subject_id`, allowing a configured subclass of
 `Nvl\Auth\Models\User` and stable morph aliases without introducing a duplicate
 principal projection. Consumer-specific foreign keys and cross-module
 relationships belong on the subclass or its application-owned extension tables.
+The complete physical principal attribute map is configurable; UUID identity is
+still mandatory. Physical columns must not share names with relationships
+declared by the configured User subclass.
 
 ## Connection and table names
 

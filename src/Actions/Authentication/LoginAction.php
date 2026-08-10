@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\StatefulGuard;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\BrowserSession;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Data\Mutations\LoginData;
 use Nvl\Auth\Enums\AuthFeature;
@@ -38,6 +39,7 @@ final readonly class LoginAction
     public function __construct(
         private FeatureGate $features,
         private AuthConfiguration $configuration,
+        private PrincipalAttributeMapper $principalAttributes,
         private AuthManager $auth,
         private BrowserSession $session,
         private AuthPipeline $pipeline,
@@ -56,7 +58,9 @@ final readonly class LoginAction
         $this->features->assertAllowed(AuthFeature::Authentication, FeatureOperation::Use);
         $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Use);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Use);
-        $identifierName = $this->configuration->string('identifier', 'email');
+        $identifierName = $this->principalAttributes->identifierColumn(
+            $this->configuration->string('identifier', 'email'),
+        );
         $guard = $this->auth->guard($this->configuration->string('guard', 'web'));
 
         if (! $guard instanceof StatefulGuard) {

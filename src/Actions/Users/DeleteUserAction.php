@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Users;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\PrincipalChanged;
@@ -28,6 +29,7 @@ final readonly class DeleteUserAction
         private ManagementAuthorizer $authorization,
         private UserLocator $users,
         private AuthAuditRecorder $audits,
+        private PrincipalAttributeMapper $attributes,
     ) {}
 
     /** Soft delete one principal. */
@@ -37,7 +39,7 @@ final readonly class DeleteUserAction
         $this->authorization->authorize($actor, 'nvl-auth.users.delete');
         $user = $this->users->find($user);
 
-        if ($actor->getAuthIdentifier() === $user->id) {
+        if ($actor->getAuthIdentifier() === $user->getKey()) {
             throw new AuthException('self_delete_forbidden', 'You cannot delete your own account.', 422);
         }
 
@@ -46,7 +48,7 @@ final readonly class DeleteUserAction
             $user->tokens()->delete();
             $deleted = (bool) $user->delete();
             $this->audits->record('user.deleted', subject: $reference, actor: $actor);
-            PrincipalChanged::dispatch($user->id, 'deleted');
+            PrincipalChanged::dispatch($this->attributes->identifier($user), 'deleted');
 
             return $deleted;
         }, 3);

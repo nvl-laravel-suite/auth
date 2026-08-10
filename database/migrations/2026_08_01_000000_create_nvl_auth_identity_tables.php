@@ -6,8 +6,9 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schema;
+use Nvl\Auth\Contracts\AuthSchemaMigration;
 
-return new class extends Migration
+return new class extends Migration implements AuthSchemaMigration
 {
     /**
      * Create the package-owned principal, RBAC, and Sanctum schema.
@@ -17,115 +18,138 @@ return new class extends Migration
         $schema = Schema::connection($this->connectionName());
         $tables = $this->tables();
 
-        $schema->create($tables['users'], function (Blueprint $table): void {
-            $table->uuid('id')->primary();
-            $table->string('name', 160);
-            $table->string('email', 254)->unique();
-            $table->timestampTz('email_verified_at')->nullable();
-            $table->string('password')->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->string('locale', 12)->default('en');
-            $table->string('timezone', 64)->default('UTC');
-            $table->json('profile')->nullable();
-            $table->json('preferences')->nullable();
-            $table->timestampTz('last_login_at')->nullable();
-            $table->text('last_login_ip')->nullable();
-            $table->timestampTz('locked_until')->nullable();
-            $table->rememberToken();
-            $table->timestampsTz();
-            $table->softDeletesTz();
+        if ($this->featureEnabled('principal_management') && ! $schema->hasTable($tables['users'])) {
+            $schema->create($tables['users'], function (Blueprint $table): void {
+                $table->uuid('id')->primary();
+                $table->string('name', 160);
+                $table->string('email', 254)->unique();
+                $table->timestampTz('email_verified_at')->nullable();
+                $table->string('password')->nullable();
+                $table->boolean('is_active')->default(true);
+                $table->string('locale', 12)->default('en');
+                $table->string('timezone', 64)->default('UTC');
+                $table->json('profile')->nullable();
+                $table->json('preferences')->nullable();
+                $table->timestampTz('last_login_at')->nullable();
+                $table->text('last_login_ip')->nullable();
+                $table->timestampTz('locked_until')->nullable();
+                $table->rememberToken();
+                $table->timestampsTz();
+                $table->softDeletesTz();
 
-            $table->index(['is_active', 'deleted_at'], 'nvl_auth_users_active_deleted_index');
-            $table->index(['locked_until', 'is_active'], 'nvl_auth_users_lock_index');
-            $table->index(['name', 'email'], 'nvl_auth_users_suggestion_index');
-        });
+                $table->index(['is_active', 'deleted_at'], 'nvl_auth_users_active_deleted_index');
+                $table->index(['locked_until', 'is_active'], 'nvl_auth_users_lock_index');
+                $table->index(['name', 'email'], 'nvl_auth_users_suggestion_index');
+            });
+        }
 
-        $schema->create($tables['permissions'], function (Blueprint $table): void {
-            $table->uuid('id')->primary();
-            $table->string('name', 160);
-            $table->string('guard_name', 80);
-            $table->string('display_name', 160)->nullable();
-            $table->text('description')->nullable();
-            $table->string('group', 120)->nullable();
-            $table->boolean('is_system')->default(false);
-            $table->json('metadata')->nullable();
-            $table->timestampsTz();
+        if ($this->featureEnabled('rbac')) {
+            if (! $schema->hasTable($tables['permissions'])) {
+                $schema->create($tables['permissions'], function (Blueprint $table): void {
+                    $table->uuid('id')->primary();
+                    $table->string('name', 160);
+                    $table->string('guard_name', 80);
+                    $table->string('display_name', 160)->nullable();
+                    $table->text('description')->nullable();
+                    $table->string('group', 120)->nullable();
+                    $table->boolean('is_system')->default(false);
+                    $table->json('metadata')->nullable();
+                    $table->timestampsTz();
 
-            $table->unique(['name', 'guard_name'], 'nvl_auth_permissions_name_guard_unique');
-            $table->index(['group', 'guard_name'], 'nvl_auth_permissions_group_guard_index');
-        });
+                    $table->unique(['name', 'guard_name'], 'nvl_auth_permissions_name_guard_unique');
+                    $table->index(['group', 'guard_name'], 'nvl_auth_permissions_group_guard_index');
+                });
+            }
 
-        $schema->create($tables['roles'], function (Blueprint $table): void {
-            $table->uuid('id')->primary();
-            $table->string('name', 160);
-            $table->string('guard_name', 80);
-            $table->string('display_name', 160)->nullable();
-            $table->text('description')->nullable();
-            $table->uuid('parent_id')->nullable();
-            $table->integer('priority')->default(0);
-            $table->boolean('is_system')->default(false);
-            $table->json('metadata')->nullable();
-            $table->timestampsTz();
+            $rolesCreated = false;
 
-            $table->unique(['name', 'guard_name'], 'nvl_auth_roles_name_guard_unique');
-            $table->index(['parent_id', 'priority'], 'nvl_auth_roles_hierarchy_index');
-        });
+            if (! $schema->hasTable($tables['roles'])) {
+                $schema->create($tables['roles'], function (Blueprint $table): void {
+                    $table->uuid('id')->primary();
+                    $table->string('name', 160);
+                    $table->string('guard_name', 80);
+                    $table->string('display_name', 160)->nullable();
+                    $table->text('description')->nullable();
+                    $table->uuid('parent_id')->nullable();
+                    $table->integer('priority')->default(0);
+                    $table->boolean('is_system')->default(false);
+                    $table->json('metadata')->nullable();
+                    $table->timestampsTz();
 
-        // PostgreSQL compiles self-referencing foreign keys before primary-key
-        // commands inside one create-table blueprint. Add the relation only
-        // after the referenced primary key has been created.
-        $schema->table($tables['roles'], function (Blueprint $table) use ($tables): void {
-            $table->foreign('parent_id', 'nvl_auth_roles_parent_id_foreign')
-                ->references('id')
-                ->on($tables['roles'])
-                ->nullOnDelete();
-        });
+                    $table->unique(['name', 'guard_name'], 'nvl_auth_roles_name_guard_unique');
+                    $table->index(['parent_id', 'priority'], 'nvl_auth_roles_hierarchy_index');
+                });
+                $rolesCreated = true;
+            }
 
-        $schema->create($tables['model_has_permissions'], function (Blueprint $table) use ($tables): void {
-            $table->foreignUuid('permission_id')->constrained($tables['permissions'])->cascadeOnDelete();
-            $table->string('model_type', 160);
-            $table->uuid('model_id');
+            // PostgreSQL compiles self-referencing foreign keys before primary-key
+            // commands inside one create-table blueprint. Add the relation only
+            // after the referenced primary key has been created.
+            if ($rolesCreated) {
+                $schema->table($tables['roles'], function (Blueprint $table) use ($tables): void {
+                    $table->foreign('parent_id', 'nvl_auth_roles_parent_id_foreign')
+                        ->references('id')
+                        ->on($tables['roles'])
+                        ->nullOnDelete();
+                });
+            }
 
-            $table->primary(['permission_id', 'model_id', 'model_type'], 'nvl_auth_model_permissions_primary');
-            $table->index(['model_id', 'model_type'], 'nvl_auth_model_permissions_model_index');
-        });
+            if (! $schema->hasTable($tables['model_has_permissions'])) {
+                $schema->create($tables['model_has_permissions'], function (Blueprint $table) use ($tables): void {
+                    $table->foreignUuid('permission_id')->constrained($tables['permissions'])->cascadeOnDelete();
+                    $table->string('model_type', 160);
+                    $table->uuid('model_id');
 
-        $schema->create($tables['model_has_roles'], function (Blueprint $table) use ($tables): void {
-            $table->foreignUuid('role_id')->constrained($tables['roles'])->cascadeOnDelete();
-            $table->string('model_type', 160);
-            $table->uuid('model_id');
+                    $table->primary(['permission_id', 'model_id', 'model_type'], 'nvl_auth_model_permissions_primary');
+                    $table->index(['model_id', 'model_type'], 'nvl_auth_model_permissions_model_index');
+                });
+            }
 
-            $table->primary(['role_id', 'model_id', 'model_type'], 'nvl_auth_model_roles_primary');
-            $table->index(['model_id', 'model_type'], 'nvl_auth_model_roles_model_index');
-        });
+            if (! $schema->hasTable($tables['model_has_roles'])) {
+                $schema->create($tables['model_has_roles'], function (Blueprint $table) use ($tables): void {
+                    $table->foreignUuid('role_id')->constrained($tables['roles'])->cascadeOnDelete();
+                    $table->string('model_type', 160);
+                    $table->uuid('model_id');
 
-        $schema->create($tables['role_has_permissions'], function (Blueprint $table) use ($tables): void {
-            $table->foreignUuid('permission_id')->constrained($tables['permissions'])->cascadeOnDelete();
-            $table->foreignUuid('role_id')->constrained($tables['roles'])->cascadeOnDelete();
+                    $table->primary(['role_id', 'model_id', 'model_type'], 'nvl_auth_model_roles_primary');
+                    $table->index(['model_id', 'model_type'], 'nvl_auth_model_roles_model_index');
+                });
+            }
 
-            $table->primary(['permission_id', 'role_id'], 'nvl_auth_role_permissions_primary');
-        });
+            if (! $schema->hasTable($tables['role_has_permissions'])) {
+                $schema->create($tables['role_has_permissions'], function (Blueprint $table) use ($tables): void {
+                    $table->foreignUuid('permission_id')->constrained($tables['permissions'])->cascadeOnDelete();
+                    $table->foreignUuid('role_id')->constrained($tables['roles'])->cascadeOnDelete();
 
-        $schema->create($tables['personal_access_tokens'], function (Blueprint $table): void {
-            $table->uuid('id')->primary();
-            $table->string('tokenable_type', 160);
-            $table->uuid('tokenable_id');
-            $table->string('name');
-            $table->string('token', 64)->unique();
-            $table->text('abilities')->nullable();
-            $table->timestampTz('last_used_at')->nullable();
-            $table->timestampTz('expires_at')->nullable();
-            $table->timestampsTz();
+                    $table->primary(['permission_id', 'role_id'], 'nvl_auth_role_permissions_primary');
+                });
+            }
+        }
 
-            $table->index(['tokenable_type', 'tokenable_id'], 'nvl_auth_tokens_tokenable_index');
-            $table->index('expires_at', 'nvl_auth_tokens_expiry_index');
-        });
+        if ($this->featureEnabled('api_tokens') && ! $schema->hasTable($tables['personal_access_tokens'])) {
+            $schema->create($tables['personal_access_tokens'], function (Blueprint $table): void {
+                $table->uuid('id')->primary();
+                $table->string('tokenable_type', 160);
+                $table->uuid('tokenable_id');
+                $table->string('name');
+                $table->string('token', 64)->unique();
+                $table->text('abilities')->nullable();
+                $table->timestampTz('last_used_at')->nullable();
+                $table->timestampTz('expires_at')->nullable();
+                $table->timestampsTz();
 
-        $schema->create($tables['password_reset_tokens'], function (Blueprint $table): void {
-            $table->string('email', 254)->primary();
-            $table->string('token');
-            $table->timestampTz('created_at')->nullable();
-        });
+                $table->index(['tokenable_type', 'tokenable_id'], 'nvl_auth_tokens_tokenable_index');
+                $table->index('expires_at', 'nvl_auth_tokens_expiry_index');
+            });
+        }
+
+        if ($this->featureEnabled('password') && ! $schema->hasTable($tables['password_reset_tokens'])) {
+            $schema->create($tables['password_reset_tokens'], function (Blueprint $table): void {
+                $table->string('email', 254)->primary();
+                $table->string('token');
+                $table->timestampTz('created_at')->nullable();
+            });
+        }
     }
 
     /**
@@ -198,5 +222,14 @@ return new class extends Migration
         return is_string($connection) && trim($connection) !== ''
             ? trim($connection)
             : null;
+    }
+
+    /**
+     * Determine whether one independently adoptable schema capability is enabled.
+     */
+    private function featureEnabled(string $feature): bool
+    {
+        return Config::get('nvl-auth.migrations.install_all', false) === true
+            || Config::get("nvl-auth.features.{$feature}.enabled", false) === true;
     }
 };

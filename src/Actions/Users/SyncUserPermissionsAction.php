@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Users;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\RbacChanged;
@@ -28,6 +29,7 @@ final readonly class SyncUserPermissionsAction
         private ManagementAuthorizer $authorization,
         private UserLocator $users,
         private AuthAuditRecorder $audits,
+        private PrincipalAttributeMapper $attributes,
     ) {}
 
     /**
@@ -48,7 +50,7 @@ final readonly class SyncUserPermissionsAction
             $this->audits->record('user.permissions_synchronized', subject: SubjectReference::fromAuthenticatable($user), actor: $actor, metadata: [
                 'permissions' => $permissions,
             ]);
-            RbacChanged::dispatch('user', $user->id, 'permissions_synchronized', ['permissions' => $permissions]);
+            RbacChanged::dispatch('user', $this->attributes->identifier($user), 'permissions_synchronized', ['permissions' => $permissions]);
 
             return $user->refresh()->load('permissions');
         }, 3);
