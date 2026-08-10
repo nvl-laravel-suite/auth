@@ -30,7 +30,6 @@ push, or another transport without coupling Auth to delivery infrastructure.
 ```bash
 composer require nvl/laravel-suite:^1.0
 php artisan vendor:publish --tag=auth-config
-php artisan vendor:publish --tag=auth-migrations
 php artisan vendor:publish --tag=auth-skills
 php artisan migrate
 php artisan nvl:auth:doctor
@@ -43,6 +42,19 @@ password-reset repository, Spatie Role and Permission models, and Sanctum
 PersonalAccessToken model. Routes remain off until explicitly enabled. When
 global Auth ingress is disabled, provider registration is passive and does not
 replace host Auth, Permission, Sanctum, or migration state.
+
+### Migration ownership modes
+
+Choose exactly one migration owner:
+
+1. **Automatic vendor loading (default):** leave `nvl-auth.migrations.enabled=true`, do not publish `auth-migrations`, and run `php artisan migrate`.
+2. **Host-owned published migrations:** publish `auth-migrations`, set `nvl-auth.migrations.enabled=false` before migrating, and maintain the published files as application migrations.
+
+   ```bash
+   php artisan vendor:publish --tag=auth-migrations
+   ```
+
+Never run both sources. Laravel retimestamps files published through the migration tag. `php artisan nvl:auth:doctor` reports a warning when automatic loading remains enabled and `database/migrations` contains a timestamp-independent name matching a package migration; `--strict` promotes that warning to failure.
 
 ## Ownership
 

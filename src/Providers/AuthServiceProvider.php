@@ -145,7 +145,7 @@ final class AuthServiceProvider extends ServiceProvider
         $this->configureOwnedIdentityStorage();
         $root = dirname(__DIR__, 2);
         $this->publishes([$root.'/config/nvl-auth.php' => config_path('nvl-auth.php')], 'auth-config');
-        $this->publishes([$root.'/database/migrations' => database_path('migrations')], 'auth-migrations');
+        $this->publishesMigrations([$root.'/database/migrations' => database_path('migrations')], 'auth-migrations');
         $this->publishes([$root.'/resources/boost/skills' => base_path('.agents/skills')], 'auth-skills');
 
         if ($configuration->boolean('migrations.enabled', true)

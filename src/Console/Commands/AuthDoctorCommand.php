@@ -142,6 +142,19 @@ final class AuthDoctorCommand extends Command
         }
 
         $checks = [];
+        $strict = (bool) $this->option('strict');
+        $migrationDuplicates = config('nvl-auth.migrations.enabled') === true
+            ? $this->publishedMigrationDuplicates(dirname(__DIR__, 3).'/database/migrations')
+            : [];
+        $checks[] = $this->check(
+            'migrations.ownership',
+            $migrationDuplicates === [],
+            sprintf(
+                'Automatic vendor migration loading overlaps published host migration(s): %s. Disable nvl-auth.migrations.enabled before running host-owned copies.',
+                implode(', ', $migrationDuplicates),
+            ),
+            'warning',
+        );
         $connection = $configuration->get('connection');
         $schema = Schema::connection(is_string($connection) && $connection !== '' ? $connection : null);
 
@@ -427,13 +440,18 @@ final class AuthDoctorCommand extends Command
             'Auth route inventory differs from configuration; rebuild route and configuration caches.',
         );
 
-        $failed = count(array_filter($checks, static fn (array $check): bool => ! $check['passed']));
+        $failed = count(array_filter(
+            $checks,
+            static fn (array $check): bool => ! $check['passed']
+                && ($check['severity'] === 'error' || $strict),
+        ));
 
         if ($format === 'json') {
             $this->line((string) json_encode(['ready' => $failed === 0, 'checks' => $checks], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
         } else {
-            $this->table(['Check', 'Result', 'Message'], array_map(static fn (array $check): array => [
+            $this->table(['Check', 'Severity', 'Result', 'Message'], array_map(static fn (array $check): array => [
                 $check['name'],
+                $check['severity'],
                 $check['passed'] ? 'PASS' : 'FAIL',
                 $check['message'],
             ], $checks));
@@ -472,11 +490,57 @@ final class AuthDoctorCommand extends Command
     /**
      * Build one diagnostic check.
      *
-     * @return array{name: string, passed: bool, message: string}
+     * @return array{name: string, severity: string, passed: bool, message: string}
      */
-    private function check(string $name, bool $passed, string $failure): array
+    private function check(
+        string $name,
+        bool $passed,
+        string $failure,
+        string $severity = 'error',
+    ): array {
+        return [
+            'name' => $name,
+            'severity' => $severity,
+            'passed' => $passed,
+            'message' => $passed ? 'Ready.' : $failure,
+        ];
+    }
+
+    /**
+     * Find host migrations whose timestamp-independent names match package migrations.
+     *
+     * @return list<string>
+     */
+    private function publishedMigrationDuplicates(string $packagePath): array
     {
-        return ['name' => $name, 'passed' => $passed, 'message' => $passed ? 'Ready.' : $failure];
+        $packageMigrations = glob($packagePath.'/*.php') ?: [];
+        $hostMigrations = glob(database_path('migrations/*.php')) ?: [];
+        $packageNames = array_map($this->migrationName(...), $packageMigrations);
+        $duplicates = [];
+
+        foreach ($hostMigrations as $migration) {
+            $name = $this->migrationName($migration);
+
+            if (in_array($name, $packageNames, true)) {
+                $duplicates[] = $name;
+            }
+        }
+
+        sort($duplicates);
+
+        return array_values(array_unique($duplicates));
+    }
+
+    /**
+     * Remove Laravel's timestamp prefix from a migration filename.
+     */
+    private function migrationName(string $path): string
+    {
+        return (string) preg_replace(
+            '/^\d{4}_\d{2}_\d{2}_\d{6}_/',
+            '',
+            pathinfo($path, PATHINFO_FILENAME),
+        );
     }
 
     /** Resolve a configurable identity/provider table name. */

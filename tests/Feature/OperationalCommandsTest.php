@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\ServiceProvider;
 use Nvl\Auth\Adapters\ApiTokens\SanctumApiTokenManager;
 use Nvl\Auth\Contracts\AuthManagementAccess;
+use Nvl\Auth\Providers\AuthServiceProvider;
 use Nvl\Auth\Services\LaravelGateAuthManagementAccess;
 
 it('reports the complete feature inventory in table and JSON formats', function (): void {
@@ -27,6 +29,36 @@ it('passes readiness for the default lean profile and fails missing dependencies
     $this->artisan('nvl:auth:doctor')
         ->expectsOutputToContain('Feature [password] requires [authentication].')
         ->assertFailed();
+});
+
+it('registers timestamp-aware migration publishing and warns about duplicate ownership', function (): void {
+    $migrationPath = realpath(dirname(__DIR__, 2).'/database/migrations');
+    $publishableMigrationPaths = array_map(
+        static fn (string $path): string|false => realpath($path),
+        ServiceProvider::publishableMigrationPaths(),
+    );
+
+    expect(AuthServiceProvider::pathsToPublish(
+        AuthServiceProvider::class,
+        'auth-migrations',
+    ))->not->toBeEmpty()
+        ->and($publishableMigrationPaths)->toContain($migrationPath);
+
+    $published = database_path(
+        'migrations/2099_01_01_000000_create_nvl_auth_identity_tables.php',
+    );
+    file_put_contents($published, "<?php\n");
+
+    try {
+        $this->artisan('nvl:auth:doctor')
+            ->expectsOutputToContain('Automatic vendor migration loading overlaps')
+            ->assertSuccessful();
+        $this->artisan('nvl:auth:doctor', ['--strict' => true])
+            ->expectsOutputToContain('create_nvl_auth_identity_tables')
+            ->assertFailed();
+    } finally {
+        unlink($published);
+    }
 });
 
 it('fails readiness when passkeys are enabled without valid relying-party policy', function (): void {

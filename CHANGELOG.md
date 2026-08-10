@@ -4,6 +4,9 @@ All notable changes to `nvl/auth` are documented here.
 
 ## Unreleased
 
+- Registered migration publication through Laravel's timestamp-aware API and
+  made Doctor warn when automatic vendor loading overlaps a published host copy.
+
 ## 1.0.1 - 2026-08-09
 
 ### Changed
