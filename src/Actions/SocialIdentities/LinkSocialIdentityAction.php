@@ -76,6 +76,8 @@ final readonly class LinkSocialIdentityAction
                     'name' => $identity->name,
                     'avatar' => $identity->avatar,
                     ...$identity->profile,
+                    'email_verified' => $identity->emailVerified,
+                    'email_verification_source' => $identity->emailVerificationSource,
                 ],
                 'last_used_at' => now(),
                 'revoked_at' => null,

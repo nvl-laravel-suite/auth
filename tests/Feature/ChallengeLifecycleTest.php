@@ -21,9 +21,15 @@ it('issues hashed magic links and consumes them once', function (): void {
     Event::fake([AuthDeliveryRequested::class]);
     $issued = app(RequestMagicLinkAction::class)->execute(new RequestMagicLinkData('user@example.test'));
 
-    expect($issued->challenge->getRawOriginal('secret_hash'))->not->toBe($issued->secret);
+    expect($issued->challenge->getRawOriginal('secret_hash'))->not->toBe($issued->secret)
+        ->and($issued->fallbackCode)->toMatch('/^\d{6}$/')
+        ->and($issued->challenge->getRawOriginal('secondary_secret_hash'))->not->toBe($issued->fallbackCode);
 
-    $consumed = app(ConsumeMagicLinkAction::class)->execute(new ConsumeMagicLinkData('user@example.test', $issued->secret));
+    $consumed = app(ConsumeMagicLinkAction::class)->execute(new ConsumeMagicLinkData(
+        '',
+        (string) $issued->fallbackCode,
+        $issued->challenge->identifier(),
+    ));
 
     expect($consumed->consumed_at)->not->toBeNull()
         ->and(fn () => app(ConsumeMagicLinkAction::class)->execute(new ConsumeMagicLinkData('user@example.test', $issued->secret)))

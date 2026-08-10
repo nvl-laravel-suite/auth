@@ -8,10 +8,12 @@ use Illuminate\Auth\AuthManager;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\StatefulGuard;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\BrowserSession;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Data\Mutations\LoginData;
+use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\AuthenticationAttempted;
@@ -21,7 +23,6 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
-use Nvl\Auth\Services\PrincipalEligibility;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -44,7 +45,7 @@ final readonly class LoginAction
         private BrowserSession $session,
         private AuthPipeline $pipeline,
         private AuthAuditRecorder $audits,
-        private PrincipalEligibility $eligibility,
+        private AuthenticationEligibility $eligibility,
         private SuccessfulLoginMetadataRecorder $loginMetadata,
     ) {}
 
@@ -85,7 +86,7 @@ final readonly class LoginAction
         }
 
         try {
-            $this->eligibility->assertAuthenticationAllowed($subject);
+            $this->eligibility->assertEligible($subject, AuthenticationPurpose::CredentialLogin);
         } catch (AuthException $exception) {
             $guard->logout();
             $this->audits->record('authentication.failed', outcome: 'failure');
@@ -99,26 +100,24 @@ final readonly class LoginAction
             throw $exception;
         }
 
-        $this->loginMetadata->record($subject, $requestContext ?? new AuthenticationRequestContext);
-
         $reference = SubjectReference::fromAuthenticatable($subject);
 
         try {
-            return $this->pipeline->run(
+            $authenticated = $this->pipeline->run(
                 'login',
                 new AuthPipelineContext(
                     'login',
                     ['identifier_name' => $identifierName, 'remember' => $data->remember],
                     $reference,
                 ),
-                function () use ($reference, $subject): Authenticatable {
-                    $this->session->regenerateIdentifier();
-                    $this->audits->record('authentication.succeeded', subject: $reference, actor: $subject);
-                    UserAuthenticated::dispatch($reference);
-
-                    return $subject;
-                },
+                fn (): Authenticatable => $subject,
             );
+            $this->session->regenerateIdentifier();
+            $this->loginMetadata->record($authenticated, $requestContext ?? new AuthenticationRequestContext);
+            $this->audits->record('authentication.succeeded', subject: $reference, actor: $authenticated);
+            UserAuthenticated::dispatch($reference);
+
+            return $authenticated;
         } catch (Throwable $exception) {
             $guard->logout();
             $this->audits->record(

@@ -46,6 +46,10 @@ final readonly class ConsumeChallengeAction
             "challenge-{$messageType->value}-{$recipientHash}",
             $secret,
         );
+        $secondarySecretHash = $this->hasher->hash(
+            "challenge-{$messageType->value}-secondary-{$recipientHash}",
+            $secret,
+        );
         $connection = (new Challenge)->getConnectionName();
 
         $challenge = DB::connection($connection)->transaction(function () use (
@@ -53,6 +57,7 @@ final readonly class ConsumeChallengeAction
             $purpose,
             $recipientHash,
             $secretHash,
+            $secondarySecretHash,
         ): ?Challenge {
             Challenge::query()
                 ->where('type', $messageType->value)
@@ -67,7 +72,9 @@ final readonly class ConsumeChallengeAction
                 ->where('type', $messageType->value)
                 ->where('purpose', $purpose)
                 ->where('recipient_hash', $recipientHash)
-                ->where('secret_hash', $secretHash)
+                ->where(static fn ($query) => $query
+                    ->where('secret_hash', $secretHash)
+                    ->orWhere('secondary_secret_hash', $secondarySecretHash))
                 ->lockForUpdate()
                 ->first();
 

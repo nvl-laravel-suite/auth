@@ -22,6 +22,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\OpaqueTokenFactory;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
+use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 
 /**
  * Rotates and republishes one still-active invitation token.
@@ -45,14 +46,21 @@ final readonly class ResendInvitationAction
      */
     public function execute(
         Invitation $invitation,
-        Authenticatable $actor,
+        ?Authenticatable $actor = null,
         ?string $locale = null,
+        ?InvitationIssuanceContext $context = null,
     ): IssuedInvitation {
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Issue);
-        $this->authorization->authorize($actor, 'nvl-auth.invitations.resend', $invitation);
+        $context ??= new InvitationIssuanceContext;
+
+        if ($actor instanceof Authenticatable) {
+            $this->authorization->authorize($actor, 'nvl-auth.invitations.resend', $invitation);
+        } elseif (! $context->actorlessAuthorized) {
+            throw new AuthException('forbidden', 'Actorless invitation resend was not explicitly authorized.', 403);
+        }
         $connection = $invitation->getConnectionName();
 
-        return DB::connection($connection)->transaction(function () use ($actor, $invitation, $locale): IssuedInvitation {
+        return DB::connection($connection)->transaction(function () use ($actor, $context, $invitation, $locale): IssuedInvitation {
             /** @var Invitation $locked */
             $locked = Invitation::query()->lockForUpdate()->findOrFail($invitation->identifier());
 
@@ -76,6 +84,7 @@ final readonly class ResendInvitationAction
                 'token_hash' => $this->hasher->hash('invitation-token', $token),
                 'resend_count' => $locked->resend_count + 1,
                 'last_sent_at' => CarbonImmutable::now(),
+                'expires_at' => $context->expiresAt ?? $locked->expires_at,
             ])->save();
             AuthDeliveryRequested::dispatch(new AuthDeliveryRequest(
                 messageId: (string) Str::uuid(),
@@ -87,6 +96,9 @@ final readonly class ResendInvitationAction
                     'token' => $token,
                     'type' => $locked->type,
                     'purpose' => $locked->purpose,
+                    'return_path' => $context->returnPath ?? (
+                        is_array($locked->metadata) ? ($locked->metadata['return_path'] ?? null) : null
+                    ),
                 ],
                 expiresAt: $locked->expires_at,
                 locale: $locale,

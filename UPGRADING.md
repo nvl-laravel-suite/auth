@@ -2,6 +2,19 @@
 
 ## Unreleased from 1.0.1
 
+### Authentication and onboarding security
+
+Run migrations after updating. Existing installations gain nullable
+`nvl_auth_invitations.context_hash` and
+`nvl_auth_challenges.secondary_secret_hash` columns. Publish the new corrective
+migration when the application publishes package migrations; do not edit an
+already-run published migration.
+
+Hosts that resolve social subjects by email must now provide verified-email
+provenance. Hosts with custom login or reset admission should implement
+`AuthenticationEligibility`; custom public invitation registration attributes
+belong in `InvitationRegistrationMapper`.
+
 ### Feature-aware schema
 
 Fresh migrations now create only tables required by features enabled at

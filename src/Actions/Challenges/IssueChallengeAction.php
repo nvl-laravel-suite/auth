@@ -57,6 +57,8 @@ final readonly class IssueChallengeAction
         array $payload = [],
         array $metadata = [],
         ?string $locale = null,
+        bool $withFallbackCode = false,
+        int $fallbackDigits = 6,
     ): IssuedChallenge {
         $this->features->assertAllowed($feature, FeatureOperation::Issue);
 
@@ -72,7 +74,10 @@ final readonly class IssueChallengeAction
             throw new InvalidArgumentException('Challenge expiry must be in the future.');
         }
 
-        if ($maxAttempts < 1 || $maxAttempts > 100 || ($numeric && ($digits < 4 || $digits > 10))) {
+        if ($maxAttempts < 1
+            || $maxAttempts > 100
+            || ($numeric && ($digits < 4 || $digits > 10))
+            || ($withFallbackCode && ($numeric || $fallbackDigits < 4 || $fallbackDigits > 10))) {
             throw new InvalidArgumentException('Challenge attempt or numeric-code configuration is invalid.');
         }
 
@@ -85,6 +90,12 @@ final readonly class IssueChallengeAction
             "challenge-{$messageType->value}-{$recipientHash}",
             $secret,
         );
+        $fallbackCode = $withFallbackCode
+            ? str_pad((string) random_int(0, (10 ** $fallbackDigits) - 1), $fallbackDigits, '0', STR_PAD_LEFT)
+            : null;
+        $secondarySecretHash = $fallbackCode === null
+            ? null
+            : $this->hasher->hash("challenge-{$messageType->value}-secondary-{$recipientHash}", $fallbackCode);
         $activeKey = $this->hasher->hash(
             'active-challenge',
             $messageType->value."\0".$purpose."\0".$recipientHash,
@@ -107,6 +118,8 @@ final readonly class IssueChallengeAction
                 $secret,
                 $secretHash,
                 $subject,
+                $fallbackCode,
+                $secondarySecretHash,
             ): IssuedChallenge {
                 Challenge::query()
                     ->where('active_key', $activeKey)
@@ -118,6 +131,7 @@ final readonly class IssueChallengeAction
                     'subject_id' => $subject?->identifier,
                     'recipient_hash' => $recipientHash,
                     'secret_hash' => $secretHash,
+                    'secondary_secret_hash' => $secondarySecretHash,
                     'active_key' => $activeKey,
                     'payload' => $payload,
                     'max_attempts' => $maxAttempts,
@@ -132,6 +146,7 @@ final readonly class IssueChallengeAction
                         ...$payload,
                         'challenge_id' => $challenge->identifier(),
                         'secret' => $secret,
+                        'code' => $fallbackCode,
                         'purpose' => $purpose,
                     ],
                     expiresAt: $expiresAt,
@@ -144,7 +159,7 @@ final readonly class IssueChallengeAction
                     metadata: ['challenge_id' => $challenge->identifier(), 'purpose' => $purpose],
                 );
 
-                return new IssuedChallenge($challenge, $secret);
+                return new IssuedChallenge($challenge, $secret, $fallbackCode);
             }, 3);
         } catch (QueryException $exception) {
             if (in_array($exception->errorInfo[0] ?? null, ['23000', '23505'], true)

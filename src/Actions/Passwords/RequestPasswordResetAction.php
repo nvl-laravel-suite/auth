@@ -11,12 +11,15 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Support\Str;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\RequestPasswordResetData;
+use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\AuthDeliveryRequested;
+use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
@@ -39,6 +42,7 @@ final readonly class RequestPasswordResetAction
         private PasswordBrokerManager $brokers,
         private AuthPipeline $pipeline,
         private AuthAuditRecorder $audits,
+        private AuthenticationEligibility $eligibility,
     ) {}
 
     /**
@@ -69,6 +73,25 @@ final readonly class RequestPasswordResetAction
                     return;
                 }
 
+                if (! $subject instanceof Authenticatable) {
+                    $this->audits->record('password.reset_requested', metadata: ['matched' => false]);
+
+                    return;
+                }
+
+                try {
+                    $this->eligibility->assertEligible($subject, AuthenticationPurpose::PasswordReset);
+                } catch (AuthException $exception) {
+                    $this->audits->record(
+                        'password.reset_rejected',
+                        outcome: 'failure',
+                        subject: SubjectReference::fromAuthenticatable($subject),
+                        metadata: ['reason' => $exception->errorCode],
+                    );
+
+                    return;
+                }
+
                 $token = $broker->createToken($subject);
                 $expiresAt = CarbonImmutable::now()->addMinutes(
                     $this->configuration->integerBetween(
@@ -87,9 +110,7 @@ final readonly class RequestPasswordResetAction
                     expiresAt: $expiresAt,
                     locale: $locale,
                 ));
-                $reference = $subject instanceof Authenticatable
-                    ? SubjectReference::fromAuthenticatable($subject)
-                    : null;
+                $reference = SubjectReference::fromAuthenticatable($subject);
                 $this->audits->record(
                     'password.reset_requested',
                     subject: $reference,

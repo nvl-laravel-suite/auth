@@ -188,6 +188,13 @@ invitations, clients, and API-token issue. Replace contract bindings only where
 the application needs different identity, authorization, social, passkey, token,
 or audit behavior.
 
+Authentication admission is independently replaceable through
+`features.authentication.services.eligibility`; every session-establishment and
+password-reset path uses it. Sensitive self-service mutations use
+`features.principal_management.services.account_confirmation`. Invitation hosts
+can replace `features.invitations.services.registration_mapper` to map validated
+registration extensions to their configured principal model.
+
 ## Passkeys and tokens
 
 Passkeys work without a host ceremony class. Enable the feature and configure a
@@ -213,6 +220,10 @@ final class DeliverAuthMessage
     }
 }
 ```
+
+Each delivery feature owns exactly one message type. Magic-link delivery
+includes `challenge_id`, an opaque `secret`, and a numeric `code`; either
+credential atomically consumes the same challenge.
 
 Auth owns the message intent and secure payload. The consumer owns channel,
 template, provider, delivery retry, and provider callback concerns.

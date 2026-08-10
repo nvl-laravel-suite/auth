@@ -22,6 +22,7 @@ final readonly class ConsumeMagicLinkAction
     public function __construct(
         private FeatureGate $features,
         private ConsumeChallengeAction $challenges,
+        private ConsumeChallengeByIdAction $directChallenges,
     ) {}
 
     /**
@@ -31,10 +32,20 @@ final readonly class ConsumeMagicLinkAction
     {
         $this->features->assertAllowed(AuthFeature::MagicLinks, FeatureOperation::Use);
 
+        if ($data->challengeId !== null) {
+            return $this->directChallenges->execute(
+                AuthFeature::MagicLinks,
+                AuthMessageType::MagicLink,
+                $data->challengeId,
+                $purpose,
+                $data->token,
+            );
+        }
+
         return $this->challenges->execute(
             AuthFeature::MagicLinks,
             AuthMessageType::MagicLink,
-            $data->recipient,
+            (string) $data->recipient,
             $purpose,
             $data->token,
         );

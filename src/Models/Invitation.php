@@ -16,6 +16,7 @@ use Nvl\Auth\Database\Factories\InvitationFactory;
  * @property string|null $active_key
  * @property string $recipient
  * @property string $recipient_hash
+ * @property string|null $context_hash
  * @property string $type
  * @property string $purpose
  * @property string|null $inviter_type
@@ -48,6 +49,7 @@ final class Invitation extends AuthModel
         'active_key',
         'recipient',
         'recipient_hash',
+        'context_hash',
         'type',
         'purpose',
         'inviter_type',
@@ -65,7 +67,7 @@ final class Invitation extends AuthModel
     ];
 
     /** @var list<string> */
-    protected $hidden = ['token_hash', 'active_key', 'recipient', 'recipient_hash'];
+    protected $hidden = ['token_hash', 'active_key', 'recipient', 'recipient_hash', 'context_hash'];
 
     /**
      * Define invitation casts.

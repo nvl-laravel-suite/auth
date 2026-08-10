@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Http\Controllers\Public;
 
 use Illuminate\Http\JsonResponse;
-use Nvl\Auth\Actions\Invitations\AcceptInvitationAction;
-use Nvl\Auth\Actions\Invitations\PreviewInvitationAction;
-use Nvl\Auth\Contracts\InvitationSubjectResolver;
+use Nvl\Auth\Actions\Invitations\RegisterInvitationAction;
 use Nvl\Auth\Data\Mutations\AcceptInvitationData;
 use Nvl\Auth\Http\Controllers\Concerns\InteractsWithValidatedInput;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -24,19 +22,14 @@ final class InvitationController
      */
     public function accept(
         AcceptInvitationData $data,
-        PreviewInvitationAction $preview,
-        InvitationSubjectResolver $subjects,
-        AcceptInvitationAction $accept,
+        RegisterInvitationAction $register,
     ): JsonResponse {
-        $token = $data->token;
-        $invitation = $preview->execute($token);
-        $subject = $subjects->resolve($invitation, $data->toRegistrationArray());
-        $accepted = $accept->execute($token, $subject);
-        $reference = SubjectReference::fromAuthenticatable($subject);
+        $registered = $register->execute($data);
+        $reference = SubjectReference::fromAuthenticatable($registered->subject);
 
         return response()->json([
             'data' => [
-                'invitation_id' => $accepted->identifier(),
+                'invitation_id' => $registered->invitation->identifier(),
                 'subject' => ['type' => $reference->type, 'id' => $reference->identifier],
             ],
             'code' => 'invitation_accepted',

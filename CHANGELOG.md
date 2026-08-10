@@ -18,6 +18,19 @@ All notable changes to `nvl/auth` are documented here.
 - Made principal create/update Actions persist complete validated DTO payloads
   through the attribute mapper; update DTOs use `Optional` so omitted fields
   remain unchanged while explicit values are applied without duplicate wiring.
+- Added replaceable authentication eligibility and account-confirmation
+  contracts across credential, passwordless, social, password-reset, profile,
+  and self-service deletion flows. Successful login metadata now records only
+  after host policy and the login pipeline accept the subject.
+- Added fail-closed Socialite verified-email provenance, atomic sparse email
+  changes with verification restart, and complete self-delete session/token
+  containment.
+- Added explicitly authorized actorless invitation issuance, bounded expiry and
+  return-path context, atomic invitation registration, exact blind-index
+  filters, and replaceable registration mapping for host fields.
+- Added compound magic-link challenges with one single-use link token and
+  numeric fallback code plus direct challenge-ID callbacks. Delivery requests
+  now reject feature/message-type mismatches.
 
 ## 1.0.1 - 2026-08-09
 

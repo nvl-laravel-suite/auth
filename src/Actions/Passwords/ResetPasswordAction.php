@@ -10,9 +10,11 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Contracts\Auth\PasswordBroker as PasswordBrokerContract;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\ResetPasswordData;
+use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
@@ -39,6 +41,7 @@ final readonly class ResetPasswordAction
         private PasswordUpdater $passwords,
         private AuthPipeline $pipeline,
         private AuthAuditRecorder $audits,
+        private AuthenticationEligibility $eligibility,
     ) {}
 
     /**
@@ -60,15 +63,32 @@ final readonly class ResetPasswordAction
                 $status = $broker->reset(
                     [$identifierName => $data->identifier, 'token' => $data->token, 'password' => $data->password],
                     function (CanResetPassword $subject, string $newPassword): void {
-                        $this->passwords->update($subject, $newPassword);
-
-                        if ($subject instanceof Authenticatable) {
-                            event(new PasswordReset($subject));
-                            $this->audits->record(
-                                'password.reset',
-                                subject: SubjectReference::fromAuthenticatable($subject),
+                        if (! $subject instanceof Authenticatable) {
+                            throw AuthException::invalidConfiguration(
+                                'Password reset subjects must implement Laravel Authenticatable.',
                             );
                         }
+
+                        try {
+                            $this->eligibility->assertEligible($subject, AuthenticationPurpose::PasswordReset);
+                        } catch (AuthException $exception) {
+                            $this->audits->record(
+                                'password.reset_rejected',
+                                outcome: 'failure',
+                                subject: SubjectReference::fromAuthenticatable($subject),
+                                metadata: ['reason' => $exception->errorCode],
+                            );
+
+                            throw $exception;
+                        }
+
+                        $this->passwords->update($subject, $newPassword);
+
+                        event(new PasswordReset($subject));
+                        $this->audits->record(
+                            'password.reset',
+                            subject: SubjectReference::fromAuthenticatable($subject),
+                        );
                     },
                 );
 

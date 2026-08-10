@@ -48,6 +48,8 @@ final class TestSocialIdentityProvider implements SocialIdentityProvider
             email: 'claim@example.test',
             name: 'External User',
             profile: ['source' => 'test'],
+            emailVerified: true,
+            emailVerificationSource: 'fixture.email_verified',
         );
     }
 }

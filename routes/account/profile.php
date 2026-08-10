@@ -11,3 +11,9 @@ Route::get('profile', [ProfileController::class, 'show'])
 Route::patch('profile', [ProfileController::class, 'update'])
     ->middleware('nvl-auth.feature:principal_management,update')
     ->name('profile.update');
+Route::delete('profile', [ProfileController::class, 'destroy'])
+    ->middleware([
+        'nvl-auth.feature:principal_management,revoke',
+        'nvl-auth.feature:sessions,revoke',
+    ])
+    ->name('profile.destroy');

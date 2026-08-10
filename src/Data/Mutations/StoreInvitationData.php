@@ -32,6 +32,7 @@ final class StoreInvitationData extends Data
         public readonly array $permissions = [],
         public readonly array $metadata = [],
         public ?string $locale = null,
+        public readonly ?string $context = null,
     ) {
         if (trim($this->recipient) === '' || mb_strlen($this->recipient) > 320) {
             throw new InvalidArgumentException('Invitation recipients must contain between one and 320 characters.');
@@ -40,6 +41,10 @@ final class StoreInvitationData extends Data
         if (trim($this->type) === '' || mb_strlen($this->type) > 80
             || trim($this->purpose) === '' || mb_strlen($this->purpose) > 120) {
             throw new InvalidArgumentException('Invitation type or purpose is invalid.');
+        }
+
+        if ($this->context !== null && (trim($this->context) === '' || mb_strlen($this->context) > 191)) {
+            throw new InvalidArgumentException('Invitation contexts must contain between one and 191 characters.');
         }
 
         foreach ([...$this->roles, ...$this->permissions] as $grant) {
@@ -71,6 +76,7 @@ final class StoreInvitationData extends Data
             'permissions' => ['sometimes', 'array'],
             'permissions.*' => ['string', 'max:255'],
             'metadata' => ['sometimes', 'array'],
+            'context' => ['sometimes', 'nullable', 'string', 'max:191'],
         ];
     }
 }

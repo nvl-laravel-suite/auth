@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use Nvl\Auth\Actions\Audit\ShowAuthAuditAction;
+use Nvl\Auth\Actions\Authentication\EstablishAuthenticatedSessionAction;
 use Nvl\Auth\Actions\Authentication\LoginAction;
 use Nvl\Auth\Actions\Authentication\LogoutAction;
 use Nvl\Auth\Actions\Authentication\RequestEmailVerificationAction;
@@ -24,6 +25,7 @@ use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Tests\Fixtures\HostAuditRecorder;
 use Nvl\Auth\Tests\Fixtures\RejectLoginStage;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
+use Nvl\Auth\ValueObjects\SubjectReference;
 
 it('logs in and out through the configured Laravel stateful guard', function (): void {
     $user = $this->user();
@@ -119,7 +121,23 @@ it('runs the login pipeline after credential resolution and logs out rejected su
         ->toThrow(AuthException::class, 'rejected');
 
     expect(RejectLoginStage::$subject?->identifier)->toBe((string) $user->getKey())
-        ->and(Auth::guard('web')->check())->toBeFalse();
+        ->and(Auth::guard('web')->check())->toBeFalse()
+        ->and($user->refresh()->last_login_at)->toBeNull();
+});
+
+it('applies shared eligibility and rejection semantics to passwordless sessions', function (): void {
+    $user = $this->user();
+    $user->forceFill(['is_active' => false])->save();
+    Event::fake([AuthenticationRejected::class]);
+
+    expect(fn () => app(EstablishAuthenticatedSessionAction::class)->execute(
+        SubjectReference::fromAuthenticatable($user),
+    ))->toThrow(AuthException::class, 'cannot be completed');
+
+    expect(Auth::guard('web')->check())->toBeFalse()
+        ->and($user->refresh()->last_login_at)->toBeNull()
+        ->and(AuthAudit::query()->where('action', 'authentication.rejected')->exists())->toBeTrue();
+    Event::assertDispatched(AuthenticationRejected::class);
 });
 
 it('authorizes audit detail access with decrypted metadata', function (): void {

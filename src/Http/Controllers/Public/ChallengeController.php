@@ -16,6 +16,7 @@ use Nvl\Auth\Data\Mutations\RequestMagicLinkData;
 use Nvl\Auth\Data\Mutations\RequestSecurityCodeData;
 use Nvl\Auth\Data\Mutations\VerifySecurityCodeData;
 use Nvl\Auth\Http\Controllers\Concerns\InteractsWithValidatedInput;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
@@ -43,13 +44,21 @@ final class ChallengeController
      */
     public function consumeMagicLink(
         ConsumeMagicLinkData $data,
+        Request $request,
         ConsumeMagicLinkAction $action,
         EstablishAuthenticatedSessionAction $sessions,
     ): JsonResponse {
         $challenge = $action->execute($data);
 
         if (is_string($challenge->subject_type) && is_string($challenge->subject_id)) {
-            $sessions->execute(new SubjectReference($challenge->subject_type, $challenge->subject_id));
+            $sessions->execute(
+                new SubjectReference($challenge->subject_type, $challenge->subject_id),
+                requestContext: new AuthenticationRequestContext(
+                    ipAddress: $request->ip(),
+                    userAgent: $request->userAgent(),
+                    requestId: $request->header('X-Request-ID'),
+                ),
+            );
         }
 
         return response()->json(['data' => null, 'code' => 'magic_link_consumed', 'message' => 'The magic link was consumed.']);

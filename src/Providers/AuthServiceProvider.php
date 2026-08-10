@@ -19,14 +19,17 @@ use Nvl\Auth\Console\Commands\AuthDoctorCommand;
 use Nvl\Auth\Console\Commands\InstallAuthSchemaCommand;
 use Nvl\Auth\Console\Commands\ListAuthFeaturesCommand;
 use Nvl\Auth\Console\Commands\PruneAuthStateCommand;
+use Nvl\Auth\Contracts\AccountConfirmation;
 use Nvl\Auth\Contracts\ApiTokenAbilityProvider;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthAuditContextProvider;
 use Nvl\Auth\Contracts\AuthAuditRecorder as AuthAuditRecorderContract;
+use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\AuthIdentifierResolver;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\BrowserSession;
+use Nvl\Auth\Contracts\InvitationRegistrationMapper;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Contracts\PasswordUpdater;
@@ -52,8 +55,11 @@ use Nvl\Auth\Services\EloquentSuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\FeatureManifest;
 use Nvl\Auth\Services\LaravelGateAuthManagementAccess;
+use Nvl\Auth\Services\PackageInvitationRegistrationMapper;
 use Nvl\Auth\Services\PackageInvitationSubjectResolver;
+use Nvl\Auth\Services\PasswordAccountConfirmation;
 use Nvl\Auth\Services\PermissionCatalogRegistry;
+use Nvl\Auth\Services\PrincipalEligibility;
 use Nvl\Auth\Services\RoleTemplateRegistry;
 use Nvl\Auth\Services\UnavailableSocialIdentityProvider;
 use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
@@ -97,6 +103,11 @@ final class AuthServiceProvider extends ServiceProvider
             ConfiguredPrincipalAttributeMapper::class,
         );
         $this->bindConfiguredContract(
+            AccountConfirmation::class,
+            'features.principal_management.services.account_confirmation',
+            PasswordAccountConfirmation::class,
+        );
+        $this->bindConfiguredContract(
             AuthSubjectResolver::class,
             'features.authentication.services.subject_resolver',
             EloquentAuthSubjectResolver::class,
@@ -110,6 +121,11 @@ final class AuthServiceProvider extends ServiceProvider
             SuccessfulLoginMetadataRecorder::class,
             'features.authentication.services.login_metadata_recorder',
             EloquentSuccessfulLoginMetadataRecorder::class,
+        );
+        $this->bindConfiguredContract(
+            AuthenticationEligibility::class,
+            'features.authentication.services.eligibility',
+            PrincipalEligibility::class,
         );
         $this->bindConfiguredContract(
             ApiTokenManager::class,
@@ -140,6 +156,11 @@ final class AuthServiceProvider extends ServiceProvider
             InvitationSubjectResolver::class,
             'features.invitations.services.subject_resolver',
             PackageInvitationSubjectResolver::class,
+        );
+        $this->bindConfiguredContract(
+            InvitationRegistrationMapper::class,
+            'features.invitations.services.registration_mapper',
+            PackageInvitationRegistrationMapper::class,
         );
         $this->registerExtensionRegistries();
         $this->app->register(RouteServiceProvider::class);

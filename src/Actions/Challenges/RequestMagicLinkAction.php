@@ -53,6 +53,13 @@ final readonly class RequestMagicLinkAction
             subject: $subject,
             payload: $payload,
             locale: $locale,
+            withFallbackCode: true,
+            fallbackDigits: $this->configuration->integerBetween(
+                'features.magic_links.settings.fallback_code_digits',
+                6,
+                4,
+                10,
+            ),
         );
     }
 }

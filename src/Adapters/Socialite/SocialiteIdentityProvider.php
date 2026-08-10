@@ -65,13 +65,39 @@ final readonly class SocialiteIdentityProvider implements SocialIdentityProvider
             );
         }
 
+        $email = $user->getEmail();
+        $raw = $user->getRaw();
+        $verificationSource = null;
+        $emailVerified = false;
+
+        foreach (['email_verified', 'verified_email'] as $claim) {
+            if (! array_key_exists($claim, $raw)) {
+                continue;
+            }
+
+            $verificationSource = "socialite.raw.{$claim}";
+            $emailVerified = filter_var($raw[$claim], FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) === true;
+
+            break;
+        }
+
+        if (is_string($email) && trim($email) !== '' && ! $emailVerified) {
+            throw new AuthException(
+                'social_email_unverified',
+                "Socialite provider [{$provider}] did not prove the returned email address.",
+                422,
+            );
+        }
+
         return new ExternalIdentity(
             provider: $provider,
             providerUserId: $providerUserId,
-            email: $user->getEmail(),
+            email: $email,
             name: $user->getName(),
             avatar: $user->getAvatar(),
             profile: ['nickname' => $user->getNickname()],
+            emailVerified: $emailVerified,
+            emailVerificationSource: $verificationSource,
         );
     }
 

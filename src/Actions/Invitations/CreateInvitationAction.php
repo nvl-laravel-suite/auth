@@ -26,6 +26,7 @@ use Nvl\Auth\Services\OpaqueTokenFactory;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
+use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
@@ -51,10 +52,17 @@ final readonly class CreateInvitationAction
      */
     public function execute(
         StoreInvitationData $data,
-        Authenticatable $actor,
+        ?Authenticatable $actor = null,
+        ?InvitationIssuanceContext $context = null,
     ): IssuedInvitation {
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Issue);
-        $this->authorization->authorize($actor, 'nvl-auth.invitations.create');
+        $context ??= new InvitationIssuanceContext;
+
+        if ($actor instanceof Authenticatable) {
+            $this->authorization->authorize($actor, 'nvl-auth.invitations.create');
+        } elseif (! $context->actorlessAuthorized) {
+            throw new AuthException('forbidden', 'Actorless invitation issuance was not explicitly authorized.', 403);
+        }
 
         if ($data->roles !== [] || $data->permissions !== []) {
             $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
@@ -63,15 +71,18 @@ final readonly class CreateInvitationAction
         $recipient = mb_strtolower(trim($data->recipient));
         $recipientHash = $this->hasher->hash('invitation-recipient', $recipient);
         $activeKey = $this->hasher->hash('active-invitation', $recipientHash."\0".$data->purpose);
-        $actorReference = SubjectReference::fromAuthenticatable($actor);
+        $actorReference = $actor instanceof Authenticatable
+            ? SubjectReference::fromAuthenticatable($actor)
+            : null;
 
         return $this->pipeline->run(
             'invitation_issued',
             new AuthPipelineContext('invitation_issued', [
                 'recipient_hash' => $recipientHash,
                 'purpose' => $data->purpose,
+                'context' => $data->context,
             ], $actorReference),
-            function () use ($activeKey, $actor, $actorReference, $data, $recipient, $recipientHash): IssuedInvitation {
+            function () use ($activeKey, $actor, $actorReference, $context, $data, $recipient, $recipientHash): IssuedInvitation {
                 $connection = (new Invitation)->getConnectionName();
 
                 try {
@@ -80,6 +91,7 @@ final readonly class CreateInvitationAction
                         $activeKey,
                         $actorReference,
                         $data,
+                        $context,
                         $recipient,
                         $recipientHash,
                     ): IssuedInvitation {
@@ -96,7 +108,7 @@ final readonly class CreateInvitationAction
                         }
 
                         $token = $this->tokens->make();
-                        $expiresAt = CarbonImmutable::now()->addHours(
+                        $expiresAt = $context->expiresAt ?? CarbonImmutable::now()->addHours(
                             $this->configuration->integerBetween(
                                 'features.invitations.settings.ttl_hours',
                                 72,
@@ -109,13 +121,19 @@ final readonly class CreateInvitationAction
                             'active_key' => $activeKey,
                             'recipient' => $recipient,
                             'recipient_hash' => $recipientHash,
+                            'context_hash' => $data->context === null
+                                ? null
+                                : $this->hasher->hash('invitation-context', trim($data->context)),
                             'type' => $data->type,
                             'purpose' => $data->purpose,
-                            'inviter_type' => $actorReference->type,
-                            'inviter_id' => $actorReference->identifier,
+                            'inviter_type' => $actorReference?->type,
+                            'inviter_id' => $actorReference?->identifier,
                             'roles' => $data->roles,
                             'permissions' => $data->permissions,
-                            'metadata' => $data->metadata,
+                            'metadata' => [
+                                ...$data->metadata,
+                                'return_path' => $context->returnPath,
+                            ],
                             'last_sent_at' => CarbonImmutable::now(),
                             'expires_at' => $expiresAt,
                         ]);
@@ -130,10 +148,14 @@ final readonly class CreateInvitationAction
                                 'token' => $token,
                                 'type' => $data->type,
                                 'purpose' => $data->purpose,
+                                'return_path' => $context->returnPath,
                             ],
                             expiresAt: $expiresAt,
                             locale: $data->locale,
-                            metadata: ['invitation_id' => $invitation->identifier()],
+                            metadata: [
+                                'invitation_id' => $invitation->identifier(),
+                                'context' => $data->context,
+                            ],
                         ));
                         $this->audits->record(
                             'invitation.issued',

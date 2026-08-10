@@ -13,7 +13,10 @@ use Nvl\Auth\ValueObjects\ExternalIdentity;
 interface SocialSubjectResolver
 {
     /**
-     * Resolve the principal for one verified external identity.
+     * Resolve the principal for one external identity.
+     *
+     * Implementations matching by email must require a true emailVerified claim
+     * and retain or inspect emailVerificationSource as verification provenance.
      */
     public function resolve(ExternalIdentity $identity): Authenticatable;
 }

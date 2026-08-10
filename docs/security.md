@@ -16,15 +16,25 @@ rows. Do not log Action result objects containing issuance secrets.
 ## Authentication and enumeration
 
 - Login returns one neutral credential failure.
-- Password-reset request does not reveal whether the identifier matched.
+- Password-reset request does not reveal whether the identifier matched or was
+  rejected by the configured `AuthenticationEligibility` policy. Ineligible
+  subjects receive no token or delivery, and reset consumption checks the same
+  policy before changing credentials.
 - Public magic-link requests resolve through the configured user provider, emit no
   delivery for unknown identifiers, and return the same neutral HTTP response.
 - Challenges bind message type, purpose, normalized recipient, and secret.
+  Compound magic links store independently purpose-separated hashes for their
+  link token and fallback code; consuming either credential consumes both.
+  Direct callbacks use the challenge UUID and never scan active rows.
 - A database uniqueness key prevents concurrent issuance from leaving multiple
   active message challenges for the same recipient, type, and purpose.
 - Wrong challenge/passkey attempts are committed before a neutral error returns.
 - Consumed, revoked, expired, and attempt-exhausted state cannot be reused.
-- Laravel session IDs regenerate after login and invalidate on logout.
+- Laravel session IDs regenerate only after eligibility and login-pipeline
+  acceptance. Successful-login metadata is recorded after those checks.
+- Self-service account deletion requires the configured confirmation policy,
+  revokes all subject API tokens, logs out the guard, invalidates the browser
+  session, and rotates its CSRF token.
 - Password confirmation uses Laravel's standard session timestamp.
 - Every package HTTP response is non-cacheable and suppresses referrer leakage.
 
@@ -51,7 +61,10 @@ user-verification policy before a passkey-enabled deployment is ready.
 Provider identity is `(provider, immutable provider user ID)`. Email is a claim,
 not ownership authority. The configured `SocialSubjectResolver` decides whether to
 resolve, provision, or reject a subject. Auth does not persist OAuth access or
-refresh tokens and does not auto-link by email.
+refresh tokens and does not auto-link by email. The Socialite adapter requires a
+true raw `email_verified` or `verified_email` claim whenever an email is
+returned, and `ExternalIdentity` carries the normalized boolean plus provenance.
+Custom resolvers matching by email must enforce both.
 
 ## API tokens and RBAC
 
@@ -66,6 +79,12 @@ using Spatie `HasRoles`. Management routes additionally require
 `AuthManagementAccess`; route enablement is not authorization.
 Invitation grants also require Auth principal, role, and permission storage
 to share one connection so the acceptance transaction cannot partially commit.
+Public registration resolves or creates the principal, applies RBAC, consumes
+the invitation, and runs acceptance hooks inside that one transaction.
+
+Invitation recipient and host-context lookup are exact HMAC blind-index
+matches. Substring recipient search is deliberately unsupported; decrypting and
+scanning rows in memory is not a safe package fallback.
 
 ## Delivery
 
@@ -73,6 +92,7 @@ to share one connection so the acceptance transaction cannot partially commit.
 encrypted/secured transport appropriate to the host, deduplicate `messageId`,
 recheck feature admission, reject expired payloads, and prevent observability
 systems from capturing payload values.
+The value object rejects feature/message pairs outside the package-owned map.
 
 ## Disablement
 

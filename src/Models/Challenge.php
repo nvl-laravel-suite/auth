@@ -18,6 +18,7 @@ use Nvl\Auth\Database\Factories\ChallengeFactory;
  * @property string|null $subject_id
  * @property string|null $recipient_hash
  * @property string $secret_hash
+ * @property string|null $secondary_secret_hash
  * @property string|null $active_key
  * @property array<string, mixed>|null $payload
  * @property int $attempts
@@ -45,6 +46,7 @@ final class Challenge extends AuthModel
         'subject_id',
         'recipient_hash',
         'secret_hash',
+        'secondary_secret_hash',
         'active_key',
         'payload',
         'attempts',
@@ -55,7 +57,7 @@ final class Challenge extends AuthModel
     ];
 
     /** @var list<string> */
-    protected $hidden = ['recipient_hash', 'secret_hash', 'active_key', 'payload'];
+    protected $hidden = ['recipient_hash', 'secret_hash', 'secondary_secret_hash', 'active_key', 'payload'];
 
     /**
      * Define challenge casts.

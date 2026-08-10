@@ -49,6 +49,7 @@ return [
                 'subject_resolver' => null,
                 'identifier_resolver' => null,
                 'login_metadata_recorder' => null,
+                'eligibility' => null,
             ],
             'settings' => [],
         ],
@@ -56,7 +57,10 @@ return [
             'enabled' => env('NVL_AUTH_PRINCIPAL_MANAGEMENT_ENABLED', true),
             'routes' => ['account' => ['enabled' => false], 'management' => ['enabled' => false]],
             'models' => ['user' => User::class],
-            'services' => ['attribute_mapper' => ConfiguredPrincipalAttributeMapper::class],
+            'services' => [
+                'attribute_mapper' => ConfiguredPrincipalAttributeMapper::class,
+                'account_confirmation' => null,
+            ],
             'settings' => [
                 'use_as_auth_model' => true,
                 'default_locale' => env('APP_LOCALE', 'en'),
@@ -99,7 +103,7 @@ return [
         'magic_links' => [
             'enabled' => env('NVL_AUTH_MAGIC_LINKS_ENABLED', false),
             'routes' => ['public' => ['enabled' => false]],
-            'settings' => ['ttl_minutes' => 15, 'max_attempts' => 5],
+            'settings' => ['ttl_minutes' => 15, 'max_attempts' => 5, 'fallback_code_digits' => 6],
         ],
         'security_codes' => [
             'enabled' => env('NVL_AUTH_SECURITY_CODES_ENABLED', false),
@@ -109,7 +113,10 @@ return [
         'invitations' => [
             'enabled' => env('NVL_AUTH_INVITATIONS_ENABLED', false),
             'routes' => ['public' => ['enabled' => false], 'management' => ['enabled' => false]],
-            'services' => ['subject_resolver' => null],
+            'services' => [
+                'subject_resolver' => null,
+                'registration_mapper' => null,
+            ],
             'settings' => ['ttl_hours' => 72, 'resend_cooldown_seconds' => 60],
         ],
         'totp' => [

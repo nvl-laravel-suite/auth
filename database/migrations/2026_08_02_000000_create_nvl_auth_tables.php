@@ -65,6 +65,7 @@ return new class extends Migration implements AuthSchemaMigration
                 $table->char('active_key', 64)->nullable()->unique();
                 $table->text('recipient');
                 $table->char('recipient_hash', 64);
+                $table->char('context_hash', 64)->nullable()->index();
                 $table->string('type', 80)->default('registration');
                 $table->string('purpose', 120)->default('registration');
                 $table->string('inviter_type', 160)->nullable();
@@ -97,6 +98,7 @@ return new class extends Migration implements AuthSchemaMigration
                 $table->string('subject_id', 191)->nullable();
                 $table->char('recipient_hash', 64)->nullable();
                 $table->char('secret_hash', 64)->unique();
+                $table->char('secondary_secret_hash', 64)->nullable()->unique();
                 $table->char('active_key', 64)->nullable()->unique();
                 $table->text('payload')->nullable();
                 $table->unsignedSmallInteger('attempts')->default(0);

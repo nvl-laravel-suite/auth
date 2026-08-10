@@ -14,14 +14,17 @@ use Illuminate\Database\Schema\Builder;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Adapters\ApiTokens\SanctumApiTokenManager;
+use Nvl\Auth\Contracts\AccountConfirmation;
 use Nvl\Auth\Contracts\ApiTokenAbilityProvider;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthAuditContextProvider;
+use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\AuthIdentifierResolver;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\AuthPipelineStage;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\BrowserSession;
+use Nvl\Auth\Contracts\InvitationRegistrationMapper;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Contracts\PasswordUpdater;
@@ -87,8 +90,8 @@ final class AuthDoctorCommand extends Command
         'nvl_auth_password_reset_tokens' => ['email', 'token', 'created_at'],
         'nvl_auth_clients' => ['id', 'name', 'surface', 'base_url', 'return_paths', 'allowed_origins', 'allowed_flows', 'metadata', 'is_active', 'last_used_at', 'created_at', 'updated_at'],
         'nvl_auth_client_sessions' => ['id', 'client_id', 'subject_type', 'subject_id', 'session_id_hash', 'ip_address', 'user_agent', 'metadata', 'authenticated_at', 'last_seen_at', 'ended_at', 'end_reason', 'created_at', 'updated_at'],
-        'nvl_auth_invitations' => ['id', 'token_hash', 'active_key', 'recipient', 'recipient_hash', 'type', 'purpose', 'inviter_type', 'inviter_id', 'accepted_by_type', 'accepted_by_id', 'roles', 'permissions', 'metadata', 'resend_count', 'last_sent_at', 'expires_at', 'accepted_at', 'revoked_at', 'created_at', 'updated_at'],
-        'nvl_auth_challenges' => ['id', 'type', 'purpose', 'subject_type', 'subject_id', 'recipient_hash', 'secret_hash', 'active_key', 'payload', 'attempts', 'max_attempts', 'expires_at', 'consumed_at', 'revoked_at', 'created_at', 'updated_at'],
+        'nvl_auth_invitations' => ['id', 'token_hash', 'active_key', 'recipient', 'recipient_hash', 'context_hash', 'type', 'purpose', 'inviter_type', 'inviter_id', 'accepted_by_type', 'accepted_by_id', 'roles', 'permissions', 'metadata', 'resend_count', 'last_sent_at', 'expires_at', 'accepted_at', 'revoked_at', 'created_at', 'updated_at'],
+        'nvl_auth_challenges' => ['id', 'type', 'purpose', 'subject_type', 'subject_id', 'recipient_hash', 'secret_hash', 'secondary_secret_hash', 'active_key', 'payload', 'attempts', 'max_attempts', 'expires_at', 'consumed_at', 'revoked_at', 'created_at', 'updated_at'],
         'nvl_auth_totp_credentials' => ['id', 'subject_type', 'subject_id', 'name', 'secret', 'algorithm', 'digits', 'period', 'allowed_drift', 'last_accepted_timestep', 'confirmed_at', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'],
         'nvl_auth_passkeys' => ['id', 'subject_type', 'subject_id', 'name', 'credential_id', 'credential_id_hash', 'public_key', 'user_handle', 'signature_counter', 'transports', 'backup_eligible', 'backed_up', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'],
         'nvl_auth_recovery_codes' => ['id', 'batch_id', 'subject_type', 'subject_id', 'code_hash', 'used_at', 'revoked_at', 'created_at', 'updated_at'],
@@ -249,6 +252,22 @@ final class AuthDoctorCommand extends Command
             );
         }
 
+        if ($configuration->featureEnabled(AuthFeature::Authentication)) {
+            $checks[] = $this->check(
+                'contract.authentication_eligibility',
+                $this->integration($container, AuthenticationEligibility::class) instanceof AuthenticationEligibility,
+                'Authentication operations require a valid eligibility policy.',
+            );
+        }
+
+        if ($configuration->featureEnabled(AuthFeature::PrincipalManagement)) {
+            $checks[] = $this->check(
+                'contract.account_confirmation',
+                $this->integration($container, AccountConfirmation::class) instanceof AccountConfirmation,
+                'Sensitive self-service mutations require a valid account confirmation policy.',
+            );
+        }
+
         if ($configuration->featureEnabled(AuthFeature::Sessions)) {
             $checks[] = $this->check(
                 'contract.browser_session',
@@ -278,6 +297,14 @@ final class AuthDoctorCommand extends Command
                 'contract.email_verification_subject_resolver',
                 $this->integration($container, AuthSubjectResolver::class) instanceof AuthSubjectResolver,
                 'Public email verification requires a valid subject resolver.',
+            );
+        }
+
+        if ($configuration->featureEnabled(AuthFeature::Invitations)) {
+            $checks[] = $this->check(
+                'contract.invitation_registration_mapper',
+                $this->integration($container, InvitationRegistrationMapper::class) instanceof InvitationRegistrationMapper,
+                'Invitation registration requires a valid principal attribute mapper.',
             );
         }
 

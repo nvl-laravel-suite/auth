@@ -31,6 +31,19 @@ final readonly class AuthDeliveryRequest
         public ?string $locale = null,
         public array $metadata = [],
     ) {
+        $supportedType = match ($this->feature) {
+            AuthFeature::Invitations => AuthMessageType::Invitation,
+            AuthFeature::MagicLinks => AuthMessageType::MagicLink,
+            AuthFeature::SecurityCodes => AuthMessageType::SecurityCode,
+            AuthFeature::Password => AuthMessageType::PasswordReset,
+            AuthFeature::EmailVerification => AuthMessageType::EmailVerification,
+            default => null,
+        };
+
+        if ($supportedType !== $this->type) {
+            throw new InvalidArgumentException('Auth delivery feature and message type are incompatible.');
+        }
+
         if (trim($this->messageId) === ''
             || $this->messageId !== trim($this->messageId)
             || mb_strlen($this->messageId) > 191

@@ -54,6 +54,14 @@ final readonly class CompleteSocialAuthorizationAction
             );
         }
 
+        if ($subject === null && $identity->email !== null && ! $identity->emailVerified) {
+            throw new AuthException(
+                'social_email_unverified',
+                'The social provider did not prove the returned email address.',
+                422,
+            );
+        }
+
         $resolvedSubject = $subject ?? $this->subjects->resolve($identity);
 
         return $this->links->execute($resolvedSubject, $identity);

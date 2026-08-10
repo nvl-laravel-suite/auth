@@ -51,7 +51,7 @@ final class FeatureManifest
                 $all,
                 routeFamilies: ['account' => 'profile', 'management' => 'users'],
                 routeNames: [
-                    'account' => ['profile.show', 'profile.update'],
+                    'account' => ['profile.show', 'profile.update', 'profile.destroy'],
                     'management' => [
                         'users.index',
                         'users.suggestions',

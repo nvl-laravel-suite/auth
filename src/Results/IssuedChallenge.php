@@ -17,15 +17,20 @@ final readonly class IssuedChallenge
     public function __construct(
         public Challenge $challenge,
         public string $secret,
+        public ?string $fallbackCode = null,
     ) {}
 
     /**
      * Redact the secret during inspection.
      *
-     * @return array{challenge_id: string, secret: string}
+     * @return array{challenge_id: string, secret: string, fallback_code: string|null}
      */
     public function __debugInfo(): array
     {
-        return ['challenge_id' => $this->challenge->identifier(), 'secret' => '[REDACTED]'];
+        return [
+            'challenge_id' => $this->challenge->identifier(),
+            'secret' => '[REDACTED]',
+            'fallback_code' => $this->fallbackCode === null ? null : '[REDACTED]',
+        ];
     }
 }

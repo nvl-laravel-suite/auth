@@ -6,8 +6,10 @@ namespace Nvl\Auth\Http\Controllers\Account;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Nvl\Auth\Actions\Users\DeleteOwnAccountAction;
 use Nvl\Auth\Actions\Users\ShowProfileAction;
 use Nvl\Auth\Actions\Users\UpdateProfileAction;
+use Nvl\Auth\Data\Mutations\DeleteOwnAccountData;
 use Nvl\Auth\Data\Mutations\UpdateProfileData;
 
 /** Handles package-owned self-service profile transport. */
@@ -31,6 +33,21 @@ final class ProfileController extends AuthenticatedController
             'data' => $user,
             'code' => 'profile_updated',
             'message' => 'The profile was updated.',
+        ]);
+    }
+
+    /** Confirm and delete the authenticated principal. */
+    public function destroy(
+        DeleteOwnAccountData $data,
+        Request $request,
+        DeleteOwnAccountAction $action,
+    ): JsonResponse {
+        $action->execute($this->subject($request), $data);
+
+        return response()->json([
+            'data' => null,
+            'code' => 'account_deleted',
+            'message' => 'The account was deleted.',
         ]);
     }
 }

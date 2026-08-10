@@ -48,6 +48,18 @@ or an application-specific model/namespace to Auth.
 12. Adopt legacy principals only through a versioned dry-run-first manifest
     that reconciles counts, identifiers, hashes, tokens, and declared host FKs.
 13. Run focused Pest, full Pest, PHPStan max, and Pint.
+14. Apply `AuthenticationEligibility` after subject resolution in every login
+    and password-reset flow; do not record success metadata before policy and
+    pipeline acceptance.
+15. Carry Socialite verified-email provenance and fail closed before any
+    email-based subject resolution.
+16. Keep profile mutations sparse. Email changes require account confirmation,
+    atomically clear verification, and emit fresh verification delivery.
+17. Keep invitation principal creation, RBAC, consumption, audit, and acceptance
+    hooks in one transaction. Actorless issuance requires a trusted
+    `InvitationIssuanceContext`; never hydrate it from public input.
+18. Query encrypted invitation recipients only by exact blind index. Never
+    decrypt and scan for substring search.
 
 ## Features
 

@@ -14,14 +14,39 @@ container so configured adapters and pipelines are applied.
 - `UpdatePasswordAction`
 - `RequestEmailVerificationAction`
 - `VerifyEmailAction`
+- `DeleteOwnAccountAction`
+
+`AuthenticationEligibility` is invoked after subject resolution and before
+credential, passwordless, social, or password-reset success. Replace it under
+`features.authentication.services.eligibility`. Sparse profile writes use
+`UpdateProfileData::toArray()` semantics; changing email additionally requires
+the replaceable `AccountConfirmation`, clears verification atomically, and
+requests a fresh verification delivery.
 
 ## Challenges and invitations
 
 - `RequestMagicLinkAction`, `ConsumeMagicLinkAction`
 - `RequestSecurityCodeAction`, `VerifySecurityCodeAction`
-- lower-level `IssueChallengeAction`, `ConsumeChallengeAction`
+- lower-level `IssueChallengeAction`, `ConsumeChallengeAction`,
+  `ConsumeChallengeByIdAction`
 - `CreateInvitationAction`, `PreviewInvitationAction`, `AcceptInvitationAction`
-- `ResendInvitationAction`, `RevokeInvitationAction`, `ListInvitationsAction`
+- `RegisterInvitationAction`, `ResendInvitationAction`,
+  `RevokeInvitationAction`, `ListInvitationsAction`
+
+Magic links contain one opaque token and one numeric fallback code for the same
+single-use challenge. Token-only callbacks carry `challengeId` and the chosen
+credential; legacy recipient-bound consumption remains supported.
+
+Pass trusted `InvitationIssuanceContext` from host orchestration for explicitly
+authorized actorless issuance, a bounded expiry override, or a post-accept
+return path. Public request input must never construct this context.
+`InvitationIndexQueryData` supports exact normalized recipient, type, purpose,
+lifecycle, expiry, and exact host-context filters. Recipient substring search is
+intentionally unavailable because recipients are encrypted at rest.
+The built-in registration mapper handles password registration. A host mapper
+may admit `registrationMethod=social` and consume only bounded `extensions`
+after its provider proof has succeeded; the atomic Action and acceptance hooks
+remain unchanged.
 
 Issuance Results redact plaintext secrets from debug output. Callers must avoid
 logging or caching the returned secret.
@@ -67,6 +92,8 @@ is off.
 Public extension contracts are in `Nvl\Auth\Contracts`:
 
 - subject-reference, login-identifier, invitation, and social resolvers;
+- authentication eligibility, account confirmation, and invitation
+  registration mapping;
 - password updater;
 - passkey ceremony;
 - social identity and API-token provider adapters;

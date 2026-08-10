@@ -42,3 +42,14 @@ it('rejects expired or oversized delivery payloads', function (): void {
             expiresAt: CarbonImmutable::now()->addMinute(),
         ))->toThrow(InvalidArgumentException::class, 'size');
 });
+
+it('rejects delivery message types outside their owning feature', function (): void {
+    expect(fn () => new AuthDeliveryRequest(
+        messageId: 'message-1',
+        feature: AuthFeature::Authentication,
+        type: AuthMessageType::EmailVerification,
+        recipient: 'user@example.test',
+        payload: [],
+        expiresAt: CarbonImmutable::now()->addMinute(),
+    ))->toThrow(InvalidArgumentException::class, 'incompatible');
+});
