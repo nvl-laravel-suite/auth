@@ -466,9 +466,13 @@ final readonly class AdoptPrincipalsAction
             $this->assertForeignKeyTable($schema, $foreignKey);
 
             if ($this->hasForeignKey($schema->getForeignKeys($foreignKey->table), $foreignKey)) {
+                $constraint = $schema->getConnection()->getDriverName() === 'sqlite'
+                    ? [$foreignKey->column]
+                    : $foreignKey->name;
+
                 $schema->table(
                     $foreignKey->table,
-                    static fn (Blueprint $table) => $table->dropForeign([$foreignKey->column]),
+                    static fn (Blueprint $table) => $table->dropForeign($constraint),
                 );
             }
         }

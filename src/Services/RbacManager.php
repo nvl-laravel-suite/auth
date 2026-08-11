@@ -83,7 +83,8 @@ final readonly class RbacManager
             $this->principals->identifier($subject),
             'roles_synchronized',
             $roles,
-            metadata: $metadata,
+            [],
+            $metadata,
         );
     }
 
@@ -101,8 +102,9 @@ final readonly class RbacManager
         RbacAssignmentChanged::dispatch(
             $this->principals->identifier($subject),
             'permissions_synchronized',
-            permissions: $permissions,
-            metadata: $metadata,
+            [],
+            $permissions,
+            $metadata,
         );
     }
 

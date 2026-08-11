@@ -186,7 +186,7 @@ it('plans and applies pre-migration principal table staging', function (): void 
     Schema::create('staged_domain_records', function (Blueprint $table): void {
         $table->id();
         $table->uuid('user_id')->nullable();
-        $table->foreign('user_id', 'staged_domain_records_user_id_foreign')
+        $table->foreign('user_id', 'staged_domain_records_principal_foreign')
             ->references('id')
             ->on('staged_users_source')
             ->nullOnDelete();
@@ -199,7 +199,7 @@ it('plans and applies pre-migration principal table staging', function (): void 
     $manifest['foreign_keys'] = [[
         'table' => 'staged_domain_records',
         'column' => 'user_id',
-        'name' => 'staged_domain_records_user_id_foreign',
+        'name' => 'staged_domain_records_principal_foreign',
         'on_delete' => 'null',
     ]];
     $action = app(AdoptPrincipalsAction::class);
@@ -207,8 +207,8 @@ it('plans and applies pre-migration principal table staging', function (): void 
     $plan = $action->execute($manifest, stage: true);
     $applied = $action->execute($manifest, stage: true, apply: true);
 
-    expect($plan['foreign_keys_detected'])->toBe(['staged_domain_records_user_id_foreign'])
-        ->and($applied['foreign_keys_detached'])->toBe(['staged_domain_records_user_id_foreign'])
+    expect($plan['foreign_keys_detected'])->toBe(['staged_domain_records_principal_foreign'])
+        ->and($applied['foreign_keys_detached'])->toBe(['staged_domain_records_principal_foreign'])
         ->and(Schema::hasTable('staged_users_source'))->toBeFalse()
         ->and(Schema::hasTable('staged_users_target'))->toBeTrue()
         ->and(Schema::getForeignKeys('staged_domain_records'))->toBe([]);
