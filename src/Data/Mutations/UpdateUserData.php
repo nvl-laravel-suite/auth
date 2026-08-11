@@ -10,6 +10,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use InvalidArgumentException;
 use JsonException;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Data\Traits\DataTransform;
 use Spatie\LaravelData\Attributes\MapInputName;
 use Spatie\LaravelData\Attributes\MapOutputName;
@@ -94,7 +95,7 @@ final class UpdateUserData extends Data
         $userId = isset($payload['_currentUserId']) && is_string($payload['_currentUserId'])
             ? $payload['_currentUserId']
             : null;
-        $table = Config::string('nvl-auth.tables.users', 'nvl_auth_users');
+        $table = Config::string('nvl-auth.tables.users', AuthTables::Users);
         $id = Config::string('nvl-auth.features.principal_management.settings.attributes.id', 'id');
         $email = Config::string('nvl-auth.features.principal_management.settings.attributes.email', 'email');
 

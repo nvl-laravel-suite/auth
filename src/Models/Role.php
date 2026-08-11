@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Nvl\Auth\Database\Factories\RoleFactory;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Spatie\Permission\Models\Role as SpatieRole;
 
 /**
@@ -35,7 +36,7 @@ class Role extends SpatieRole
 
     use HasUuids;
 
-    public const TABLE = 'nvl_auth_roles';
+    public const TABLE = AuthTables::Roles;
 
     /** @var string */
     protected $keyType = 'string';

@@ -21,6 +21,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\Contracts\HasApiTokens as HasApiTokensContract;
 use Laravel\Sanctum\HasApiTokens;
 use Nvl\Auth\Database\Factories\UserFactory;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -61,7 +62,7 @@ class User extends Authenticatable implements CanResetPasswordContract, HasApiTo
     use Notifiable;
     use SoftDeletes;
 
-    public const TABLE = 'nvl_auth_users';
+    public const TABLE = AuthTables::Users;
 
     /** @var string */
     protected $table = self::TABLE;

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Nvl\Auth\Database\Factories\AuthClientSessionFactory;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 
 /**
  * Correlates a host Laravel session with one Auth client without replacing it.
@@ -28,7 +29,7 @@ use Nvl\Auth\Database\Factories\AuthClientSessionFactory;
 #[UseFactory(AuthClientSessionFactory::class)]
 final class AuthClientSession extends AuthModel
 {
-    public const TABLE = 'nvl_auth_client_sessions';
+    public const TABLE = AuthTables::ClientSessions;
 
     /** @use HasFactory<AuthClientSessionFactory> */
     use HasFactory;

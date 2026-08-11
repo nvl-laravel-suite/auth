@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\RecoveryCodeFactory;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 
 /**
  * Stores one independently consumable hashed recovery code.
@@ -22,7 +23,7 @@ use Nvl\Auth\Database\Factories\RecoveryCodeFactory;
 #[UseFactory(RecoveryCodeFactory::class)]
 final class RecoveryCode extends AuthModel
 {
-    public const TABLE = 'nvl_auth_recovery_codes';
+    public const TABLE = AuthTables::RecoveryCodes;
 
     /** @use HasFactory<RecoveryCodeFactory> */
     use HasFactory;

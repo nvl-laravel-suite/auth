@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\TotpCredentialFactory;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 
 /**
  * Stores one encrypted TOTP secret owned by a host subject.
@@ -28,7 +29,7 @@ use Nvl\Auth\Database\Factories\TotpCredentialFactory;
 #[UseFactory(TotpCredentialFactory::class)]
 final class TotpCredential extends AuthModel
 {
-    public const TABLE = 'nvl_auth_totp_credentials';
+    public const TABLE = AuthTables::TotpCredentials;
 
     /** @use HasFactory<TotpCredentialFactory> */
     use HasFactory;

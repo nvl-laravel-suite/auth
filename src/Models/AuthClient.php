@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Nvl\Auth\Database\Factories\AuthClientFactory;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 
 /**
  * Represents one package-managed first-party authentication client.
@@ -26,7 +27,7 @@ use Nvl\Auth\Database\Factories\AuthClientFactory;
 #[UseFactory(AuthClientFactory::class)]
 final class AuthClient extends AuthModel
 {
-    public const TABLE = 'nvl_auth_clients';
+    public const TABLE = AuthTables::Clients;
 
     /** @use HasFactory<AuthClientFactory> */
     use HasFactory;

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Nvl\Auth\Adapters\Laravel\LaravelPrincipalSessionContainment;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\PersonalAccessToken;
 use Nvl\Auth\Models\Role;
@@ -262,13 +263,13 @@ return [
     |
     */
     'tables' => [
-        'users' => 'nvl_auth_users',
-        'roles' => 'nvl_auth_roles',
-        'permissions' => 'nvl_auth_permissions',
-        'model_has_permissions' => 'nvl_auth_model_has_permissions',
-        'model_has_roles' => 'nvl_auth_model_has_roles',
-        'role_has_permissions' => 'nvl_auth_role_has_permissions',
-        'personal_access_tokens' => 'nvl_auth_personal_access_tokens',
-        'password_reset_tokens' => 'nvl_auth_password_reset_tokens',
+        'users' => AuthTables::Users,
+        'roles' => AuthTables::Roles,
+        'permissions' => AuthTables::Permissions,
+        'model_has_permissions' => AuthTables::ModelHasPermissions,
+        'model_has_roles' => AuthTables::ModelHasRoles,
+        'role_has_permissions' => AuthTables::RoleHasPermissions,
+        'personal_access_tokens' => AuthTables::PersonalAccessTokens,
+        'password_reset_tokens' => AuthTables::PasswordResetTokens,
     ],
 ];

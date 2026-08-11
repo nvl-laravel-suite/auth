@@ -3,28 +3,29 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Schema;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Services\AuthSchemaManager;
 
 it('installs exactly the seventeen namespaced auth-owned tables', function (): void {
     $owned = [
-        'nvl_auth_users',
-        'nvl_auth_permissions',
-        'nvl_auth_roles',
-        'nvl_auth_model_has_permissions',
-        'nvl_auth_model_has_roles',
-        'nvl_auth_role_has_permissions',
-        'nvl_auth_personal_access_tokens',
-        'nvl_auth_password_reset_tokens',
-        'nvl_auth_clients',
-        'nvl_auth_client_sessions',
-        'nvl_auth_invitations',
-        'nvl_auth_challenges',
-        'nvl_auth_totp_credentials',
-        'nvl_auth_passkeys',
-        'nvl_auth_recovery_codes',
-        'nvl_auth_social_identities',
-        'nvl_auth_audits',
+        AuthTables::Users,
+        AuthTables::Permissions,
+        AuthTables::Roles,
+        AuthTables::ModelHasPermissions,
+        AuthTables::ModelHasRoles,
+        AuthTables::RoleHasPermissions,
+        AuthTables::PersonalAccessTokens,
+        AuthTables::PasswordResetTokens,
+        AuthTables::Clients,
+        AuthTables::ClientSessions,
+        AuthTables::Invitations,
+        AuthTables::Challenges,
+        AuthTables::TotpCredentials,
+        AuthTables::Passkeys,
+        AuthTables::RecoveryCodes,
+        AuthTables::SocialIdentities,
+        AuthTables::Audits,
     ];
 
     foreach ($owned as $table) {
@@ -68,20 +69,20 @@ it('installs only enabled feature schema and safely installs later capabilities'
     $identity->up();
     $features->up();
 
-    expect(Schema::hasTable('nvl_auth_users'))->toBeFalse()
-        ->and(Schema::hasTable('nvl_auth_roles'))->toBeFalse()
-        ->and(Schema::hasTable('nvl_auth_totp_credentials'))->toBeFalse();
+    expect(Schema::hasTable(AuthTables::Users))->toBeFalse()
+        ->and(Schema::hasTable(AuthTables::Roles))->toBeFalse()
+        ->and(Schema::hasTable(AuthTables::TotpCredentials))->toBeFalse();
 
     config()->set('nvl-auth.features.principal_management.enabled', true);
     config()->set('nvl-auth.features.totp.enabled', true);
     $plan = app(AuthSchemaManager::class)->execute();
     $applied = app(AuthSchemaManager::class)->execute(true);
 
-    expect($plan['missing'])->toBe(['nvl_auth_users', 'nvl_auth_totp_credentials'])
-        ->and($applied['created'])->toBe(['nvl_auth_users', 'nvl_auth_totp_credentials'])
-        ->and(Schema::hasTable('nvl_auth_users'))->toBeTrue()
-        ->and(Schema::hasTable('nvl_auth_totp_credentials'))->toBeTrue()
-        ->and(Schema::hasTable('nvl_auth_passkeys'))->toBeFalse();
+    expect($plan['missing'])->toBe([AuthTables::Users, AuthTables::TotpCredentials])
+        ->and($applied['created'])->toBe([AuthTables::Users, AuthTables::TotpCredentials])
+        ->and(Schema::hasTable(AuthTables::Users))->toBeTrue()
+        ->and(Schema::hasTable(AuthTables::TotpCredentials))->toBeTrue()
+        ->and(Schema::hasTable(AuthTables::Passkeys))->toBeFalse();
 
     foreach (AuthFeature::cases() as $feature) {
         config()->set("nvl-auth.features.{$feature->value}.enabled", true);
@@ -118,19 +119,19 @@ it('rolls the complete package schema down and back up cleanly', function (): vo
     $features->down();
     $identity->down();
 
-    expect(Schema::hasTable('nvl_auth_users'))->toBeFalse()
-        ->and(Schema::hasTable('nvl_auth_clients'))->toBeFalse()
-        ->and(Schema::hasTable('nvl_auth_audits'))->toBeFalse();
+    expect(Schema::hasTable(AuthTables::Users))->toBeFalse()
+        ->and(Schema::hasTable(AuthTables::Clients))->toBeFalse()
+        ->and(Schema::hasTable(AuthTables::Audits))->toBeFalse();
 
     $identity->up();
     $features->up();
 
-    expect(Schema::hasTable('nvl_auth_users'))->toBeTrue()
-        ->and(Schema::hasTable('nvl_auth_roles'))->toBeTrue()
-        ->and(Schema::hasTable('nvl_auth_clients'))->toBeTrue()
-        ->and(Schema::hasColumn('nvl_auth_invitations', 'active_key'))->toBeTrue()
-        ->and(Schema::hasColumn('nvl_auth_challenges', 'active_key'))->toBeTrue()
-        ->and(Schema::hasTable('nvl_auth_audits'))->toBeTrue();
+    expect(Schema::hasTable(AuthTables::Users))->toBeTrue()
+        ->and(Schema::hasTable(AuthTables::Roles))->toBeTrue()
+        ->and(Schema::hasTable(AuthTables::Clients))->toBeTrue()
+        ->and(Schema::hasColumn(AuthTables::Invitations, 'active_key'))->toBeTrue()
+        ->and(Schema::hasColumn(AuthTables::Challenges, 'active_key'))->toBeTrue()
+        ->and(Schema::hasTable(AuthTables::Audits))->toBeTrue();
 });
 
 it('uses configured identity provider table names consistently during installation', function (): void {
@@ -160,14 +161,14 @@ it('uses configured identity provider table names consistently during installati
     $identity->down();
 
     foreach ([
-        'users' => 'nvl_auth_users',
-        'permissions' => 'nvl_auth_permissions',
-        'roles' => 'nvl_auth_roles',
-        'model_has_permissions' => 'nvl_auth_model_has_permissions',
-        'model_has_roles' => 'nvl_auth_model_has_roles',
-        'role_has_permissions' => 'nvl_auth_role_has_permissions',
-        'personal_access_tokens' => 'nvl_auth_personal_access_tokens',
-        'password_reset_tokens' => 'nvl_auth_password_reset_tokens',
+        'users' => AuthTables::Users,
+        'permissions' => AuthTables::Permissions,
+        'roles' => AuthTables::Roles,
+        'model_has_permissions' => AuthTables::ModelHasPermissions,
+        'model_has_roles' => AuthTables::ModelHasRoles,
+        'role_has_permissions' => AuthTables::RoleHasPermissions,
+        'personal_access_tokens' => AuthTables::PersonalAccessTokens,
+        'password_reset_tokens' => AuthTables::PasswordResetTokens,
     ] as $key => $table) {
         config()->set("nvl-auth.tables.{$key}", $table);
     }

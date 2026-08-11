@@ -6,6 +6,7 @@ namespace Nvl\Auth\Services;
 
 use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Contracts\AuthSchemaMigration;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use RuntimeException;
 
@@ -68,63 +69,63 @@ final readonly class AuthSchemaManager
         $tables = [];
 
         if ($this->enabled(AuthFeature::PrincipalManagement)) {
-            $tables[] = $this->table('users', 'nvl_auth_users');
+            $tables[] = $this->table('users', AuthTables::Users);
         }
 
         if ($this->enabled(AuthFeature::Password)) {
-            $tables[] = $this->table('password_reset_tokens', 'nvl_auth_password_reset_tokens');
+            $tables[] = $this->table('password_reset_tokens', AuthTables::PasswordResetTokens);
         }
 
         if ($this->enabled(AuthFeature::Rbac)) {
             foreach ([
-                'permissions' => 'nvl_auth_permissions',
-                'roles' => 'nvl_auth_roles',
-                'model_has_permissions' => 'nvl_auth_model_has_permissions',
-                'model_has_roles' => 'nvl_auth_model_has_roles',
-                'role_has_permissions' => 'nvl_auth_role_has_permissions',
+                'permissions' => AuthTables::Permissions,
+                'roles' => AuthTables::Roles,
+                'model_has_permissions' => AuthTables::ModelHasPermissions,
+                'model_has_roles' => AuthTables::ModelHasRoles,
+                'role_has_permissions' => AuthTables::RoleHasPermissions,
             ] as $key => $default) {
                 $tables[] = $this->table($key, $default);
             }
         }
 
         if ($this->enabled(AuthFeature::ApiTokens)) {
-            $tables[] = $this->table('personal_access_tokens', 'nvl_auth_personal_access_tokens');
+            $tables[] = $this->table('personal_access_tokens', AuthTables::PersonalAccessTokens);
         }
 
         if ($this->enabled(AuthFeature::Clients) || $this->enabled(AuthFeature::Audit)) {
-            $tables[] = 'nvl_auth_clients';
+            $tables[] = AuthTables::Clients;
         }
 
         if ($this->enabled(AuthFeature::Clients)) {
-            $tables[] = 'nvl_auth_client_sessions';
+            $tables[] = AuthTables::ClientSessions;
         }
 
         if ($this->enabled(AuthFeature::Invitations)) {
-            $tables[] = 'nvl_auth_invitations';
+            $tables[] = AuthTables::Invitations;
         }
 
         if ($this->enabled(AuthFeature::MagicLinks) || $this->enabled(AuthFeature::SecurityCodes)) {
-            $tables[] = 'nvl_auth_challenges';
+            $tables[] = AuthTables::Challenges;
         }
 
         if ($this->enabled(AuthFeature::Totp)) {
-            $tables[] = 'nvl_auth_totp_credentials';
+            $tables[] = AuthTables::TotpCredentials;
         }
 
         if ($this->enabled(AuthFeature::Passkeys)) {
-            $tables[] = 'nvl_auth_passkeys';
+            $tables[] = AuthTables::Passkeys;
         }
 
         if ($this->enabled(AuthFeature::RecoveryCodes)) {
-            $tables[] = 'nvl_auth_recovery_codes';
+            $tables[] = AuthTables::RecoveryCodes;
         }
 
         if ($this->enabled(AuthFeature::SocialIdentities)) {
-            $tables[] = 'nvl_auth_social_identities';
+            $tables[] = AuthTables::SocialIdentities;
         }
 
         if ($this->enabled(AuthFeature::Audit)) {
-            $tables[] = 'nvl_auth_audits';
+            $tables[] = AuthTables::Audits;
         }
 
         return array_values(array_unique($tables));

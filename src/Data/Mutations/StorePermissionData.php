@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 use JsonException;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Data\Traits\DataTransform;
 use Spatie\LaravelData\Attributes\MapInputName;
 use Spatie\LaravelData\Attributes\MapOutputName;
@@ -64,7 +65,7 @@ final class StorePermissionData extends Data
     /** @return array<string, list<mixed>> */
     public static function rules(): array
     {
-        $permissions = Config::string('nvl-auth.tables.permissions', 'nvl_auth_permissions');
+        $permissions = Config::string('nvl-auth.tables.permissions', AuthTables::Permissions);
         $guard = Config::string('nvl-auth.features.rbac.settings.guard', 'web');
 
         return [

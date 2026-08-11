@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\SocialIdentityFactory;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 
 /**
  * Links one verified external provider identity to a host subject.
@@ -25,7 +26,7 @@ use Nvl\Auth\Database\Factories\SocialIdentityFactory;
 #[UseFactory(SocialIdentityFactory::class)]
 final class SocialIdentity extends AuthModel
 {
-    public const TABLE = 'nvl_auth_social_identities';
+    public const TABLE = AuthTables::SocialIdentities;
 
     /** @use HasFactory<SocialIdentityFactory> */
     use HasFactory;

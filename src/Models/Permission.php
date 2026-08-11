@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\PermissionFactory;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Spatie\Permission\Models\Permission as SpatiePermission;
 
 /**
@@ -32,7 +33,7 @@ class Permission extends SpatiePermission
 
     use HasUuids;
 
-    public const TABLE = 'nvl_auth_permissions';
+    public const TABLE = AuthTables::Permissions;
 
     /** @var string */
     protected $keyType = 'string';

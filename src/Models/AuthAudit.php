@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Nvl\Auth\Database\Factories\AuthAuditFactory;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 
 /**
  * Stores one simple, queryable Auth audit fact and bounded metadata.
@@ -27,7 +28,7 @@ use Nvl\Auth\Database\Factories\AuthAuditFactory;
 #[UseFactory(AuthAuditFactory::class)]
 final class AuthAudit extends AuthModel
 {
-    public const TABLE = 'nvl_auth_audits';
+    public const TABLE = AuthTables::Audits;
 
     /** @use HasFactory<AuthAuditFactory> */
     use HasFactory;

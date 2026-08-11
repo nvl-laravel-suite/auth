@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\PasskeyFactory;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 
 /**
  * Stores verified WebAuthn credential material for a host subject.
@@ -29,7 +30,7 @@ use Nvl\Auth\Database\Factories\PasskeyFactory;
 #[UseFactory(PasskeyFactory::class)]
 final class Passkey extends AuthModel
 {
-    public const TABLE = 'nvl_auth_passkeys';
+    public const TABLE = AuthTables::Passkeys;
 
     /** @use HasFactory<PasskeyFactory> */
     use HasFactory;

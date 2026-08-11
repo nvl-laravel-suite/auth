@@ -43,6 +43,7 @@ use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Contracts\SystemMutationAccess;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
@@ -276,7 +277,7 @@ final class AuthServiceProvider extends ServiceProvider
             if (is_string($broker) && trim($broker) !== '') {
                 $configuration->set(
                     "auth.passwords.{$broker}.table",
-                    $configuration->get('nvl-auth.tables.password_reset_tokens', 'nvl_auth_password_reset_tokens'),
+                    $configuration->get('nvl-auth.tables.password_reset_tokens', AuthTables::PasswordResetTokens),
                 );
                 $connection = $configuration->get('nvl-auth.connection');
 
@@ -300,11 +301,11 @@ final class AuthServiceProvider extends ServiceProvider
             $configuration->get('nvl-auth.features.rbac.models.permission', Permission::class),
         );
         $configuration->set('permission.table_names', [
-            'roles' => $configuration->get('nvl-auth.tables.roles', 'nvl_auth_roles'),
-            'permissions' => $configuration->get('nvl-auth.tables.permissions', 'nvl_auth_permissions'),
-            'model_has_permissions' => $configuration->get('nvl-auth.tables.model_has_permissions', 'nvl_auth_model_has_permissions'),
-            'model_has_roles' => $configuration->get('nvl-auth.tables.model_has_roles', 'nvl_auth_model_has_roles'),
-            'role_has_permissions' => $configuration->get('nvl-auth.tables.role_has_permissions', 'nvl_auth_role_has_permissions'),
+            'roles' => $configuration->get('nvl-auth.tables.roles', AuthTables::Roles),
+            'permissions' => $configuration->get('nvl-auth.tables.permissions', AuthTables::Permissions),
+            'model_has_permissions' => $configuration->get('nvl-auth.tables.model_has_permissions', AuthTables::ModelHasPermissions),
+            'model_has_roles' => $configuration->get('nvl-auth.tables.model_has_roles', AuthTables::ModelHasRoles),
+            'role_has_permissions' => $configuration->get('nvl-auth.tables.role_has_permissions', AuthTables::RoleHasPermissions),
         ]);
         $columnNames = $configuration->get('permission.column_names', []);
         $columnNames = is_array($columnNames) ? $columnNames : [];

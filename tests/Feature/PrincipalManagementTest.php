@@ -31,6 +31,7 @@ use Nvl\Auth\Data\Mutations\SyncUserPermissionsData;
 use Nvl\Auth\Data\Mutations\SyncUserRolesData;
 use Nvl\Auth\Data\Mutations\UpdateProfileData;
 use Nvl\Auth\Data\Mutations\UpdateUserStatusData;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\UserBulkOperation;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Events\PrincipalChanged;
@@ -56,7 +57,7 @@ it('owns a complete principal lifecycle and fails disabled login closed', functi
     ));
 
     expect($user)->toBeInstanceOf(User::class)
-        ->and($user->getTable())->toBe('nvl_auth_users')
+        ->and($user->getTable())->toBe(AuthTables::Users)
         ->and(Hash::check('SecurePassword123', (string) $user->password))->toBeTrue()
         ->and($user->hasRole('manage'))->toBeTrue()
         ->and($user->hasDirectPermission('users.create'))->toBeTrue();

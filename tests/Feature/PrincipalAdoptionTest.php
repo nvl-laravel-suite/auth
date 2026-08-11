@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Nvl\Auth\Actions\AdoptPrincipalsAction;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Models\User;
 
 /**
@@ -62,7 +63,7 @@ function principalAdoptionManifestForTest(
 }
 
 it('dry runs and applies a reconciled principal, token, extension, and foreign-key adoption', function (): void {
-    Schema::table('nvl_auth_users', function (Blueprint $table): void {
+    Schema::table(AuthTables::Users, function (Blueprint $table): void {
         $table->string('domain_reference')->nullable();
     });
     Schema::create('legacy_users', function (Blueprint $table): void {
@@ -138,11 +139,11 @@ it('dry runs and applies a reconciled principal, token, extension, and foreign-k
         ->and($user->profile)->toBe(['phone' => '+359000000000'])
         ->and($user->last_login_ip)->toBe('127.0.0.1')
         ->and($user->getAttribute('domain_reference'))->toBe('legacy-67')
-        ->and(DB::table('nvl_auth_password_reset_tokens')->where('email', 'legacy@example.test')->value('token'))->toBe('legacy-token-hash')
+        ->and(DB::table(AuthTables::PasswordResetTokens)->where('email', 'legacy@example.test')->value('token'))->toBe('legacy-token-hash')
         ->and(Schema::hasTable('legacy_users'))->toBeFalse()
         ->and(Schema::hasTable('legacy_password_reset_tokens'))->toBeFalse()
         ->and(collect($foreignKeys)->contains(
-            static fn (array $foreignKey): bool => ($foreignKey['foreign_table'] ?? null) === 'nvl_auth_users',
+            static fn (array $foreignKey): bool => ($foreignKey['foreign_table'] ?? null) === AuthTables::Users,
         ))->toBeTrue();
 });
 

@@ -6,6 +6,7 @@ namespace Nvl\Auth\Data\Mutations;
 
 use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Data\Traits\DataTransform;
 use Spatie\LaravelData\Attributes\MapInputName;
 use Spatie\LaravelData\Attributes\MapOutputName;
@@ -44,7 +45,7 @@ final class SyncUserRolesData extends Data
      */
     public static function rules(): array
     {
-        $roles = Config::string('nvl-auth.tables.roles', 'nvl_auth_roles');
+        $roles = Config::string('nvl-auth.tables.roles', AuthTables::Roles);
 
         return [
             'roles' => ['required', 'array', 'max:100'],

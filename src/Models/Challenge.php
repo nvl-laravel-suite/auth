@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\ChallengeFactory;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 
 /**
  * Stores one hashed magic-link, verification, or security-code challenge.
@@ -30,7 +31,7 @@ use Nvl\Auth\Database\Factories\ChallengeFactory;
 #[UseFactory(ChallengeFactory::class)]
 final class Challenge extends AuthModel
 {
-    public const TABLE = 'nvl_auth_challenges';
+    public const TABLE = AuthTables::Challenges;
 
     /** @use HasFactory<ChallengeFactory> */
     use HasFactory;

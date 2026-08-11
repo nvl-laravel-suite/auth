@@ -31,6 +31,7 @@ use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\PrincipalAttribute;
@@ -69,34 +70,34 @@ final class AuthDoctorCommand extends Command
     ];
 
     private const CONFIGURABLE_TABLES = [
-        'nvl_auth_users' => 'users',
-        'nvl_auth_permissions' => 'permissions',
-        'nvl_auth_roles' => 'roles',
-        'nvl_auth_model_has_permissions' => 'model_has_permissions',
-        'nvl_auth_model_has_roles' => 'model_has_roles',
-        'nvl_auth_role_has_permissions' => 'role_has_permissions',
-        'nvl_auth_personal_access_tokens' => 'personal_access_tokens',
-        'nvl_auth_password_reset_tokens' => 'password_reset_tokens',
+        AuthTables::Users => 'users',
+        AuthTables::Permissions => 'permissions',
+        AuthTables::Roles => 'roles',
+        AuthTables::ModelHasPermissions => 'model_has_permissions',
+        AuthTables::ModelHasRoles => 'model_has_roles',
+        AuthTables::RoleHasPermissions => 'role_has_permissions',
+        AuthTables::PersonalAccessTokens => 'personal_access_tokens',
+        AuthTables::PasswordResetTokens => 'password_reset_tokens',
     ];
 
     private const TABLE_COLUMNS = [
-        'nvl_auth_users' => ['id', 'name', 'email', 'email_verified_at', 'password', 'is_active', 'locale', 'timezone', 'profile', 'preferences', 'last_login_at', 'last_login_ip', 'locked_until', 'remember_token', 'created_at', 'updated_at', 'deleted_at'],
-        'nvl_auth_permissions' => ['id', 'name', 'guard_name', 'display_name', 'description', 'group', 'is_system', 'metadata', 'created_at', 'updated_at'],
-        'nvl_auth_roles' => ['id', 'name', 'guard_name', 'display_name', 'description', 'parent_id', 'priority', 'is_system', 'metadata', 'created_at', 'updated_at'],
-        'nvl_auth_model_has_permissions' => ['permission_id', 'model_type', 'model_id'],
-        'nvl_auth_model_has_roles' => ['role_id', 'model_type', 'model_id'],
-        'nvl_auth_role_has_permissions' => ['permission_id', 'role_id'],
-        'nvl_auth_personal_access_tokens' => ['id', 'tokenable_type', 'tokenable_id', 'name', 'token', 'abilities', 'last_used_at', 'expires_at', 'created_at', 'updated_at'],
-        'nvl_auth_password_reset_tokens' => ['email', 'token', 'created_at'],
-        'nvl_auth_clients' => ['id', 'name', 'surface', 'base_url', 'return_paths', 'allowed_origins', 'allowed_flows', 'metadata', 'is_active', 'last_used_at', 'created_at', 'updated_at'],
-        'nvl_auth_client_sessions' => ['id', 'client_id', 'subject_type', 'subject_id', 'session_id_hash', 'ip_address', 'user_agent', 'metadata', 'authenticated_at', 'last_seen_at', 'ended_at', 'end_reason', 'created_at', 'updated_at'],
-        'nvl_auth_invitations' => ['id', 'token_hash', 'active_key', 'recipient', 'recipient_hash', 'context_hash', 'type', 'purpose', 'inviter_type', 'inviter_id', 'accepted_by_type', 'accepted_by_id', 'roles', 'permissions', 'metadata', 'resend_count', 'last_sent_at', 'expires_at', 'accepted_at', 'revoked_at', 'created_at', 'updated_at'],
-        'nvl_auth_challenges' => ['id', 'type', 'purpose', 'subject_type', 'subject_id', 'recipient_hash', 'secret_hash', 'secondary_secret_hash', 'active_key', 'payload', 'attempts', 'max_attempts', 'expires_at', 'consumed_at', 'revoked_at', 'created_at', 'updated_at'],
-        'nvl_auth_totp_credentials' => ['id', 'subject_type', 'subject_id', 'name', 'secret', 'algorithm', 'digits', 'period', 'allowed_drift', 'last_accepted_timestep', 'confirmed_at', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'],
-        'nvl_auth_passkeys' => ['id', 'subject_type', 'subject_id', 'name', 'credential_id', 'credential_id_hash', 'public_key', 'user_handle', 'signature_counter', 'transports', 'backup_eligible', 'backed_up', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'],
-        'nvl_auth_recovery_codes' => ['id', 'batch_id', 'subject_type', 'subject_id', 'code_hash', 'used_at', 'revoked_at', 'created_at', 'updated_at'],
-        'nvl_auth_social_identities' => ['id', 'subject_type', 'subject_id', 'provider', 'provider_user_id', 'provider_user_id_hash', 'email', 'profile', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'],
-        'nvl_auth_audits' => ['id', 'action', 'outcome', 'subject_type', 'subject_id', 'actor_type', 'actor_id', 'client_id', 'ip_address', 'user_agent', 'request_id', 'metadata', 'created_at', 'updated_at'],
+        AuthTables::Users => ['id', 'name', 'email', 'email_verified_at', 'password', 'is_active', 'locale', 'timezone', 'profile', 'preferences', 'last_login_at', 'last_login_ip', 'locked_until', 'remember_token', 'created_at', 'updated_at', 'deleted_at'],
+        AuthTables::Permissions => ['id', 'name', 'guard_name', 'display_name', 'description', 'group', 'is_system', 'metadata', 'created_at', 'updated_at'],
+        AuthTables::Roles => ['id', 'name', 'guard_name', 'display_name', 'description', 'parent_id', 'priority', 'is_system', 'metadata', 'created_at', 'updated_at'],
+        AuthTables::ModelHasPermissions => ['permission_id', 'model_type', 'model_id'],
+        AuthTables::ModelHasRoles => ['role_id', 'model_type', 'model_id'],
+        AuthTables::RoleHasPermissions => ['permission_id', 'role_id'],
+        AuthTables::PersonalAccessTokens => ['id', 'tokenable_type', 'tokenable_id', 'name', 'token', 'abilities', 'last_used_at', 'expires_at', 'created_at', 'updated_at'],
+        AuthTables::PasswordResetTokens => ['email', 'token', 'created_at'],
+        AuthTables::Clients => ['id', 'name', 'surface', 'base_url', 'return_paths', 'allowed_origins', 'allowed_flows', 'metadata', 'is_active', 'last_used_at', 'created_at', 'updated_at'],
+        AuthTables::ClientSessions => ['id', 'client_id', 'subject_type', 'subject_id', 'session_id_hash', 'ip_address', 'user_agent', 'metadata', 'authenticated_at', 'last_seen_at', 'ended_at', 'end_reason', 'created_at', 'updated_at'],
+        AuthTables::Invitations => ['id', 'token_hash', 'active_key', 'recipient', 'recipient_hash', 'context_hash', 'type', 'purpose', 'inviter_type', 'inviter_id', 'accepted_by_type', 'accepted_by_id', 'roles', 'permissions', 'metadata', 'resend_count', 'last_sent_at', 'expires_at', 'accepted_at', 'revoked_at', 'created_at', 'updated_at'],
+        AuthTables::Challenges => ['id', 'type', 'purpose', 'subject_type', 'subject_id', 'recipient_hash', 'secret_hash', 'secondary_secret_hash', 'active_key', 'payload', 'attempts', 'max_attempts', 'expires_at', 'consumed_at', 'revoked_at', 'created_at', 'updated_at'],
+        AuthTables::TotpCredentials => ['id', 'subject_type', 'subject_id', 'name', 'secret', 'algorithm', 'digits', 'period', 'allowed_drift', 'last_accepted_timestep', 'confirmed_at', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'],
+        AuthTables::Passkeys => ['id', 'subject_type', 'subject_id', 'name', 'credential_id', 'credential_id_hash', 'public_key', 'user_handle', 'signature_counter', 'transports', 'backup_eligible', 'backed_up', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'],
+        AuthTables::RecoveryCodes => ['id', 'batch_id', 'subject_type', 'subject_id', 'code_hash', 'used_at', 'revoked_at', 'created_at', 'updated_at'],
+        AuthTables::SocialIdentities => ['id', 'subject_type', 'subject_id', 'provider', 'provider_user_id', 'provider_user_id_hash', 'email', 'profile', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'],
+        AuthTables::Audits => ['id', 'action', 'outcome', 'subject_type', 'subject_id', 'actor_type', 'actor_id', 'client_id', 'ip_address', 'user_agent', 'request_id', 'metadata', 'created_at', 'updated_at'],
     ];
 
     private const LEGACY_TABLES = [
@@ -178,7 +179,7 @@ final class AuthDoctorCommand extends Command
                 continue;
             }
 
-            if ($defaultTable === 'nvl_auth_users') {
+            if ($defaultTable === AuthTables::Users) {
                 $columns = array_map(
                     $principalAttributes->column(...),
                     PrincipalAttribute::cases(),
@@ -212,7 +213,7 @@ final class AuthDoctorCommand extends Command
             $this->ownedModelsReady($container),
             'Configured User, Role, Permission, or PersonalAccessToken models do not extend their package model.',
         );
-        $principalTable = $this->configuredTable($configuration, 'nvl_auth_users');
+        $principalTable = $this->configuredTable($configuration, AuthTables::Users);
         $attributeCollisions = $configuration->featureEnabled(AuthFeature::PrincipalManagement)
             && $schema->hasTable($principalTable)
                 ? $this->principalAttributeCollisions($container, $schema, $principalTable)

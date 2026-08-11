@@ -7,6 +7,7 @@ namespace Nvl\Auth\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Validation\Rule;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 
 /** Validates role cloning input. */
 final class CloneRoleRequest extends FormRequest
@@ -19,7 +20,7 @@ final class CloneRoleRequest extends FormRequest
     /** @return array<string, list<mixed>> */
     public function rules(): array
     {
-        $roles = Config::string('nvl-auth.tables.roles', 'nvl_auth_roles');
+        $roles = Config::string('nvl-auth.tables.roles', AuthTables::Roles);
         $guard = Config::string('nvl-auth.features.rbac.settings.guard', 'web');
 
         return [

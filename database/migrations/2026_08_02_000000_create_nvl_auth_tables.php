@@ -7,6 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Contracts\AuthSchemaMigration;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 
 return new class extends Migration implements AuthSchemaMigration
 {
@@ -18,8 +19,8 @@ return new class extends Migration implements AuthSchemaMigration
         $schema = Schema::connection($this->connectionName());
 
         if (($this->featureEnabled('clients') || $this->featureEnabled('audit'))
-            && ! $schema->hasTable('nvl_auth_clients')) {
-            $schema->create('nvl_auth_clients', function (Blueprint $table): void {
+            && ! $schema->hasTable(AuthTables::Clients)) {
+            $schema->create(AuthTables::Clients, function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->string('name', 120);
                 $table->string('surface', 40)->default('web');
@@ -36,10 +37,10 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if ($this->featureEnabled('clients') && ! $schema->hasTable('nvl_auth_client_sessions')) {
-            $schema->create('nvl_auth_client_sessions', function (Blueprint $table): void {
+        if ($this->featureEnabled('clients') && ! $schema->hasTable(AuthTables::ClientSessions)) {
+            $schema->create(AuthTables::ClientSessions, function (Blueprint $table): void {
                 $table->uuid('id')->primary();
-                $table->foreignUuid('client_id')->constrained('nvl_auth_clients')->cascadeOnDelete();
+                $table->foreignUuid('client_id')->constrained(AuthTables::Clients)->cascadeOnDelete();
                 $table->string('subject_type', 160)->nullable();
                 $table->string('subject_id', 191)->nullable();
                 $table->char('session_id_hash', 64);
@@ -58,8 +59,8 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if ($this->featureEnabled('invitations') && ! $schema->hasTable('nvl_auth_invitations')) {
-            $schema->create('nvl_auth_invitations', function (Blueprint $table): void {
+        if ($this->featureEnabled('invitations') && ! $schema->hasTable(AuthTables::Invitations)) {
+            $schema->create(AuthTables::Invitations, function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->char('token_hash', 64)->unique();
                 $table->char('active_key', 64)->nullable()->unique();
@@ -89,8 +90,8 @@ return new class extends Migration implements AuthSchemaMigration
         }
 
         if (($this->featureEnabled('magic_links') || $this->featureEnabled('security_codes'))
-            && ! $schema->hasTable('nvl_auth_challenges')) {
-            $schema->create('nvl_auth_challenges', function (Blueprint $table): void {
+            && ! $schema->hasTable(AuthTables::Challenges)) {
+            $schema->create(AuthTables::Challenges, function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->string('type', 80);
                 $table->string('purpose', 120);
@@ -114,8 +115,8 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if ($this->featureEnabled('totp') && ! $schema->hasTable('nvl_auth_totp_credentials')) {
-            $schema->create('nvl_auth_totp_credentials', function (Blueprint $table): void {
+        if ($this->featureEnabled('totp') && ! $schema->hasTable(AuthTables::TotpCredentials)) {
+            $schema->create(AuthTables::TotpCredentials, function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->string('subject_type', 160);
                 $table->string('subject_id', 191);
@@ -135,8 +136,8 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if ($this->featureEnabled('passkeys') && ! $schema->hasTable('nvl_auth_passkeys')) {
-            $schema->create('nvl_auth_passkeys', function (Blueprint $table): void {
+        if ($this->featureEnabled('passkeys') && ! $schema->hasTable(AuthTables::Passkeys)) {
+            $schema->create(AuthTables::Passkeys, function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->string('subject_type', 160);
                 $table->string('subject_id', 191);
@@ -157,8 +158,8 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if ($this->featureEnabled('recovery_codes') && ! $schema->hasTable('nvl_auth_recovery_codes')) {
-            $schema->create('nvl_auth_recovery_codes', function (Blueprint $table): void {
+        if ($this->featureEnabled('recovery_codes') && ! $schema->hasTable(AuthTables::RecoveryCodes)) {
+            $schema->create(AuthTables::RecoveryCodes, function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->uuid('batch_id');
                 $table->string('subject_type', 160);
@@ -173,8 +174,8 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if ($this->featureEnabled('social_identities') && ! $schema->hasTable('nvl_auth_social_identities')) {
-            $schema->create('nvl_auth_social_identities', function (Blueprint $table): void {
+        if ($this->featureEnabled('social_identities') && ! $schema->hasTable(AuthTables::SocialIdentities)) {
+            $schema->create(AuthTables::SocialIdentities, function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->string('subject_type', 160);
                 $table->string('subject_id', 191);
@@ -192,8 +193,8 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if ($this->featureEnabled('audit') && ! $schema->hasTable('nvl_auth_audits')) {
-            $schema->create('nvl_auth_audits', function (Blueprint $table): void {
+        if ($this->featureEnabled('audit') && ! $schema->hasTable(AuthTables::Audits)) {
+            $schema->create(AuthTables::Audits, function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->string('action', 120);
                 $table->string('outcome', 40)->default('success');
@@ -201,7 +202,7 @@ return new class extends Migration implements AuthSchemaMigration
                 $table->string('subject_id', 191)->nullable();
                 $table->string('actor_type', 160)->nullable();
                 $table->string('actor_id', 191)->nullable();
-                $table->foreignUuid('client_id')->nullable()->constrained('nvl_auth_clients')->nullOnDelete();
+                $table->foreignUuid('client_id')->nullable()->constrained(AuthTables::Clients)->nullOnDelete();
                 $table->text('ip_address')->nullable();
                 $table->text('user_agent')->nullable();
                 $table->string('request_id', 128)->nullable();
@@ -223,15 +224,15 @@ return new class extends Migration implements AuthSchemaMigration
         $schema = Schema::connection($this->connectionName());
 
         foreach ([
-            'nvl_auth_audits',
-            'nvl_auth_social_identities',
-            'nvl_auth_recovery_codes',
-            'nvl_auth_passkeys',
-            'nvl_auth_totp_credentials',
-            'nvl_auth_challenges',
-            'nvl_auth_invitations',
-            'nvl_auth_client_sessions',
-            'nvl_auth_clients',
+            AuthTables::Audits,
+            AuthTables::SocialIdentities,
+            AuthTables::RecoveryCodes,
+            AuthTables::Passkeys,
+            AuthTables::TotpCredentials,
+            AuthTables::Challenges,
+            AuthTables::Invitations,
+            AuthTables::ClientSessions,
+            AuthTables::Clients,
         ] as $table) {
             $schema->dropIfExists($table);
         }

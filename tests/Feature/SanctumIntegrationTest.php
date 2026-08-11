@@ -9,6 +9,7 @@ use Nvl\Auth\Actions\ApiTokens\RevokeAllApiTokensAction;
 use Nvl\Auth\Actions\ApiTokens\RotateApiTokenAction;
 use Nvl\Auth\Actions\ApiTokens\UpdateApiTokenAction;
 use Nvl\Auth\Data\Mutations\ApiTokenData;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 
 it('manages tokens directly through sanctum without an auth projection', function (): void {
     config()->set('nvl-auth.features.api_tokens.enabled', true);
@@ -24,7 +25,7 @@ it('manages tokens directly through sanctum without an auth projection', functio
         ->and(app(ListApiTokensAction::class)->execute($user))->toHaveCount(1)
         ->and($issued->token->name)->toBe('automation')
         ->and($issued->token->abilities)->toBe(['reports:read'])
-        ->and(Schema::hasTable('nvl_auth_personal_access_tokens'))->toBeTrue()
+        ->and(Schema::hasTable(AuthTables::PersonalAccessTokens))->toBeTrue()
         ->and(Schema::hasTable('personal_access_tokens'))->toBeFalse()
         ->and(Schema::hasTable('auth_api_tokens'))->toBeFalse();
 

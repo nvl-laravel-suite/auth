@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Validation\Rules\Password;
 use InvalidArgumentException;
 use JsonException;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Data\Traits\DataTransform;
 use Spatie\LaravelData\Attributes\MapInputName;
 use Spatie\LaravelData\Attributes\MapOutputName;
@@ -115,10 +116,10 @@ final class StoreUserData extends Data
     /** @return array<string, list<mixed>> */
     public static function rules(): array
     {
-        $users = Config::string('nvl-auth.tables.users', 'nvl_auth_users');
+        $users = Config::string('nvl-auth.tables.users', AuthTables::Users);
         $email = Config::string('nvl-auth.features.principal_management.settings.attributes.email', 'email');
-        $roles = Config::string('nvl-auth.tables.roles', 'nvl_auth_roles');
-        $permissions = Config::string('nvl-auth.tables.permissions', 'nvl_auth_permissions');
+        $roles = Config::string('nvl-auth.tables.roles', AuthTables::Roles);
+        $permissions = Config::string('nvl-auth.tables.permissions', AuthTables::Permissions);
 
         return [
             'name' => ['required', 'string', 'max:160'],

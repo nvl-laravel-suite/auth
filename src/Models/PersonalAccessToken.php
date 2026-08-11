@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 use Nvl\Auth\Database\Factories\PersonalAccessTokenFactory;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 
 /**
  * Stores Sanctum tokens in the package-owned namespaced token table.
@@ -28,7 +29,7 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
 
     use HasUuids;
 
-    public const TABLE = 'nvl_auth_personal_access_tokens';
+    public const TABLE = AuthTables::PersonalAccessTokens;
 
     /** @var string */
     protected $keyType = 'string';

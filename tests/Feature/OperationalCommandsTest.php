@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Nvl\Auth\Adapters\ApiTokens\SanctumApiTokenManager;
 use Nvl\Auth\Contracts\AuthManagementAccess;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Providers\AuthServiceProvider;
 use Nvl\Auth\Services\LaravelGateAuthManagementAccess;
 
@@ -103,7 +104,7 @@ it('validates optional Sanctum storage without making Sanctum a core dependency'
 
     $this->artisan('nvl:auth:doctor')->assertSuccessful();
 
-    Schema::drop('nvl_auth_personal_access_tokens');
+    Schema::drop(AuthTables::PersonalAccessTokens);
 
     $this->artisan('nvl:auth:doctor')
         ->expectsOutputToContain('The Sanctum adapter requires package-owned nvl_auth_personal_access_tokens storage.')

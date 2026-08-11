@@ -7,6 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Contracts\AuthSchemaMigration;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 
 return new class extends Migration implements AuthSchemaMigration
 {
@@ -183,14 +184,14 @@ return new class extends Migration implements AuthSchemaMigration
     private function tables(): array
     {
         $defaults = [
-            'users' => 'nvl_auth_users',
-            'permissions' => 'nvl_auth_permissions',
-            'roles' => 'nvl_auth_roles',
-            'model_has_permissions' => 'nvl_auth_model_has_permissions',
-            'model_has_roles' => 'nvl_auth_model_has_roles',
-            'role_has_permissions' => 'nvl_auth_role_has_permissions',
-            'personal_access_tokens' => 'nvl_auth_personal_access_tokens',
-            'password_reset_tokens' => 'nvl_auth_password_reset_tokens',
+            'users' => AuthTables::Users,
+            'permissions' => AuthTables::Permissions,
+            'roles' => AuthTables::Roles,
+            'model_has_permissions' => AuthTables::ModelHasPermissions,
+            'model_has_roles' => AuthTables::ModelHasRoles,
+            'role_has_permissions' => AuthTables::RoleHasPermissions,
+            'personal_access_tokens' => AuthTables::PersonalAccessTokens,
+            'password_reset_tokens' => AuthTables::PasswordResetTokens,
         ];
         $tables = [];
 

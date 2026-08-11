@@ -6,6 +6,7 @@ namespace Nvl\Auth\Tests\Fixtures;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
@@ -21,7 +22,7 @@ final class HostRbacPrincipal extends Authenticatable
     use HasUuids;
 
     /** @var string */
-    protected $table = 'nvl_auth_users';
+    protected $table = AuthTables::Users;
 
     /** @var string */
     protected $keyType = 'string';

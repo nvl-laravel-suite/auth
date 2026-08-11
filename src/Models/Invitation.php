@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\InvitationFactory;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 
 /**
  * Represents one bounded, bearer-token invitation.
@@ -35,7 +36,7 @@ use Nvl\Auth\Database\Factories\InvitationFactory;
 #[UseFactory(InvitationFactory::class)]
 final class Invitation extends AuthModel
 {
-    public const TABLE = 'nvl_auth_invitations';
+    public const TABLE = AuthTables::Invitations;
 
     /** @use HasFactory<InvitationFactory> */
     use HasFactory;

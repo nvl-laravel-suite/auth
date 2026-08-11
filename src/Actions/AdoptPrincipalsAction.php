@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\PrincipalAttribute;
@@ -179,7 +180,7 @@ final readonly class AdoptPrincipalsAction
         $target = (new $class)->getTable();
         $passwordTarget = $this->configuration->string(
             'tables.password_reset_tokens',
-            'nvl_auth_password_reset_tokens',
+            AuthTables::PasswordResetTokens,
         );
         $schema = Schema::connection($plan->connection);
 
