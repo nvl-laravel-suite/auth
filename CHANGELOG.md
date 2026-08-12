@@ -2,14 +2,33 @@
 
 All notable changes to `nvl/auth` are documented here.
 
-## Unreleased
+## [Unreleased]
+
+### Fixed
+
+- Preserved application-defined `$fillable` attributes on User subclasses while
+  merging the configured canonical principal columns, normalizing duplicates,
+  and keeping unlisted attributes protected.
+
+### Changed
+
+- Documented host principal extension fields and sensitive self-service profile
+  confirmation for email changes.
+
+## [1.0.3] - 2026-08-12
+
+### Fixed
 
 - Restored the v1.0.1 Auth create-migration schema and added a forward-only,
   idempotent corrective migration for invitation `context_hash` and challenge
   `secondary_secret_hash` columns and indexes. Schema planning now reports and
   repairs incomplete enabled-feature tables, Doctor verifies both indexes, and
-  the release workflow rehearses a real v1.0.1-to-candidate upgrade. Target:
-  v1.0.3; the v1.0.2 tag remains immutable.
+  the release workflow rehearses a real v1.0.1-to-v1.0.3 upgrade.
+
+## [1.0.2] - 2026-08-12
+
+### Changed
+
 - Registered migration publication through Laravel's timestamp-aware API and
   made Doctor warn when automatic vendor loading overlaps a published host copy.
 - Added versioned, dry-run-first legacy principal adoption with staging,
@@ -50,7 +69,7 @@ All notable changes to `nvl/auth` are documented here.
   restore, and bulk lifecycle paths. The Laravel adapter revokes package API
   tokens, rotates remember credentials, and removes database sessions.
 
-## 1.0.1 - 2026-08-09
+## [1.0.1] - 2026-08-09
 
 ### Changed
 

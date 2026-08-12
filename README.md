@@ -169,12 +169,24 @@ use Nvl\Auth\Models\User as AuthUser;
 
 final class User extends AuthUser
 {
+    /** @var list<string> */
+    protected $fillable = [
+        'phone',
+        'organization_id',
+        'position',
+    ];
+
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
     }
 }
 ```
+
+Configured canonical principal columns are always mass assignable. The package
+merges them with this subclass list, removes duplicates, and keeps every
+unlisted host attribute protected. Extension fields therefore survive `fill()`,
+`create()`, and `update()` without weakening mass-assignment protection.
 
 ```php
 'features' => [
@@ -195,6 +207,22 @@ password-reset path uses it. Sensitive self-service mutations use
 `features.principal_management.services.account_confirmation`. Invitation hosts
 can replace `features.invitations.services.registration_mapper` to map validated
 registration extensions to their configured principal model.
+
+Self-service profile updates require the current password only when a sensitive
+field changes, especially email. Submit conditional payloads rather than asking
+for a password on name-only edits:
+
+```php
+[
+    'name' => $name,
+    'email' => $email,
+    'currentPassword' => $emailChanged ? $currentPassword : null,
+]
+```
+
+An email change with missing or incorrect confirmation fails closed. A
+successful change clears `email_verified_at`, requests a fresh verification
+delivery, records the audit facts, and dispatches `PrincipalChanged`.
 
 RBAC assignment is independently configurable through
 `features.rbac.models.principal` and

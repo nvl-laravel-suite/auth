@@ -32,6 +32,10 @@ beforeEach(function (): void {
         $table->string('timezone')->default('UTC');
         $table->json('auth_profile')->nullable();
         $table->json('auth_preferences')->nullable();
+        $table->string('phone')->nullable();
+        $table->uuid('organization_id')->nullable();
+        $table->string('position')->nullable();
+        $table->string('unlisted_extension')->nullable();
         $table->timestamp('last_login_at')->nullable();
         $table->text('last_login_ip')->nullable();
         $table->timestamp('locked_until')->nullable();
@@ -54,6 +58,61 @@ beforeEach(function (): void {
     config()->set('nvl-auth.features.principal_management.settings.attributes.preferences', 'auth_preferences');
     app()->forgetInstance(AuthModelRegistry::class);
     app()->forgetInstance(PrincipalAttributeMapper::class);
+});
+
+it('preserves host fillable extensions alongside mapped principal attributes', function (): void {
+    $principal = new MappedPrincipal;
+    $fillable = $principal->getFillable();
+
+    expect($fillable)
+        ->toContain(
+            'name',
+            'auth_email',
+            'active',
+            'auth_profile',
+            'auth_preferences',
+            'phone',
+            'organization_id',
+            'position',
+        )
+        ->not->toContain('email', 'is_active', 'profile', 'preferences', 'unlisted_extension')
+        ->and(array_values(array_unique($fillable)))->toBe($fillable);
+
+    $filled = (new MappedPrincipal)->fill([
+        'phone' => '+359222222222',
+        'position' => 'Architect',
+        'unlisted_extension' => 'protected',
+    ]);
+
+    expect($filled->phone)->toBe('+359222222222')
+        ->and($filled->position)->toBe('Architect')
+        ->and($filled->unlisted_extension)->toBeNull();
+
+    $organizationId = (string) str()->uuid();
+    $created = MappedPrincipal::query()->create([
+        'name' => 'Extended Principal',
+        'auth_email' => 'extended@example.test',
+        'password' => 'SecurePassword123',
+        'phone' => '+359000000000',
+        'organization_id' => $organizationId,
+        'position' => 'Engineer',
+        'unlisted_extension' => 'must not persist',
+    ]);
+
+    expect($created->phone)->toBe('+359000000000')
+        ->and($created->organization_id)->toBe($organizationId)
+        ->and($created->position)->toBe('Engineer')
+        ->and($created->unlisted_extension)->toBeNull();
+
+    $created->update([
+        'phone' => '+359111111111',
+        'position' => 'Lead Engineer',
+        'unlisted_extension' => 'still protected',
+    ]);
+
+    expect($created->refresh()->phone)->toBe('+359111111111')
+        ->and($created->position)->toBe('Lead Engineer')
+        ->and($created->unlisted_extension)->toBeNull();
 });
 
 it('maps package principal mutations without shadowing a host profile relationship', function (): void {

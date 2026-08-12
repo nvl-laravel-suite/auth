@@ -241,9 +241,51 @@ it('changes self-service email sparsely after confirmation and restarts verifica
     expect($updated->email)->toBe('new.address@example.test')
         ->and($updated->email_verified_at)->toBeNull()
         ->and($updated->name)->toBe('Test User')
-        ->and($updated->locale)->toBe('bg');
+        ->and($updated->locale)->toBe('bg')
+        ->and(AuthAudit::query()->where('action', 'profile.updated')->exists())->toBeTrue()
+        ->and(AuthAudit::query()->where('action', 'email_verification.requested')->exists())->toBeTrue();
     Event::assertDispatched(AuthDeliveryRequested::class, static fn (AuthDeliveryRequested $event): bool => $event->request->recipient === 'new.address@example.test');
+    Event::assertDispatched(PrincipalChanged::class, static fn (PrincipalChanged $event): bool => $event->operation === 'profile_updated'
+        && in_array('emailVerified', $event->payload['attributes'] ?? [], true));
 });
+
+it('updates a nonsensitive profile field without account confirmation', function (): void {
+    $user = $this->user('profile-name@example.test');
+
+    $updated = app(UpdateProfileAction::class)->execute($user, new UpdateProfileData(
+        name: 'Updated Without Confirmation',
+    ));
+
+    expect($updated->name)->toBe('Updated Without Confirmation')
+        ->and($updated->email)->toBe('profile-name@example.test');
+});
+
+it('requires valid account confirmation before changing email', function (UpdateProfileData $data, string $code): void {
+    $user = $this->user('confirmation-required@example.test');
+    $failure = null;
+
+    try {
+        app(UpdateProfileAction::class)->execute($user, $data);
+    } catch (AuthException $exception) {
+        $failure = $exception;
+    }
+
+    expect($failure)->toBeInstanceOf(AuthException::class)
+        ->errorCode->toBe($code)
+        ->and($user->refresh()->email)->toBe('confirmation-required@example.test');
+})->with([
+    'missing current password' => [
+        new UpdateProfileData(email: 'missing-confirmation@example.test'),
+        'account_confirmation_required',
+    ],
+    'incorrect current password' => [
+        new UpdateProfileData(
+            email: 'invalid-confirmation@example.test',
+            currentPassword: 'incorrect-password',
+        ),
+        'account_confirmation_invalid',
+    ],
+]);
 
 it('rejects a self-service email conflict without changing profile state', function (): void {
     config()->set('nvl-auth.features.email_verification.enabled', true);

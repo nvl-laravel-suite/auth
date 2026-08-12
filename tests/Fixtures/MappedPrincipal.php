@@ -10,6 +10,14 @@ use Nvl\Auth\Models\User;
 /** Host principal fixture whose domain profile relation must remain usable. */
 final class MappedPrincipal extends User
 {
+    /** @var list<string> */
+    protected $fillable = [
+        'auth_email',
+        'phone',
+        'organization_id',
+        'position',
+    ];
+
     /** @return HasOne<MappedPrincipalProfile, $this> */
     public function profile(): HasOne
     {

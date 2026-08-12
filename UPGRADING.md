@@ -74,6 +74,42 @@ to physical host columns, including namespaced metadata columns when the model
 has relationships such as `profile()`. Doctor now fails when any physical
 principal column shadows a declared Eloquent relationship.
 
+Application principal subclasses may add normal host fields with a protected
+`$fillable` list. The post-v1.0.3 implementation merges that list with the
+configured canonical principal columns and removes duplicates. Until installing
+a suite release containing this correction, a v1.0.3 host that needs extension
+field mass assignment may use this compatible temporary override:
+
+```php
+public function getFillable(): array
+{
+    return array_values(array_unique([
+        ...parent::getFillable(),
+        ...$this->fillable,
+    ]));
+}
+```
+
+Remove the override after upgrading. Keep sensitive fields out of `$fillable`
+unless the application deliberately exposes them through a validated Action.
+
+### Self-service profile confirmation
+
+Email changes require `currentPassword`; name-only and other nonsensitive
+profile edits do not. Build a conditional request payload:
+
+```php
+[
+    'name' => $name,
+    'email' => $email,
+    'currentPassword' => $emailChanged ? $currentPassword : null,
+]
+```
+
+Missing or incorrect confirmation rejects the email change. A successful email
+change clears its verification timestamp, requests a new verification delivery,
+records audit facts, and emits `PrincipalChanged`.
+
 ## Package-owned identity release
 
 This pre-1.0 release intentionally replaces the prior host-owned identity/RBAC

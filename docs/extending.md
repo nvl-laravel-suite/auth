@@ -15,6 +15,20 @@ name, email, verification, password, active state, locale/timezone,
 profile/preferences metadata, login/lock state, remember token, timestamps, and
 soft deletion. UUID principal identity remains required.
 
+Declare host-owned mass-assignable fields on the subclass; the package retains
+them alongside every configured canonical principal column:
+
+```php
+final class User extends \Nvl\Auth\Models\User
+{
+    /** @var list<string> */
+    protected $fillable = ['phone', 'organization_id', 'position'];
+}
+```
+
+Duplicate physical names are normalized. Fields absent from both the host list
+and canonical map stay protected during `fill()`, `create()`, and `update()`.
+
 Eloquent attributes shadow relationships. If the subclass declares
 `profile(): Relation`, map package profile metadata to a namespaced column such
 as `auth_profile` and ensure the physical table has no `profile` column.
@@ -25,6 +39,12 @@ Permission, and PersonalAccessToken through their feature `models` keys.
 
 The model registry validates configured inheritance and every package Action
 resolves the configured model, so API and direct PHP use remain aligned.
+
+Profile mutation is sparse. Name, locale, timezone, profile, and preference
+changes do not require account confirmation. A changed email requires
+`currentPassword`; on success Auth resets verification state, emits a new
+verification delivery request, records audit facts, and dispatches
+`PrincipalChanged`.
 
 For an existing first-party principal table, use the manifest-driven adoption
 bridge rather than an ad hoc copy. It validates UUIDs, normalized unique emails,

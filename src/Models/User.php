@@ -116,7 +116,7 @@ class User extends Authenticatable implements CanResetPasswordContract, HasApiTo
      */
     public function getFillable(): array
     {
-        return array_map($this->principalColumn(...), [
+        $canonical = array_map($this->principalColumn(...), [
             PrincipalAttribute::Name,
             PrincipalAttribute::Email,
             PrincipalAttribute::EmailVerifiedAt,
@@ -130,6 +130,11 @@ class User extends Authenticatable implements CanResetPasswordContract, HasApiTo
             PrincipalAttribute::LastLoginIp,
             PrincipalAttribute::LockedUntil,
         ]);
+
+        return array_values(array_unique([
+            ...parent::getFillable(),
+            ...$canonical,
+        ]));
     }
 
     /**

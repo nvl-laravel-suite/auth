@@ -106,6 +106,21 @@ mapper and into Eloquent mass assignment. Partial mutation DTOs represent
 missing properties with `Optional`, so an omitted field is never rewritten to
 a default or `null`; explicit nullable values remain intentional updates.
 
+Consumer User subclasses may declare application fields normally:
+
+```php
+final class User extends \Nvl\Auth\Models\User
+{
+    /** @var list<string> */
+    protected $fillable = ['phone', 'organization_id', 'position'];
+}
+```
+
+`getFillable()` merges that list with the mapped canonical principal columns
+and normalizes duplicates. Do not list attributes that should remain protected.
+For self-service profile requests, provide `currentPassword` only when a
+sensitive value such as email changes; name-only edits need no confirmation.
+
 Never map a column to the name of an Eloquent relationship. Also ensure the
 physical principal table has no otherwise-unused column with that relationship
 name: Eloquent attributes shadow relations even when the package map points
