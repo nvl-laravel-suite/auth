@@ -23,7 +23,7 @@ it('exposes the complete configured Eloquent RBAC principal adapter', function (
     expect($access->find($principal))->toBe($principal)
         ->and($access->find((string) $principal->getKey())->is($principal))->toBeTrue()
         ->and($access->identifier($principal))->toBe((string) $principal->getKey())
-        ->and($access->connectionName($principal))->toBe('testing');
+        ->and($access->connectionName($principal))->toBe($principal->getConnectionName());
 
     $access->assign($principal, [$role->name], [$permission->name]);
     expect($principal->hasRole($role))->toBeTrue()
