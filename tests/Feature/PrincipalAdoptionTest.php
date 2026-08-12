@@ -218,3 +218,96 @@ it('plans and applies pre-migration principal table staging', function (): void 
 it('registers the dry-run principal adoption command', function (): void {
     expect(collect(Artisan::all())->has('nvl:auth:adopt-principals'))->toBeTrue();
 });
+
+it('fails closed for unsafe principal staging and adoption topology', function (): void {
+    $action = app(AdoptPrincipalsAction::class);
+    $manifest = principalAdoptionManifestForTest('missing_source_users', 0);
+
+    expect(fn (): array => $action->execute($manifest, stage: true))
+        ->toThrow(InvalidArgumentException::class, 'requires at least one table rename');
+
+    $manifest['staging'] = [[
+        'source_table' => 'missing_source_users',
+        'staging_table' => 'staged_users',
+    ]];
+
+    expect(fn (): array => $action->execute($manifest, stage: true))
+        ->toThrow(InvalidArgumentException::class, 'source [missing_source_users] does not exist');
+
+    Schema::create('source_users', function (Blueprint $table): void {
+        $table->uuid('id')->primary();
+    });
+    Schema::create('staged_users', function (Blueprint $table): void {
+        $table->uuid('id')->primary();
+    });
+    $manifest['staging'][0] = [
+        'source_table' => 'source_users',
+        'staging_table' => 'staged_users',
+    ];
+
+    expect(fn (): array => $action->execute($manifest, stage: true))
+        ->toThrow(InvalidArgumentException::class, 'target [staged_users] already exists');
+
+    config()->set('nvl-auth.connection', 'secondary');
+    $manifest = principalAdoptionManifestForTest('source_users', 0);
+    $manifest['connection'] = 'testing';
+
+    expect(fn (): array => $action->execute($manifest))
+        ->toThrow(InvalidArgumentException::class, 'same connection');
+});
+
+it('rejects missing, incomplete, or conflicting principal adoption source data', function (): void {
+    $action = app(AdoptPrincipalsAction::class);
+    $manifest = principalAdoptionManifestForTest('missing_source_users', 0);
+    $manifest['principals']['extension_columns'] = [];
+
+    expect(fn (): array => $action->execute($manifest))
+        ->toThrow(InvalidArgumentException::class, 'source table [missing_source_users] does not exist');
+
+    Schema::create('incomplete_source_users', function (Blueprint $table): void {
+        $table->uuid('id')->primary();
+    });
+    $manifest = principalAdoptionManifestForTest('incomplete_source_users', 0);
+    $manifest['principals']['extension_columns'] = [];
+
+    expect(fn (): array => $action->execute($manifest))
+        ->toThrow(InvalidArgumentException::class, 'is missing [name]');
+
+    Schema::create('empty_source_users', function (Blueprint $table): void {
+        $table->uuid('id')->primary();
+        $table->string('name');
+        $table->string('email');
+        $table->timestamp('email_verified_at')->nullable();
+        $table->string('password')->nullable();
+        $table->boolean('active')->nullable();
+        $table->string('locale')->nullable();
+        $table->string('timezone')->nullable();
+        $table->json('profile_data')->nullable();
+        $table->string('last_login_ip')->nullable();
+        $table->string('domain_reference')->nullable();
+        $table->timestamps();
+    });
+    $manifest = principalAdoptionManifestForTest('empty_source_users', 1);
+    $manifest['principals']['extension_columns'] = [];
+
+    expect(fn (): array => $action->execute($manifest))
+        ->toThrow(InvalidArgumentException::class, 'expected 1 principals but found 0');
+
+    $id = (string) Str::uuid();
+    DB::table('empty_source_users')->insert([
+        'id' => $id,
+        'name' => 'Conflicting Consumer',
+        'email' => 'conflict@example.test',
+        'active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    User::query()->create([
+        'name' => 'Existing Consumer',
+        'email' => 'conflict@example.test',
+        'password' => 'correct-password',
+    ]);
+
+    expect(fn (): array => $action->execute($manifest))
+        ->toThrow(InvalidArgumentException::class, 'target already contains a source email');
+});

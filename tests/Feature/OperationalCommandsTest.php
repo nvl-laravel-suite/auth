@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Nvl\Auth\Adapters\ApiTokens\SanctumApiTokenManager;
@@ -16,6 +17,64 @@ it('reports the complete feature inventory in table and JSON formats', function 
         ->expectsOutputToContain('"authentication"')
         ->assertSuccessful();
     $this->artisan('nvl:auth:features', ['--format' => 'yaml'])->assertExitCode(2);
+});
+
+it('reports Auth schema plans in text and JSON formats', function (): void {
+    $this->artisan('nvl:auth:schema')->assertSuccessful();
+    $this->artisan('nvl:auth:schema', ['--format' => 'json'])
+        ->expectsOutputToContain('"mode": "plan"')
+        ->assertSuccessful();
+
+    Schema::drop(AuthTables::PersonalAccessTokens);
+
+    $this->artisan('nvl:auth:schema')
+        ->expectsOutputToContain(AuthTables::PersonalAccessTokens)
+        ->assertSuccessful();
+
+    expect(static fn (): int => Artisan::call('nvl:auth:schema', ['--format' => 'yaml']))
+        ->toThrow(InvalidArgumentException::class, 'format must be text or json');
+});
+
+it('rejects unsafe principal adoption command input before invoking adoption', function (): void {
+    expect(static fn (): int => Artisan::call('nvl:auth:adopt-principals', [
+        'manifest' => 'missing.json',
+        '--format' => 'yaml',
+    ]))->toThrow(InvalidArgumentException::class, 'format must be text or json');
+
+    expect(static fn (): int => Artisan::call('nvl:auth:adopt-principals', [
+        'manifest' => ' ',
+    ]))->toThrow(InvalidArgumentException::class, 'manifest is required');
+
+    config()->set('nvl-auth.adoption.maximum_manifest_bytes', 0);
+    expect(static fn (): int => Artisan::call('nvl:auth:adopt-principals', [
+        'manifest' => 'missing.json',
+    ]))->toThrow(InvalidArgumentException::class, 'must be a positive integer');
+
+    config()->set('nvl-auth.adoption.maximum_manifest_bytes', 1_048_576);
+    expect(static fn (): int => Artisan::call('nvl:auth:adopt-principals', [
+        'manifest' => 'missing.json',
+    ]))->toThrow(InvalidArgumentException::class, 'missing or too large');
+
+    $invalidJson = tempnam(sys_get_temp_dir(), 'nvl-auth-invalid-json-');
+    $scalarJson = tempnam(sys_get_temp_dir(), 'nvl-auth-scalar-json-');
+
+    expect($invalidJson)->toBeString()
+        ->and($scalarJson)->toBeString();
+
+    file_put_contents($invalidJson, '{');
+    file_put_contents($scalarJson, 'true');
+
+    try {
+        expect(static fn (): int => Artisan::call('nvl:auth:adopt-principals', [
+            'manifest' => $invalidJson,
+        ]))->toThrow(InvalidArgumentException::class, 'is not valid JSON')
+            ->and(static fn (): int => Artisan::call('nvl:auth:adopt-principals', [
+                'manifest' => $scalarJson,
+            ]))->toThrow(InvalidArgumentException::class, 'must be a JSON object');
+    } finally {
+        unlink($invalidJson);
+        unlink($scalarJson);
+    }
 });
 
 it('passes readiness for the default lean profile and fails missing dependencies', function (): void {

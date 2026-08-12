@@ -23,7 +23,12 @@ it('issues hashed magic links and consumes them once', function (): void {
 
     expect($issued->challenge->getRawOriginal('secret_hash'))->not->toBe($issued->secret)
         ->and($issued->fallbackCode)->toMatch('/^\d{6}$/')
-        ->and($issued->challenge->getRawOriginal('secondary_secret_hash'))->not->toBe($issued->fallbackCode);
+        ->and($issued->challenge->getRawOriginal('secondary_secret_hash'))->not->toBe($issued->fallbackCode)
+        ->and($issued->__debugInfo())->toBe([
+            'challenge_id' => $issued->challenge->identifier(),
+            'secret' => '[REDACTED]',
+            'fallback_code' => '[REDACTED]',
+        ]);
 
     $consumed = app(ConsumeMagicLinkAction::class)->execute(new ConsumeMagicLinkData(
         '',
