@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Connection;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\Schema\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -180,6 +182,68 @@ it('refuses to repair outdated tables when migrations are host-owned', function 
         config()->set('nvl-auth.migrations.enabled', true);
         resetAuthDeliveryFeatureSchema();
     }
+});
+
+it('reports outdated delivery columns and indexes in the schema plan', function (): void {
+    resetAuthDeliveryFeatureSchema(false);
+    config()->set('nvl-auth.migrations.install_all', false);
+    setAuthFeatures(false);
+    config()->set('nvl-auth.features.invitations.enabled', true);
+    config()->set('nvl-auth.features.magic_links.enabled', true);
+
+    try {
+        $this->artisan('nvl:auth:schema')
+            ->expectsOutputToContain(
+                AuthTables::Invitations.' missing column(s): context_hash',
+            )
+            ->expectsOutputToContain(
+                AuthTables::Challenges.' missing column(s): secondary_secret_hash',
+            )
+            ->expectsOutputToContain(
+                AuthTables::Invitations.' missing index(es): nvl_auth_invitations_context_hash_index',
+            )
+            ->expectsOutputToContain(
+                AuthTables::Challenges.' missing index(es): nvl_auth_challenges_secondary_secret_hash_unique',
+            )
+            ->assertSuccessful();
+    } finally {
+        resetAuthDeliveryFeatureSchema();
+    }
+});
+
+it('fails closed when an enabled schema remains incomplete after repair', function (): void {
+    config()->set('nvl-auth.migrations.install_all', false);
+    setAuthFeatures(false);
+    config()->set('nvl-auth.features.invitations.enabled', true);
+    config()->set('nvl-auth.features.magic_links.enabled', true);
+    config()->set('nvl-auth.connection', 'stubborn_auth_schema');
+    config()->set('database.connections.stubborn_auth_schema', [
+        'driver' => 'stubborn_auth_schema',
+    ]);
+
+    $schema = Mockery::mock(Builder::class);
+    $schema->shouldReceive('hasTable')->andReturnTrue();
+    $schema->shouldReceive('hasColumn')->andReturnFalse();
+    $schema->shouldReceive('hasIndex')->andReturnFalse();
+    $schema->shouldReceive('table')->times(4);
+
+    $connection = Mockery::mock(Connection::class)->shouldIgnoreMissing();
+    $connection->shouldReceive('setReadWriteType')->andReturnSelf();
+    $connection->shouldReceive('getSchemaBuilder')->andReturn($schema);
+
+    app('db')->extend(
+        'stubborn_auth_schema',
+        static fn (array $configuration, string $name): Connection => $connection,
+    );
+
+    expect(fn (): array => app(AuthSchemaManager::class)->execute(true))
+        ->toThrow(
+            RuntimeException::class,
+            'Auth schema installation remains incomplete: tables [], '
+            .'columns [nvl_auth_invitations:context_hash, nvl_auth_challenges:secondary_secret_hash], '
+            .'indexes [nvl_auth_invitations:nvl_auth_invitations_context_hash_index, '
+            .'nvl_auth_challenges:nvl_auth_challenges_secondary_secret_hash_unique].',
+        );
 });
 
 /**
