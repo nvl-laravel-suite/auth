@@ -4,6 +4,8 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-08-12
+
 ### Fixed
 
 - Preserved application-defined `$fillable` attributes on User subclasses while
