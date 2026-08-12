@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
@@ -89,6 +90,42 @@ it('passes readiness for the default lean profile and fails missing dependencies
     $this->artisan('nvl:auth:doctor')
         ->expectsOutputToContain('Feature [password] requires [authentication].')
         ->assertFailed();
+});
+
+it('fails readiness when Auth delivery correlation indexes are missing', function (): void {
+    config()->set('nvl-auth.features.invitations.enabled', true);
+    config()->set('nvl-auth.features.magic_links.enabled', true);
+
+    Schema::table(AuthTables::Invitations, function (Blueprint $table): void {
+        $table->dropIndex('nvl_auth_invitations_context_hash_index');
+    });
+
+    try {
+        $this->artisan('nvl:auth:doctor')
+            ->expectsOutputToContain('nvl_auth_invitations_context_hash_index')
+            ->assertFailed();
+    } finally {
+        $migration = require dirname(__DIR__, 2).'/database/migrations/2026_08_12_000000_add_auth_delivery_context_columns.php';
+        $migration->up();
+    }
+
+    Schema::table(AuthTables::Challenges, function (Blueprint $table): void {
+        $table->dropUnique('nvl_auth_challenges_secondary_secret_hash_unique');
+    });
+
+    try {
+        $this->artisan('nvl:auth:doctor')
+            ->expectsOutputToContain('nvl_auth_challenges_secondary_secret_hash_unique')
+            ->assertFailed();
+    } finally {
+        $migration = require dirname(__DIR__, 2).'/database/migrations/2026_08_12_000000_add_auth_delivery_context_columns.php';
+        $migration->up();
+    }
+
+    config()->set('nvl-auth.features.invitations.enabled', false);
+    config()->set('nvl-auth.features.magic_links.enabled', false);
+
+    $this->artisan('nvl:auth:doctor')->assertSuccessful();
 });
 
 it('registers timestamp-aware migration publishing and warns about duplicate ownership', function (): void {

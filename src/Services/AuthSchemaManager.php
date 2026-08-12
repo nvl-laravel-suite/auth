@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Illuminate\Database\Schema\Builder;
 use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Contracts\AuthSchemaMigration;
 use Nvl\Auth\Definitions\Tables\AuthTables;
@@ -13,10 +14,24 @@ use RuntimeException;
 /** Plans and installs only schema required by currently enabled Auth features. */
 final readonly class AuthSchemaManager
 {
+    /** @var array<string, list<string>> */
+    private const array REQUIRED_COLUMNS = [
+        AuthTables::Invitations => ['context_hash'],
+        AuthTables::Challenges => ['secondary_secret_hash'],
+    ];
+
+    /** @var array<string, list<string>> */
+    private const array REQUIRED_INDEXES = [
+        AuthTables::Invitations => ['nvl_auth_invitations_context_hash_index'],
+        AuthTables::Challenges => ['nvl_auth_challenges_secondary_secret_hash_unique'],
+    ];
+
     public function __construct(private AuthConfiguration $configuration) {}
 
     /**
-     * @return array{mode: 'apply'|'plan', required: list<string>, existing: list<string>, missing: list<string>, created: list<string>}
+     * Plan or repair the schema required by enabled Auth features.
+     *
+     * @return array{mode: 'apply'|'plan', required: list<string>, existing: list<string>, missing: list<string>, outdated: array<string, list<string>>, missing_indexes: array<string, list<string>>, created: list<string>}
      */
     public function execute(bool $apply = false): array
     {
@@ -27,28 +42,39 @@ final readonly class AuthSchemaManager
             static fn (string $table): bool => $schema->hasTable($table),
         ));
         $missing = array_values(array_diff($required, $existing));
+        $outdated = $this->outdatedTables($schema, $required);
+        $missingIndexes = $this->missingIndexes($schema, $required);
+        $requiresRepair = $missing !== [] || $outdated !== [] || $missingIndexes !== [];
 
-        if ($apply && $missing !== []) {
-            if (! $this->configuration->boolean('migrations.enabled', true)) {
-                throw new RuntimeException(
-                    'Auth schema apply is unavailable while migrations are host-owned. '
-                    .'Update and run the published host migrations, then rerun the schema plan.',
-                );
+        if ($apply && $requiresRepair && ! $this->configuration->boolean('migrations.enabled', true)) {
+            throw new RuntimeException(
+                'Auth schema apply is unavailable while migrations are host-owned. '
+                .'Update and run the published host migrations, then rerun the schema plan.',
+            );
+        }
+
+        if ($apply && $this->configuration->boolean('migrations.enabled', true)) {
+            if ($missing !== []) {
+                $this->migration('2026_08_01_000000_create_nvl_auth_identity_tables.php')->up();
+                $this->migration('2026_08_02_000000_create_nvl_auth_tables.php')->up();
             }
 
-            $this->migration('2026_08_01_000000_create_nvl_auth_identity_tables.php')->up();
-            $this->migration('2026_08_02_000000_create_nvl_auth_tables.php')->up();
+            $this->migration('2026_08_12_000000_add_auth_delivery_context_columns.php')->up();
         }
 
         $remaining = array_values(array_filter(
             $required,
             static fn (string $table): bool => ! $schema->hasTable($table),
         ));
+        $remainingOutdated = $this->outdatedTables($schema, $required);
+        $remainingIndexes = $this->missingIndexes($schema, $required);
 
-        if ($apply && $remaining !== []) {
+        if ($apply && ($remaining !== [] || $remainingOutdated !== [] || $remainingIndexes !== [])) {
             throw new RuntimeException(sprintf(
-                'Auth schema installation did not create required table(s): %s.',
+                'Auth schema installation remains incomplete: tables [%s], columns [%s], indexes [%s].',
                 implode(', ', $remaining),
+                $this->formatRequirements($remainingOutdated),
+                $this->formatRequirements($remainingIndexes),
             ));
         }
 
@@ -57,11 +83,87 @@ final readonly class AuthSchemaManager
             'required' => $required,
             'existing' => $existing,
             'missing' => $missing,
+            'outdated' => $outdated,
+            'missing_indexes' => $missingIndexes,
             'created' => $apply ? $missing : [],
         ];
     }
 
     /**
+     * Return required columns missing from existing enabled-feature tables.
+     *
+     * @param  list<string>  $required
+     * @return array<string, list<string>>
+     */
+    private function outdatedTables(Builder $schema, array $required): array
+    {
+        $outdated = [];
+
+        foreach (self::REQUIRED_COLUMNS as $table => $columns) {
+            if (! in_array($table, $required, true) || ! $schema->hasTable($table)) {
+                continue;
+            }
+
+            $missing = array_filter(
+                $columns,
+                static fn (string $column): bool => ! $schema->hasColumn($table, $column),
+            );
+
+            if ($missing !== []) {
+                $outdated[$table] = $missing;
+            }
+        }
+
+        return $outdated;
+    }
+
+    /**
+     * Return required indexes missing from existing enabled-feature tables.
+     *
+     * @param  list<string>  $required
+     * @return array<string, list<string>>
+     */
+    private function missingIndexes(Builder $schema, array $required): array
+    {
+        $missingIndexes = [];
+
+        foreach (self::REQUIRED_INDEXES as $table => $indexes) {
+            if (! in_array($table, $required, true) || ! $schema->hasTable($table)) {
+                continue;
+            }
+
+            $missing = array_filter(
+                $indexes,
+                static fn (string $index): bool => ! $schema->hasIndex($table, $index),
+            );
+
+            if ($missing !== []) {
+                $missingIndexes[$table] = $missing;
+            }
+        }
+
+        return $missingIndexes;
+    }
+
+    /**
+     * Format a table-keyed requirement map for operator failures.
+     *
+     * @param  array<string, list<string>>  $requirements
+     */
+    private function formatRequirements(array $requirements): string
+    {
+        $formatted = [];
+
+        foreach ($requirements as $table => $items) {
+            $formatted[] = $table.':'.implode('|', $items);
+        }
+
+        return implode(', ', $formatted);
+    }
+
+    /**
+     * Return the unique tables required by enabled Auth features.
+     *
      * @return list<string>
      */
     public function requiredTables(): array

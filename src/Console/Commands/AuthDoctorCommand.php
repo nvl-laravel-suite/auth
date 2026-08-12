@@ -100,6 +100,16 @@ final class AuthDoctorCommand extends Command
         AuthTables::Audits => ['id', 'action', 'outcome', 'subject_type', 'subject_id', 'actor_type', 'actor_id', 'client_id', 'ip_address', 'user_agent', 'request_id', 'metadata', 'created_at', 'updated_at'],
     ];
 
+    /** @var array<string, array<string, bool>> */
+    private const TABLE_INDEXES = [
+        AuthTables::Invitations => [
+            'nvl_auth_invitations_context_hash_index' => false,
+        ],
+        AuthTables::Challenges => [
+            'nvl_auth_challenges_secondary_secret_hash_unique' => true,
+        ],
+    ];
+
     private const LEGACY_TABLES = [
         'auth_clients',
         'auth_client_sessions',
@@ -193,6 +203,14 @@ final class AuthDoctorCommand extends Command
                 $exists && $schema->hasColumns($table, $columns),
                 "Required table [{$table}] is partial or outdated.",
             );
+
+            foreach (self::TABLE_INDEXES[$defaultTable] ?? [] as $index => $unique) {
+                $checks[] = $this->check(
+                    "schema.{$table}.index.{$index}",
+                    $exists && $this->indexReady($schema, $table, $index, $unique),
+                    "Required table [{$table}] is missing index [{$index}].",
+                );
+            }
         }
 
         foreach (self::LEGACY_TABLES as $table) {
@@ -1026,6 +1044,21 @@ final class AuthDoctorCommand extends Command
         }
 
         return $collisions;
+    }
+
+    /**
+     * Determine whether a named schema index has the required uniqueness.
+     */
+    private function indexReady(
+        Builder $schema,
+        string $table,
+        string $name,
+        bool $unique,
+    ): bool {
+        return collect($schema->getIndexes($table))->contains(
+            static fn (array $index): bool => $index['name'] === $name
+                && $index['unique'] === $unique,
+        );
     }
 
     /**

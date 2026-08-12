@@ -4,6 +4,12 @@ All notable changes to `nvl/auth` are documented here.
 
 ## Unreleased
 
+- Restored the v1.0.1 Auth create-migration schema and added a forward-only,
+  idempotent corrective migration for invitation `context_hash` and challenge
+  `secondary_secret_hash` columns and indexes. Schema planning now reports and
+  repairs incomplete enabled-feature tables, Doctor verifies both indexes, and
+  the release workflow rehearses a real v1.0.1-to-candidate upgrade. Target:
+  v1.0.3; the v1.0.2 tag remains immutable.
 - Registered migration publication through Laravel's timestamp-aware API and
   made Doctor warn when automatic vendor loading overlaps a published host copy.
 - Added versioned, dry-run-first legacy principal adoption with staging,

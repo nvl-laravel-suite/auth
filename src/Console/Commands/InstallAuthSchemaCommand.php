@@ -40,15 +40,25 @@ final class InstallAuthSchemaCommand extends Command
         }
 
         $this->components->info(sprintf(
-            'Auth schema %s completed: %d required, %d missing, %d created.',
+            'Auth schema %s completed: %d required, %d missing, %d outdated, %d indexes missing, %d created.',
             $result['mode'],
             count($result['required']),
             count($result['missing']),
+            count($result['outdated']),
+            count($result['missing_indexes']),
             count($result['created']),
         ));
 
         foreach ($result['missing'] as $table) {
             $this->line(" - {$table}");
+        }
+
+        foreach ($result['outdated'] as $table => $columns) {
+            $this->line(sprintf(' - %s missing column(s): %s', $table, implode(', ', $columns)));
+        }
+
+        foreach ($result['missing_indexes'] as $table => $indexes) {
+            $this->line(sprintf(' - %s missing index(es): %s', $table, implode(', ', $indexes)));
         }
 
         return self::SUCCESS;

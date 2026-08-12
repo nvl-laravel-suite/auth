@@ -1,14 +1,30 @@
 # Upgrading NVL Auth
 
-## Unreleased from 1.0.1
+## 1.0.3 from 1.0.1 or 1.0.2
 
 ### Authentication and onboarding security
 
-Run migrations after updating. Existing installations gain nullable
-`nvl_auth_invitations.context_hash` and
-`nvl_auth_challenges.secondary_secret_hash` columns. Publish the new corrective
-migration when the application publishes package migrations; do not edit an
-already-run published migration.
+Version 1.0.2 added runtime use of `nvl_auth_invitations.context_hash` and
+`nvl_auth_challenges.secondary_secret_hash` but did not ship a corrective
+migration for databases first installed with v1.0.1. Version 1.0.3 restores the
+original v1.0.1 create migration and adds
+`2026_08_12_000000_add_auth_delivery_context_columns.php` so fresh and upgraded
+installations share one migration history. The migration is idempotent for
+v1.0.2 fresh schemas, preserves existing rows, and intentionally leaves both new
+nullable values empty for historical records.
+
+Run migrations immediately after updating:
+
+```bash
+php artisan optimize:clear
+php artisan migrate
+php artisan nvl:auth:schema
+php artisan nvl:auth:doctor --strict
+```
+
+Do not edit, recreate, move, or retag v1.0.2. Publish the new corrective
+migration when the application uses host-owned package migrations; do not edit
+an already-run published create migration.
 
 Hosts that resolve social subjects by email must now provide verified-email
 provenance. Hosts with custom login or reset admission should implement
@@ -17,9 +33,11 @@ belong in `InvitationRegistrationMapper`.
 
 ### Feature-aware schema
 
-Fresh migrations now create only tables required by features enabled at
-migration time. A 1.0.1 installation keeps any already-created dormant tables;
-the upgrade does not drop them. Before enabling a new feature, run:
+Fresh migrations create only tables required by features enabled at migration
+time. A 1.0.1 installation keeps any already-created dormant tables; the
+upgrade does not drop them. Schema plans now report `outdated` table columns and
+`missing_indexes` in addition to missing tables. Before enabling a new feature,
+run:
 
 ```bash
 php artisan nvl:auth:schema
@@ -27,12 +45,14 @@ php artisan nvl:auth:schema --apply
 php artisan nvl:auth:doctor --strict
 ```
 
-If migrations are host-owned, republish to a temporary location, merge the new
-idempotent feature guards into the maintained host copies, run `php artisan
-migrate`, then use `nvl:auth:schema` to verify the result. Schema `--apply` fails
-closed while `migrations.enabled=false` so it cannot bypass host ownership. Do
-not switch `migrations.install_all` on in production; it exists for controlled
-full-schema test and rehearsal environments.
+If migrations are host-owned, publish to a temporary location, copy the new
+corrective migration into the host migration inventory, run `php artisan
+migrate`, then use `nvl:auth:schema` to verify the result. Do not merge the new
+columns into a previously executed create migration. Schema `--apply` fails
+closed while `migrations.enabled=false` whenever a table, column, or index needs
+repair, so it cannot bypass host ownership. Do not switch
+`migrations.install_all` on in production; it exists for controlled full-schema
+test and rehearsal environments.
 
 ### Existing first-party Users
 
