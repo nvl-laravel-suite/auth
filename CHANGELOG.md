@@ -4,12 +4,14 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [Unreleased]
 
-## [1.0.5] - 2026-08-12
+## [1.0.6] - 2026-08-13
 
 ### Added
 
 - Added a privacy-bounded, after-commit `InvitationAccepted` event for direct
   and registration-through-invitation acceptance paths.
+
+## [1.0.5] - 2026-08-12
 
 ### Fixed
 
