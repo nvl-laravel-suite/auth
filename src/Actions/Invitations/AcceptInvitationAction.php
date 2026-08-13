@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Events\InvitationAccepted;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Pipelines\AuthPipeline;
@@ -74,6 +75,12 @@ final readonly class AcceptInvitationAction
                         subject: $reference,
                         actor: $subject,
                         metadata: ['invitation_id' => $invitation->identifier()],
+                    );
+                    InvitationAccepted::dispatch(
+                        invitationId: $invitation->identifier(),
+                        type: $invitation->type,
+                        purpose: $invitation->purpose,
+                        subject: $reference,
                     );
 
                     return $invitation;

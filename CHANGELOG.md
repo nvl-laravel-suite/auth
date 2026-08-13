@@ -6,6 +6,11 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [1.0.5] - 2026-08-12
 
+### Added
+
+- Added a privacy-bounded, after-commit `InvitationAccepted` event for direct
+  and registration-through-invitation acceptance paths.
+
 ### Fixed
 
 - Preserved application-defined `$fillable` attributes on User subclasses while

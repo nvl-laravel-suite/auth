@@ -12,6 +12,7 @@ use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Data\Mutations\AcceptInvitationData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Events\InvitationAccepted;
 use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
@@ -92,6 +93,12 @@ final readonly class RegisterInvitationAction
                             subject: $reference,
                             actor: $subject,
                             metadata: ['invitation_id' => $invitation->identifier()],
+                        );
+                        InvitationAccepted::dispatch(
+                            invitationId: $invitation->identifier(),
+                            type: $invitation->type,
+                            purpose: $invitation->purpose,
+                            subject: $reference,
                         );
                         PrincipalChanged::dispatch($reference->identifier, 'invitation_registered');
 

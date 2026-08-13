@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Support\Facades\Event;
 use Nvl\Auth\Actions\Invitations\AcceptInvitationAction;
 use Nvl\Auth\Actions\Invitations\CreateInvitationAction;
@@ -14,19 +15,21 @@ use Nvl\Auth\Data\Mutations\StoreInvitationData;
 use Nvl\Auth\Data\Queries\InvitationIndexQueryData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Events\AuthDeliveryRequested;
+use Nvl\Auth\Events\InvitationAccepted;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Tests\Fixtures\RejectLoginStage;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
+use Nvl\Auth\ValueObjects\SubjectReference;
 
 beforeEach(function (): void {
     config()->set('nvl-auth.features.invitations.enabled', true);
 });
 
 it('issues consumes and audits a simple invitation without delivery persistence', function (): void {
-    Event::fake([AuthDeliveryRequested::class]);
+    Event::fake([AuthDeliveryRequested::class, InvitationAccepted::class]);
     $actor = $this->user('actor@example.test');
     $consumer = $this->user('consumer@example.test');
     $issued = app(CreateInvitationAction::class)->execute(
@@ -43,9 +46,19 @@ it('issues consumes and audits a simple invitation without delivery persistence'
 
     expect($accepted->accepted_at)->not->toBeNull()
         ->and($accepted->accepted_by_id)->toBe((string) $consumer->getKey())
-        ->and(AuthAudit::query()->count())->toBe(2);
+        ->and(AuthAudit::query()->count())->toBe(2)
+        ->and(fn () => app(AcceptInvitationAction::class)->execute($issued->token, $consumer))
+        ->toThrow(AuthException::class);
     Event::assertDispatched(AuthDeliveryRequested::class, static fn (AuthDeliveryRequested $event): bool => $event->request->feature === AuthFeature::Invitations
         && $event->request->payload['token'] === $issued->token);
+    Event::assertDispatchedTimes(InvitationAccepted::class, 1);
+    Event::assertDispatched(
+        InvitationAccepted::class,
+        static fn (InvitationAccepted $event): bool => $event->invitationId === $issued->invitation->identifier()
+            && $event->type === $issued->invitation->type
+            && $event->purpose === $issued->invitation->purpose
+            && $event->subject->identifier === (string) $consumer->getKey(),
+    );
 });
 
 it('revokes invitations while the feature is disabled', function (): void {
@@ -76,6 +89,7 @@ it('enforces one active invitation per recipient and purpose while preserving hi
 });
 
 it('provisions the package principal out of the box for public invitation acceptance', function (): void {
+    Event::fake([InvitationAccepted::class]);
     $actor = $this->user('invitation.owner@example.test');
     $issued = app(CreateInvitationAction::class)->execute(
         new StoreInvitationData('new.invitee@example.test'),
@@ -95,6 +109,36 @@ it('provisions the package principal out of the box for public invitation accept
         ->and($subject->email)->toBe('new.invitee@example.test')
         ->and($subject->locale)->toBe('bg')
         ->and($accepted->accepted_by_id)->toBe($subject->id);
+    Event::assertDispatchedTimes(InvitationAccepted::class, 1);
+    Event::assertDispatched(
+        InvitationAccepted::class,
+        static fn (InvitationAccepted $event): bool => $event->invitationId === $accepted->identifier()
+            && $event->subject->identifier === $subject->id,
+    );
+});
+
+it('keeps invitation acceptance events privacy bounded', function (): void {
+    $subject = $this->user('privacy.invitee@example.test');
+    $event = new InvitationAccepted(
+        invitationId: 'invitation-1',
+        type: 'account',
+        purpose: 'registration',
+        subject: SubjectReference::fromAuthenticatable($subject),
+    );
+    $serialized = serialize($event);
+
+    expect($event)->toBeInstanceOf(ShouldDispatchAfterCommit::class)
+        ->and(get_object_vars($event))->toHaveKeys([
+            'invitationId',
+            'type',
+            'purpose',
+            'subject',
+        ])->not->toHaveKeys([
+            'token',
+            'recipient',
+            'metadata',
+        ])
+        ->and($serialized)->not->toContain('privacy.invitee@example.test');
 });
 
 it('supports explicitly authorized actorless issuance expiry and exact indexed filters', function (): void {
@@ -132,6 +176,7 @@ it('supports explicitly authorized actorless issuance expiry and exact indexed f
 });
 
 it('rolls principal creation back when an invitation acceptance hook rejects', function (): void {
+    Event::fake([InvitationAccepted::class]);
     $actor = $this->user('rollback.owner@example.test');
     $issued = app(CreateInvitationAction::class)->execute(
         new StoreInvitationData('rollback.invitee@example.test'),
@@ -148,6 +193,7 @@ it('rolls principal creation back when an invitation acceptance hook rejects', f
 
     expect(User::query()->where('email', 'rollback.invitee@example.test')->exists())->toBeFalse()
         ->and($issued->invitation->refresh()->accepted_at)->toBeNull();
+    Event::assertNotDispatched(InvitationAccepted::class);
 });
 
 it('supports a host-mapped social registration variant inside the invitation transaction', function (): void {

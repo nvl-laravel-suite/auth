@@ -38,6 +38,9 @@ or an application-specific model/namespace to Auth.
    A globally disabled provider must remain passive unless migration loading is
    explicitly requested.
 8. Emit delivery through `AuthDeliveryRequested`; do not send it in Auth.
+   Emit successful direct and registration-through-invitation consumption
+   through the privacy-bounded, after-commit `InvitationAccepted` event. Never
+   add its token, recipient, metadata, roles, or permissions to that event.
 9. Update manifest route names, HTTP docs, OpenAPI, and contract tests together.
 10. Keep the configured principal attribute map aligned across models, Actions,
     validation, authentication, adoption, and Doctor. Reject physical

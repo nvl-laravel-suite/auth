@@ -266,6 +266,11 @@ credential atomically consumes the same challenge.
 Auth owns the message intent and secure payload. The consumer owns channel,
 template, provider, delivery retry, and provider callback concerns.
 
+Successful direct and registration-through-invitation acceptance dispatches an
+after-commit `InvitationAccepted` event exactly once. It contains only the
+invitation ID, type, purpose, and accepted `SubjectReference`; bearer tokens,
+recipient addresses, and invitation metadata are deliberately excluded.
+
 ## Storage
 
 Package migrations install only schema owned by features enabled at migration
