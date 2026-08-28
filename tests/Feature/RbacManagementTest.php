@@ -5,9 +5,13 @@ declare(strict_types=1);
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Nvl\Auth\Actions\Rbac\AddRolePermissionsAction;
 use Nvl\Auth\Actions\Rbac\ApplyRoleTemplateAction;
+use Nvl\Auth\Actions\Rbac\CheckRoleNameAvailabilityAction;
 use Nvl\Auth\Actions\Rbac\CloneRoleAction;
 use Nvl\Auth\Actions\Rbac\CreatePermissionAction;
+use Nvl\Auth\Actions\Rbac\CreatePermissionWithRolesAction;
 use Nvl\Auth\Actions\Rbac\CreateRoleAction;
 use Nvl\Auth\Actions\Rbac\ListPermissionCatalogAction;
 use Nvl\Auth\Actions\Rbac\ListPermissionGroupsAction;
@@ -16,10 +20,14 @@ use Nvl\Auth\Actions\Rbac\ListRoleCatalogAction;
 use Nvl\Auth\Actions\Rbac\ListRoleHierarchyAction;
 use Nvl\Auth\Actions\Rbac\ListRoleOptionsAction;
 use Nvl\Auth\Actions\Rbac\ListRoleTemplatesAction;
+use Nvl\Auth\Actions\Rbac\ResolvePermissionIdentifiersAction;
+use Nvl\Auth\Actions\Rbac\ResolveRoleIdentifiersAction;
 use Nvl\Auth\Actions\Rbac\ShowRbacAnalyticsAction;
 use Nvl\Auth\Actions\Rbac\SuggestPermissionsAction;
 use Nvl\Auth\Actions\Rbac\SuggestRolesAction;
+use Nvl\Auth\Actions\Rbac\SyncRolePermissionsAction;
 use Nvl\Auth\Actions\Rbac\UpdatePermissionAction;
+use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Data\Display\PermissionGroupData;
 use Nvl\Auth\Data\Display\PermissionListItemData;
@@ -34,9 +42,14 @@ use Nvl\Auth\Data\Mutations\StoreRoleData;
 use Nvl\Auth\Data\Mutations\UpdatePermissionData;
 use Nvl\Auth\Data\Queries\PermissionIndexQueryData;
 use Nvl\Auth\Data\Queries\RoleIndexQueryData;
+use Nvl\Auth\Events\RbacChanged;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
+use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\RbacEntityLocator;
+use Nvl\Auth\ValueObjects\SubjectReference;
 
 it('owns role and permission CRUD foundations, cloning, hierarchy, templates, and analytics', function (): void {
     $actor = $this->user('rbac.owner@example.test');
@@ -483,4 +496,272 @@ it('keeps option and catalog query counts independent of fixture size', function
         ->and($singleCounts['role_catalog'])->toBeLessThanOrEqual(3)
         ->and($singleCounts['permission_catalog'])->toBeLessThanOrEqual(2)
         ->and($populatedCounts)->toBe($singleCounts);
+});
+
+it('checks canonical role name availability for the configured guard', function (): void {
+    $actor = $this->user('rbac-availability@example.test');
+    $webRole = Role::factory()->create(['name' => 'editor', 'guard_name' => 'web']);
+    Role::factory()->create(['name' => 'api-only', 'guard_name' => 'api']);
+
+    $conflict = app(CheckRoleNameAvailabilityAction::class)->execute($actor, '  editor  ');
+    $unchanged = app(CheckRoleNameAvailabilityAction::class)->execute($actor, 'editor', $webRole->id);
+    $otherGuard = app(CheckRoleNameAvailabilityAction::class)->execute($actor, 'api-only');
+
+    expect($conflict->toArray())->toBe([
+        'name' => 'editor',
+        'available' => false,
+        'conflictingRoleId' => $webRole->id,
+    ])->and($unchanged->available)->toBeTrue()
+        ->and($unchanged->conflictingRoleId)->toBeNull()
+        ->and($otherGuard->available)->toBeTrue()
+        ->and(fn () => app(CheckRoleNameAvailabilityAction::class)->execute($actor, '   '))
+        ->toThrow(AuthException::class, 'between one and 160')
+        ->and(fn () => app(CheckRoleNameAvailabilityAction::class)->execute($actor, 'editor', 'not-a-uuid'))
+        ->toThrow(AuthException::class, 'UUID');
+});
+
+it('resolves mixed role and permission identifiers into ordered DTOs with bounded queries', function (): void {
+    $actor = $this->user('rbac-resolution@example.test');
+    $editor = Role::factory()->create(['name' => 'editor']);
+    $publisher = Role::factory()->create(['name' => 'publisher']);
+    $read = Permission::factory()->create(['name' => 'content.read']);
+    $write = Permission::factory()->create(['name' => 'content.write']);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    $roles = app(ResolveRoleIdentifiersAction::class)->execute($actor, [$publisher->id, 'editor']);
+    $roleQueryCount = count(DB::getQueryLog());
+    DB::flushQueryLog();
+    $permissions = app(ResolvePermissionIdentifiersAction::class)->execute($actor, ['content.write', $read->id]);
+    $permissionQueryCount = count(DB::getQueryLog());
+    DB::disableQueryLog();
+
+    expect($roles)->toHaveCount(2)
+        ->and($roles->every(fn (mixed $role): bool => $role instanceof RoleOptionData))->toBeTrue()
+        ->and($roles->pluck('id')->all())->toBe([$publisher->id, $editor->id])
+        ->and($permissions)->toHaveCount(2)
+        ->and($permissions->every(fn (mixed $permission): bool => $permission instanceof PermissionOptionData))->toBeTrue()
+        ->and($permissions->pluck('id')->all())->toBe([$write->id, $read->id])
+        ->and($roleQueryCount)->toBeLessThanOrEqual(2)
+        ->and($permissionQueryCount)->toBeLessThanOrEqual(2);
+});
+
+it('keeps the existing entity locator construction contract source compatible', function (): void {
+    $role = Role::factory()->create(['name' => 'legacy-constructor-role']);
+    $locator = new RbacEntityLocator(app(AuthModelRegistry::class));
+
+    expect($locator->rolesByIdentifiers([$role->id])->sole()->is($role))->toBeTrue();
+});
+
+it('rejects invalid, missing, ambiguous, duplicate, and cross-guard RBAC identifiers', function (): void {
+    $actor = $this->user('rbac-resolution-errors@example.test');
+    $role = Role::factory()->create(['name' => 'editor']);
+    Role::factory()->create(['name' => $role->id]);
+    $apiRole = Role::factory()->create(['name' => 'api-editor', 'guard_name' => 'api']);
+    $permission = Permission::factory()->create(['name' => 'content.read']);
+
+    expect(fn () => app(ResolveRoleIdentifiersAction::class)->execute($actor, ['']))
+        ->toThrow(AuthException::class, 'empty')
+        ->and(fn () => app(ResolveRoleIdentifiersAction::class)->execute($actor, ['editor', ' editor ']))
+        ->toThrow(AuthException::class, 'duplicate')
+        ->and(fn () => app(ResolvePermissionIdentifiersAction::class)->execute($actor, [$permission->id, 'content.read']))
+        ->toThrow(AuthException::class, 'same permission')
+        ->and(fn () => app(ResolveRoleIdentifiersAction::class)->execute($actor, [$role->id]))
+        ->toThrow(AuthException::class, 'ambiguous')
+        ->and(fn () => app(ResolveRoleIdentifiersAction::class)->execute($actor, [$apiRole->id]))
+        ->toThrow(AuthException::class, 'not found')
+        ->and(fn () => app(ResolvePermissionIdentifiersAction::class)->execute($actor, ['missing.permission']))
+        ->toThrow(AuthException::class, 'not found')
+        ->and(fn () => app(ResolveRoleIdentifiersAction::class)->execute($actor, array_fill(0, 101, 'role')))
+        ->toThrow(AuthException::class, '100');
+});
+
+it('denies RBAC availability and resolution before querying package storage', function (): void {
+    $actor = $this->user('rbac-resolution-denied@example.test');
+    app()->instance(AuthManagementAccess::class, new class implements AuthManagementAccess
+    {
+        public function allows(Authenticatable $actor, string $ability, mixed $target = null): bool
+        {
+            return false;
+        }
+    });
+
+    foreach ([
+        static fn () => app(CheckRoleNameAvailabilityAction::class)->execute($actor, 'editor'),
+        static fn () => app(ResolveRoleIdentifiersAction::class)->execute($actor, ['editor']),
+        static fn () => app(ResolvePermissionIdentifiersAction::class)->execute($actor, ['content.read']),
+    ] as $read) {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        expect($read)->toThrow(AuthException::class, 'not authorized')
+            ->and(DB::getQueryLog())->toBe([]);
+
+        DB::disableQueryLog();
+    }
+});
+
+it('adds and synchronizes role permissions through atomic assignment seams', function (): void {
+    $actor = $this->user('rbac-assignments@example.test');
+    $role = Role::factory()->create(['name' => 'editor']);
+    $systemRole = Role::factory()->create(['name' => 'system-editor', 'is_system' => true]);
+    $archive = Permission::factory()->create(['name' => 'content.archive']);
+    $publish = Permission::factory()->create(['name' => 'content.publish']);
+    $read = Permission::factory()->create(['name' => 'content.read']);
+    $role->givePermissionTo($read);
+    Event::fake([RbacChanged::class]);
+    $initialAuditCount = AuthAudit::query()->count();
+
+    $added = app(AddRolePermissionsAction::class)->execute($actor, $role, [$publish->id, 'content.archive']);
+    $addedPermissionNames = $added->permissions->pluck('name')->all();
+    $synchronized = app(SyncRolePermissionsAction::class)->execute($actor, $role, [$publish->id]);
+    $synchronizedPermissionNames = $synchronized->permissions->pluck('name')->all();
+    $cleared = app(SyncRolePermissionsAction::class)->execute($actor, $role, []);
+    $clearedPermissionNames = $cleared->permissions->pluck('name')->all();
+    $system = app(SyncRolePermissionsAction::class)->execute($actor, $systemRole, [$read->id]);
+
+    expect($addedPermissionNames)->toBe([
+        'content.archive',
+        'content.publish',
+        'content.read',
+    ])->and($synchronizedPermissionNames)->toBe(['content.publish'])
+        ->and($clearedPermissionNames)->toBe([])
+        ->and($system->name)->toBe('system-editor')
+        ->and($system->is_system)->toBeTrue()
+        ->and($system->permissions->pluck('name')->all())->toBe(['content.read'])
+        ->and(AuthAudit::query()->whereIn('action', [
+            'role.permissions_added',
+            'role.permissions_synchronized',
+        ])->count())->toBe(4)
+        ->and(AuthAudit::query()->count())->toBe($initialAuditCount + 4);
+
+    Event::assertDispatchedTimes(RbacChanged::class, 4);
+    Event::assertDispatched(RbacChanged::class, static fn (RbacChanged $event): bool => $event->entityType === 'role'
+        && $event->entityId === $role->id
+        && $event->operation === 'permissions_added'
+        && $event->payload['permission_names'] === ['content.archive', 'content.publish']);
+});
+
+it('rejects invalid role assignment inputs without changing existing permissions', function (): void {
+    $actor = $this->user('rbac-invalid-assignment@example.test');
+    $role = Role::factory()->create(['name' => 'editor']);
+    $permission = Permission::factory()->create(['name' => 'content.read']);
+    $role->givePermissionTo($permission);
+
+    expect(fn () => app(AddRolePermissionsAction::class)->execute($actor, $role, [$permission->id, $permission->id]))
+        ->toThrow(AuthException::class, 'duplicate')
+        ->and(fn () => app(SyncRolePermissionsAction::class)->execute($actor, $role, ['missing.permission']))
+        ->toThrow(AuthException::class, 'not found')
+        ->and($role->fresh()->permissions()->pluck('name')->all())->toBe(['content.read']);
+});
+
+it('creates a permission with initial roles atomically and rolls back unresolved assignments', function (): void {
+    $actor = $this->user('rbac-create-with-roles@example.test');
+    $editor = Role::factory()->create(['name' => 'editor']);
+    $publisher = Role::factory()->create(['name' => 'publisher']);
+    Event::fake([RbacChanged::class]);
+    $initialAuditCount = AuthAudit::query()->count();
+
+    $permission = app(CreatePermissionWithRolesAction::class)->execute(
+        $actor,
+        new StorePermissionData(
+            name: 'content.publish',
+            group: 'content',
+            metadata: ['scope' => 'global'],
+        ),
+        [$publisher->id, 'editor'],
+    );
+
+    expect($permission->roles->pluck('name')->all())->toBe(['editor', 'publisher'])
+        ->and($permission->group)->toBe('content')
+        ->and($permission->metadata)->toBe(['scope' => 'global'])
+        ->and(AuthAudit::query()->where('action', 'permission.created_with_roles')->count())->toBe(1)
+        ->and(AuthAudit::query()->count())->toBe($initialAuditCount + 1);
+    Event::assertDispatchedTimes(RbacChanged::class, 1);
+
+    expect(fn () => app(CreatePermissionWithRolesAction::class)->execute(
+        $actor,
+        new StorePermissionData('content.missing-role'),
+        ['missing-role'],
+    ))->toThrow(AuthException::class, 'not found')
+        ->and(Permission::query()->where('name', 'content.missing-role')->exists())->toBeFalse();
+    Event::assertDispatchedTimes(RbacChanged::class, 1);
+});
+
+it('keeps maximum multibyte assignment audits within the package byte boundary', function (): void {
+    $actor = $this->user('rbac-bounded-audit@example.test');
+    $role = Role::factory()->create(['name' => 'bounded-audit-role']);
+    $permissions = collect(range(1, 100))->map(
+        static fn (int $index): Permission => Permission::factory()->create([
+            'name' => str_repeat('π', 150).sprintf('%010d', $index),
+        ]),
+    );
+    Event::fake([RbacChanged::class]);
+
+    $updated = app(AddRolePermissionsAction::class)->execute(
+        $actor,
+        $role,
+        $permissions->pluck('id')->all(),
+    );
+
+    expect($updated->permissions)->toHaveCount(100)
+        ->and(AuthAudit::query()->where('action', 'role.permissions_added')->count())->toBe(1);
+    Event::assertDispatchedTimes(RbacChanged::class, 1);
+});
+
+it('rolls back permission creation when its required audit cannot be recorded', function (): void {
+    $actor = $this->user('rbac-audit-rollback@example.test');
+    $role = Role::factory()->create(['name' => 'audit-rollback-role']);
+    app()->instance(AuthAuditRecorder::class, new class implements AuthAuditRecorder
+    {
+        public function record(
+            string $action,
+            string $outcome = 'success',
+            ?SubjectReference $subject = null,
+            ?Authenticatable $actor = null,
+            ?string $clientId = null,
+            array $metadata = [],
+        ): ?object {
+            throw new RuntimeException('Audit recorder unavailable.');
+        }
+    });
+    Event::fake([RbacChanged::class]);
+
+    expect(fn () => app(CreatePermissionWithRolesAction::class)->execute(
+        $actor,
+        new StorePermissionData('content.audit-rollback'),
+        [$role->id],
+    ))->toThrow(RuntimeException::class, 'Audit recorder unavailable')
+        ->and(Permission::query()->where('name', 'content.audit-rollback')->exists())->toBeFalse()
+        ->and($role->fresh()->permissions)->toBeEmpty();
+    Event::assertNotDispatched(RbacChanged::class);
+});
+
+it('authorizes assignment seams before loading or writing RBAC state', function (): void {
+    $actor = $this->user('rbac-assignment-denied@example.test');
+    app()->instance(AuthManagementAccess::class, new class implements AuthManagementAccess
+    {
+        public function allows(Authenticatable $actor, string $ability, mixed $target = null): bool
+        {
+            return false;
+        }
+    });
+
+    foreach ([
+        static fn () => app(AddRolePermissionsAction::class)->execute($actor, 'role-id', ['permission-id']),
+        static fn () => app(SyncRolePermissionsAction::class)->execute($actor, 'role-id', []),
+        static fn () => app(CreatePermissionWithRolesAction::class)->execute(
+            $actor,
+            new StorePermissionData('content.denied'),
+            ['role-id'],
+        ),
+    ] as $write) {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        expect($write)->toThrow(AuthException::class, 'not authorized')
+            ->and(DB::getQueryLog())->toBe([]);
+
+        DB::disableQueryLog();
+    }
 });
