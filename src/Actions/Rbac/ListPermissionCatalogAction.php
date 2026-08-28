@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Nvl\Auth\Data\Display\PermissionListItemData;
+use Nvl\Auth\Data\Display\PermissionOptionData;
 use Nvl\Auth\Data\Queries\PermissionIndexQueryData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -73,9 +74,9 @@ final readonly class ListPermissionCatalogAction
             });
         }
 
-        $group = trim((string) $data->group);
+        $group = PermissionOptionData::normalizeNullableGroup($data->group);
 
-        if ($group !== '') {
+        if ($group !== null) {
             $this->applyGroupFilter($query, $group);
         }
 
@@ -100,18 +101,7 @@ final readonly class ListPermissionCatalogAction
      */
     private function applyGroupFilter(Builder $query, string $group): void
     {
-        if ($group !== 'general') {
-            $query->where('group', $group);
-
-            return;
-        }
-
-        $blankGroup = $this->groupExpressions->blank($query);
-        $query->where(static function ($groupQuery) use ($blankGroup): void {
-            $groupQuery
-                ->where('group', 'general')
-                ->orWhere($blankGroup, '');
-        });
+        $query->where($this->groupExpressions->normalized($query), $group);
     }
 
     /**

@@ -106,17 +106,6 @@ final readonly class RbacOptionReadService
      */
     private function applyGroupFilter(Builder $query, string $group): void
     {
-        if ($group !== 'general') {
-            $query->where('group', $group);
-
-            return;
-        }
-
-        $blankGroup = $this->groupExpressions->blank($query);
-        $query->where(static function ($groupQuery) use ($blankGroup): void {
-            $groupQuery
-                ->where('group', 'general')
-                ->orWhere($blankGroup, '');
-        });
+        $query->where($this->groupExpressions->normalized($query), $group);
     }
 }

@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Data\Display\PermissionOptionData;
 use Nvl\Auth\Data\Mutations\UpdatePermissionData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -44,7 +45,7 @@ final readonly class UpdatePermissionAction
                 'name' => trim($data->name),
                 'display_name' => $data->displayName,
                 'description' => $data->description,
-                'group' => $data->group,
+                'group' => PermissionOptionData::normalizeNullableGroup($data->group),
                 'metadata' => $data->metadata,
             ])->save();
             $this->audits->record('permission.updated', actor: $actor, metadata: ['permission_id' => $permission->id]);

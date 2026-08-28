@@ -67,15 +67,15 @@ final readonly class ListPermissionOptionsAction
     /** Normalize and constrain an exact permission group filter. */
     private function normalizedGroup(?string $group): ?string
     {
-        $group = trim((string) $group);
+        $rawGroup = (string) $group;
 
-        if (mb_strlen($group) > 120) {
+        if (mb_strlen($rawGroup) > 120) {
             throw new AuthException(
                 'invalid_permission_group',
                 'Permission group may not exceed 120 characters.',
             );
         }
 
-        return $group !== '' ? $group : null;
+        return PermissionOptionData::normalizeNullableGroup($rawGroup);
     }
 }

@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Data\Display\PermissionOptionData;
 use Nvl\Auth\Data\Mutations\StorePermissionData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -43,7 +44,7 @@ final readonly class CreatePermissionAction
                 'guard_name' => $this->configuration->string('features.rbac.settings.guard', 'web'),
                 'display_name' => $data->displayName,
                 'description' => $data->description,
-                'group' => $data->group,
+                'group' => PermissionOptionData::normalizeNullableGroup($data->group),
                 'is_system' => $data->system,
                 'metadata' => $data->metadata,
             ]);

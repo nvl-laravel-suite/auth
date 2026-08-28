@@ -58,8 +58,19 @@ final class PermissionOptionData extends Data
      */
     public static function normalizeGroup(?string $group): string
     {
-        $group = trim((string) $group);
+        return self::normalizeNullableGroup($group) ?? 'general';
+    }
 
-        return $group !== '' ? $group : 'general';
+    /**
+     * Normalize a nullable group at package input and persistence boundaries.
+     */
+    public static function normalizeNullableGroup(?string $group): ?string
+    {
+        $group = trim(
+            str_replace(["\0", "\t", "\n", "\v", "\r"], '', (string) $group),
+            ' ',
+        );
+
+        return $group !== '' ? $group : null;
     }
 }

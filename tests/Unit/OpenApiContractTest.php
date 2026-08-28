@@ -174,18 +174,23 @@ it('builds portable permission group expressions for every supported database gr
     $originalGrammar = $connection->getQueryGrammar();
     $expressions = app(RbacPermissionGroupExpressions::class);
     $grammars = [
-        [new MySqlGrammar($connection), "TRIM(COALESCE(`group`, ''))"],
-        [new PostgresGrammar($connection), "TRIM(COALESCE(\"group\", ''))"],
-        [new SQLiteGrammar($connection), "TRIM(COALESCE(\"group\", ''))"],
-        [new SqlServerGrammar($connection), "TRIM(COALESCE([group], ''))"],
+        [new MySqlGrammar($connection), '`group`', 'CHAR'],
+        [new PostgresGrammar($connection), '"group"', 'CHR'],
+        [new SQLiteGrammar($connection), '"group"', 'CHAR'],
+        [new SqlServerGrammar($connection), '[group]', 'CHAR'],
     ];
 
     try {
-        foreach ($grammars as [$grammar, $expected]) {
+        foreach ($grammars as [$grammar, $quotedGroup, $characterFunction]) {
             $connection->setQueryGrammar($grammar);
-            $expression = $expressions->blank(Permission::query());
+            $query = Permission::query();
+            $blank = $expressions->blank($query)->getValue($grammar);
+            $normalized = $expressions->normalized($query)->getValue($grammar);
+            $selected = $expressions->selected($query)->getValue($grammar);
 
-            expect($expression->getValue($grammar))->toBe($expected);
+            expect($blank)->toContain($quotedGroup, "{$characterFunction}(9)", "{$characterFunction}(10)", "{$characterFunction}(11)", "{$characterFunction}(13)")
+                ->and($normalized)->toContain($blank, "'general'")
+                ->and($selected)->toContain($normalized, 'normalized_group');
         }
     } finally {
         $connection->setQueryGrammar($originalGrammar);

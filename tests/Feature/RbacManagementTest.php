@@ -19,6 +19,7 @@ use Nvl\Auth\Actions\Rbac\ListRoleTemplatesAction;
 use Nvl\Auth\Actions\Rbac\ShowRbacAnalyticsAction;
 use Nvl\Auth\Actions\Rbac\SuggestPermissionsAction;
 use Nvl\Auth\Actions\Rbac\SuggestRolesAction;
+use Nvl\Auth\Actions\Rbac\UpdatePermissionAction;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Data\Display\PermissionGroupData;
 use Nvl\Auth\Data\Display\PermissionListItemData;
@@ -30,6 +31,7 @@ use Nvl\Auth\Data\Display\RoleOptionData;
 use Nvl\Auth\Data\Mutations\ApplyRoleTemplateData;
 use Nvl\Auth\Data\Mutations\StorePermissionData;
 use Nvl\Auth\Data\Mutations\StoreRoleData;
+use Nvl\Auth\Data\Mutations\UpdatePermissionData;
 use Nvl\Auth\Data\Queries\PermissionIndexQueryData;
 use Nvl\Auth\Data\Queries\RoleIndexQueryData;
 use Nvl\Auth\Exceptions\AuthException;
@@ -287,18 +289,48 @@ it('filters whitespace-only permission groups through the canonical general grou
     $actor = $this->user('rbac-general-group@example.test');
     $permission = Permission::factory()->create([
         'name' => 'general.whitespace',
-        'group' => '   ',
+        'group' => "\t \n",
+    ]);
+    $contentPermission = Permission::factory()->create([
+        'name' => 'content.padded',
+        'group' => "\t content \n",
     ]);
 
     $options = app(ListPermissionOptionsAction::class)->execute($actor, group: 'general');
+    $contentOptions = app(ListPermissionOptionsAction::class)->execute($actor, group: 'content');
     $catalog = app(ListPermissionCatalogAction::class)->execute(
         $actor,
-        new PermissionIndexQueryData(group: 'general'),
+        new PermissionIndexQueryData(group: 'content'),
     );
+    $groups = app(ListPermissionGroupsAction::class)->execute($actor);
 
     expect($options->pluck('id')->all())->toBe([$permission->id])
         ->and($options->first()?->group)->toBe('general')
-        ->and(collect($catalog->items())->pluck('id')->all())->toBe([$permission->id]);
+        ->and($contentOptions->pluck('id')->all())->toBe([$contentPermission->id])
+        ->and($contentOptions->first()?->group)->toBe('content')
+        ->and(collect($catalog->items())->pluck('id')->all())->toBe([$contentPermission->id])
+        ->and($groups->map->toArray()->all())->toBe([
+            ['value' => 'content', 'label' => 'Content', 'permissionsCount' => 1],
+            ['value' => 'general', 'label' => 'General', 'permissionsCount' => 1],
+        ]);
+});
+
+it('canonicalizes permission groups at package write boundaries', function (): void {
+    $actor = $this->user('rbac-group-write@example.test');
+    $permission = app(CreatePermissionAction::class)->execute(
+        $actor,
+        new StorePermissionData('content.review', group: "\t content \n"),
+    );
+
+    expect($permission->group)->toBe('content');
+
+    $permission = app(UpdatePermissionAction::class)->execute(
+        $actor,
+        $permission,
+        new UpdatePermissionData('content.review', group: "\r editorial \v"),
+    );
+
+    expect($permission->group)->toBe('editorial');
 });
 
 it('denies every RBAC consumer read before querying package storage', function (): void {
