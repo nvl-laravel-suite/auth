@@ -204,6 +204,9 @@ return [
                 'guard' => env('NVL_AUTH_RBAC_GUARD', 'web'),
                 'super_admin_role' => env('NVL_AUTH_SUPER_ADMIN_ROLE', 'super-admin'),
                 'use_package_storage' => true,
+                'role_option_limit' => 50,
+                'permission_option_limit' => 100,
+                'identifier_resolution_limit' => 100,
             ],
         ],
         'audit' => [

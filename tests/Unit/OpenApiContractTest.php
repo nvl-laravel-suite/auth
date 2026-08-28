@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Services\FeatureManifest;
+use Nvl\Auth\Services\RbacConsumerLimits;
 
 it('keeps OpenAPI operations and feature metadata identical to the manifest', function (): void {
     $contents = file_get_contents(dirname(__DIR__, 2).'/docs/openapi.json');
@@ -124,4 +126,32 @@ it('keeps OpenAPI operations and feature metadata identical to the manifest', fu
             'Cache-Control',
             'Referrer-Policy',
         ]);
+});
+
+it('owns and hard-bounds every RBAC consumer limit', function (): void {
+    $limits = app(RbacConsumerLimits::class);
+
+    expect(config('nvl-auth.features.rbac.settings.role_option_limit'))->toBe(50)
+        ->and(config('nvl-auth.features.rbac.settings.permission_option_limit'))->toBe(100)
+        ->and(config('nvl-auth.features.rbac.settings.identifier_resolution_limit'))->toBe(100)
+        ->and($limits->roleOptionLimit(500))->toBe(50)
+        ->and($limits->roleOptionLimit(0))->toBe(1)
+        ->and($limits->permissionOptionLimit(500))->toBe(100)
+        ->and($limits->identifierResolutionLimit())->toBe(100);
+
+    config()->set('nvl-auth.features.rbac.settings.role_option_limit', 0);
+    expect(fn (): int => $limits->roleOptionLimit())
+        ->toThrow(AuthException::class, 'integer between 1 and 50');
+
+    config()->set('nvl-auth.features.rbac.settings.role_option_limit', 51);
+    expect(fn (): int => $limits->roleOptionLimit())
+        ->toThrow(AuthException::class, 'integer between 1 and 50');
+
+    config()->set('nvl-auth.features.rbac.settings.permission_option_limit', 101);
+    expect(fn (): int => $limits->permissionOptionLimit())
+        ->toThrow(AuthException::class, 'integer between 1 and 100');
+
+    config()->set('nvl-auth.features.rbac.settings.identifier_resolution_limit', -1);
+    expect(fn (): int => $limits->identifierResolutionLimit())
+        ->toThrow(AuthException::class, 'integer between 1 and 100');
 });
