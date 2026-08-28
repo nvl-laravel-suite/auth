@@ -10,7 +10,6 @@ parameters:
     paths:
         - src
         - database/factories
-        - database/migrations
 
     level: max
 
