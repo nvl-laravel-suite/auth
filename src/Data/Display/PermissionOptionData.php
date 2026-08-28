@@ -67,7 +67,7 @@ final class PermissionOptionData extends Data
     public static function normalizeNullableGroup(?string $group): ?string
     {
         $group = trim(
-            str_replace(["\0", "\t", "\n", "\v", "\r"], '', (string) $group),
+            str_replace(["\t", "\n", "\v", "\r"], '', (string) $group),
             ' ',
         );
 

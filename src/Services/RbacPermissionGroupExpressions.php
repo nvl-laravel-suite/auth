@@ -62,7 +62,7 @@ final class RbacPermissionGroupExpressions
         $grammar = $query->getQuery()->getGrammar();
 
         if ($grammar instanceof MySqlGrammar) {
-            return "TRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(`group`, ''), CHAR(9), ''), CHAR(10), ''), CHAR(11), ''), CHAR(13), ''), CHAR(0), ''))";
+            return "TRIM(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(`group`, ''), CHAR(9), ''), CHAR(10), ''), CHAR(11), ''), CHAR(13), ''))";
         }
 
         if ($grammar instanceof SqlServerGrammar) {
@@ -73,7 +73,7 @@ final class RbacPermissionGroupExpressions
             return "BTRIM(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(\"group\", ''), CHR(9), ''), CHR(10), ''), CHR(11), ''), CHR(13), ''))";
         }
 
-        return "TRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(\"group\", ''), CHAR(9), ''), CHAR(10), ''), CHAR(11), ''), CHAR(13), ''), CHAR(0), ''))";
+        return "TRIM(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(\"group\", ''), CHAR(9), ''), CHAR(10), ''), CHAR(11), ''), CHAR(13), ''))";
     }
 
     /**

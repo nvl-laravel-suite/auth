@@ -48,6 +48,10 @@ final class UpdatePermissionData extends Data
             throw new InvalidArgumentException('Permission descriptions must not exceed 2,000 characters.');
         }
 
+        if ($this->group !== null && str_contains($this->group, "\0")) {
+            throw new InvalidArgumentException('Permission groups must not contain null bytes.');
+        }
+
         if ($this->group !== null && mb_strlen($this->group) > 120) {
             throw new InvalidArgumentException('Permission groups must not exceed 120 characters.');
         }

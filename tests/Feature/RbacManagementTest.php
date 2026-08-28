@@ -295,24 +295,31 @@ it('filters whitespace-only permission groups through the canonical general grou
         'name' => 'content.padded',
         'group' => "\t content \n",
     ]);
+    $legacyNulPermission = Permission::factory()->create([
+        'name' => 'legacy.nul',
+        'group' => "\0legacy\0",
+    ]);
 
     $options = app(ListPermissionOptionsAction::class)->execute($actor, group: 'general');
     $contentOptions = app(ListPermissionOptionsAction::class)->execute($actor, group: 'content');
+    $legacyNulOptions = app(ListPermissionOptionsAction::class)->execute($actor, group: "\0legacy\0");
     $catalog = app(ListPermissionCatalogAction::class)->execute(
         $actor,
         new PermissionIndexQueryData(group: 'content'),
     );
     $groups = app(ListPermissionGroupsAction::class)->execute($actor);
+    $groupsByValue = $groups->keyBy('value');
 
     expect($options->pluck('id')->all())->toBe([$permission->id])
         ->and($options->first()?->group)->toBe('general')
         ->and($contentOptions->pluck('id')->all())->toBe([$contentPermission->id])
         ->and($contentOptions->first()?->group)->toBe('content')
+        ->and($legacyNulOptions->pluck('id')->all())->toBe([$legacyNulPermission->id])
+        ->and($legacyNulOptions->first()?->group)->toBe("\0legacy\0")
         ->and(collect($catalog->items())->pluck('id')->all())->toBe([$contentPermission->id])
-        ->and($groups->map->toArray()->all())->toBe([
-            ['value' => 'content', 'label' => 'Content', 'permissionsCount' => 1],
-            ['value' => 'general', 'label' => 'General', 'permissionsCount' => 1],
-        ]);
+        ->and($groupsByValue->get('content')?->permissionsCount)->toBe(1)
+        ->and($groupsByValue->get('general')?->permissionsCount)->toBe(1)
+        ->and($groupsByValue->get("\0legacy\0")?->permissionsCount)->toBe(1);
 });
 
 it('canonicalizes permission groups at package write boundaries', function (): void {
@@ -331,6 +338,11 @@ it('canonicalizes permission groups at package write boundaries', function (): v
     );
 
     expect($permission->group)->toBe('editorial');
+
+    expect(fn () => new StorePermissionData('content.invalid', group: "content\0legacy"))
+        ->toThrow(InvalidArgumentException::class, 'null bytes')
+        ->and(fn () => new UpdatePermissionData('content.review', group: "content\0legacy"))
+        ->toThrow(InvalidArgumentException::class, 'null bytes');
 });
 
 it('denies every RBAC consumer read before querying package storage', function (): void {
