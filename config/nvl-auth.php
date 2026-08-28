@@ -206,6 +206,7 @@ return [
                 'use_package_storage' => true,
                 'role_option_limit' => 50,
                 'permission_option_limit' => 100,
+                'permission_group_limit' => 100,
                 'identifier_resolution_limit' => 100,
             ],
         ],

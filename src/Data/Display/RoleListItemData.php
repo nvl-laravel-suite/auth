@@ -101,6 +101,8 @@ final class RoleListItemData extends Data
             }
         }
 
+        sort($identifiers, SORT_STRING);
+
         return $identifiers;
     }
 

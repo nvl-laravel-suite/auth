@@ -97,6 +97,8 @@ final class PermissionListItemData extends Data
             }
         }
 
+        sort($identifiers, SORT_STRING);
+
         return $identifiers;
     }
 

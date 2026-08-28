@@ -10,11 +10,10 @@ use Nvl\Auth\Data\Display\RoleOptionData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Auth\Models\Role;
-use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacConsumerLimits;
+use Nvl\Auth\Services\RbacOptionReadService;
 
 /** Lists bounded role options for consumer-owned selectors. */
 final readonly class ListRoleOptionsAction
@@ -23,8 +22,8 @@ final readonly class ListRoleOptionsAction
     public function __construct(
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
-        private AuthModelRegistry $models,
         private RbacConsumerLimits $limits,
+        private RbacOptionReadService $options,
     ) {}
 
     /**
@@ -40,32 +39,8 @@ final readonly class ListRoleOptionsAction
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
         $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
         $search = $this->normalizedSearch($search);
-        $class = $this->models->roleClass();
-        $query = $class::query()->select([
-            'id',
-            'name',
-            'display_name',
-            'description',
-            'is_system',
-        ]);
 
-        if ($search !== null) {
-            $term = "%{$search}%";
-            $query->where(static function ($searchQuery) use ($term): void {
-                $searchQuery
-                    ->where('name', 'like', $term)
-                    ->orWhere('display_name', 'like', $term)
-                    ->orWhere('description', 'like', $term);
-            });
-        }
-
-        return $query
-            ->orderByDesc('is_system')
-            ->orderBy('name')
-            ->orderBy('id')
-            ->limit($this->limits->roleOptionLimit($limit))
-            ->get()
-            ->map(static fn (Role $role): RoleOptionData => RoleOptionData::fromModel($role));
+        return $this->options->roles($search, $this->limits->roleOptionLimit($limit));
     }
 
     /** Normalize and constrain an untrusted selector search. */

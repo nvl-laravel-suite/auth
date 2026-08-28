@@ -12,6 +12,8 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
+use Nvl\Auth\Services\RbacConsumerLimits;
+use Nvl\Auth\Services\RbacOptionReadService;
 
 /** Resolves bounded role suggestions for typeahead consumers. */
 final readonly class SuggestRolesAction
@@ -20,7 +22,8 @@ final readonly class SuggestRolesAction
     public function __construct(
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
-        private ListRoleOptionsAction $options,
+        private RbacConsumerLimits $limits,
+        private RbacOptionReadService $options,
     ) {}
 
     /**
@@ -45,13 +48,13 @@ final readonly class SuggestRolesAction
         }
 
         if ($search === '') {
-            return $this->options->execute($actor, limit: $limit);
+            return $this->options->roles(null, $this->limits->roleOptionLimit($limit));
         }
 
         if (mb_strlen($search) === 1) {
             return new Collection;
         }
 
-        return $this->options->execute($actor, $search, $limit);
+        return $this->options->roles($search, $this->limits->roleOptionLimit($limit));
     }
 }

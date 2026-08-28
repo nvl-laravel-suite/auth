@@ -12,6 +12,8 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
+use Nvl\Auth\Services\RbacConsumerLimits;
+use Nvl\Auth\Services\RbacOptionReadService;
 
 /** Resolves bounded permission suggestions for typeahead consumers. */
 final readonly class SuggestPermissionsAction
@@ -20,7 +22,8 @@ final readonly class SuggestPermissionsAction
     public function __construct(
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
-        private ListPermissionOptionsAction $options,
+        private RbacConsumerLimits $limits,
+        private RbacOptionReadService $options,
     ) {}
 
     /**
@@ -37,6 +40,7 @@ final readonly class SuggestPermissionsAction
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
         $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
         $search = trim((string) $search);
+        $group = $this->normalizedGroup($group);
 
         if (mb_strlen($search) > 160) {
             throw new AuthException(
@@ -46,13 +50,36 @@ final readonly class SuggestPermissionsAction
         }
 
         if ($search === '') {
-            return $this->options->execute($actor, group: $group, limit: $limit);
+            return $this->options->permissions(
+                null,
+                $group,
+                $this->limits->permissionOptionLimit($limit),
+            );
         }
 
         if (mb_strlen($search) === 1) {
             return new Collection;
         }
 
-        return $this->options->execute($actor, $search, $group, $limit);
+        return $this->options->permissions(
+            $search,
+            $group,
+            $this->limits->permissionOptionLimit($limit),
+        );
+    }
+
+    /** Normalize and constrain an exact permission group filter. */
+    private function normalizedGroup(?string $group): ?string
+    {
+        $group = trim((string) $group);
+
+        if (mb_strlen($group) > 120) {
+            throw new AuthException(
+                'invalid_permission_group',
+                'Permission group may not exceed 120 characters.',
+            );
+        }
+
+        return $group !== '' ? $group : null;
     }
 }

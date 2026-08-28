@@ -10,6 +10,7 @@ use Spatie\LaravelData\Attributes\MapInputName;
 use Spatie\LaravelData\Attributes\MapOutputName;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Mappers\CamelCaseMapper;
+use Spatie\TypeScriptTransformer\Attributes\Optional as TypeScriptOptional;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 #[MapInputName(CamelCaseMapper::class)]
@@ -29,9 +30,13 @@ final class PermissionIndexQueryData extends Data
         public readonly ?string $search = null,
         public readonly ?string $group = null,
         public readonly ?int $perPage = null,
+        #[TypeScriptOptional]
         public readonly ?string $guard = null,
+        #[TypeScriptOptional]
         public readonly ?string $sort = null,
+        #[TypeScriptOptional]
         public readonly ?string $direction = null,
+        #[TypeScriptOptional]
         public readonly bool $includeAssignments = false,
     ) {
         if ($sort !== null && ! in_array($sort, self::SORTS, true)) {

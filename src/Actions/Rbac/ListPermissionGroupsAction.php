@@ -9,12 +9,13 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use LogicException;
 use Nvl\Auth\Data\Display\PermissionGroupData;
-use Nvl\Auth\Data\Display\PermissionOptionData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
+use Nvl\Auth\Services\RbacConsumerLimits;
+use Nvl\Auth\Services\RbacPermissionGroupExpressions;
 
 /** Lists normalized permission groups and their catalog counts. */
 final readonly class ListPermissionGroupsAction
@@ -24,6 +25,8 @@ final readonly class ListPermissionGroupsAction
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
         private AuthModelRegistry $models,
+        private RbacConsumerLimits $limits,
+        private RbacPermissionGroupExpressions $groupExpressions,
     ) {}
 
     /**
@@ -36,33 +39,28 @@ final readonly class ListPermissionGroupsAction
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
         $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
         $class = $this->models->permissionClass();
-        $rows = $class::query()
-            ->select('group')
+        $query = $class::query();
+        $rows = $query
+            ->select($this->groupExpressions->selected($query))
             ->selectRaw('COUNT(*) AS permissions_count')
-            ->groupBy('group')
+            ->groupBy($this->groupExpressions->normalized($query))
+            ->orderBy('normalized_group')
+            ->limit($this->limits->permissionGroupLimit())
             ->get();
-        $counts = [];
 
-        foreach ($rows as $row) {
-            $rawGroup = $row->getAttribute('group');
-            $rawCount = $row->getAttribute('permissions_count');
+        return $rows->map(static function ($row): PermissionGroupData {
+            $group = $row->getAttribute('normalized_group');
+            $count = $row->getAttribute('permissions_count');
 
-            if ((! is_string($rawGroup) && $rawGroup !== null) || ! is_numeric($rawCount)) {
+            if (! is_string($group) || ! is_numeric($count)) {
                 throw new LogicException('Permission group aggregates returned an invalid database value.');
             }
 
-            $group = PermissionOptionData::normalizeGroup($rawGroup);
-            $counts[$group] = ($counts[$group] ?? 0) + (int) $rawCount;
-        }
-
-        ksort($counts);
-
-        return collect($counts)->map(
-            static fn (int $count, string $group): PermissionGroupData => new PermissionGroupData(
+            return new PermissionGroupData(
                 value: $group,
                 label: Str::headline($group),
-                permissionsCount: $count,
-            ),
-        )->values();
+                permissionsCount: (int) $count,
+            );
+        })->values();
     }
 }

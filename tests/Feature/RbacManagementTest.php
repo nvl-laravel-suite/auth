@@ -253,7 +253,7 @@ it('returns bounded role and permission options through authorized DTO projectio
 it('normalizes and counts permission groups in one authorized query', function (): void {
     $actor = $this->user('rbac-groups@example.test');
     Permission::factory()->create(['name' => 'general.null', 'group' => null]);
-    Permission::factory()->create(['name' => 'general.blank', 'group' => '']);
+    Permission::factory()->create(['name' => 'general.blank', 'group' => '   ']);
     Permission::factory()->count(2)->create(['group' => 'content_management']);
 
     DB::flushQueryLog();
@@ -274,6 +274,31 @@ it('normalizes and counts permission groups in one authorized query', function (
             'permissionsCount' => 2,
         ],
     ])->and($queryCount)->toBe(1);
+
+    config()->set('nvl-auth.features.rbac.settings.permission_group_limit', 1);
+
+    expect(app(ListPermissionGroupsAction::class)->execute($actor))
+        ->toHaveCount(1)
+        ->and(app(ListPermissionGroupsAction::class)->execute($actor)->first()?->value)
+        ->toBe('content_management');
+});
+
+it('filters whitespace-only permission groups through the canonical general group', function (): void {
+    $actor = $this->user('rbac-general-group@example.test');
+    $permission = Permission::factory()->create([
+        'name' => 'general.whitespace',
+        'group' => '   ',
+    ]);
+
+    $options = app(ListPermissionOptionsAction::class)->execute($actor, group: 'general');
+    $catalog = app(ListPermissionCatalogAction::class)->execute(
+        $actor,
+        new PermissionIndexQueryData(group: 'general'),
+    );
+
+    expect($options->pluck('id')->all())->toBe([$permission->id])
+        ->and($options->first()?->group)->toBe('general')
+        ->and(collect($catalog->items())->pluck('id')->all())->toBe([$permission->id]);
 });
 
 it('denies every RBAC consumer read before querying package storage', function (): void {
@@ -321,7 +346,15 @@ it('returns filtered stable DTO catalogs without related user identity data', fu
         'display_name' => 'Publish Content',
         'group' => 'content',
     ]);
+    $secondPermission = Permission::factory()->create([
+        'name' => 'content.archive',
+        'display_name' => 'Archive Content',
+        'group' => 'content',
+    ]);
+    $secondRole = Role::factory()->create(['name' => 'publisher']);
     $role->givePermissionTo($permission);
+    $role->givePermissionTo($secondPermission);
+    $secondRole->givePermissionTo($permission);
     $actor->assignRole($role);
     $actor->givePermissionTo($permission);
 
@@ -349,13 +382,13 @@ it('returns filtered stable DTO catalogs without related user identity data', fu
     expect($roles->perPage())->toBe(100)
         ->and($roleItem)->toBeInstanceOf(RoleListItemData::class)
         ->and($roleItem?->parentName)->toBe('manager')
-        ->and($roleItem?->permissionIds)->toBe([$permission->id])
-        ->and($roleItem?->permissionsCount)->toBe(1)
+        ->and($roleItem?->permissionIds)->toBe(collect([$permission->id, $secondPermission->id])->sort()->values()->all())
+        ->and($roleItem?->permissionsCount)->toBe(2)
         ->and($roleItem?->usersCount)->toBe(1)
         ->and($permissions->perPage())->toBe(100)
         ->and($permissionItem)->toBeInstanceOf(PermissionListItemData::class)
-        ->and($permissionItem?->roleIds)->toBe([$role->id])
-        ->and($permissionItem?->rolesCount)->toBe(1)
+        ->and($permissionItem?->roleIds)->toBe(collect([$role->id, $secondRole->id])->sort()->values()->all())
+        ->and($permissionItem?->rolesCount)->toBe(2)
         ->and($permissionItem?->usersCount)->toBe(1)
         ->and(array_keys($roleItem?->toArray() ?? []))->not->toContain('users', 'email')
         ->and(array_keys($permissionItem?->toArray() ?? []))->not->toContain('users', 'email');

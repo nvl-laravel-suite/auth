@@ -5,17 +5,15 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Nvl\Auth\Data\Display\PermissionOptionData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Auth\Models\Permission;
-use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacConsumerLimits;
+use Nvl\Auth\Services\RbacOptionReadService;
 
 /** Lists bounded permission options for consumer-owned selectors. */
 final readonly class ListPermissionOptionsAction
@@ -24,8 +22,8 @@ final readonly class ListPermissionOptionsAction
     public function __construct(
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
-        private AuthModelRegistry $models,
         private RbacConsumerLimits $limits,
+        private RbacOptionReadService $options,
     ) {}
 
     /**
@@ -43,37 +41,12 @@ final readonly class ListPermissionOptionsAction
         $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
         $search = $this->normalizedSearch($search);
         $group = $this->normalizedGroup($group);
-        $class = $this->models->permissionClass();
-        $query = $class::query()->select([
-            'id',
-            'name',
-            'display_name',
-            'description',
-            'group',
-        ]);
 
-        if ($search !== null) {
-            $term = "%{$search}%";
-            $query->where(static function ($searchQuery) use ($term): void {
-                $searchQuery
-                    ->where('name', 'like', $term)
-                    ->orWhere('display_name', 'like', $term)
-                    ->orWhere('description', 'like', $term)
-                    ->orWhere('group', 'like', $term);
-            });
-        }
-
-        if ($group !== null) {
-            $this->applyGroupFilter($query, $group);
-        }
-
-        return $query
-            ->orderBy('group')
-            ->orderBy('name')
-            ->orderBy('id')
-            ->limit($this->limits->permissionOptionLimit($limit))
-            ->get()
-            ->map(static fn (Permission $permission): PermissionOptionData => PermissionOptionData::fromModel($permission));
+        return $this->options->permissions(
+            $search,
+            $group,
+            $this->limits->permissionOptionLimit($limit),
+        );
     }
 
     /** Normalize and constrain an untrusted selector search. */
@@ -104,26 +77,5 @@ final readonly class ListPermissionOptionsAction
         }
 
         return $group !== '' ? $group : null;
-    }
-
-    /**
-     * Apply an exact filter using the same general-group normalization as DTOs.
-     *
-     * @param  Builder<Permission>  $query
-     */
-    private function applyGroupFilter(Builder $query, string $group): void
-    {
-        if ($group !== 'general') {
-            $query->where('group', $group);
-
-            return;
-        }
-
-        $query->where(static function ($groupQuery): void {
-            $groupQuery
-                ->where('group', 'general')
-                ->orWhereNull('group')
-                ->orWhere('group', '');
-        });
     }
 }

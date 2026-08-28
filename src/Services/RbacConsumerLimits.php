@@ -15,6 +15,8 @@ final readonly class RbacConsumerLimits
 
     private const int PERMISSION_OPTION_HARD_LIMIT = 100;
 
+    private const int PERMISSION_GROUP_HARD_LIMIT = 100;
+
     private const int IDENTIFIER_RESOLUTION_HARD_LIMIT = 100;
 
     /**
@@ -45,6 +47,19 @@ final readonly class RbacConsumerLimits
             default: self::PERMISSION_OPTION_HARD_LIMIT,
             hardMaximum: self::PERMISSION_OPTION_HARD_LIMIT,
             requested: $requested,
+        );
+    }
+
+    /**
+     * Return the configured permission group maximum beneath the hard cap.
+     */
+    public function permissionGroupLimit(): int
+    {
+        return $this->configuration->integerBetween(
+            'features.rbac.settings.permission_group_limit',
+            self::PERMISSION_GROUP_HARD_LIMIT,
+            1,
+            self::PERMISSION_GROUP_HARD_LIMIT,
         );
     }
 

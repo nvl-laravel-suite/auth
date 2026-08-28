@@ -2,11 +2,18 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Query\Grammars\MySqlGrammar;
+use Illuminate\Database\Query\Grammars\PostgresGrammar;
+use Illuminate\Database\Query\Grammars\SQLiteGrammar;
+use Illuminate\Database\Query\Grammars\SqlServerGrammar;
+use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Services\FeatureManifest;
 use Nvl\Auth\Services\RbacConsumerLimits;
+use Nvl\Auth\Services\RbacPermissionGroupExpressions;
 
 it('keeps OpenAPI operations and feature metadata identical to the manifest', function (): void {
     $contents = file_get_contents(dirname(__DIR__, 2).'/docs/openapi.json');
@@ -133,10 +140,12 @@ it('owns and hard-bounds every RBAC consumer limit', function (): void {
 
     expect(config('nvl-auth.features.rbac.settings.role_option_limit'))->toBe(50)
         ->and(config('nvl-auth.features.rbac.settings.permission_option_limit'))->toBe(100)
+        ->and(config('nvl-auth.features.rbac.settings.permission_group_limit'))->toBe(100)
         ->and(config('nvl-auth.features.rbac.settings.identifier_resolution_limit'))->toBe(100)
         ->and($limits->roleOptionLimit(500))->toBe(50)
         ->and($limits->roleOptionLimit(0))->toBe(1)
         ->and($limits->permissionOptionLimit(500))->toBe(100)
+        ->and($limits->permissionGroupLimit())->toBe(100)
         ->and($limits->identifierResolutionLimit())->toBe(100);
 
     config()->set('nvl-auth.features.rbac.settings.role_option_limit', 0);
@@ -151,7 +160,34 @@ it('owns and hard-bounds every RBAC consumer limit', function (): void {
     expect(fn (): int => $limits->permissionOptionLimit())
         ->toThrow(AuthException::class, 'integer between 1 and 100');
 
+    config()->set('nvl-auth.features.rbac.settings.permission_group_limit', 101);
+    expect(fn (): int => $limits->permissionGroupLimit())
+        ->toThrow(AuthException::class, 'integer between 1 and 100');
+
     config()->set('nvl-auth.features.rbac.settings.identifier_resolution_limit', -1);
     expect(fn (): int => $limits->identifierResolutionLimit())
         ->toThrow(AuthException::class, 'integer between 1 and 100');
+});
+
+it('builds portable permission group expressions for every supported database grammar', function (): void {
+    $connection = DB::connection();
+    $originalGrammar = $connection->getQueryGrammar();
+    $expressions = app(RbacPermissionGroupExpressions::class);
+    $grammars = [
+        [new MySqlGrammar($connection), "TRIM(COALESCE(`group`, ''))"],
+        [new PostgresGrammar($connection), "TRIM(COALESCE(\"group\", ''))"],
+        [new SQLiteGrammar($connection), "TRIM(COALESCE(\"group\", ''))"],
+        [new SqlServerGrammar($connection), "TRIM(COALESCE([group], ''))"],
+    ];
+
+    try {
+        foreach ($grammars as [$grammar, $expected]) {
+            $connection->setQueryGrammar($grammar);
+            $expression = $expressions->blank(Permission::query());
+
+            expect($expression->getValue($grammar))->toBe($expected);
+        }
+    } finally {
+        $connection->setQueryGrammar($originalGrammar);
+    }
 });

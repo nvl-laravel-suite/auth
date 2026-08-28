@@ -16,6 +16,7 @@ use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
+use Nvl\Auth\Services\RbacPermissionGroupExpressions;
 
 /** Lists a safe, stable permission catalog for non-HTTP consumers. */
 final readonly class ListPermissionCatalogAction
@@ -25,6 +26,7 @@ final readonly class ListPermissionCatalogAction
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
         private AuthModelRegistry $models,
+        private RbacPermissionGroupExpressions $groupExpressions,
     ) {}
 
     /**
@@ -104,11 +106,11 @@ final readonly class ListPermissionCatalogAction
             return;
         }
 
-        $query->where(static function ($groupQuery): void {
+        $blankGroup = $this->groupExpressions->blank($query);
+        $query->where(static function ($groupQuery) use ($blankGroup): void {
             $groupQuery
                 ->where('group', 'general')
-                ->orWhereNull('group')
-                ->orWhere('group', '');
+                ->orWhere($blankGroup, '');
         });
     }
 
@@ -122,7 +124,7 @@ final readonly class ListPermissionCatalogAction
         $direction = $data->direction === 'desc' ? 'desc' : 'asc';
 
         if ($data->sort === null || $data->sort === 'group') {
-            $query->orderBy('group', $direction);
+            $query->orderBy($this->groupExpressions->normalized($query), $direction);
         } elseif ($data->sort === 'label') {
             $query->orderByRaw($direction === 'desc'
                 ? "COALESCE(NULLIF(TRIM(display_name), ''), name) DESC"
