@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Model;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\PersonalAccessToken;
@@ -43,6 +45,30 @@ final readonly class AuthModelRegistry
     public function permissionClass(): string
     {
         return $this->model('features.rbac.models.permission', Permission::class, Permission::class);
+    }
+
+    /**
+     * Return the independently configured RBAC principal model.
+     *
+     * @return class-string<Model&Authenticatable>
+     */
+    public function rbacPrincipalClass(): string
+    {
+        $configured = config('nvl-auth.features.rbac.models.principal');
+        $configured = is_string($configured) && trim($configured) !== ''
+            ? $configured
+            : $this->userClass();
+
+        if (! is_a($configured, Model::class, true)
+            || ! is_a($configured, Authenticatable::class, true)
+            || ! method_exists($configured, 'roles')) {
+            throw AuthException::invalidConfiguration(
+                'The configured RBAC principal must be an Eloquent Authenticatable model using Spatie Permission HasRoles.',
+            );
+        }
+
+        /** @var class-string<Model&Authenticatable> $configured */
+        return $configured;
     }
 
     /**

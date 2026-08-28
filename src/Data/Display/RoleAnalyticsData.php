@@ -12,7 +12,7 @@ use Spatie\TypeScriptTransformer\Attributes\LiteralTypeScriptType;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
- * Bounded per-role analytics projection with deterministic permission groups.
+ * Bounded, identity-free per-role analytics with deterministic permission groups.
  */
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]

@@ -8,13 +8,15 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Nvl\Auth\Contracts\RbacPrincipalAccess;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Auth\Models\User;
 
 /**
  * Applies RBAC to a configured Eloquent principal without requiring package principal management.
  */
 final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
 {
+    /** Create the configured Eloquent RBAC adapter. */
+    public function __construct(private ?AuthModelRegistry $models = null) {}
+
     /**
      * Resolve a configured host principal instance or identifier.
      */
@@ -120,21 +122,7 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
      */
     private function principalClass(): string
     {
-        $configured = config('nvl-auth.features.rbac.models.principal');
-        $configured = is_string($configured) && trim($configured) !== ''
-            ? $configured
-            : config('nvl-auth.features.principal_management.models.user', User::class);
-
-        if (! is_string($configured)
-            || ! is_a($configured, Model::class, true)
-            || ! is_a($configured, Authenticatable::class, true)) {
-            throw AuthException::invalidConfiguration(
-                'The configured RBAC principal must be an Eloquent Authenticatable model.',
-            );
-        }
-
-        /** @var class-string<Model&Authenticatable> $configured */
-        return $configured;
+        return ($this->models ?? app(AuthModelRegistry::class))->rbacPrincipalClass();
     }
 
     /**

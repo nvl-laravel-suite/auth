@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Nvl\Auth\Exceptions\AuthException;
@@ -36,6 +37,23 @@ final readonly class RbacEntityLocator
         $class = $this->models->roleClass();
 
         return $class::query()->findOrFail($role);
+    }
+
+    /** Resolve one canonical role through the configured model and guard. */
+    public function roleForConfiguredGuard(Role|string $role): Role
+    {
+        $class = $this->models->roleClass();
+
+        if ($role instanceof Role && ! $role instanceof $class) {
+            throw (new ModelNotFoundException)->setModel($class, [$role->id]);
+        }
+
+        $identifier = $role instanceof Role ? $role->id : $role;
+        $guard = $this->configuration()->string('features.rbac.settings.guard', 'web');
+
+        return $class::query()
+            ->where('guard_name', $guard)
+            ->findOrFail($identifier);
     }
 
     /**

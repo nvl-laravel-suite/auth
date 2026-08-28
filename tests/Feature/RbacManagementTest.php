@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Actions\Rbac\AddRolePermissionsAction;
 use Nvl\Auth\Actions\Rbac\ApplyRoleTemplateAction;
 use Nvl\Auth\Actions\Rbac\CheckRoleNameAvailabilityAction;
@@ -23,6 +26,7 @@ use Nvl\Auth\Actions\Rbac\ListRoleTemplatesAction;
 use Nvl\Auth\Actions\Rbac\ResolvePermissionIdentifiersAction;
 use Nvl\Auth\Actions\Rbac\ResolveRoleIdentifiersAction;
 use Nvl\Auth\Actions\Rbac\ShowRbacAnalyticsAction;
+use Nvl\Auth\Actions\Rbac\ShowRoleAnalyticsAction;
 use Nvl\Auth\Actions\Rbac\SuggestPermissionsAction;
 use Nvl\Auth\Actions\Rbac\SuggestRolesAction;
 use Nvl\Auth\Actions\Rbac\SyncRolePermissionsAction;
@@ -42,6 +46,7 @@ use Nvl\Auth\Data\Mutations\StoreRoleData;
 use Nvl\Auth\Data\Mutations\UpdatePermissionData;
 use Nvl\Auth\Data\Queries\PermissionIndexQueryData;
 use Nvl\Auth\Data\Queries\RoleIndexQueryData;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Events\RbacChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
@@ -49,6 +54,8 @@ use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\RbacEntityLocator;
+use Nvl\Auth\Tests\Fixtures\HostAnalyticsPrincipal;
+use Nvl\Auth\Tests\Fixtures\HostRbacRole;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 it('owns role and permission CRUD foundations, cloning, hierarchy, templates, and analytics', function (): void {
@@ -764,4 +771,179 @@ it('authorizes assignment seams before loading or writing RBAC state', function 
 
         DB::disableQueryLog();
     }
+});
+
+it('returns bounded per-role analytics using configured principal semantics', function (): void {
+    Schema::table(AuthTables::Users, static function (Blueprint $table): void {
+        $table->boolean('enabled_for_access')->default(true);
+    });
+    config()->set(
+        'nvl-auth.features.principal_management.settings.attributes.active',
+        'enabled_for_access',
+    );
+    $actor = $this->user('rbac-role-analytics@example.test');
+    $parent = Role::factory()->create(['name' => 'manager']);
+    $role = Role::factory()->create(['name' => 'editor', 'parent_id' => $parent->id]);
+    $firstChild = Role::factory()->create(['name' => 'editor-a', 'parent_id' => $role->id]);
+    Role::factory()->create(['name' => 'editor-b', 'parent_id' => $role->id]);
+    Role::factory()->create(['name' => 'editor-a-child', 'parent_id' => $firstChild->id]);
+    $permissions = collect([
+        ['name' => 'content.read', 'group' => 'content'],
+        ['name' => 'content.write', 'group' => "\t content \n"],
+        ['name' => 'users.read', 'group' => 'identity'],
+        ['name' => 'misc.read', 'group' => '   '],
+    ])->map(static fn (array $attributes): Permission => Permission::factory()->create($attributes));
+    $role->givePermissionTo($permissions);
+
+    foreach ([true, true, false] as $index => $active) {
+        $user = $this->user("role-analytics-{$index}@example.test");
+        $user->forceFill(['enabled_for_access' => $active])->save();
+        $user->assignRole($role);
+    }
+
+    $analytics = app(ShowRoleAnalyticsAction::class)->execute($actor, $role->id);
+
+    expect($analytics)->toBeInstanceOf(RoleAnalyticsData::class)
+        ->and($analytics->toArray())->toMatchArray([
+            'roleId' => $role->id,
+            'users' => 3,
+            'activeUsers' => 2,
+            'inactiveUsers' => 1,
+            'permissions' => 4,
+            'children' => 2,
+            'descendants' => 3,
+            'parentName' => 'manager',
+            'permissionGroups' => [
+                'content' => 2,
+                'general' => 1,
+                'identity' => 1,
+            ],
+        ])->and(array_keys($analytics->toArray()))->not->toContain('userIds', 'usersData', 'email');
+});
+
+it('counts an independently configured RBAC principal model', function (): void {
+    $actor = $this->user('rbac-host-analytics@example.test');
+    Schema::create('host_analytics_principals', static function (Blueprint $table): void {
+        $table->uuid('id')->primary();
+        $table->string('name');
+        $table->string('email')->unique();
+        $table->boolean('enabled_for_access')->default(true);
+        $table->timestamps();
+    });
+    config()->set('nvl-auth.features.rbac.models.principal', HostAnalyticsPrincipal::class);
+    config()->set(
+        'nvl-auth.features.principal_management.settings.attributes.active',
+        'enabled_for_access',
+    );
+    $role = Role::factory()->create(['name' => 'host-editor']);
+
+    foreach ([true, true, false] as $index => $active) {
+        $principal = HostAnalyticsPrincipal::query()->create([
+            'name' => "Host Principal {$index}",
+            'email' => "host-principal-{$index}@example.test",
+            'enabled_for_access' => $active,
+        ]);
+        $principal->assignRole($role);
+    }
+
+    $analytics = app(ShowRoleAnalyticsAction::class)->execute($actor, $role->id);
+
+    expect($analytics->users)->toBe(3)
+        ->and($analytics->activeUsers)->toBe(2)
+        ->and($analytics->inactiveUsers)->toBe(1);
+});
+
+it('restricts role analytics to the configured role model and guard', function (): void {
+    config()->set('nvl-auth.features.rbac.models.role', HostRbacRole::class);
+    config()->set('nvl-auth.features.rbac.settings.guard', 'web');
+    $actor = $this->user('rbac-role-boundary@example.test');
+    $configuredRole = HostRbacRole::query()->create([
+        'name' => 'configured-editor',
+        'guard_name' => 'web',
+    ]);
+    $crossGuardRole = HostRbacRole::query()->create([
+        'name' => 'api-editor',
+        'guard_name' => 'api',
+    ]);
+    $unconfiguredModel = Role::factory()->create(['name' => 'base-editor']);
+
+    expect(app(ShowRoleAnalyticsAction::class)->execute($actor, $configuredRole->id)->roleId)
+        ->toBe($configuredRole->id)
+        ->and(fn () => app(ShowRoleAnalyticsAction::class)->execute($actor, $crossGuardRole->id))
+        ->toThrow(ModelNotFoundException::class)
+        ->and(fn () => app(ShowRoleAnalyticsAction::class)->execute($actor, $unconfiguredModel))
+        ->toThrow(ModelNotFoundException::class);
+});
+
+it('keeps role analytics query count constant as related data grows', function (): void {
+    $actor = $this->user('rbac-role-analytics-query-count@example.test');
+    $createFixture = function (string $prefix, int $size): Role {
+        $role = Role::factory()->create(['name' => "{$prefix}-role"]);
+
+        for ($index = 0; $index < $size; $index++) {
+            Role::factory()->create([
+                'name' => "{$prefix}-child-{$index}",
+                'parent_id' => $role->id,
+            ]);
+            $permission = Permission::factory()->create([
+                'name' => "{$prefix}.permission.{$index}",
+                'group' => "{$prefix}-group",
+            ]);
+            $role->givePermissionTo($permission);
+            $this->user("{$prefix}-user-{$index}@example.test")->assignRole($role);
+        }
+
+        return $role;
+    };
+    $small = $createFixture('small', 1);
+    $large = $createFixture('large', 25);
+    $measure = function (Role $role) use ($actor): array {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        app(ShowRoleAnalyticsAction::class)->execute($actor, $role->id);
+        $queries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        return $queries;
+    };
+
+    $smallQueries = $measure($small);
+    $largeQueries = $measure($large);
+
+    expect($smallQueries)->toHaveCount(4)
+        ->and($largeQueries)->toHaveCount(4)
+        ->and(collect($largeQueries)->pluck('query')->implode(' '))->not->toContain('activity');
+});
+
+it('counts role descendants once when persisted hierarchy data contains a cycle', function (): void {
+    $actor = $this->user('rbac-role-analytics-cycle@example.test');
+    $first = Role::factory()->create(['name' => 'cycle-first']);
+    $second = Role::factory()->create(['name' => 'cycle-second', 'parent_id' => $first->id]);
+    Role::factory()->create(['name' => 'cycle-child', 'parent_id' => $second->id]);
+    $first->forceFill(['parent_id' => $second->id])->save();
+
+    $analytics = app(ShowRoleAnalyticsAction::class)->execute($actor, $first->id);
+
+    expect($analytics->children)->toBe(1)
+        ->and($analytics->descendants)->toBe(2)
+        ->and($analytics->parentName)->toBe('cycle-second');
+});
+
+it('denies per-role analytics before querying package storage', function (): void {
+    $actor = $this->user('rbac-role-analytics-denied@example.test');
+    app()->instance(AuthManagementAccess::class, new class implements AuthManagementAccess
+    {
+        public function allows(Authenticatable $actor, string $ability, mixed $target = null): bool
+        {
+            return false;
+        }
+    });
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    expect(fn () => app(ShowRoleAnalyticsAction::class)->execute($actor, 'role-id'))
+        ->toThrow(AuthException::class, 'not authorized')
+        ->and(DB::getQueryLog())->toBe([]);
+
+    DB::disableQueryLog();
 });

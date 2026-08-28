@@ -233,6 +233,38 @@ explicit host `SystemMutationAccess` grant. Destructive lifecycle Actions invoke
 the replaceable `PrincipalSessionContainment` contract for API tokens, remember
 credentials, Laravel database sessions, and host extensions.
 
+## RBAC consumer reads and analytics
+
+Use RBAC Actions for option lists, suggestions, catalogs, name availability,
+mixed ID/name resolution, assignments, and analytics. Consumers must not start
+queries from `Role` or `Permission`; the Actions own feature admission,
+authorization, configured models and guards, input bounds, and portable query
+semantics.
+
+Per-role analytics is an identity-free projection. It counts principals using
+the configured active-column mapping, aggregates canonical permission groups,
+and traverses the role hierarchy with a bounded number of queries. Activity is
+intentionally a separate package concern and can be composed from the identity
+returned by `ShowRoleAction`:
+
+```php
+use Nvl\Activity\Services\ActivityReadService;
+use Nvl\Auth\Actions\Rbac\ShowRoleAction;
+use Nvl\Auth\Actions\Rbac\ShowRoleAnalyticsAction;
+
+$role = app(ShowRoleAction::class)->execute($actor, $roleId);
+$analytics = app(ShowRoleAnalyticsAction::class)->execute($actor, $roleId);
+$activity = app(ActivityReadService::class)->paginateForSubjectKey(
+    $role->getMorphClass(),
+    $role->getKey(),
+    20,
+);
+```
+
+The Action-returned role may be used only as the authorized identity/result for
+that composition. A consumer-initiated role query is still outside the public
+application boundary.
+
 ## Passkeys and tokens
 
 Passkeys work without a host ceremony class. Enable the feature and configure a
