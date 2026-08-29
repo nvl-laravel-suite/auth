@@ -3,8 +3,8 @@
 Report vulnerabilities privately to the package maintainers. Do not open a
 public issue containing secrets, exploit details, or affected production data.
 
-Supported versions are the current pre-1.0 development line and the latest
-tagged release.
+Security fixes are provided for the current `2.x` release line on PHP 8.3+
+and Laravel 13.
 
 Security-sensitive design rules:
 

@@ -33,9 +33,8 @@ release claims, static-analysis baselines, or error suppressions.
 
 ## Schema changes
 
-This package is pre-1.0. Keep one complete baseline migration until the first
-stable release unless published releases require additive migrations. Never
-condition a table or column on a feature flag.
+Published baseline migrations are immutable. Add forward migrations for schema
+changes, and never condition a table or column on a feature flag.
 
 ## Public contracts
 

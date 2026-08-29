@@ -6,7 +6,7 @@
 
 | Item | Value |
 |---|---|
-| Installed through | `composer require nvl/laravel-suite:^1.0` |
+| Installed through | `composer require nvl/laravel-suite:^2.0` |
 | Module identifier | `nvl/auth` |
 | PHP namespace | `Nvl\Auth` |
 | Service provider | `Nvl\Auth\Providers\AuthServiceProvider` |
@@ -28,7 +28,7 @@ push, or another transport without coupling Auth to delivery infrastructure.
 ## Installation
 
 ```bash
-composer require nvl/laravel-suite:^1.0
+composer require nvl/laravel-suite:^2.0
 php artisan vendor:publish --tag=auth-config
 php artisan vendor:publish --tag=auth-skills
 php artisan vendor:publish --tag=auth-adoption

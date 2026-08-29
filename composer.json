@@ -18,11 +18,11 @@
         "ext-filter": "*",
         "ext-json": "*",
         "ext-mbstring": "*",
-        "laravel/framework": "^12.0 || ^13.0",
+        "laravel/framework": "^13.0",
         "laravel/sanctum": "^4.3",
         "nesbot/carbon": "^2.72 || ^3.0",
-        "nvl/data": "^1.0",
-        "nvl/support": "^1.0",
+        "nvl/data": "^2.0",
+        "nvl/support": "^2.0",
         "paragonie/constant_time_encoding": "^2.6 || ^3.0",
         "pragmarx/google2fa": "^9.0",
         "spatie/laravel-data": "^4.23",
@@ -40,7 +40,7 @@
         "laravel/pint": "^1.27",
         "laravel/socialite": "^5.29",
         "mockery/mockery": "^1.6",
-        "orchestra/testbench": "^10.0 || ^11.0",
+        "orchestra/testbench": "^11.0",
         "pestphp/pest": "^4.0",
         "pestphp/pest-plugin-laravel": "^4.0",
         "spomky-labs/cbor-php": "^3.0",
@@ -79,7 +79,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "1.x-dev"
+            "dev-main": "2.x-dev"
         },
         "laravel": {
             "providers": [
