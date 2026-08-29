@@ -19,9 +19,11 @@ use Nvl\Auth\Actions\Rbac\CreateRoleAction;
 use Nvl\Auth\Actions\Rbac\ListPermissionCatalogAction;
 use Nvl\Auth\Actions\Rbac\ListPermissionGroupsAction;
 use Nvl\Auth\Actions\Rbac\ListPermissionOptionsAction;
+use Nvl\Auth\Actions\Rbac\ListPermissionsAction;
 use Nvl\Auth\Actions\Rbac\ListRoleCatalogAction;
 use Nvl\Auth\Actions\Rbac\ListRoleHierarchyAction;
 use Nvl\Auth\Actions\Rbac\ListRoleOptionsAction;
+use Nvl\Auth\Actions\Rbac\ListRolesAction;
 use Nvl\Auth\Actions\Rbac\ListRoleTemplatesAction;
 use Nvl\Auth\Actions\Rbac\ResolvePermissionIdentifiersAction;
 use Nvl\Auth\Actions\Rbac\ResolveRoleIdentifiersAction;
@@ -380,6 +382,8 @@ it('denies every RBAC consumer read before querying package storage', function (
         static fn () => app(ListPermissionOptionsAction::class)->execute($actor),
         static fn () => app(SuggestPermissionsAction::class)->execute($actor),
         static fn () => app(ListPermissionGroupsAction::class)->execute($actor),
+        static fn () => app(ListRolesAction::class)->execute($actor),
+        static fn () => app(ListPermissionsAction::class)->execute($actor),
         static fn () => app(ListRoleCatalogAction::class)->execute($actor, new RoleIndexQueryData),
         static fn () => app(ListPermissionCatalogAction::class)->execute($actor, new PermissionIndexQueryData),
     ];
@@ -461,6 +465,84 @@ it('returns filtered stable DTO catalogs without related user identity data', fu
         ->toThrow(InvalidArgumentException::class, 'sort')
         ->and(fn () => new PermissionIndexQueryData(direction: 'sideways'))
         ->toThrow(InvalidArgumentException::class, 'direction');
+});
+
+it('returns compatibility role and permission pages as stable DTOs without mapping queries', function (): void {
+    $actor = $this->user('rbac-compatibility-reads@example.test');
+    $parent = Role::factory()->create([
+        'name' => 'manager',
+        'display_name' => 'Manager',
+        'priority' => 10,
+    ]);
+    $role = Role::factory()->create([
+        'name' => 'content-editor',
+        'display_name' => 'Content Editor',
+        'parent_id' => $parent->id,
+        'priority' => 20,
+    ]);
+    $permission = Permission::factory()->create([
+        'name' => 'content.publish',
+        'display_name' => 'Publish Content',
+        'group' => 'content',
+    ]);
+    $role->givePermissionTo($permission);
+    $actor->assignRole($role);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    try {
+        $roles = app(ListRolesAction::class)->execute(
+            $actor,
+            search: 'content',
+            perPage: 1,
+        );
+        $roleQueryCount = count(DB::getQueryLog());
+        $roleItem = $roles->items()[0] ?? null;
+        $roleItem?->toArray();
+
+        expect(DB::getQueryLog())->toHaveCount($roleQueryCount)
+            ->and($roleQueryCount)->toBeLessThanOrEqual(3)
+            ->and($roles->total())->toBe(1)
+            ->and($roles->currentPage())->toBe(1)
+            ->and($roles->perPage())->toBe(1)
+            ->and($roles->getOptions()['path'] ?? null)->toBe($roles->path())
+            ->and($roles->appends(['search' => 'content'])->url(2))->toContain(
+                'page=2',
+                'search=content',
+            )
+            ->and($roleItem)->toBeInstanceOf(RoleListItemData::class)
+            ->and($roleItem?->name)->toBe('content-editor')
+            ->and($roleItem?->label)->toBe('Content Editor')
+            ->and($roleItem?->parentName)->toBe('manager')
+            ->and($roleItem?->permissionsCount)->toBe(1)
+            ->and($roleItem?->usersCount)->toBe(1);
+
+        DB::flushQueryLog();
+        $permissions = app(ListPermissionsAction::class)->execute(
+            $actor,
+            search: 'publish',
+            group: 'content',
+            perPage: 1,
+        );
+        $permissionQueryCount = count(DB::getQueryLog());
+        $permissionItem = $permissions->items()[0] ?? null;
+        $permissionItem?->toArray();
+
+        expect(DB::getQueryLog())->toHaveCount($permissionQueryCount)
+            ->and($permissionQueryCount)->toBeLessThanOrEqual(2)
+            ->and($permissions->total())->toBe(1)
+            ->and($permissions->currentPage())->toBe(1)
+            ->and($permissions->perPage())->toBe(1)
+            ->and($permissionItem)->toBeInstanceOf(PermissionListItemData::class)
+            ->and($permissionItem?->name)->toBe('content.publish')
+            ->and($permissionItem?->label)->toBe('Publish Content')
+            ->and($permissionItem?->group)->toBe('content')
+            ->and($permissionItem?->rolesCount)->toBe(1)
+            ->and($permissionItem?->usersCount)->toBe(0);
+    } finally {
+        DB::disableQueryLog();
+    }
 });
 
 it('keeps option and catalog query counts independent of fixture size', function (): void {

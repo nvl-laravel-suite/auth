@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Nvl\Auth\Data\Display\RoleListItemData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\Role;
@@ -23,7 +24,7 @@ final readonly class ListRolesAction
         private AuthModelRegistry $models,
     ) {}
 
-    /** @return LengthAwarePaginator<int, Role> */
+    /** @return LengthAwarePaginator<int, RoleListItemData> */
     public function execute(Authenticatable $actor, ?string $search = null, int $perPage = 25): LengthAwarePaginator
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
@@ -38,6 +39,13 @@ final readonly class ListRolesAction
             });
         }
 
-        return $query->orderByDesc('priority')->orderBy('name')->paginate(max(1, min($perPage, 100)));
+        $roles = $query
+            ->orderByDesc('priority')
+            ->orderBy('name')
+            ->paginate(max(1, min($perPage, 100)));
+
+        return $roles->through(
+            static fn (Role $role): RoleListItemData => RoleListItemData::fromModel($role),
+        );
     }
 }

@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Nvl\Auth\Data\Display\PermissionListItemData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\Permission;
@@ -23,7 +24,7 @@ final readonly class ListPermissionsAction
         private AuthModelRegistry $models,
     ) {}
 
-    /** @return LengthAwarePaginator<int, Permission> */
+    /** @return LengthAwarePaginator<int, PermissionListItemData> */
     public function execute(Authenticatable $actor, ?string $search = null, ?string $group = null, int $perPage = 25): LengthAwarePaginator
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
@@ -42,6 +43,13 @@ final readonly class ListPermissionsAction
             $query->where('group', trim($group));
         }
 
-        return $query->orderBy('group')->orderBy('name')->paginate(max(1, min($perPage, 100)));
+        $permissions = $query
+            ->orderBy('group')
+            ->orderBy('name')
+            ->paginate(max(1, min($perPage, 100)));
+
+        return $permissions->through(
+            static fn (Permission $permission): PermissionListItemData => PermissionListItemData::fromModel($permission),
+        );
     }
 }
