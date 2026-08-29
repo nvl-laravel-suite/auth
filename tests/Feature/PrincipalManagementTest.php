@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -18,10 +19,12 @@ use Nvl\Auth\Actions\Users\DeleteUserAction;
 use Nvl\Auth\Actions\Users\ListUsersAction;
 use Nvl\Auth\Actions\Users\RestoreUserAction;
 use Nvl\Auth\Actions\Users\SetUserActiveAction;
+use Nvl\Auth\Actions\Users\ShowUserAction;
 use Nvl\Auth\Actions\Users\SuggestUsersAction;
 use Nvl\Auth\Actions\Users\SyncUserPermissionsAction;
 use Nvl\Auth\Actions\Users\SyncUserRolesAction;
 use Nvl\Auth\Actions\Users\UpdateProfileAction;
+use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Data\Mutations\DeleteOwnAccountData;
 use Nvl\Auth\Data\Mutations\LoginData;
 use Nvl\Auth\Data\Mutations\StorePermissionData;
@@ -129,6 +132,37 @@ it('supports profile, suggestions, and bounded bulk lifecycle operations', funct
         ->and($second->fresh()->remember_token)->not->toBe('second-remember')
         ->and($first->tokens()->count())->toBe(0)
         ->and($second->tokens()->count())->toBe(0);
+});
+
+it('passes resolved principal targets to individual and bulk management policy decisions', function (): void {
+    $actor = $this->user('policy-actor@example.test');
+    $first = $this->user('policy-first@example.test');
+    $second = $this->user('policy-second@example.test');
+    $access = new class implements AuthManagementAccess
+    {
+        /** @var list<mixed> */
+        public array $targets = [];
+
+        public function allows(Authenticatable $actor, string $ability, mixed $target = null): bool
+        {
+            $this->targets[] = $target;
+
+            return $target instanceof User;
+        }
+    };
+    app()->instance(AuthManagementAccess::class, $access);
+
+    $shown = app(ShowUserAction::class)->execute($actor, $first->id);
+    $result = app(BulkUpdateUsersAction::class)->execute(
+        $actor,
+        UserBulkOperation::Disable,
+        [$first->id, $second->id],
+    );
+
+    expect($shown->is($first))->toBeTrue()
+        ->and($result->affected)->toBe(2)
+        ->and($access->targets)->toHaveCount(3)
+        ->and($access->targets)->each->toBeInstanceOf(User::class);
 });
 
 it('keeps eager-loaded principal list queries independent of fixture size', function (): void {

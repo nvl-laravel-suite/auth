@@ -54,13 +54,11 @@ final readonly class BulkUpdateUsersAction
                 ? FeatureOperation::Revoke
                 : FeatureOperation::Update,
         );
-        $actor = $this->authorization->authorize($authority, match ($operation) {
+        $ability = match ($operation) {
             UserBulkOperation::Delete => 'nvl-auth.users.delete',
             UserBulkOperation::Restore => 'nvl-auth.users.restore',
             default => 'nvl-auth.users.update',
-        });
-        $metadata = $this->authorization->metadata($authority);
-        $context = $authority instanceof SystemMutationContext ? $authority : null;
+        };
         if ($userIds === []
             || count($userIds) > 100
             || count(array_filter($userIds, static fn (string $id): bool => ! Str::isUuid($id))) > 0) {
@@ -68,6 +66,11 @@ final readonly class BulkUpdateUsersAction
         }
 
         $userIds = array_values(array_unique($userIds));
+        $metadata = $this->authorization->metadata($authority);
+        $context = $authority instanceof SystemMutationContext ? $authority : null;
+        $actor = $context === null
+            ? $authority
+            : $this->authorization->authorize($context, $ability);
 
         if ($authority instanceof Authenticatable
             && in_array($authority->getAuthIdentifier(), $userIds, true)) {
@@ -76,11 +79,15 @@ final readonly class BulkUpdateUsersAction
 
         $connection = $this->users->query(true)->getModel()->getConnectionName();
 
-        return DB::connection($connection)->transaction(function () use ($actor, $context, $metadata, $operation, $userIds): BulkUserResult {
+        return DB::connection($connection)->transaction(function () use ($ability, $actor, $authority, $context, $metadata, $operation, $userIds): BulkUserResult {
             $users = $this->users->query(true)->whereKey($userIds)->lockForUpdate()->get();
 
             /** @var User $user */
             foreach ($users as $user) {
+                if ($authority instanceof Authenticatable) {
+                    $this->authorization->authorize($authority, $ability, $user);
+                }
+
                 match ($operation) {
                     UserBulkOperation::Enable => $this->setActive($user, new UpdateUserStatusData(true)),
                     UserBulkOperation::Disable => $this->setActive($user, new UpdateUserStatusData(false), $context),

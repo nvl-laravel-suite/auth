@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Nvl\Auth\Adapters\ApiTokens\SanctumApiTokenManager;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Models\Role;
 use Nvl\Auth\Providers\AuthServiceProvider;
+use Nvl\Auth\Services\ConfiguredPolicyAuthManagementAccess;
 use Nvl\Auth\Services\LaravelGateAuthManagementAccess;
+use Nvl\Auth\Tests\Fixtures\EmbeddedRolePolicy;
 
 it('reports the complete feature inventory in table and JSON formats', function (): void {
     $this->artisan('nvl:auth:features')->assertSuccessful();
@@ -259,5 +264,73 @@ it('fails readiness for invalid pipelines and management abilities without packa
 
     $this->artisan('nvl:auth:doctor')
         ->expectsOutputToContain('Management routes require package RBAC or Laravel Gate authorization for [nvl-auth.clients.viewAny].')
+        ->assertFailed();
+});
+
+it('fails readiness for incomplete configured management policy coverage', function (): void {
+    config()->set('nvl-auth.services.management_access', ConfiguredPolicyAuthManagementAccess::class);
+    config()->set('nvl-auth.management.abilities', [
+        'users.viewAny' => 'viewAny',
+        'unknown.alias' => 'view',
+    ]);
+    config()->set('nvl-auth.management.policy_models', ['users' => stdClass::class]);
+    $this->app->forgetInstance(AuthManagementAccess::class);
+    $this->app->singleton(AuthManagementAccess::class, ConfiguredPolicyAuthManagementAccess::class);
+
+    $this->artisan('nvl:auth:doctor')
+        ->expectsOutputToContain('Management policy mappings contain unknown aliases')
+        ->expectsOutputToContain('Management authorization has no resolvable policy decision for [nvl-auth.users.viewAny].')
+        ->assertFailed();
+});
+
+it('rejects a configured policy model from the wrong management group', function (): void {
+    config()->set('nvl-auth.services.management_access', ConfiguredPolicyAuthManagementAccess::class);
+    config()->set('nvl-auth.management.abilities', ['users.viewAny' => 'manage']);
+    config()->set('nvl-auth.management.policy_models', ['users' => Role::class]);
+    Gate::policy(Role::class, EmbeddedRolePolicy::class);
+    $this->app->forgetInstance(AuthManagementAccess::class);
+    $this->app->singleton(AuthManagementAccess::class, ConfiguredPolicyAuthManagementAccess::class);
+
+    $this->artisan('nvl:auth:doctor')
+        ->expectsOutputToContain('Management policy mappings contain unknown aliases, invalid operations, or invalid model classes.')
+        ->expectsOutputToContain('Management authorization has no resolvable policy decision for [nvl-auth.users.viewAny].')
+        ->assertFailed();
+});
+
+it('reports missing host route evidence and conflicting package route ownership', function (): void {
+    config()->set('nvl-auth.ownership.http', 'host');
+    config()->set('nvl-auth.ownership.host_routes', []);
+
+    $this->artisan('nvl:auth:doctor')
+        ->expectsOutputToContain('Host-owned Auth flow [authentication.public] has no registered route evidence.')
+        ->assertSuccessful();
+    $this->artisan('nvl:auth:doctor', ['--strict' => true])->assertFailed();
+
+    config()->set('nvl-auth.ownership.service_only', [
+        'authentication.public',
+        'authentication.account',
+        'principal_management.account',
+        'principal_management.management',
+        'password.public',
+        'password.account',
+        'api_tokens.account',
+        'rbac.management',
+        'audit.management',
+    ]);
+    $this->artisan('nvl:auth:doctor', ['--strict' => true])
+        ->doesntExpectOutputToContain('has no registered route evidence')
+        ->assertSuccessful();
+
+    config()->set('nvl-auth.routes.enabled', true);
+    config()->set('nvl-auth.routes.public.enabled', true);
+    config()->set('nvl-auth.features.authentication.routes.public.enabled', true);
+    config()->set('nvl-auth.ownership.host_routes', [
+        'authentication.public' => ['fixture.auth.login'],
+    ]);
+    Route::get('/fixture-auth-login', static fn (): string => 'login')
+        ->name('fixture.auth.login');
+
+    $this->artisan('nvl:auth:doctor')
+        ->expectsOutputToContain('Auth flow [authentication.public] is owned by both package and host routes.')
         ->assertFailed();
 });

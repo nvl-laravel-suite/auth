@@ -21,6 +21,7 @@ final class FeatureManifest
      */
     public function definitions(): array
     {
+        $managementAbilities = new AuthManagementAbilityCatalog;
         $all = [
             FeatureOperation::Read,
             FeatureOperation::Enroll,
@@ -66,15 +67,7 @@ final class FeatureManifest
                         'users.destroy',
                     ],
                 ],
-                managementAbilities: [
-                    'nvl-auth.users.viewAny',
-                    'nvl-auth.users.view',
-                    'nvl-auth.users.create',
-                    'nvl-auth.users.update',
-                    'nvl-auth.users.delete',
-                    'nvl-auth.users.restore',
-                    'nvl-auth.users.manageAccess',
-                ],
+                managementAbilities: $managementAbilities->abilitiesFor(AuthFeature::PrincipalManagement),
             ),
             new FeatureDefinition(
                 AuthFeature::Password,
@@ -114,12 +107,7 @@ final class FeatureManifest
                     'public' => ['invitations.accept'],
                     'management' => ['invitations.index', 'invitations.store', 'invitations.resend', 'invitations.destroy'],
                 ],
-                managementAbilities: [
-                    'nvl-auth.invitations.viewAny',
-                    'nvl-auth.invitations.create',
-                    'nvl-auth.invitations.resend',
-                    'nvl-auth.invitations.revoke',
-                ],
+                managementAbilities: $managementAbilities->abilitiesFor(AuthFeature::Invitations),
             ),
             new FeatureDefinition(
                 AuthFeature::Totp,
@@ -166,13 +154,7 @@ final class FeatureManifest
                     'public' => ['clients.start'],
                     'management' => ['clients.index', 'clients.store', 'clients.show', 'clients.update', 'clients.status', 'clients.destroy'],
                 ],
-                managementAbilities: [
-                    'nvl-auth.clients.viewAny',
-                    'nvl-auth.clients.view',
-                    'nvl-auth.clients.create',
-                    'nvl-auth.clients.update',
-                    'nvl-auth.clients.delete',
-                ],
+                managementAbilities: $managementAbilities->abilitiesFor(AuthFeature::Clients),
             ),
             new FeatureDefinition(AuthFeature::Sessions, [FeatureOperation::Read, FeatureOperation::Use, FeatureOperation::Revoke], [AuthFeature::Authentication]),
             new FeatureDefinition(
@@ -204,19 +186,14 @@ final class FeatureManifest
                     'permissions.update',
                     'permissions.destroy',
                 ]],
-                managementAbilities: [
-                    'nvl-auth.rbac.view',
-                    'nvl-auth.rbac.manageRoles',
-                    'nvl-auth.rbac.managePermissions',
-                    'nvl-auth.rbac.synchronize',
-                ],
+                managementAbilities: $managementAbilities->abilitiesFor(AuthFeature::Rbac),
             ),
             new FeatureDefinition(
                 AuthFeature::Audit,
                 [FeatureOperation::Read, FeatureOperation::Issue, FeatureOperation::Cleanup],
                 routeFamilies: ['management' => 'audits'],
                 routeNames: ['management' => ['audits.index', 'audits.show']],
-                managementAbilities: ['nvl-auth.audits.viewAny', 'nvl-auth.audits.view'],
+                managementAbilities: $managementAbilities->abilitiesFor(AuthFeature::Audit),
             ),
         ];
 

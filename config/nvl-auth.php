@@ -11,6 +11,7 @@ use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\ConfiguredPrincipalAttributeMapper;
 use Nvl\Auth\Services\DenySystemMutationAccess;
 use Nvl\Auth\Services\EloquentRbacPrincipalAccess;
+use Nvl\Auth\Services\LaravelGateAuthManagementAccess;
 use Nvl\Auth\Services\PackagePermissionCatalog;
 use Nvl\Auth\Services\PackageRoleTemplates;
 
@@ -37,7 +38,34 @@ return [
     'password_broker' => env('NVL_AUTH_PASSWORD_BROKER'),
     'identifier' => env('NVL_AUTH_IDENTIFIER', 'email'),
     'services' => [
+        'management_access' => LaravelGateAuthManagementAccess::class,
         'system_mutation_access' => DenySystemMutationAccess::class,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Host management authorization
+    |--------------------------------------------------------------------------
+    |
+    | The configured-policy adapter only delegates aliases listed here. Missing
+    | aliases or policy models deny access, so consumers opt into every decision.
+    |
+    */
+    'management' => [
+        'abilities' => [],
+        'policy_models' => [],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Integration ownership
+    |--------------------------------------------------------------------------
+    */
+    'ownership' => [
+        'http' => 'package',
+        'delivery' => 'host',
+        'host_routes' => [],
+        'service_only' => [],
     ],
 
     /*

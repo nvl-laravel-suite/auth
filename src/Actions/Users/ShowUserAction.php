@@ -28,8 +28,9 @@ final readonly class ShowUserAction
     public function execute(Authenticatable $actor, User|string $user): User
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.users.view');
+        $user = $this->users->find($user, true);
+        $this->authorization->authorize($actor, 'nvl-auth.users.view', $user);
 
-        return $this->users->find($user, true)->load(['roles', 'permissions']);
+        return $user->load(['roles', 'permissions']);
     }
 }

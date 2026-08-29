@@ -16,6 +16,8 @@ use Nvl\Auth\Adapters\Laravel\LaravelPrincipalSessionContainment;
 use Nvl\Auth\Adapters\Laravel\LaravelRequestAuditContextProvider;
 use Nvl\Auth\Adapters\Passkeys\WebauthnPasskeyCeremony;
 use Nvl\Auth\Console\Commands\AdoptPrincipalsCommand;
+use Nvl\Auth\Console\Commands\AuthConfigurationCommand;
+use Nvl\Auth\Console\Commands\AuthConfigureCommand;
 use Nvl\Auth\Console\Commands\AuthDoctorCommand;
 use Nvl\Auth\Console\Commands\InstallAuthSchemaCommand;
 use Nvl\Auth\Console\Commands\ListAuthFeaturesCommand;
@@ -51,6 +53,7 @@ use Nvl\Auth\Models\Role;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\AuthManagementAbilityCatalog;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\AuthSchemaManager;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
@@ -91,6 +94,7 @@ final class AuthServiceProvider extends ServiceProvider
         $this->configureOwnedIdentityStorage();
         $this->app->singleton(AuthConfiguration::class);
         $this->app->singleton(AuthModelRegistry::class);
+        $this->app->singleton(AuthManagementAbilityCatalog::class);
         $this->app->singleton(AuthSchemaManager::class);
         $this->app->singleton(FeatureManifest::class);
         $this->app->singleton(FeatureGate::class);
@@ -101,7 +105,11 @@ final class AuthServiceProvider extends ServiceProvider
             'features.audit.services.recorder',
             AuthAuditRecorder::class,
         );
-        $this->app->singleton(AuthManagementAccess::class, LaravelGateAuthManagementAccess::class);
+        $this->bindConfiguredContract(
+            AuthManagementAccess::class,
+            'services.management_access',
+            LaravelGateAuthManagementAccess::class,
+        );
         $this->bindConfiguredContract(
             PasswordUpdater::class,
             'features.password.services.updater',
@@ -221,6 +229,8 @@ final class AuthServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 AdoptPrincipalsCommand::class,
+                AuthConfigurationCommand::class,
+                AuthConfigureCommand::class,
                 AuthDoctorCommand::class,
                 InstallAuthSchemaCommand::class,
                 ListAuthFeaturesCommand::class,

@@ -84,6 +84,63 @@ to operate on the configured class. Host schemas may map every package principal
 attribute to a different physical column through
 `features.principal_management.settings.attributes`.
 
+### Embedded applications and host policies
+
+Applications that own their pages and HTTP controllers can preview a focused
+overlay instead of publishing the full package configuration:
+
+```bash
+php artisan nvl:auth:configure \
+    --preset=embedded-application \
+    --user-model='App\Models\User'
+```
+
+The command is a dry run by default. Add `--write` to create a missing file. To
+replace an existing file, first run the dry run with the intended options and
+review its unified diff, then repeat it with `--write --force`. Repeatable
+`--enable` and `--disable` options add only explicit feature overrides. The
+preset keeps package HTTP routes off, marks HTTP and delivery as host-owned,
+configures the host User model, and selects the policy adapter.
+
+The adapter removes the need to define one Laravel Gate for every
+`nvl-auth.*` ability. Map closed package aliases to methods on registered Laravel
+policies instead:
+
+```php
+use App\Models\User;
+use Nvl\Auth\Models\Permission;
+use Nvl\Auth\Models\Role;
+
+'management' => [
+    'abilities' => [
+        'users.viewAny' => 'viewAny',
+        'users.view' => 'view',
+        'users.create' => 'create',
+        'users.update' => 'update',
+        'rbac.view' => 'viewRbac',
+        'rbac.manageRoles' => 'manageRoles',
+        'rbac.managePermissions' => 'managePermissions',
+        'rbac.synchronize' => 'synchronizeRbac',
+    ],
+    'policy_models' => [
+        'users' => User::class,
+        'roles' => Role::class,
+        'permissions' => Permission::class,
+    ],
+],
+```
+
+Register those model policies through Laravel's normal policy discovery or
+`Gate::policy`. Unknown aliases, missing mappings, invalid model classes, and
+wrong target types deny access. A custom `AuthManagementAccess` implementation
+remains the supported escape hatch for domain authorization that cannot be
+expressed as model-policy decisions.
+
+Use `php artisan nvl:auth:configuration --format=json` to inspect effective
+features, route ownership, model classes, adapters, policy coverage, and Suite
+configuration drift without printing configuration values or secrets. Run
+`php artisan nvl:auth:doctor --strict` after registering host routes and policies.
+
 ## Features
 
 Every capability has `features.<name>.enabled` and per-surface route switches.
@@ -380,6 +437,8 @@ See [schema](docs/schema.md) for the exact inventory.
 ```bash
 php artisan nvl:auth:features
 php artisan nvl:auth:features --format=json
+php artisan nvl:auth:configure --preset=embedded-application --user-model='App\Models\User'
+php artisan nvl:auth:configuration --format=json
 php artisan nvl:auth:schema
 php artisan nvl:auth:schema --apply
 php artisan nvl:auth:doctor --strict
