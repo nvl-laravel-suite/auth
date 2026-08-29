@@ -4,6 +4,16 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-08-29
+
+### Changed
+
+- Changed role and permission management list items from Eloquent models to
+  `RoleListItemData` and `PermissionListItemData` while preserving paginator
+  metadata, authorization, counts, and ordering.
+- Established the bounded Auth Actions and authorization contracts as the 2.0
+  consumer boundary; direct consumer Auth-model queries now fail Suite audit.
+
 ## [1.0.6] - 2026-08-13
 
 ### Added
