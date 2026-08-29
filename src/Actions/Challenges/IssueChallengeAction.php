@@ -152,6 +152,7 @@ final readonly class IssueChallengeAction
                     expiresAt: $expiresAt,
                     locale: $locale,
                     metadata: ['challenge_id' => $challenge->identifier(), ...$metadata],
+                    subject: $subject,
                 ));
                 $this->audits->record(
                     "{$feature->value}.issued",

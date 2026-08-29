@@ -92,6 +92,28 @@ it('passes readiness for the default lean profile and fails missing dependencies
         ->assertFailed();
 });
 
+it('fails readiness for unsafe invitation delivery metadata allowlists', function (): void {
+    config()->set('nvl-auth.features.invitations.enabled', true);
+    config()->set('nvl-auth.features.invitations.settings.delivery_metadata_keys', [
+        'member_id',
+        'api_token',
+        'active_key',
+    ]);
+
+    $this->artisan('nvl:auth:doctor')
+        ->expectsOutputToContain('Invitation delivery metadata keys must be a bounded safe allowlist.')
+        ->assertFailed();
+
+    config()->set(
+        'nvl-auth.features.invitations.settings.delivery_metadata_keys',
+        array_map(static fn (int $index): string => "field_{$index}", range(1, 51)),
+    );
+
+    $this->artisan('nvl:auth:doctor')
+        ->expectsOutputToContain('Invitation delivery metadata keys must be a bounded safe allowlist.')
+        ->assertFailed();
+});
+
 it('fails readiness when Auth delivery correlation indexes are missing', function (): void {
     config()->set('nvl-auth.features.invitations.enabled', true);
     config()->set('nvl-auth.features.magic_links.enabled', true);

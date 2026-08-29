@@ -126,7 +126,11 @@ return [
                 'subject_resolver' => null,
                 'registration_mapper' => null,
             ],
-            'settings' => ['ttl_hours' => 72, 'resend_cooldown_seconds' => 60],
+            'settings' => [
+                'ttl_hours' => 72,
+                'resend_cooldown_seconds' => 60,
+                'delivery_metadata_keys' => [],
+            ],
         ],
         'totp' => [
             'enabled' => env('NVL_AUTH_TOTP_ENABLED', false),

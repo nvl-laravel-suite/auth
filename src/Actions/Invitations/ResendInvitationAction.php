@@ -18,6 +18,7 @@ use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Results\IssuedInvitation;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Services\InvitationDeliveryMetadataPolicy;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\OpaqueTokenFactory;
 use Nvl\Auth\Services\SecretHasher;
@@ -39,6 +40,7 @@ final readonly class ResendInvitationAction
         private SecretHasher $hasher,
         private ManagementAuthorizer $authorization,
         private AuthAuditRecorder $audits,
+        private ?InvitationDeliveryMetadataPolicy $deliveryMetadata = null,
     ) {}
 
     /**
@@ -103,6 +105,9 @@ final readonly class ResendInvitationAction
                 expiresAt: $locked->expires_at,
                 locale: $locale,
                 metadata: ['invitation_id' => $locked->identifier(), 'resend' => true],
+                invitation: ($this->deliveryMetadata ?? new InvitationDeliveryMetadataPolicy(
+                    $this->configuration,
+                ))->deliveryData($locked),
             ));
             $this->audits->record(
                 'invitation.resent',

@@ -54,6 +54,17 @@ it('binds public login links to resolved subjects and stays neutral for unknown 
         ->and(app(RequestMagicLinkAuthenticationAction::class)->execute(new RequestMagicLinkData('unknown@example.test')))->toBeNull();
 
     Event::assertDispatchedTimes(AuthDeliveryRequested::class, 1);
+    Event::assertDispatched(
+        AuthDeliveryRequested::class,
+        static fn (AuthDeliveryRequested $event): bool => $event->request->subject?->type === $user->getMorphClass()
+            && $event->request->subject->identifier === (string) $user->getKey(),
+    );
+    /** @var AuthDeliveryRequested $deliveryEvent */
+    $deliveryEvent = Event::dispatched(AuthDeliveryRequested::class)->sole()[0];
+    /** @var AuthDeliveryRequested $restoredEvent */
+    $restoredEvent = unserialize(serialize($deliveryEvent));
+
+    expect($restoredEvent->request->subject?->identifier)->toBe((string) $user->getKey());
 });
 
 it('scopes numeric codes to their recipient and purpose', function (): void {

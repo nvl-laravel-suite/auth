@@ -8,6 +8,7 @@ use Nvl\Auth\Actions\Invitations\AcceptInvitationAction;
 use Nvl\Auth\Actions\Invitations\CreateInvitationAction;
 use Nvl\Auth\Actions\Invitations\ListInvitationsAction;
 use Nvl\Auth\Actions\Invitations\RegisterInvitationAction;
+use Nvl\Auth\Actions\Invitations\ResendInvitationAction;
 use Nvl\Auth\Actions\Invitations\RevokeInvitationAction;
 use Nvl\Auth\Contracts\InvitationRegistrationMapper;
 use Nvl\Auth\Data\Mutations\AcceptInvitationData;
@@ -30,10 +31,21 @@ beforeEach(function (): void {
 
 it('issues consumes and audits a simple invitation without delivery persistence', function (): void {
     Event::fake([AuthDeliveryRequested::class, InvitationAccepted::class]);
+    config()->set('nvl-auth.features.invitations.settings.delivery_metadata_keys', [
+        'member_id',
+        'channel',
+    ]);
     $actor = $this->user('actor@example.test');
     $consumer = $this->user('consumer@example.test');
     $issued = app(CreateInvitationAction::class)->execute(
-        new StoreInvitationData('consumer@example.test'),
+        new StoreInvitationData(
+            recipient: 'consumer@example.test',
+            metadata: [
+                'member_id' => 'member-1',
+                'channel' => 'partner',
+                'private_note' => 'not-for-delivery',
+            ],
+        ),
         $actor,
     );
 
@@ -50,15 +62,69 @@ it('issues consumes and audits a simple invitation without delivery persistence'
         ->and(fn () => app(AcceptInvitationAction::class)->execute($issued->token, $consumer))
         ->toThrow(AuthException::class);
     Event::assertDispatched(AuthDeliveryRequested::class, static fn (AuthDeliveryRequested $event): bool => $event->request->feature === AuthFeature::Invitations
-        && $event->request->payload['token'] === $issued->token);
+        && $event->request->payload['token'] === $issued->token
+        && $event->request->invitation?->id === $issued->invitation->identifier()
+        && $event->request->invitation->recipient === 'consumer@example.test'
+        && $event->request->invitation->inviter?->id === (string) $actor->getKey()
+        && $event->request->invitation->metadata === [
+            'member_id' => 'member-1',
+            'channel' => 'partner',
+        ]
+        && $event->request->invitation->resendCount === 0);
     Event::assertDispatchedTimes(InvitationAccepted::class, 1);
     Event::assertDispatched(
         InvitationAccepted::class,
         static fn (InvitationAccepted $event): bool => $event->invitationId === $issued->invitation->identifier()
             && $event->type === $issued->invitation->type
             && $event->purpose === $issued->invitation->purpose
-            && $event->subject->identifier === (string) $consumer->getKey(),
+            && $event->subject->identifier === (string) $consumer->getKey()
+            && $event->acceptedAt?->equalTo($accepted->accepted_at) === true,
     );
+    /** @var AuthDeliveryRequested $deliveryEvent */
+    $deliveryEvent = Event::dispatched(AuthDeliveryRequested::class)->sole()[0];
+    /** @var InvitationAccepted $acceptanceEvent */
+    $acceptanceEvent = Event::dispatched(InvitationAccepted::class)->sole()[0];
+    /** @var InvitationAccepted $restoredAcceptanceEvent */
+    $restoredAcceptanceEvent = unserialize(serialize($acceptanceEvent));
+    $deliverySnapshot = json_encode(
+        $deliveryEvent->request->invitation?->toArray(),
+        JSON_THROW_ON_ERROR,
+    );
+
+    expect($restoredAcceptanceEvent->acceptedAt?->equalTo($accepted->accepted_at))->toBeTrue()
+        ->and($deliverySnapshot)->not->toContain(
+            $issued->token,
+            'private_note',
+            'not-for-delivery',
+            'token_hash',
+            'active_key',
+            'recipient_hash',
+        );
+});
+
+it('publishes current typed invitation context when resending', function (): void {
+    Event::fake([AuthDeliveryRequested::class]);
+    config()->set('nvl-auth.features.invitations.settings.resend_cooldown_seconds', 1);
+    config()->set('nvl-auth.features.invitations.settings.delivery_metadata_keys', ['member_id']);
+    $actor = $this->user('resend.owner@example.test');
+    $issued = app(CreateInvitationAction::class)->execute(
+        new StoreInvitationData(
+            recipient: 'resend.invitee@example.test',
+            metadata: ['member_id' => 'member-1'],
+        ),
+        $actor,
+    );
+    $issued->invitation->forceFill(['last_sent_at' => now()->subSeconds(2)])->save();
+
+    $resent = app(ResendInvitationAction::class)->execute($issued->invitation, $actor);
+    $events = Event::dispatched(AuthDeliveryRequested::class);
+    /** @var AuthDeliveryRequested $event */
+    $event = $events->last()[0];
+
+    expect($resent->invitation->resend_count)->toBe(1)
+        ->and($event->request->invitation?->id)->toBe($issued->invitation->identifier())
+        ->and($event->request->invitation?->resendCount)->toBe(1)
+        ->and($event->request->invitation?->metadata)->toBe(['member_id' => 'member-1']);
 });
 
 it('revokes invitations while the feature is disabled', function (): void {
@@ -113,7 +179,8 @@ it('provisions the package principal out of the box for public invitation accept
     Event::assertDispatched(
         InvitationAccepted::class,
         static fn (InvitationAccepted $event): bool => $event->invitationId === $accepted->identifier()
-            && $event->subject->identifier === $subject->id,
+            && $event->subject->identifier === $subject->id
+            && $event->acceptedAt?->equalTo($accepted->accepted_at) === true,
     );
 });
 
@@ -133,12 +200,55 @@ it('keeps invitation acceptance events privacy bounded', function (): void {
             'type',
             'purpose',
             'subject',
+            'acceptedAt',
         ])->not->toHaveKeys([
             'token',
             'recipient',
             'metadata',
         ])
+        ->and($event->acceptedAt)->toBeNull()
         ->and($serialized)->not->toContain('privacy.invitee@example.test');
+});
+
+it('rejects configured invitation delivery metadata that is not bounded scalar data', function (): void {
+    config()->set('nvl-auth.features.invitations.settings.delivery_metadata_keys', ['member_id']);
+    $actor = $this->user('metadata.owner@example.test');
+
+    expect(fn () => app(CreateInvitationAction::class)->execute(
+        new StoreInvitationData(
+            recipient: 'metadata.invitee@example.test',
+            metadata: ['member_id' => ['nested' => 'value']],
+        ),
+        $actor,
+    ))->toThrow(AuthException::class, 'scalar');
+});
+
+it('rejects protected metadata keys and malformed stored grant projections', function (): void {
+    Event::fake([AuthDeliveryRequested::class]);
+    config()->set('nvl-auth.features.invitations.settings.delivery_metadata_keys', ['active_key']);
+    $actor = $this->user('projection.owner@example.test');
+
+    expect(fn () => app(CreateInvitationAction::class)->execute(
+        new StoreInvitationData(
+            recipient: 'protected.invitee@example.test',
+            metadata: ['active_key' => 'protected-value'],
+        ),
+        $actor,
+    ))->toThrow(AuthException::class, 'safe allowlist');
+
+    config()->set('nvl-auth.features.invitations.settings.delivery_metadata_keys', []);
+    $issued = app(CreateInvitationAction::class)->execute(
+        new StoreInvitationData('malformed.invitee@example.test'),
+        $actor,
+    );
+    $issued->invitation->forceFill([
+        'roles' => ['named' => 'member'],
+        'last_sent_at' => now()->subMinutes(2),
+    ])->save();
+
+    expect(fn () => app(ResendInvitationAction::class)->execute($issued->invitation, $actor))
+        ->toThrow(AuthException::class, 'roles must be a distinct bounded list');
+    Event::assertDispatchedTimes(AuthDeliveryRequested::class, 1);
 });
 
 it('supports explicitly authorized actorless issuance expiry and exact indexed filters', function (): void {

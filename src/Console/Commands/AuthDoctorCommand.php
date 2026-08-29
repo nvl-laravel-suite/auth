@@ -41,6 +41,7 @@ use Nvl\Auth\Services\AuthSchemaManager;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\FeatureManifest;
+use Nvl\Auth\Services\InvitationDeliveryMetadataPolicy;
 use Nvl\Auth\Services\LaravelGateAuthManagementAccess;
 use Nvl\Auth\Services\SocialProviderConfiguration;
 use Nvl\Auth\Services\UnavailableApiTokenManager;
@@ -154,6 +155,7 @@ final class AuthDoctorCommand extends Command
         Container $container,
         AuthSchemaManager $schemaManager,
         PrincipalAttributeMapper $principalAttributes,
+        ?InvitationDeliveryMetadataPolicy $deliveryMetadata = null,
     ): int {
         $format = $this->option('format');
 
@@ -320,6 +322,13 @@ final class AuthDoctorCommand extends Command
         }
 
         if ($configuration->featureEnabled(AuthFeature::Invitations)) {
+            $checks[] = $this->check(
+                'configuration.invitations.delivery_metadata_keys',
+                ($deliveryMetadata ?? new InvitationDeliveryMetadataPolicy(
+                    $configuration,
+                ))->configurationIsValid(),
+                'Invitation delivery metadata keys must be a bounded safe allowlist.',
+            );
             $checks[] = $this->check(
                 'contract.invitation_registration_mapper',
                 $this->integration($container, InvitationRegistrationMapper::class) instanceof InvitationRegistrationMapper,

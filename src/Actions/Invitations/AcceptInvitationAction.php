@@ -64,11 +64,12 @@ final readonly class AcceptInvitationAction
                     $roles = is_array($invitation->roles) ? $invitation->roles : [];
                     $permissions = is_array($invitation->permissions) ? $invitation->permissions : [];
                     $this->rbac->assign($subject, $roles, $permissions);
+                    $acceptedAt = CarbonImmutable::now();
                     $invitation->forceFill([
                         'active_key' => null,
                         'accepted_by_type' => $reference->type,
                         'accepted_by_id' => $reference->identifier,
-                        'accepted_at' => CarbonImmutable::now(),
+                        'accepted_at' => $acceptedAt,
                     ])->save();
                     $this->audits->record(
                         'invitation.accepted',
@@ -81,6 +82,7 @@ final readonly class AcceptInvitationAction
                         type: $invitation->type,
                         purpose: $invitation->purpose,
                         subject: $reference,
+                        acceptedAt: $invitation->accepted_at,
                     );
 
                     return $invitation;

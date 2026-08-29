@@ -21,6 +21,7 @@ use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Results\IssuedInvitation;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Services\InvitationDeliveryMetadataPolicy;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\OpaqueTokenFactory;
 use Nvl\Auth\Services\SecretHasher;
@@ -45,6 +46,7 @@ final readonly class CreateInvitationAction
         private ManagementAuthorizer $authorization,
         private AuthPipeline $pipeline,
         private AuthAuditRecorder $audits,
+        private ?InvitationDeliveryMetadataPolicy $deliveryMetadata = null,
     ) {}
 
     /**
@@ -134,6 +136,7 @@ final readonly class CreateInvitationAction
                                 ...$data->metadata,
                                 'return_path' => $context->returnPath,
                             ],
+                            'resend_count' => 0,
                             'last_sent_at' => CarbonImmutable::now(),
                             'expires_at' => $expiresAt,
                         ]);
@@ -156,6 +159,9 @@ final readonly class CreateInvitationAction
                                 'invitation_id' => $invitation->identifier(),
                                 'context' => $data->context,
                             ],
+                            invitation: ($this->deliveryMetadata ?? new InvitationDeliveryMetadataPolicy(
+                                $this->configuration,
+                            ))->deliveryData($invitation),
                         ));
                         $this->audits->record(
                             'invitation.issued',

@@ -7,6 +7,7 @@ namespace Nvl\Auth\ValueObjects;
 use Carbon\CarbonImmutable;
 use InvalidArgumentException;
 use JsonException;
+use Nvl\Auth\Data\Display\InvitationDeliveryData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 
@@ -30,6 +31,8 @@ final readonly class AuthDeliveryRequest
         public CarbonImmutable $expiresAt,
         public ?string $locale = null,
         public array $metadata = [],
+        public ?SubjectReference $subject = null,
+        public ?InvitationDeliveryData $invitation = null,
     ) {
         $supportedType = match ($this->feature) {
             AuthFeature::Invitations => AuthMessageType::Invitation,
@@ -42,6 +45,10 @@ final readonly class AuthDeliveryRequest
 
         if ($supportedType !== $this->type) {
             throw new InvalidArgumentException('Auth delivery feature and message type are incompatible.');
+        }
+
+        if ($this->invitation !== null && $this->feature !== AuthFeature::Invitations) {
+            throw new InvalidArgumentException('Invitation delivery context requires the invitations feature.');
         }
 
         if (trim($this->messageId) === ''
@@ -93,6 +100,67 @@ final readonly class AuthDeliveryRequest
             'expires_at' => $this->expiresAt->toIso8601String(),
             'locale' => $this->locale,
             'metadata_keys' => array_keys($this->metadata),
+            'subject_type' => $this->subject?->type,
+            'has_invitation' => $this->invitation !== null,
         ];
+    }
+
+    /**
+     * Serialize initialized delivery fields, including legacy-shaped instances.
+     *
+     * @return array<string, mixed>
+     */
+    public function __serialize(): array
+    {
+        $data = [
+            'messageId' => $this->messageId,
+            'feature' => $this->feature,
+            'type' => $this->type,
+            'recipient' => $this->recipient,
+            'payload' => $this->payload,
+            'expiresAt' => $this->expiresAt,
+            'locale' => $this->locale,
+            'metadata' => $this->metadata,
+        ];
+
+        if (isset($this->subject)) {
+            $data['subject'] = $this->subject;
+        }
+
+        if (isset($this->invitation)) {
+            $data['invitation'] = $this->invitation;
+        }
+
+        return $data;
+    }
+
+    /**
+     * Restore context omitted by delivery requests queued before it existed.
+     *
+     * @param  array{
+     *     messageId: string,
+     *     feature: AuthFeature,
+     *     type: AuthMessageType,
+     *     recipient: string,
+     *     payload: array<string, mixed>,
+     *     expiresAt: CarbonImmutable,
+     *     locale: string|null,
+     *     metadata: array<string, mixed>,
+     *     subject?: SubjectReference|null,
+     *     invitation?: InvitationDeliveryData|null
+     * }  $data
+     */
+    public function __unserialize(array $data): void
+    {
+        $this->messageId = $data['messageId'];
+        $this->feature = $data['feature'];
+        $this->type = $data['type'];
+        $this->recipient = $data['recipient'];
+        $this->payload = $data['payload'];
+        $this->expiresAt = $data['expiresAt'];
+        $this->locale = $data['locale'];
+        $this->metadata = $data['metadata'];
+        $this->subject = $data['subject'] ?? null;
+        $this->invitation = $data['invitation'] ?? null;
     }
 }

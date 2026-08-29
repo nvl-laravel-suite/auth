@@ -47,11 +47,8 @@ final class StoreInvitationData extends Data
             throw new InvalidArgumentException('Invitation contexts must contain between one and 191 characters.');
         }
 
-        foreach ([...$this->roles, ...$this->permissions] as $grant) {
-            if (! self::validGrant($grant)) {
-                throw new InvalidArgumentException('Invitation role and permission names must be non-empty strings no longer than 255 characters.');
-            }
-        }
+        $this->assertGrantList($this->roles, 100, 'roles');
+        $this->assertGrantList($this->permissions, 250, 'permissions');
 
         $encodedMetadata = json_encode($this->metadata);
         if (! is_string($encodedMetadata) || strlen($encodedMetadata) > 16_384) {
@@ -59,9 +56,30 @@ final class StoreInvitationData extends Data
         }
     }
 
-    private static function validGrant(mixed $grant): bool
+    /**
+     * Ensure invitation grants match their generated list contract and remain bounded.
+     *
+     * @param  array<array-key, mixed>  $grants
+     */
+    private function assertGrantList(array $grants, int $maximum, string $field): void
     {
-        return is_string($grant) && trim($grant) !== '' && mb_strlen($grant) <= 255;
+        if (! array_is_list($grants) || count($grants) > $maximum) {
+            throw new InvalidArgumentException("Invitation {$field} must be a distinct list containing at most {$maximum} names.");
+        }
+
+        $seen = [];
+
+        foreach ($grants as $grant) {
+            if (! is_string($grant) || trim($grant) === '' || mb_strlen($grant) > 255) {
+                throw new InvalidArgumentException('Invitation role and permission names must be non-empty strings no longer than 255 characters.');
+            }
+
+            if (isset($seen[$grant])) {
+                throw new InvalidArgumentException("Invitation {$field} must be a distinct list containing at most {$maximum} names.");
+            }
+
+            $seen[$grant] = true;
+        }
     }
 
     /** @return array<string, list<string>> */
@@ -71,10 +89,10 @@ final class StoreInvitationData extends Data
             'recipient' => ['required', 'string', 'max:320'],
             'type' => ['sometimes', 'string', 'max:80'],
             'purpose' => ['sometimes', 'string', 'max:120'],
-            'roles' => ['sometimes', 'array'],
-            'roles.*' => ['string', 'max:255'],
-            'permissions' => ['sometimes', 'array'],
-            'permissions.*' => ['string', 'max:255'],
+            'roles' => ['sometimes', 'array', 'max:100'],
+            'roles.*' => ['string', 'distinct', 'max:255'],
+            'permissions' => ['sometimes', 'array', 'max:250'],
+            'permissions.*' => ['string', 'distinct', 'max:255'],
             'metadata' => ['sometimes', 'array'],
             'context' => ['sometimes', 'nullable', 'string', 'max:191'],
         ];
