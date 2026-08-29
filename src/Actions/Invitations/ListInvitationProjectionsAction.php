@@ -15,7 +15,7 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\InvitationDeliveryMetadataPolicy;
 
 /**
- * Lists authorized invitation state without exposing package models.
+ * Orchestrates the canonical invitation listing Action into value-only projections.
  */
 final readonly class ListInvitationProjectionsAction
 {

@@ -72,18 +72,21 @@ use Nvl\Auth\Services\UnavailableSocialIdentityProvider;
 use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
 use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
+use Nvl\Support\Traits\MergesPackageConfiguration;
 
 /**
  * Registers the passive package layer and lazy feature integrations.
  */
 final class AuthServiceProvider extends ServiceProvider
 {
+    use MergesPackageConfiguration;
+
     /**
      * Merge canonical configuration and bind package contracts.
      */
     public function register(): void
     {
-        $this->mergeConfigurationRecursively();
+        $this->mergePackageConfiguration(dirname(__DIR__, 2).'/config/nvl-auth.php', 'nvl-auth');
         $this->app->register(DataServiceProvider::class);
         $this->configureOwnedIdentityStorage();
         $this->app->singleton(AuthConfiguration::class);
@@ -224,23 +227,6 @@ final class AuthServiceProvider extends ServiceProvider
                 PruneAuthStateCommand::class,
             ]);
         }
-    }
-
-    /**
-     * Recursively merge defaults so partial feature overrides remain complete.
-     */
-    private function mergeConfigurationRecursively(): void
-    {
-        $path = dirname(__DIR__, 2).'/config/nvl-auth.php';
-        $defaults = require $path;
-        $configuration = $this->app->make(ConfigRepository::class);
-        $configured = $configuration->get('nvl-auth', []);
-
-        if (! is_array($defaults) || ! is_array($configured)) {
-            throw AuthException::invalidConfiguration('Auth configuration must be an array.');
-        }
-
-        $configuration->set('nvl-auth', array_replace_recursive($defaults, $configured));
     }
 
     /**

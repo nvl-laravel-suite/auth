@@ -22,6 +22,7 @@
         "laravel/sanctum": "^4.3",
         "nesbot/carbon": "^2.72 || ^3.0",
         "nvl/data": "^1.0",
+        "nvl/support": "^1.0",
         "paragonie/constant_time_encoding": "^2.6 || ^3.0",
         "pragmarx/google2fa": "^9.0",
         "spatie/laravel-data": "^4.23",
