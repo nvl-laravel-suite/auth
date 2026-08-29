@@ -283,8 +283,10 @@ it('normalizes and counts permission groups in one authorized query', function (
     DB::flushQueryLog();
     DB::enableQueryLog();
     $groups = app(ListPermissionGroupsAction::class)->execute($actor);
-    $queryCount = count(DB::getQueryLog());
+    $queries = DB::getQueryLog();
+    $queryCount = count($queries);
     DB::disableQueryLog();
+    $groupQuery = str_replace(['`', '"', '[', ']'], '', mb_strtolower($queries[0]['query']));
 
     expect($groups->map->toArray()->all())->toBe([
         [
@@ -297,7 +299,8 @@ it('normalizes and counts permission groups in one authorized query', function (
             'label' => 'General',
             'permissionsCount' => 2,
         ],
-    ])->and($queryCount)->toBe(1);
+    ])->and($queryCount)->toBe(1)
+        ->and($groupQuery)->toContain('group by normalized_group');
 
     config()->set('nvl-auth.features.rbac.settings.permission_group_limit', 1);
 
@@ -317,14 +320,14 @@ it('filters whitespace-only permission groups through the canonical general grou
         'name' => 'content.padded',
         'group' => "\t content \n",
     ]);
-    $legacyNulPermission = Permission::factory()->create([
-        'name' => 'legacy.nul',
-        'group' => "\0legacy\0",
+    $legacyControlPermission = Permission::factory()->create([
+        'name' => 'legacy.control',
+        'group' => "\flegacy\f",
     ]);
 
     $options = app(ListPermissionOptionsAction::class)->execute($actor, group: 'general');
     $contentOptions = app(ListPermissionOptionsAction::class)->execute($actor, group: 'content');
-    $legacyNulOptions = app(ListPermissionOptionsAction::class)->execute($actor, group: "\0legacy\0");
+    $legacyControlOptions = app(ListPermissionOptionsAction::class)->execute($actor, group: "\flegacy\f");
     $catalog = app(ListPermissionCatalogAction::class)->execute(
         $actor,
         new PermissionIndexQueryData(group: 'content'),
@@ -336,12 +339,12 @@ it('filters whitespace-only permission groups through the canonical general grou
         ->and($options->first()?->group)->toBe('general')
         ->and($contentOptions->pluck('id')->all())->toBe([$contentPermission->id])
         ->and($contentOptions->first()?->group)->toBe('content')
-        ->and($legacyNulOptions->pluck('id')->all())->toBe([$legacyNulPermission->id])
-        ->and($legacyNulOptions->first()?->group)->toBe("\0legacy\0")
+        ->and($legacyControlOptions->pluck('id')->all())->toBe([$legacyControlPermission->id])
+        ->and($legacyControlOptions->first()?->group)->toBe("\flegacy\f")
         ->and(collect($catalog->items())->pluck('id')->all())->toBe([$contentPermission->id])
         ->and($groupsByValue->get('content')?->permissionsCount)->toBe(1)
         ->and($groupsByValue->get('general')?->permissionsCount)->toBe(1)
-        ->and($groupsByValue->get("\0legacy\0")?->permissionsCount)->toBe(1);
+        ->and($groupsByValue->get("\flegacy\f")?->permissionsCount)->toBe(1);
 });
 
 it('canonicalizes permission groups at package write boundaries', function (): void {
@@ -991,9 +994,16 @@ it('keeps role analytics query count constant as related data grows', function (
 
     $smallQueries = $measure($small);
     $largeQueries = $measure($large);
+    $permissionGroupQuery = collect($largeQueries)->first(
+        static fn (array $query): bool => str_contains($query['query'], 'permissions_count'),
+    );
+    $permissionGroupSql = is_array($permissionGroupQuery)
+        ? str_replace(['`', '"', '[', ']'], '', mb_strtolower($permissionGroupQuery['query']))
+        : '';
 
     expect($smallQueries)->toHaveCount(4)
         ->and($largeQueries)->toHaveCount(4)
+        ->and($permissionGroupSql)->toContain('group by normalized_group')
         ->and(collect($largeQueries)->pluck('query')->implode(' '))->not->toContain('activity');
 });
 

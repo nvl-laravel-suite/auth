@@ -43,7 +43,7 @@ final readonly class ListPermissionGroupsAction
         $rows = $query
             ->select($this->groupExpressions->selected($query))
             ->selectRaw('COUNT(*) AS permissions_count')
-            ->groupBy($this->groupExpressions->normalized($query))
+            ->groupBy('normalized_group')
             ->orderBy('normalized_group')
             ->limit($this->limits->permissionGroupLimit())
             ->get();

@@ -103,7 +103,7 @@ final readonly class ShowRoleAnalyticsAction
         $rows = $query
             ->select([$this->groupExpressions->selected($query)])
             ->selectRaw('COUNT(*) AS permissions_count')
-            ->groupBy($this->groupExpressions->normalized($query))
+            ->groupBy('normalized_group')
             ->toBase()
             ->get();
         $groups = [];

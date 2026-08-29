@@ -196,8 +196,10 @@ it('records one result when duplicate delivery outcomes race', function (): void
 
     $targetConnection = 'auth_outcome_concurrency_target';
     $originalAuthConnection = config('nvl-auth.connection');
+    $originalInvitationsEnabled = config('nvl-auth.features.invitations.enabled');
     config()->set("database.connections.{$targetConnection}", $connectionConfig);
     config()->set('nvl-auth.connection', $targetConnection);
+    config()->set('nvl-auth.features.invitations.enabled', true);
     DB::purge($targetConnection);
     $invitationId = Str::uuid()->toString();
     $messageId = Str::uuid()->toString();
@@ -252,6 +254,7 @@ it('records one result when duplicate delivery outcomes race', function (): void
             ->where('id', $invitationId)
             ->delete();
         config()->set('nvl-auth.connection', $originalAuthConnection);
+        config()->set('nvl-auth.features.invitations.enabled', $originalInvitationsEnabled);
         DB::purge($targetConnection);
         config()->set("database.connections.{$targetConnection}", null);
     }
