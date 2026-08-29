@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Invitations;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -31,14 +32,20 @@ final readonly class RevokeInvitationAction
     /**
      * Revoke an invitation idempotently.
      */
-    public function execute(Invitation $invitation, Authenticatable $actor): Invitation
+    public function execute(Invitation|string $invitation, Authenticatable $actor): Invitation
     {
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Revoke);
-        $this->authorization->authorize($actor, 'nvl-auth.invitations.revoke', $invitation);
+        $identifier = $invitation instanceof Invitation
+            ? $invitation->identifier()
+            : $this->identifier($invitation);
+        $connection = $invitation instanceof Invitation
+            ? $invitation->getConnectionName()
+            : (new Invitation)->getConnectionName();
 
-        return DB::connection($invitation->getConnectionName())->transaction(function () use ($actor, $invitation): Invitation {
+        return DB::connection($connection)->transaction(function () use ($actor, $identifier): Invitation {
             /** @var Invitation $locked */
-            $locked = Invitation::query()->lockForUpdate()->findOrFail($invitation->identifier());
+            $locked = Invitation::query()->lockForUpdate()->findOrFail($identifier);
+            $this->authorization->authorize($actor, 'nvl-auth.invitations.revoke', $locked);
 
             if ($locked->revoked_at === null && $locked->accepted_at === null) {
                 $locked->forceFill([
@@ -54,5 +61,20 @@ final readonly class RevokeInvitationAction
 
             return $locked;
         }, 3);
+    }
+
+    /**
+     * Validate an invitation identifier supplied without a model instance.
+     */
+    private function identifier(string $identifier): string
+    {
+        if (trim($identifier) === ''
+            || $identifier !== trim($identifier)
+            || mb_strlen($identifier) > 191
+            || preg_match('/[\x00-\x1F\x7F]/', $identifier) === 1) {
+            throw new InvalidArgumentException('Invitation identifiers are invalid.');
+        }
+
+        return $identifier;
     }
 }

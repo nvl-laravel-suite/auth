@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Invitations;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Nvl\Auth\Data\Queries\InvitationIndexQueryData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -48,6 +48,7 @@ final readonly class ListInvitationsAction
                 $this->hasher->hash('invitation-recipient', mb_strtolower(trim((string) $filters->recipient))),
             ))
             ->when($filters->type !== null, fn ($query) => $query->where('type', $filters->type))
+            ->when($filters->types !== null, fn ($query) => $query->whereIn('type', $filters->types))
             ->when($filters->purpose !== null, fn ($query) => $query->where('purpose', $filters->purpose))
             ->when($filters->expiresAfter !== null, fn ($query) => $query->where('expires_at', '>=', $filters->expiresAfter))
             ->when($filters->expiresBefore !== null, fn ($query) => $query->where('expires_at', '<=', $filters->expiresBefore))

@@ -32,6 +32,9 @@ requests a fresh verification delivery.
 - `CreateInvitationAction`, `PreviewInvitationAction`, `AcceptInvitationAction`
 - `RegisterInvitationAction`, `ResendInvitationAction`,
   `RevokeInvitationAction`, `ListInvitationsAction`
+- value-only `ListInvitationProjectionsAction` and
+  `FindActiveInvitationAction`
+- `RecordInvitationDeliveryOutcomeAction`
 
 Magic links contain one opaque token and one numeric fallback code for the same
 single-use challenge. Token-only callbacks carry `challengeId` and the chosen
@@ -40,9 +43,21 @@ credential; legacy recipient-bound consumption remains supported.
 Pass trusted `InvitationIssuanceContext` from host orchestration for explicitly
 authorized actorless issuance, a bounded expiry override, or a post-accept
 return path. Public request input must never construct this context.
-`InvitationIndexQueryData` supports exact normalized recipient, type, purpose,
-lifecycle, expiry, and exact host-context filters. Recipient substring search is
-intentionally unavailable because recipients are encrypted at rest.
+`InvitationIndexQueryData` supports exact normalized recipient, one type or a
+bounded list of types, purpose, lifecycle, expiry, and exact host-context
+filters. Recipient substring search is intentionally unavailable because
+recipients are encrypted at rest. New management consumers should prefer
+`ListInvitationProjectionsAction`, which returns `InvitationReadData` instead of
+models. `FindActiveInvitationAction` requires a management actor or an explicit
+trusted actorless issuance context and returns the same value-only projection.
+Resend and revoke Actions accept either the compatibility model or its ID and
+authorize the locked authoritative row.
+
+Invitation delivery requests carry a bounded `InvitationDeliveryData`
+projection. Hosts report the current request outcome through
+`RecordInvitationDeliveryOutcomeAction` using the request `messageId`, a
+Delivered/Failed status, and only a stable safe failure code. Stale resend
+callbacks cannot overwrite the current state.
 The built-in registration mapper handles password registration. A host mapper
 may admit `registrationMethod=social` and consume only bounded `extensions`
 after its provider proof has succeeded; the atomic Action and acceptance hooks

@@ -14,6 +14,7 @@ use Nvl\Auth\Data\Mutations\StoreInvitationData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Enums\InvitationDeliveryStatus;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
@@ -110,6 +111,7 @@ final readonly class CreateInvitationAction
                         }
 
                         $token = $this->tokens->make();
+                        $messageId = (string) Str::uuid();
                         $expiresAt = $context->expiresAt ?? CarbonImmutable::now()->addHours(
                             $this->configuration->integerBetween(
                                 'features.invitations.settings.ttl_hours',
@@ -137,12 +139,14 @@ final readonly class CreateInvitationAction
                                 'return_path' => $context->returnPath,
                             ],
                             'resend_count' => 0,
+                            'current_delivery_message_id' => $messageId,
+                            'delivery_status' => InvitationDeliveryStatus::Pending,
                             'last_sent_at' => CarbonImmutable::now(),
                             'expires_at' => $expiresAt,
                         ]);
 
                         AuthDeliveryRequested::dispatch(new AuthDeliveryRequest(
-                            messageId: (string) Str::uuid(),
+                            messageId: $messageId,
                             feature: AuthFeature::Invitations,
                             type: AuthMessageType::Invitation,
                             recipient: $recipient,

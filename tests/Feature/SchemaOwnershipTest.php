@@ -115,7 +115,10 @@ it('does not bypass host-owned migration mode during schema apply', function ():
 it('rolls the complete package schema down and back up cleanly', function (): void {
     $features = require dirname(__DIR__, 2).'/database/migrations/2026_08_02_000000_create_nvl_auth_tables.php';
     $identity = require dirname(__DIR__, 2).'/database/migrations/2026_08_01_000000_create_nvl_auth_identity_tables.php';
+    $deliveryContext = require dirname(__DIR__, 2).'/database/migrations/2026_08_12_000000_add_auth_delivery_context_columns.php';
+    $deliveryOutcomes = require dirname(__DIR__, 2).'/database/migrations/2026_08_28_000000_add_invitation_delivery_outcomes.php';
 
+    $deliveryOutcomes->down();
     $features->down();
     $identity->down();
 
@@ -125,11 +128,15 @@ it('rolls the complete package schema down and back up cleanly', function (): vo
 
     $identity->up();
     $features->up();
+    $deliveryContext->up();
+    $deliveryOutcomes->up();
 
     expect(Schema::hasTable(AuthTables::Users))->toBeTrue()
         ->and(Schema::hasTable(AuthTables::Roles))->toBeTrue()
         ->and(Schema::hasTable(AuthTables::Clients))->toBeTrue()
         ->and(Schema::hasColumn(AuthTables::Invitations, 'active_key'))->toBeTrue()
+        ->and(Schema::hasColumn(AuthTables::Invitations, 'delivery_status'))->toBeTrue()
+        ->and(Schema::hasColumn(AuthTables::Invitations, 'delivery_failure_code'))->toBeTrue()
         ->and(Schema::hasColumn(AuthTables::Challenges, 'active_key'))->toBeTrue()
         ->and(Schema::hasTable(AuthTables::Audits))->toBeTrue();
 });

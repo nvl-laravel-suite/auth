@@ -21,7 +21,7 @@ feature-owned schema.
 | `nvl_auth_password_reset_tokens` | Laravel password-broker reset tokens | broker-generated token hash |
 | `nvl_auth_clients` | first-party client allowlists and return policy | bounded metadata |
 | `nvl_auth_client_sessions` | correlation to a Laravel browser session | session ID hashed; IP, UA, metadata encrypted |
-| `nvl_auth_invitations` | simple invitation lifecycle | token hashed; recipient and metadata encrypted |
+| `nvl_auth_invitations` | invitation lifecycle and current coarse delivery outcome | token hashed; recipient and metadata encrypted; no provider payloads or exception text |
 | `nvl_auth_challenges` | magic links, codes, and passkey ceremony state | secrets hashed; adapter payload encrypted |
 | `nvl_auth_totp_credentials` | TOTP authenticators | secret encrypted; replay timestep stored |
 | `nvl_auth_passkeys` | WebAuthn credentials | credential ID, public key, and handle encrypted; blind index hashed |
@@ -40,8 +40,10 @@ admission add no independent tables.
 ## Deliberately absent tables
 
 The package does not create shadow browser sessions, mail notifications,
-delivery attempts, queues, jobs, outboxes, workflow/saga projections, scheduler
-checkpoints, or duplicated token/session projections. Laravel remains
+delivery-attempt histories, queues, jobs, outboxes, workflow/saga projections,
+scheduler checkpoints, or duplicated token/session projections. Invitations
+store only their current Pending/Delivered/Failed outcome, message correlation
+ID, timestamps, and a bounded safe failure code. Laravel remains
 authoritative for the running browser session; transport packages remain
 authoritative for delivery execution.
 

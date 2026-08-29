@@ -92,7 +92,7 @@ final class AuthDoctorCommand extends Command
         AuthTables::PasswordResetTokens => ['email', 'token', 'created_at'],
         AuthTables::Clients => ['id', 'name', 'surface', 'base_url', 'return_paths', 'allowed_origins', 'allowed_flows', 'metadata', 'is_active', 'last_used_at', 'created_at', 'updated_at'],
         AuthTables::ClientSessions => ['id', 'client_id', 'subject_type', 'subject_id', 'session_id_hash', 'ip_address', 'user_agent', 'metadata', 'authenticated_at', 'last_seen_at', 'ended_at', 'end_reason', 'created_at', 'updated_at'],
-        AuthTables::Invitations => ['id', 'token_hash', 'active_key', 'recipient', 'recipient_hash', 'context_hash', 'type', 'purpose', 'inviter_type', 'inviter_id', 'accepted_by_type', 'accepted_by_id', 'roles', 'permissions', 'metadata', 'resend_count', 'last_sent_at', 'expires_at', 'accepted_at', 'revoked_at', 'created_at', 'updated_at'],
+        AuthTables::Invitations => ['id', 'token_hash', 'active_key', 'recipient', 'recipient_hash', 'context_hash', 'type', 'purpose', 'inviter_type', 'inviter_id', 'accepted_by_type', 'accepted_by_id', 'roles', 'permissions', 'metadata', 'resend_count', 'current_delivery_message_id', 'delivery_status', 'delivery_attempted_at', 'delivered_at', 'delivery_failed_at', 'delivery_failure_code', 'last_sent_at', 'expires_at', 'accepted_at', 'revoked_at', 'created_at', 'updated_at'],
         AuthTables::Challenges => ['id', 'type', 'purpose', 'subject_type', 'subject_id', 'recipient_hash', 'secret_hash', 'secondary_secret_hash', 'active_key', 'payload', 'attempts', 'max_attempts', 'expires_at', 'consumed_at', 'revoked_at', 'created_at', 'updated_at'],
         AuthTables::TotpCredentials => ['id', 'subject_type', 'subject_id', 'name', 'secret', 'algorithm', 'digits', 'period', 'allowed_drift', 'last_accepted_timestep', 'confirmed_at', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'],
         AuthTables::Passkeys => ['id', 'subject_type', 'subject_id', 'name', 'credential_id', 'credential_id_hash', 'public_key', 'user_handle', 'signature_counter', 'transports', 'backup_eligible', 'backed_up', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'],
@@ -105,6 +105,7 @@ final class AuthDoctorCommand extends Command
     private const TABLE_INDEXES = [
         AuthTables::Invitations => [
             'nvl_auth_invitations_context_hash_index' => false,
+            'nvl_auth_invitations_delivery_status_index' => false,
         ],
         AuthTables::Challenges => [
             'nvl_auth_challenges_secondary_secret_hash_unique' => true,

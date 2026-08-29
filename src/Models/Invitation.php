@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\InvitationFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Enums\InvitationDeliveryStatus;
 
 /**
  * Represents one bounded, bearer-token invitation.
@@ -28,6 +29,12 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
  * @property list<string>|null $permissions
  * @property array<string, mixed>|null $metadata
  * @property int $resend_count
+ * @property string|null $current_delivery_message_id
+ * @property InvitationDeliveryStatus|null $delivery_status
+ * @property CarbonImmutable|null $delivery_attempted_at
+ * @property CarbonImmutable|null $delivered_at
+ * @property CarbonImmutable|null $delivery_failed_at
+ * @property string|null $delivery_failure_code
  * @property CarbonImmutable|null $last_sent_at
  * @property CarbonImmutable $expires_at
  * @property CarbonImmutable|null $accepted_at
@@ -61,6 +68,12 @@ final class Invitation extends AuthModel
         'permissions',
         'metadata',
         'resend_count',
+        'current_delivery_message_id',
+        'delivery_status',
+        'delivery_attempted_at',
+        'delivered_at',
+        'delivery_failed_at',
+        'delivery_failure_code',
         'last_sent_at',
         'expires_at',
         'accepted_at',
@@ -68,7 +81,14 @@ final class Invitation extends AuthModel
     ];
 
     /** @var list<string> */
-    protected $hidden = ['token_hash', 'active_key', 'recipient', 'recipient_hash', 'context_hash'];
+    protected $hidden = [
+        'token_hash',
+        'active_key',
+        'recipient',
+        'recipient_hash',
+        'context_hash',
+        'current_delivery_message_id',
+    ];
 
     /**
      * Define invitation casts.
@@ -83,6 +103,10 @@ final class Invitation extends AuthModel
             'permissions' => 'array',
             'metadata' => 'encrypted:array',
             'resend_count' => 'integer',
+            'delivery_status' => InvitationDeliveryStatus::class,
+            'delivery_attempted_at' => 'immutable_datetime',
+            'delivered_at' => 'immutable_datetime',
+            'delivery_failed_at' => 'immutable_datetime',
             'last_sent_at' => 'immutable_datetime',
             'expires_at' => 'immutable_datetime',
             'accepted_at' => 'immutable_datetime',

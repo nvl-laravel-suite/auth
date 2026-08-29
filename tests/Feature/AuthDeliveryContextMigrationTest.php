@@ -14,6 +14,50 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Services\AuthSchemaManager;
 
+it('adds reversible invitation delivery outcome columns without changing existing rows', function (): void {
+    $migration = authDeliveryOutcomeMigration();
+    $migration->down();
+    $invitationId = (string) Str::uuid();
+    DB::table(AuthTables::Invitations)->insert([
+        'id' => $invitationId,
+        'token_hash' => hash('sha256', 'outcome-token'),
+        'recipient' => 'outcome-existing@example.test',
+        'recipient_hash' => hash('sha256', 'outcome-existing@example.test'),
+        'type' => 'registration',
+        'purpose' => 'registration',
+        'expires_at' => now()->addHour()->toDateTimeString(),
+    ]);
+    $before = (array) DB::table(AuthTables::Invitations)->where('id', $invitationId)->first();
+
+    try {
+        $migration->up();
+
+        expect(Schema::hasColumns(AuthTables::Invitations, [
+            'current_delivery_message_id',
+            'delivery_status',
+            'delivery_attempted_at',
+            'delivered_at',
+            'delivery_failed_at',
+            'delivery_failure_code',
+        ]))->toBeTrue()
+            ->and(authDeliveryIndex(
+                AuthTables::Invitations,
+                'nvl_auth_invitations_delivery_status_index',
+            ))->toMatchArray([
+                'columns' => ['delivery_status', 'delivery_attempted_at'],
+                'unique' => false,
+            ])
+            ->and((array) DB::table(AuthTables::Invitations)
+                ->where('id', $invitationId)
+                ->first(array_keys($before)))->toBe($before)
+            ->and(DB::table(AuthTables::Invitations)
+                ->where('id', $invitationId)
+                ->value('delivery_status'))->toBeNull();
+    } finally {
+        $migration->up();
+    }
+});
+
 it('upgrades the v1.0.1 schema without changing existing delivery rows', function (): void {
     resetAuthDeliveryFeatureSchema(false);
     $invitationId = (string) Str::uuid();
@@ -131,10 +175,22 @@ it('plans and repairs outdated delivery tables after later feature activation', 
 
         expect($plan['missing'])->toBe([])
             ->and($plan['outdated'])->toBe([
-                AuthTables::Invitations => ['context_hash'],
+                AuthTables::Invitations => [
+                    'context_hash',
+                    'current_delivery_message_id',
+                    'delivery_status',
+                    'delivery_attempted_at',
+                    'delivered_at',
+                    'delivery_failed_at',
+                    'delivery_failure_code',
+                ],
                 AuthTables::Challenges => ['secondary_secret_hash'],
             ])
             ->and($applied['outdated'])->toBe($plan['outdated'])
+            ->and($plan['missing_indexes'][AuthTables::Invitations])->toBe([
+                'nvl_auth_invitations_context_hash_index',
+                'nvl_auth_invitations_delivery_status_index',
+            ])
             ->and(Schema::hasColumn(AuthTables::Invitations, 'context_hash'))->toBeTrue()
             ->and(Schema::hasColumn(AuthTables::Challenges, 'secondary_secret_hash'))->toBeTrue();
     } finally {
@@ -171,7 +227,15 @@ it('refuses to repair outdated tables when migrations are host-owned', function 
         $plan = app(AuthSchemaManager::class)->execute();
 
         expect($plan['outdated'])->toBe([
-            AuthTables::Invitations => ['context_hash'],
+            AuthTables::Invitations => [
+                'context_hash',
+                'current_delivery_message_id',
+                'delivery_status',
+                'delivery_attempted_at',
+                'delivered_at',
+                'delivery_failed_at',
+                'delivery_failure_code',
+            ],
             AuthTables::Challenges => ['secondary_secret_hash'],
         ])->and(fn (): array => app(AuthSchemaManager::class)->execute(true))
             ->toThrow(
@@ -225,7 +289,7 @@ it('fails closed when an enabled schema remains incomplete after repair', functi
     $schema->shouldReceive('hasTable')->andReturnTrue();
     $schema->shouldReceive('hasColumn')->andReturnFalse();
     $schema->shouldReceive('hasIndex')->andReturnFalse();
-    $schema->shouldReceive('table')->times(4);
+    $schema->shouldReceive('table')->times(11);
 
     $connection = Mockery::mock(Connection::class)->shouldIgnoreMissing();
     $connection->shouldReceive('setReadWriteType')->andReturnSelf();
@@ -240,8 +304,9 @@ it('fails closed when an enabled schema remains incomplete after repair', functi
         ->toThrow(
             RuntimeException::class,
             'Auth schema installation remains incomplete: tables [], '
-            .'columns [nvl_auth_invitations:context_hash, nvl_auth_challenges:secondary_secret_hash], '
-            .'indexes [nvl_auth_invitations:nvl_auth_invitations_context_hash_index, '
+            .'columns [nvl_auth_invitations:context_hash|current_delivery_message_id|delivery_status|delivery_attempted_at|delivered_at|delivery_failed_at|delivery_failure_code, '
+            .'nvl_auth_challenges:secondary_secret_hash], '
+            .'indexes [nvl_auth_invitations:nvl_auth_invitations_context_hash_index|nvl_auth_invitations_delivery_status_index, '
             .'nvl_auth_challenges:nvl_auth_challenges_secondary_secret_hash_unique].',
         );
 });
@@ -273,6 +338,19 @@ function authDeliveryCorrectiveMigration(): AuthSchemaMigration
 }
 
 /**
+ * Load the invitation delivery-outcome migration.
+ */
+function authDeliveryOutcomeMigration(): AuthSchemaMigration
+{
+    $migration = require dirname(__DIR__, 2).'/database/migrations/2026_08_28_000000_add_invitation_delivery_outcomes.php';
+
+    expect($migration)->toBeInstanceOf(Migration::class)
+        ->and($migration)->toBeInstanceOf(AuthSchemaMigration::class);
+
+    return $migration;
+}
+
+/**
  * Recreate the feature schema at its baseline or corrected version.
  */
 function resetAuthDeliveryFeatureSchema(bool $corrected = true): void
@@ -285,6 +363,7 @@ function resetAuthDeliveryFeatureSchema(bool $corrected = true): void
 
     if ($corrected) {
         authDeliveryCorrectiveMigration()->up();
+        authDeliveryOutcomeMigration()->up();
     }
 }
 

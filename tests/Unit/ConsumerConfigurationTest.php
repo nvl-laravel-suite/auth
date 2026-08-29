@@ -54,11 +54,31 @@ it('exposes complete consumer validation rules and invitation registration data'
         ->and(ApplyRoleTemplateData::rules())->toHaveKeys(['template', 'roleName'])
         ->and(InvitationIndexQueryData::rules())->toHaveKeys([
             'recipient',
+            'types',
             'lifecycle',
             'expiresAfter',
             'expiresBefore',
             'perPage',
         ]);
+});
+
+it('normalizes bounded multi-type invitation filters', function (): void {
+    $filters = new InvitationIndexQueryData(types: [
+        'candidate',
+        'registration',
+        'candidate',
+    ]);
+
+    expect($filters->types)->toBe(['candidate', 'registration'])
+        ->and(fn () => new InvitationIndexQueryData(types: array_map(
+            static fn (int $index): string => "type-{$index}",
+            range(1, 21),
+        )))->toThrow(InvalidArgumentException::class, 'at most 20')
+        ->and(fn () => new InvitationIndexQueryData(types: array_fill(
+            0,
+            21,
+            'candidate',
+        )))->toThrow(InvalidArgumentException::class, 'at most 20');
 });
 
 it('rejects malformed role, invitation, and assignment consumer mutations', function (): void {

@@ -286,22 +286,81 @@ final class DeliverAuthMessage
 {
     public function handle(AuthDeliveryRequested $event): void
     {
-        // Map $event->request into nvl/mail-notifications or another transport.
+        $request = $event->request;
+
+        // Render from $request->subject or $request->invitation when present,
+        // then deliver the secret-bearing $request->payload.
     }
 }
 ```
 
 Each delivery feature owns exactly one message type. Magic-link delivery
 includes `challenge_id`, an opaque `secret`, and a numeric `code`; either
-credential atomically consumes the same challenge.
+credential atomically consumes the same challenge. Its request also carries the
+challenged `SubjectReference`. Invitation delivery carries a bounded
+`InvitationDeliveryData` projection with recipient, purpose, inviter, grants,
+expiry, resend count, and only metadata keys explicitly allowlisted by
+`features.invitations.settings.delivery_metadata_keys`.
 
 Auth owns the message intent and secure payload. The consumer owns channel,
-template, provider, delivery retry, and provider callback concerns.
+template, provider, delivery retry, and provider callback concerns. The request
+`messageId` is the stable idempotency and outcome-correlation key.
 
 Successful direct and registration-through-invitation acceptance dispatches an
 after-commit `InvitationAccepted` event exactly once. It contains only the
-invitation ID, type, purpose, and accepted `SubjectReference`; bearer tokens,
-recipient addresses, and invitation metadata are deliberately excluded.
+invitation ID, type, purpose, accepted `SubjectReference`, and durable
+`acceptedAt` timestamp; bearer tokens, recipient addresses, and invitation
+metadata are deliberately excluded.
+
+## Consumer application APIs
+
+Application code should enter Auth through Actions and consume DTOs. The main
+read boundaries are the [RBAC consumer reads](#rbac-consumer-reads-and-analytics)
+and the [invitation consumer reads](#invitation-consumer-reads-and-delivery-outcomes)
+below. Package model reads remain a documented 1.x compatibility surface, not
+the preferred boundary for new applications.
+
+## Invitation consumer reads and delivery outcomes
+
+Use `ListInvitationProjectionsAction` for authorized management lists. It
+accepts `InvitationIndexQueryData`, including bounded `types`, lifecycle,
+recipient, purpose, context, and expiry filters, and returns a paginator of
+`InvitationReadData`. The DTO contains only usable consumer state; token,
+recipient, context, and active-key hashes plus the current delivery message ID
+are never exposed.
+
+```php
+use Nvl\Auth\Actions\Invitations\ListInvitationProjectionsAction;
+use Nvl\Auth\Data\Queries\InvitationIndexQueryData;
+
+$invitations = app(ListInvitationProjectionsAction::class)->execute(
+    $actor,
+    new InvitationIndexQueryData(
+        types: ['candidate', 'registration'],
+        lifecycle: 'active',
+        context: $campaignId,
+    ),
+);
+```
+
+`FindActiveInvitationAction` performs normalized exact recipient, purpose,
+optional type, and hashed-context lookup without exposing the model. Pass a
+management actor whenever one exists. Actorless lookup is a trusted server-only
+boundary and requires an explicitly constructed
+`InvitationIssuanceContext(actorlessAuthorized: true)`; never hydrate that
+context from public request data.
+
+Resend and revoke workflows may pass an invitation ID directly to
+`ResendInvitationAction` and `RevokeInvitationAction`. The Actions resolve and
+lock the authoritative row before authorization and mutation.
+
+After an invitation transport attempt, report only a coarse result through
+`RecordInvitationDeliveryOutcomeAction`: `Delivered`, or `Failed` with a stable
+safe failure code such as `provider_rejected`. Never pass provider exception
+messages. Auth ignores stale callbacks for superseded resend message IDs,
+records that fact in its audit stream, and makes duplicate callbacks
+idempotent. Provider IDs, raw responses, retry scheduling, and detailed delivery
+telemetry remain host-owned.
 
 ## Storage
 
