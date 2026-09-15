@@ -98,14 +98,13 @@ it('issues consumes and audits a simple invitation without delivery persistence'
     );
 
     expect($restoredAcceptanceEvent->acceptedAt?->equalTo($accepted->accepted_at))->toBeTrue()
-        ->and($deliverySnapshot)->not->toContain(
-            $issued->token,
-            'private_note',
-            'not-for-delivery',
-            'token_hash',
-            'active_key',
-            'recipient_hash',
-        );
+        ->and($deliverySnapshot)
+        ->not->toContain($issued->token)
+        ->not->toContain('private_note')
+        ->not->toContain('not-for-delivery')
+        ->not->toContain('token_hash')
+        ->not->toContain('active_key')
+        ->not->toContain('recipient_hash');
 });
 
 it('publishes current typed invitation context when resending', function (): void {
@@ -328,15 +327,14 @@ it('lists bounded invitation projections with multi-type filters and constant qu
 
     expect($page->items())->toHaveCount(2)
         ->each->toBeInstanceOf(InvitationReadData::class)
-        ->and($snapshot)->not->toContain(
-            'token_hash',
-            'active_key',
-            'recipient_hash',
-            'context_hash',
-            'current_delivery_message_id',
-            'private_note',
-            'not-for-consumers',
-        );
+        ->and($snapshot)
+        ->not->toContain('token_hash')
+        ->not->toContain('active_key')
+        ->not->toContain('recipient_hash')
+        ->not->toContain('context_hash')
+        ->not->toContain('current_delivery_message_id')
+        ->not->toContain('private_note')
+        ->not->toContain('not-for-consumers');
 
     Invitation::factory()->count(100)->create();
     DB::flushQueryLog();
@@ -404,10 +402,9 @@ it('supports ID lifecycle mutations and records current delivery outcomes idempo
     expect($invitation->current_delivery_message_id)->toBe($initialMessageId)
         ->and($invitation->delivery_status)->toBe(InvitationDeliveryStatus::Pending)
         ->and($invitation->delivery_attempted_at)->toBeNull()
-        ->and($modelSnapshot)->not->toContain(
-            'current_delivery_message_id',
-            $initialMessageId,
-        );
+        ->and($modelSnapshot)
+        ->not->toContain('current_delivery_message_id')
+        ->not->toContain($initialMessageId);
 
     $invitation->forceFill(['last_sent_at' => now()->subSeconds(2)])->save();
     $resent = app(ResendInvitationAction::class)->execute($invitation->identifier(), $actor);

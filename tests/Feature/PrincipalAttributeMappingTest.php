@@ -75,7 +75,11 @@ it('preserves host fillable extensions alongside mapped principal attributes', f
             'organization_id',
             'position',
         )
-        ->not->toContain('email', 'is_active', 'profile', 'preferences', 'unlisted_extension')
+        ->not->toContain('email')
+        ->not->toContain('is_active')
+        ->not->toContain('profile')
+        ->not->toContain('preferences')
+        ->not->toContain('unlisted_extension')
         ->and(array_values(array_unique($fillable)))->toBe($fillable);
 
     $filled = (new MappedPrincipal)->fill([

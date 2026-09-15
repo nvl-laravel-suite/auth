@@ -25,7 +25,8 @@ it('accepts bounded transport-neutral delivery data and redacts debug output', f
 
     expect($request->__debugInfo())
         ->toMatchArray(['recipient' => '[REDACTED]', 'payload_keys' => ['token']])
-        ->not->toContain('secret', 'user@example.test');
+        ->not->toContain('secret')
+        ->not->toContain('user@example.test');
 });
 
 it('rejects expired or oversized delivery payloads', function (): void {
@@ -93,13 +94,12 @@ it('carries queue-safe typed subject and invitation context without exposing val
         ->and($request->__debugInfo())->toMatchArray([
             'subject_type' => 'user',
             'has_invitation' => true,
-        ])->not->toContain(
-            'subject-1',
-            'invitation-1',
-            'member-1',
-            'delivery-secret',
-            'invitee@example.test',
-        );
+        ])
+        ->not->toContain('subject-1')
+        ->not->toContain('invitation-1')
+        ->not->toContain('member-1')
+        ->not->toContain('delivery-secret')
+        ->not->toContain('invitee@example.test');
 });
 
 it('rejects invitation context on unrelated delivery features', function (): void {

@@ -461,8 +461,12 @@ it('returns filtered stable DTO catalogs without related user identity data', fu
         ->and($permissionItem?->roleIds)->toBe(collect([$role->id, $secondRole->id])->sort()->values()->all())
         ->and($permissionItem?->rolesCount)->toBe(2)
         ->and($permissionItem?->usersCount)->toBe(1)
-        ->and(array_keys($roleItem?->toArray() ?? []))->not->toContain('users', 'email')
-        ->and(array_keys($permissionItem?->toArray() ?? []))->not->toContain('users', 'email');
+        ->and(array_keys($roleItem?->toArray() ?? []))
+        ->not->toContain('users')
+        ->not->toContain('email')
+        ->and(array_keys($permissionItem?->toArray() ?? []))
+        ->not->toContain('users')
+        ->not->toContain('email');
 
     expect(fn () => new RoleIndexQueryData(sort: 'users'))
         ->toThrow(InvalidArgumentException::class, 'sort')
@@ -903,7 +907,11 @@ it('returns bounded per-role analytics using configured principal semantics', fu
                 'general' => 1,
                 'identity' => 1,
             ],
-        ])->and(array_keys($analytics->toArray()))->not->toContain('userIds', 'usersData', 'email');
+        ])
+        ->and(array_keys($analytics->toArray()))
+        ->not->toContain('userIds')
+        ->not->toContain('usersData')
+        ->not->toContain('email');
 });
 
 it('counts an independently configured RBAC principal model', function (): void {
