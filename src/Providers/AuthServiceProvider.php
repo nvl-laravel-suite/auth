@@ -48,8 +48,14 @@ use Nvl\Auth\Contracts\SystemMutationAccess;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\AuthAudit;
+use Nvl\Auth\Models\Challenge;
+use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
+use Nvl\Auth\Models\TenantAuthenticationIntent;
+use Nvl\Auth\Models\TenantMembership;
+use Nvl\Auth\Models\TenantMembershipLock;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\AuthConfiguration;
@@ -73,10 +79,15 @@ use Nvl\Auth\Services\PrincipalEligibility;
 use Nvl\Auth\Services\RoleTemplateRegistry;
 use Nvl\Auth\Services\UnavailableSocialIdentityProvider;
 use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
+use Nvl\Auth\Tenancy\AuthTenancyAdoption;
 use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
 use Nvl\Support\Traits\MergesPackageConfiguration;
+use Nvl\Tenancy\Enums\TenantResourceKind;
 use Nvl\Tenancy\Providers\TenancyServiceProvider;
+use Nvl\Tenancy\Services\TenantAdoptionRegistry;
+use Nvl\Tenancy\Services\TenantResourceRegistry;
+use Nvl\Tenancy\ValueObjects\TenantResourceDefinition;
 
 /**
  * Registers the passive package layer and lazy feature integrations.
@@ -100,6 +111,7 @@ final class AuthServiceProvider extends ServiceProvider
         $this->app->singleton(AuthSchemaManager::class);
         $this->app->singleton(FeatureManifest::class);
         $this->app->singleton(FeatureGate::class);
+        $this->registerTenancyResources();
         $this->app->singleton(BrowserSession::class, LaravelBrowserSession::class);
         $this->app->singleton(AuthAuditContextProvider::class, LaravelRequestAuditContextProvider::class);
         $this->bindConfiguredContract(
@@ -311,8 +323,30 @@ final class AuthServiceProvider extends ServiceProvider
             'role_pivot_key' => 'role_id',
             'permission_pivot_key' => 'permission_id',
             'model_morph_key' => 'model_id',
+            'team_foreign_key' => 'tenant_id',
         ]));
-        $configuration->set('permission.teams', false);
+        $configuration->set('permission.teams', (bool) $configuration->get('tenancy.enabled', false));
+    }
+
+    /** Register Auth's immutable tenant resource inventory without touching storage. */
+    private function registerTenancyResources(): void
+    {
+        $resources = $this->app->make(TenantResourceRegistry::class);
+        $models = $this->app->make(AuthModelRegistry::class);
+        foreach ([
+            new TenantResourceDefinition('auth.memberships', 'auth.memberships', TenantMembership::class),
+            new TenantResourceDefinition('auth.membership_locks', 'auth.memberships', TenantMembershipLock::class),
+            new TenantResourceDefinition('auth.roles', 'auth.rbac', $models->roleClass()),
+            new TenantResourceDefinition('auth.invitations', 'auth.invitations', Invitation::class, allowsPlatformRows: true),
+            new TenantResourceDefinition('auth.tokens', 'auth.tokens', $models->personalAccessTokenClass(), allowsPlatformRows: true),
+            new TenantResourceDefinition('auth.challenges', 'auth.challenges', Challenge::class, allowsPlatformRows: true),
+            new TenantResourceDefinition('auth.audits', 'auth.audits', AuthAudit::class, allowsPlatformRows: true),
+            new TenantResourceDefinition('auth.authentication_intents', 'auth.authentication_intents', TenantAuthenticationIntent::class),
+            new TenantResourceDefinition('auth.permissions', 'auth.permissions', $models->permissionClass(), TenantResourceKind::Platform),
+        ] as $resource) {
+            $resources->register($resource);
+        }
+        $this->app->make(TenantAdoptionRegistry::class)->register('auth', AuthTenancyAdoption::class);
     }
 
     /**

@@ -53,6 +53,8 @@ final class Invitation extends AuthModel
 
     /** @var list<string> */
     protected $fillable = [
+        'tenant_id',
+        'ownership_key',
         'token_hash',
         'active_key',
         'recipient',

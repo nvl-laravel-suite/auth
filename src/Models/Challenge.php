@@ -41,6 +41,8 @@ final class Challenge extends AuthModel
 
     /** @var list<string> */
     protected $fillable = [
+        'tenant_id',
+        'ownership_key',
         'type',
         'purpose',
         'subject_type',

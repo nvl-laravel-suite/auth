@@ -186,6 +186,12 @@ final readonly class AuthSchemaManager
             $tables[] = $this->table('users', AuthTables::Users);
         }
 
+        if ($this->enabled(AuthFeature::Memberships) && config('tenancy.enabled') === true) {
+            $tables[] = AuthTables::TenantMemberships;
+            $tables[] = AuthTables::TenantMembershipLocks;
+            $tables[] = AuthTables::TenantAuthenticationIntents;
+        }
+
         if ($this->enabled(AuthFeature::Password)) {
             $tables[] = $this->table('password_reset_tokens', AuthTables::PasswordResetTokens);
         }

@@ -17,6 +17,7 @@ use Spatie\Permission\Models\Role as SpatieRole;
  * Provides the package-owned, hierarchical Spatie Permission role model.
  *
  * @property string $id
+ * @property string $tenant_id
  * @property string $name
  * @property string $guard_name
  * @property string|null $display_name
@@ -43,6 +44,7 @@ class Role extends SpatieRole
 
     /** @var list<string> */
     protected $fillable = [
+        'tenant_id',
         'name',
         'guard_name',
         'display_name',

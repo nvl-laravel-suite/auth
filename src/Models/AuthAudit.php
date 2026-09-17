@@ -38,6 +38,8 @@ final class AuthAudit extends AuthModel
 
     /** @var list<string> */
     protected $fillable = [
+        'tenant_id',
+        'ownership_key',
         'action',
         'outcome',
         'subject_type',

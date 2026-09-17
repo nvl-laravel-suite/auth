@@ -34,6 +34,11 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
     /** @var string */
     protected $keyType = 'string';
 
+    /** @var list<string> */
+    protected $fillable = [
+        'name', 'token', 'abilities', 'expires_at', 'tenant_id', 'ownership_key',
+    ];
+
     /**
      * Resolve the configured package token table.
      */
