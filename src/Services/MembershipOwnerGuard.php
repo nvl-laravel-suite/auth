@@ -59,6 +59,6 @@ final readonly class MembershipOwnerGuard
     private function hasSecondActiveOwner(Builder $query): bool
     {
         return $query->where('status', MembershipStatus::Active->value)->where('is_owner', true)
-            ->limit(2)->lockForUpdate()->get(['id'])->get(1) instanceof TenantMembership;
+            ->orderBy('id')->limit(2)->lockForUpdate()->get(['id'])->get(1) instanceof TenantMembership;
     }
 }

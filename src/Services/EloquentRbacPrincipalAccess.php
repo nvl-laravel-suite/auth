@@ -135,7 +135,13 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
 
     private function queries(): AuthTenantRbacQueries
     {
-        return $this->tenancy ?? app(AuthTenantRbacQueries::class);
+        if (! $this->tenancy instanceof AuthTenantRbacQueries) {
+            throw AuthException::invalidConfiguration(
+                'Tenant RBAC principal access requires the tenant query collaborator.',
+            );
+        }
+
+        return $this->tenancy;
     }
 
     /** @return Model&Authenticatable */

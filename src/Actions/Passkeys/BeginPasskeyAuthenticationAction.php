@@ -10,14 +10,17 @@ use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Enums\TenantAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\Passkey;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\SecretHasher;
+use Nvl\Auth\Services\TenantAuthenticationChallengeIntents;
 use Nvl\Auth\ValueObjects\PasskeyCeremonyOptions;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Tenancy\ValueObjects\TenantId;
 use Throwable;
 
 /**
@@ -34,12 +37,13 @@ final readonly class BeginPasskeyAuthenticationAction
         private PasskeyCeremony $ceremony,
         private SecretHasher $hasher,
         private AuthAuditRecorder $audits,
+        private TenantAuthenticationChallengeIntents $tenantIntents,
     ) {}
 
     /**
      * Begin one passkey authentication ceremony.
      */
-    public function execute(?Authenticatable $subject = null): PasskeyCeremonyOptions
+    public function execute(?Authenticatable $subject = null, ?TenantId $tenant = null): PasskeyCeremonyOptions
     {
         $this->features->assertAllowed(AuthFeature::Passkeys, FeatureOperation::Use);
         $reference = $subject instanceof Authenticatable
@@ -78,7 +82,7 @@ final readonly class BeginPasskeyAuthenticationAction
         }
 
         $connection = (new Challenge)->getConnectionName();
-        DB::connection($connection)->transaction(function () use ($options, $reference, $subject): void {
+        DB::connection($connection)->transaction(function () use ($options, $reference, $subject, $tenant): void {
             $challenge = Challenge::query()->create([
                 'type' => 'passkey_authentication',
                 'purpose' => 'passkey_authentication',
@@ -89,6 +93,13 @@ final readonly class BeginPasskeyAuthenticationAction
                 'max_attempts' => 1,
                 'expires_at' => $options->expiresAt,
             ]);
+            $this->tenantIntents->attach(
+                $challenge,
+                $tenant,
+                TenantAuthenticationPurpose::PasskeyLogin,
+                'passkey',
+                $reference,
+            );
             $this->audits->record(
                 'passkey.authentication_started',
                 subject: $reference,

@@ -15,6 +15,7 @@ use Nvl\Auth\Events\RbacChanged;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 
@@ -28,12 +29,14 @@ final readonly class CreatePermissionAction
         private AuthModelRegistry $models,
         private AuthConfiguration $configuration,
         private AuthAuditRecorder $audits,
+        private AuthOperationBoundary $operations,
     ) {}
 
     /** Persist one permission. */
     public function execute(Authenticatable $actor, StorePermissionData $data): Permission
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Issue);
+        $this->operations->requirePlatformAdministration();
         $this->authorization->authorize($actor, 'nvl-auth.rbac.managePermissions');
         $class = $this->models->permissionClass();
         $connection = (new $class)->getConnectionName();

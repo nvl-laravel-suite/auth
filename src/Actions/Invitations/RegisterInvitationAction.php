@@ -108,6 +108,9 @@ final readonly class RegisterInvitationAction
 
         try {
             return DB::connection($connection)->transaction(function () use ($authenticatedRecipient, $connection, $data, $tenant): InvitationRegistrationResult {
+                if ($tenant instanceof TenantId) {
+                    $this->owners->lock($tenant);
+                }
                 $query = $tenant instanceof TenantId
                     ? $this->boundary->query(Invitation::query(), 'auth.invitations')
                     : Invitation::query();
@@ -138,7 +141,6 @@ final readonly class RegisterInvitationAction
                         $membership = null;
                         if ($tenant instanceof TenantId) {
                             $principal = $this->principals->resolve($reference, true);
-                            $this->owners->lock($tenant);
                             if (! is_string($invitation->inviter_type) || ! is_string($invitation->inviter_id)) {
                                 throw new AuthException('invitation_invalid', 'The invitation is invalid or expired.', 410);
                             }
@@ -189,8 +191,16 @@ final readonly class RegisterInvitationAction
                         return new InvitationRegistrationResult($invitation, $subject);
                     },
                 );
-            }, 3);
+            }, $tenant instanceof TenantId ? 1 : 3);
         } catch (QueryException $exception) {
+            if ($tenant instanceof TenantId && ($exception->errorInfo[1] ?? null) === 1020) {
+                throw new AuthException(
+                    'invitation_invalid',
+                    'The invitation is invalid or expired.',
+                    410,
+                    previous: $exception,
+                );
+            }
             if (in_array($exception->errorInfo[0] ?? null, ['23000', '23505'], true)) {
                 throw new AuthException(
                     'invitation_principal_conflict',

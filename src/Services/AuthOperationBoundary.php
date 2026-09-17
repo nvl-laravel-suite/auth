@@ -57,4 +57,16 @@ final readonly class AuthOperationBoundary
             throw new TenantBoundaryViolation('Global Auth administration requires explicit platform context.');
         }
     }
+
+    /** Reject legacy RBAC entry points that mix platform and tenant-owned writes. */
+    public function rejectMixedRbacOperation(): void
+    {
+        if (config('tenancy.enabled') === true) {
+            throw new AuthException(
+                'rbac_mixed_context_operation',
+                'This RBAC operation mixes platform and tenant-owned state.',
+                409,
+            );
+        }
+    }
 }

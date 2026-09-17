@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Invitations;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\InvitationRecipientProof;
@@ -132,82 +133,89 @@ final readonly class AcceptInvitationAction
         SubjectReference $reference,
         TenantId $tenant,
     ): Invitation {
-        return $this->pipeline->run(
-            'invitation_accepted',
-            new AuthPipelineContext('invitation_accepted', subject: $reference),
-            function () use ($reference, $subject, $tenant, $token): Invitation {
-                $connection = (new Invitation)->getConnection()->getName();
-                $membershipConnection = (new TenantMembership)->getConnection()->getName();
-                if ($connection !== $membershipConnection || $connection !== $this->principals->connectionName()) {
-                    throw AuthException::invalidConfiguration(
-                        'Tenant invitation acceptance requires invitation, principal, and membership storage on one connection.',
-                    );
-                }
-
-                return DB::connection($connection)->transaction(function () use ($connection, $reference, $subject, $tenant, $token): Invitation {
-                    $candidate = $this->boundary->query(Invitation::query(), 'auth.invitations')
-                        ->where('token_hash', $this->hasher->hash('invitation-token', $token))
-                        ->first();
-                    if (! $candidate instanceof Invitation || ! $candidate->isUsable()) {
-                        throw new AuthException('invitation_invalid', 'The invitation is invalid or expired.', 410);
-                    }
-                    $this->recipientProof->assertMatches($candidate, $subject);
-                    $principal = $this->principals->resolve($reference, true);
-                    $this->owners->lock($tenant);
-                    /** @var Invitation|null $invitation */
-                    $invitation = $this->boundary->query(Invitation::query(), 'auth.invitations')
-                        ->whereKey($candidate->getKey())
-                        ->lockForUpdate()
-                        ->first();
-                    if (! $invitation instanceof Invitation || ! $invitation->isUsable()
-                        || ! hash_equals($invitation->token_hash, $this->hasher->hash('invitation-token', $token))) {
-                        throw new AuthException('invitation_invalid', 'The invitation is invalid or expired.', 410);
-                    }
-                    if (! is_string($invitation->inviter_type) || ! is_string($invitation->inviter_id)) {
-                        throw new AuthException('invitation_invalid', 'The invitation is invalid or expired.', 410);
-                    }
-                    $inviter = $this->principals->resolve(new SubjectReference(
-                        $invitation->inviter_type,
-                        $invitation->inviter_id,
-                    ), true);
-                    $this->membershipAccess->assertMember($inviter, $tenant);
-                    $this->authorization->authorize($inviter, 'nvl-auth.invitations.create');
-
-                    $roles = is_array($invitation->roles) ? $invitation->roles : [];
-                    $permissions = is_array($invitation->permissions) ? $invitation->permissions : [];
-                    $this->assignments->canonicalIdentifiers($roles, $permissions);
-                    $membership = $this->memberships->enroll($reference);
-                    $this->assignments->sync($principal, $roles, $permissions);
-                    $acceptedAt = CarbonImmutable::now();
-                    $invitation->forceFill([
-                        'active_key' => null,
-                        'accepted_by_type' => $reference->type,
-                        'accepted_by_id' => $reference->identifier,
-                        'accepted_at' => $acceptedAt,
-                    ])->save();
-                    DB::connection($connection)->afterCommit(function () use ($invitation, $membership, $reference, $subject, $tenant): void {
-                        $this->audits->record(
-                            'invitation.accepted',
-                            subject: $reference,
-                            actor: $subject,
-                            metadata: [
-                                'invitation_id' => $invitation->identifier(),
-                                'membership_id' => $membership->identifier(),
-                            ],
+        try {
+            return $this->pipeline->run(
+                'invitation_accepted',
+                new AuthPipelineContext('invitation_accepted', subject: $reference),
+                function () use ($reference, $subject, $tenant, $token): Invitation {
+                    $connection = (new Invitation)->getConnection()->getName();
+                    $membershipConnection = (new TenantMembership)->getConnection()->getName();
+                    if ($connection !== $membershipConnection || $connection !== $this->principals->connectionName()) {
+                        throw AuthException::invalidConfiguration(
+                            'Tenant invitation acceptance requires invitation, principal, and membership storage on one connection.',
                         );
-                        InvitationAccepted::dispatch(
-                            invitationId: $invitation->identifier(),
-                            type: $invitation->type,
-                            purpose: $invitation->purpose,
-                            subject: $reference,
-                            acceptedAt: $invitation->accepted_at,
-                            context: new AuthEventContext(TenantContextMode::Tenant, $tenant),
-                        );
-                    });
+                    }
 
-                    return $invitation;
-                }, 3);
-            },
-        );
+                    return DB::connection($connection)->transaction(function () use ($connection, $reference, $subject, $tenant, $token): Invitation {
+                        $this->owners->lock($tenant);
+                        /** @var Invitation|null $invitation */
+                        $invitation = $this->boundary->query(Invitation::query(), 'auth.invitations')
+                            ->where('token_hash', $this->hasher->hash('invitation-token', $token))
+                            ->lockForUpdate()
+                            ->first();
+                        if (! $invitation instanceof Invitation || ! $invitation->isUsable()
+                            || ! hash_equals($invitation->token_hash, $this->hasher->hash('invitation-token', $token))) {
+                            throw new AuthException('invitation_invalid', 'The invitation is invalid or expired.', 410);
+                        }
+                        $this->recipientProof->assertMatches($invitation, $subject);
+                        $principal = $this->principals->resolve($reference, true);
+                        if (! is_string($invitation->inviter_type) || ! is_string($invitation->inviter_id)) {
+                            throw new AuthException('invitation_invalid', 'The invitation is invalid or expired.', 410);
+                        }
+                        $inviter = $this->principals->resolve(new SubjectReference(
+                            $invitation->inviter_type,
+                            $invitation->inviter_id,
+                        ), true);
+                        $this->membershipAccess->assertMember($inviter, $tenant);
+                        $this->authorization->authorize($inviter, 'nvl-auth.invitations.create');
+
+                        $roles = is_array($invitation->roles) ? $invitation->roles : [];
+                        $permissions = is_array($invitation->permissions) ? $invitation->permissions : [];
+                        $this->assignments->canonicalIdentifiers($roles, $permissions);
+                        $membership = $this->memberships->enroll($reference);
+                        $this->assignments->sync($principal, $roles, $permissions);
+                        $acceptedAt = CarbonImmutable::now();
+                        $invitation->forceFill([
+                            'active_key' => null,
+                            'accepted_by_type' => $reference->type,
+                            'accepted_by_id' => $reference->identifier,
+                            'accepted_at' => $acceptedAt,
+                        ])->save();
+                        DB::connection($connection)->afterCommit(function () use ($invitation, $membership, $reference, $subject, $tenant): void {
+                            $this->audits->record(
+                                'invitation.accepted',
+                                subject: $reference,
+                                actor: $subject,
+                                metadata: [
+                                    'invitation_id' => $invitation->identifier(),
+                                    'membership_id' => $membership->identifier(),
+                                ],
+                            );
+                            InvitationAccepted::dispatch(
+                                invitationId: $invitation->identifier(),
+                                type: $invitation->type,
+                                purpose: $invitation->purpose,
+                                subject: $reference,
+                                acceptedAt: $invitation->accepted_at,
+                                context: new AuthEventContext(TenantContextMode::Tenant, $tenant),
+                            );
+                        });
+
+                        return $invitation;
+                    }, 1);
+                },
+            );
+        } catch (QueryException $exception) {
+            if (($exception->errorInfo[1] ?? null) === 1020) {
+                throw new AuthException(
+                    'invitation_invalid',
+                    'The invitation is invalid or expired.',
+                    410,
+                    previous: $exception,
+                );
+            }
+
+            throw $exception;
+        }
     }
 }

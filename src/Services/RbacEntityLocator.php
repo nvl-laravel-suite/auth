@@ -369,7 +369,7 @@ final readonly class RbacEntityLocator
     private function roleQuery(): Builder
     {
         if (config('tenancy.enabled') === true) {
-            return ($this->tenancy ?? app(AuthTenantRbacQueries::class))->roles();
+            return $this->tenantQueries()->roles();
         }
         $class = $this->models->roleClass();
 
@@ -380,10 +380,21 @@ final readonly class RbacEntityLocator
     private function permissionQuery(): Builder
     {
         if (config('tenancy.enabled') === true) {
-            return ($this->tenancy ?? app(AuthTenantRbacQueries::class))->permissions();
+            return $this->tenantQueries()->permissions();
         }
         $class = $this->models->permissionClass();
 
         return $class::query();
+    }
+
+    private function tenantQueries(): AuthTenantRbacQueries
+    {
+        if (! $this->tenancy instanceof AuthTenantRbacQueries) {
+            throw AuthException::invalidConfiguration(
+                'Tenant RBAC entity resolution requires the tenant query collaborator.',
+            );
+        }
+
+        return $this->tenancy;
     }
 }

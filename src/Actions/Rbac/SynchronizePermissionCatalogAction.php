@@ -10,6 +10,7 @@ use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacSynchronizer;
@@ -31,6 +32,7 @@ final readonly class SynchronizePermissionCatalogAction
         private RbacSynchronizer $synchronizer,
         private PermissionRegistrar $registrar,
         private AuthAuditRecorder $audits,
+        private AuthOperationBoundary $operations,
     ) {}
 
     /**
@@ -39,6 +41,7 @@ final readonly class SynchronizePermissionCatalogAction
     public function execute(Authenticatable $actor): int
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
+        $this->operations->requirePlatformAdministration();
         $this->authorization->authorize($actor, 'nvl-auth.rbac.synchronize');
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
         $connection = (new Permission)->getConnectionName();

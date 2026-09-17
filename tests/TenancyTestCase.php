@@ -6,6 +6,7 @@ namespace Nvl\Auth\Tests;
 
 use Illuminate\Contracts\Foundation\MaintenanceMode;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
 use Laravel\Sanctum\SanctumServiceProvider;
 use Nvl\Auth\Contracts\AuthManagementAccess;
@@ -20,6 +21,7 @@ use Nvl\Auth\Tests\Fixtures\AuthTestMaintenanceMode;
 use Nvl\Auth\Tests\Fixtures\AuthTestPlatformAccess;
 use Nvl\Auth\Tests\Fixtures\AuthTestTenantDirectory;
 use Nvl\Auth\Tests\Fixtures\AuthTestTenantHttpResolver;
+use Nvl\Auth\Tests\Fixtures\RecordingTenantAwareAuthActivityBridge;
 use Nvl\Auth\Tests\Fixtures\TestSubjectResolver;
 use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Data\Providers\DataServiceProvider;
@@ -67,7 +69,7 @@ abstract class TenancyTestCase extends Orchestra
         $app['config']->set('auth.passwords.users', ['provider' => 'users', 'table' => 'password_reset_tokens', 'expire' => 60, 'throttle' => 0]);
         $app['config']->set('nvl-auth.features.principal_management.models.user', TestUser::class);
         $app['config']->set('nvl-auth.migrations.install_all', true);
-        foreach (['memberships', 'invitations', 'rbac', 'audit', 'api_tokens'] as $feature) {
+        foreach (['authentication', 'sessions', 'memberships', 'invitations', 'rbac', 'audit', 'api_tokens', 'magic_links', 'security_codes', 'passkeys'] as $feature) {
             $app['config']->set("nvl-auth.features.{$feature}.enabled", true);
         }
         $app['config']->set('nvl-auth.features.api_tokens.settings.abilities', ['profile:read']);
@@ -83,6 +85,7 @@ abstract class TenancyTestCase extends Orchestra
         $app['config']->set('tenancy.directory', ['driver' => 'host', 'adapter' => AuthTestTenantDirectory::class]);
         $app['config']->set('tenancy.resolvers.http', AuthTestTenantHttpResolver::class);
         $app['config']->set('nvl-auth.tenancy.migrations.enabled', true);
+        $app['config']->set('nvl-auth.tenancy.activity_bridge', RecordingTenantAwareAuthActivityBridge::class);
         $app->singleton(TenantDirectory::class, AuthTestTenantDirectory::class);
         $app->singleton(PlatformAccess::class, AuthTestPlatformAccess::class);
         $app->singleton(MaintenanceMode::class, AuthTestMaintenanceMode::class);
@@ -113,6 +116,12 @@ abstract class TenancyTestCase extends Orchestra
                 });
             Route::name('management.')->middleware(['api', 'auth', ApplyAuthSecurityHeaders::class, RenderAuthExceptions::class])
                 ->group(dirname(__DIR__).'/routes/management/memberships.php');
+            Route::name('public.')->middleware([StartSession::class, ApplyAuthSecurityHeaders::class, RenderAuthExceptions::class])
+                ->group(function (): void {
+                    require dirname(__DIR__).'/routes/public/magic_links.php';
+                    require dirname(__DIR__).'/routes/public/security_codes.php';
+                    require dirname(__DIR__).'/routes/public/passkeys.php';
+                });
         });
     }
 

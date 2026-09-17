@@ -11,6 +11,7 @@ use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Services\CentralIdentityAuditRecorder;
+use Nvl\Auth\Services\DisabledTenantAwareAuthActivityBridge;
 use Nvl\Auth\Tests\Fixtures\AuthTenancyScenario;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -47,9 +48,14 @@ it('isolates tenant audit reads and keeps central identity facts platform-owned'
 });
 
 it('refuses an activity projection while its tenant-safe bridge is disabled', function (): void {
+    config()->set('nvl-auth.tenancy.activity_bridge', 'disabled');
+    app()->forgetInstance(TenantAwareAuthActivityBridge::class);
+
     expect(fn () => app(TenantAwareAuthActivityBridge::class)->record(
         'membership.test',
         new AuthEventContext(TenantContextMode::Tenant, (new AuthTenancyScenario)->a()),
         ['membership_id' => 'safe-scalar'],
     ))->toThrow(AuthException::class);
+
+    expect(app(TenantAwareAuthActivityBridge::class))->toBeInstanceOf(DisabledTenantAwareAuthActivityBridge::class);
 });

@@ -12,6 +12,7 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Results\RbacSynchronizationResult;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacSynchronizer;
@@ -33,6 +34,7 @@ final readonly class SynchronizeRbacAction
         private RbacSynchronizer $synchronizer,
         private PermissionRegistrar $registrar,
         private AuthAuditRecorder $audits,
+        private AuthOperationBoundary $operations,
     ) {}
 
     /**
@@ -40,6 +42,7 @@ final readonly class SynchronizeRbacAction
      */
     public function execute(Authenticatable $actor): RbacSynchronizationResult
     {
+        $this->operations->rejectMixedRbacOperation();
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
         $this->authorization->authorize($actor, 'nvl-auth.rbac.synchronize');
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');

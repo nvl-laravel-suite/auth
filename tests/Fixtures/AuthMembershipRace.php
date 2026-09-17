@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests\Fixtures;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Throwable;
@@ -58,6 +59,9 @@ final class AuthMembershipRace
                         'ok' => false,
                         'error' => $exception::class,
                         'code' => property_exists($exception, 'errorCode') ? $exception->errorCode : null,
+                        'sql_state' => $exception instanceof QueryException ? ($exception->errorInfo[0] ?? null) : null,
+                        'driver_code' => $exception instanceof QueryException ? ($exception->errorInfo[1] ?? null) : null,
+                        'message' => $exception instanceof QueryException ? $exception->getMessage() : null,
                     ];
                 }
                 file_put_contents($results[$index], json_encode($result, JSON_THROW_ON_ERROR));

@@ -76,6 +76,7 @@ use Nvl\Auth\Services\AuthTenantRbacQueries;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
 use Nvl\Auth\Services\ConfiguredPrincipalAttributeMapper;
 use Nvl\Auth\Services\DenySystemMutationAccess;
+use Nvl\Auth\Services\DisabledInvitationRecipientProof;
 use Nvl\Auth\Services\DisabledTenantAwareAuthActivityBridge;
 use Nvl\Auth\Services\EloquentMembershipPrincipalResolver;
 use Nvl\Auth\Services\EloquentPasswordUpdater;
@@ -93,7 +94,6 @@ use Nvl\Auth\Services\RbacPrincipalTracker;
 use Nvl\Auth\Services\RoleTemplateRegistry;
 use Nvl\Auth\Services\UnavailableSocialIdentityProvider;
 use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
-use Nvl\Auth\Services\VerifiedInvitationRecipientProof;
 use Nvl\Auth\Tenancy\AuthTenancyAdoption;
 use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
@@ -138,7 +138,7 @@ final class AuthServiceProvider extends ServiceProvider
         $this->app->scoped(BrowserSession::class, LaravelBrowserSession::class);
         $this->app->scoped(TenantAuthenticationSession::class, LaravelBrowserSession::class);
         $this->app->singleton(TenantAwareAuthActivityBridge::class, function (Container $container): TenantAwareAuthActivityBridge {
-            $bridge = config('nvl-auth.integrations.activity_bridge', 'disabled');
+            $bridge = config('nvl-auth.tenancy.activity_bridge', 'disabled');
             if ($bridge === 'disabled') {
                 return new DisabledTenantAwareAuthActivityBridge;
             }
@@ -152,6 +152,26 @@ final class AuthServiceProvider extends ServiceProvider
             if (! $resolved instanceof TenantAwareAuthActivityBridge) {
                 throw AuthException::invalidConfiguration(
                     'The Auth activity bridge container binding must resolve the tenant-aware bridge contract.',
+                );
+            }
+
+            return $resolved;
+        });
+        $this->app->singleton(InvitationRecipientProof::class, function (Container $container): InvitationRecipientProof {
+            $proof = config('nvl-auth.tenancy.recipient_proof', 'disabled');
+            if ($proof === 'disabled') {
+                return new DisabledInvitationRecipientProof;
+            }
+            if (! is_string($proof) || ! is_a($proof, InvitationRecipientProof::class, true)) {
+                throw AuthException::invalidConfiguration(
+                    'The Auth invitation recipient proof must be disabled or implement the recipient proof contract.',
+                );
+            }
+
+            $resolved = $container->make($proof);
+            if (! $resolved instanceof InvitationRecipientProof) {
+                throw AuthException::invalidConfiguration(
+                    'The Auth invitation recipient proof binding must resolve the recipient proof contract.',
                 );
             }
 
@@ -254,11 +274,6 @@ final class AuthServiceProvider extends ServiceProvider
             PackageInvitationRegistrationMapper::class,
         );
         $this->bindConfiguredContract(
-            InvitationRecipientProof::class,
-            'features.invitations.services.recipient_proof',
-            VerifiedInvitationRecipientProof::class,
-        );
-        $this->bindConfiguredContract(
             MembershipPrincipalResolver::class,
             'features.memberships.services.principal_resolver',
             EloquentMembershipPrincipalResolver::class,
@@ -277,11 +292,6 @@ final class AuthServiceProvider extends ServiceProvider
         if (config('tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Memberships)) {
             $this->app->scoped(TenantMembershipAccess::class, AuthTenantMembershipAccess::class);
             $kernel = $this->app->make(HttpKernelContract::class);
-            if (! method_exists($kernel, 'addToMiddlewarePriorityAfter')) {
-                throw AuthException::invalidConfiguration(
-                    'Tenant membership routes require a Laravel HTTP kernel with middleware-priority support.',
-                );
-            }
             $kernel->addToMiddlewarePriorityAfter(AuthenticatesRequests::class, EnsureAuthTenantAccess::class);
         }
         if (config('tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Rbac)) {

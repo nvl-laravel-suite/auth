@@ -12,6 +12,7 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\RbacChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
+use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
@@ -25,12 +26,14 @@ final readonly class DeletePermissionAction
         private ManagementAuthorizer $authorization,
         private RbacEntityLocator $entities,
         private AuthAuditRecorder $audits,
+        private AuthOperationBoundary $operations,
     ) {}
 
     /** Delete one permission. */
     public function execute(Authenticatable $actor, Permission|string $permission): bool
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Revoke);
+        $this->operations->requirePlatformAdministration();
         $this->authorization->authorize($actor, 'nvl-auth.rbac.managePermissions');
         $permission = $this->entities->permission($permission);
 

@@ -14,6 +14,7 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\RbacChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
+use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
@@ -27,12 +28,14 @@ final readonly class UpdatePermissionAction
         private ManagementAuthorizer $authorization,
         private RbacEntityLocator $entities,
         private AuthAuditRecorder $audits,
+        private AuthOperationBoundary $operations,
     ) {}
 
     /** Persist one permission mutation. */
     public function execute(Authenticatable $actor, Permission|string $permission, UpdatePermissionData $data): Permission
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
+        $this->operations->requirePlatformAdministration();
         $this->authorization->authorize($actor, 'nvl-auth.rbac.managePermissions');
         $permission = $this->entities->permission($permission);
 

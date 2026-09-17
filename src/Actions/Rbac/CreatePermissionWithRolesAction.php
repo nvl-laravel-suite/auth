@@ -15,6 +15,7 @@ use Nvl\Auth\Events\RbacChanged;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacAssignmentService;
@@ -30,6 +31,7 @@ final readonly class CreatePermissionWithRolesAction
         private AuthConfiguration $configuration,
         private RbacAssignmentService $assignments,
         private AuthAuditRecorder $audits,
+        private AuthOperationBoundary $operations,
     ) {}
 
     /**
@@ -42,6 +44,7 @@ final readonly class CreatePermissionWithRolesAction
         StorePermissionData $data,
         array $roleIdentifiers = [],
     ): Permission {
+        $this->operations->rejectMixedRbacOperation();
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Issue);
         $this->authorization->authorize($actor, 'nvl-auth.rbac.managePermissions');
 

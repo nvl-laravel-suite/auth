@@ -3,6 +3,12 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Artisan;
+use Nvl\Auth\Contracts\InvitationRecipientProof;
+use Nvl\Auth\Contracts\TenantAwareAuthActivityBridge;
+use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Services\DisabledInvitationRecipientProof;
+use Nvl\Auth\Services\DisabledTenantAwareAuthActivityBridge;
+use Nvl\Auth\Tests\Fixtures\RecordingTenantAwareAuthActivityBridge;
 use Nvl\Tenancy\Services\TenantAdoptionCoordinator;
 use Nvl\Tenancy\ValueObjects\PlatformOperation;
 
@@ -41,4 +47,34 @@ it('reports the activated Auth tenancy boundary through named read-only checks',
     Artisan::call('nvl:auth:schema', ['--format' => 'json']);
     $schema = json_decode(Artisan::output(), true, 64, JSON_THROW_ON_ERROR);
     expect($schema['outdated'])->toBe([]);
+});
+
+it('fails tenant readiness for disabled or mismatched configured integrations', function (): void {
+    config()->set('nvl-auth.tenancy.activity_bridge', 'disabled');
+    config()->set('nvl-auth.tenancy.recipient_proof', 'disabled');
+    app()->forgetInstance(TenantAwareAuthActivityBridge::class);
+    app()->forgetInstance(InvitationRecipientProof::class);
+
+    Artisan::call('nvl:auth:doctor', ['--format' => 'json']);
+    $checks = collect(json_decode(Artisan::output(), true, 64, JSON_THROW_ON_ERROR)['checks'])->keyBy('name');
+    expect($checks->get('tenancy.activity_bridge')['passed'])->toBeFalse()
+        ->and($checks->get('tenancy.invitation_proof')['passed'])->toBeFalse();
+
+    config()->set('nvl-auth.tenancy.activity_bridge', RecordingTenantAwareAuthActivityBridge::class);
+    app()->instance(TenantAwareAuthActivityBridge::class, new DisabledTenantAwareAuthActivityBridge);
+    app()->instance(InvitationRecipientProof::class, new DisabledInvitationRecipientProof);
+    Artisan::call('nvl:auth:doctor', ['--format' => 'json']);
+    $checks = collect(json_decode(Artisan::output(), true, 64, JSON_THROW_ON_ERROR)['checks'])->keyBy('name');
+    expect($checks->get('tenancy.activity_bridge')['passed'])->toBeFalse()
+        ->and($checks->get('tenancy.invitation_proof')['passed'])->toBeFalse();
+});
+
+it('rejects invalid tenancy integration configuration values', function (): void {
+    config()->set('nvl-auth.tenancy.activity_bridge', ['invalid']);
+    app()->forgetInstance(TenantAwareAuthActivityBridge::class);
+    expect(fn () => app(TenantAwareAuthActivityBridge::class))->toThrow(AuthException::class);
+
+    config()->set('nvl-auth.tenancy.recipient_proof', stdClass::class);
+    app()->forgetInstance(InvitationRecipientProof::class);
+    expect(fn () => app(InvitationRecipientProof::class))->toThrow(AuthException::class);
 });

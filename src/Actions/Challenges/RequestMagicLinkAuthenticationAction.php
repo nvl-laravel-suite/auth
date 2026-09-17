@@ -10,10 +10,13 @@ use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\RequestMagicLinkData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Enums\TenantAuthenticationPurpose;
 use Nvl\Auth\Results\IssuedChallenge;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Services\TenantAuthenticationChallengeIntents;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Tenancy\ValueObjects\TenantId;
 
 /**
  * Requests an account-bound magic link without disclosing account existence.
@@ -34,13 +37,17 @@ final readonly class RequestMagicLinkAuthenticationAction
         private AuthIdentifierResolver $identifiers,
         private RequestMagicLinkAction $links,
         private AuthAuditRecorder $audits,
+        private TenantAuthenticationChallengeIntents $tenantIntents,
     ) {}
 
     /**
      * Resolve an eligible subject and issue a bound login link when one exists.
      */
-    public function execute(RequestMagicLinkData $data, ?string $locale = null): ?IssuedChallenge
-    {
+    public function execute(
+        RequestMagicLinkData $data,
+        ?string $locale = null,
+        ?TenantId $tenant = null,
+    ): ?IssuedChallenge {
         $this->features->assertAllowed(AuthFeature::MagicLinks, FeatureOperation::Issue);
         $identifierName = $this->principalAttributes->identifierColumn(
             $this->configuration->string('identifier', 'email'),
@@ -58,6 +65,13 @@ final readonly class RequestMagicLinkAuthenticationAction
             $data,
             subject: $reference,
             locale: $locale,
+        );
+        $this->tenantIntents->attach(
+            $issued->challenge,
+            $tenant,
+            TenantAuthenticationPurpose::MagicLink,
+            'magic_link',
+            $reference,
         );
         $this->audits->record(
             'magic_links.requested',

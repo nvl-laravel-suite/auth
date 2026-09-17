@@ -282,5 +282,7 @@ marker. Memberships, invitations, roles, package Sanctum tokens, authentication
 intents, and audit projections become tenant-aware; principals, credentials,
 permissions, clients, and client sessions remain global. The configured Auth,
 principal, and tenancy connections must normalize to the same Laravel connection.
-`features.invitations.services.recipient_proof` must prove the invited recipient,
-and `integrations.activity_bridge` must be `disabled` or a tenant-aware bridge.
+`tenancy.recipient_proof` must be `disabled` or a class implementing the invited-recipient
+proof contract, and `tenancy.activity_bridge` must be `disabled` or a class implementing
+the tenant-aware bridge contract. Enabled tenancy readiness requires both configured
+classes to resolve exactly; the disabled modes remain fail-closed.

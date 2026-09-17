@@ -46,6 +46,8 @@ use Nvl\Auth\Services\AuthSchemaManager;
 use Nvl\Auth\Services\AuthTenantMembershipAccess;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
 use Nvl\Auth\Services\ConfiguredPolicyAuthManagementAccess;
+use Nvl\Auth\Services\DisabledInvitationRecipientProof;
+use Nvl\Auth\Services\DisabledTenantAwareAuthActivityBridge;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\FeatureManifest;
 use Nvl\Auth\Services\InvitationDeliveryMetadataPolicy;
@@ -632,6 +634,18 @@ final class AuthDoctorCommand extends Command
         $principals = $this->integration($container, MembershipPrincipalResolver::class);
         $proof = $this->integration($container, InvitationRecipientProof::class);
         $activity = $this->integration($container, TenantAwareAuthActivityBridge::class);
+        $proofConfiguration = $configuration->get('tenancy.recipient_proof', 'disabled');
+        $activityConfiguration = $configuration->get('tenancy.activity_bridge', 'disabled');
+        $proofReady = is_string($proofConfiguration)
+            && $proofConfiguration !== 'disabled'
+            && is_a($proofConfiguration, InvitationRecipientProof::class, true)
+            && $proof instanceof $proofConfiguration
+            && ! $proof instanceof DisabledInvitationRecipientProof;
+        $activityReady = is_string($activityConfiguration)
+            && $activityConfiguration !== 'disabled'
+            && is_a($activityConfiguration, TenantAwareAuthActivityBridge::class, true)
+            && $activity instanceof $activityConfiguration
+            && ! $activity instanceof DisabledTenantAwareAuthActivityBridge;
         $registrar = $this->integration($container, PermissionRegistrar::class);
         $connectionsReady = false;
         try {
@@ -682,8 +696,8 @@ final class AuthDoctorCommand extends Command
                 && ! Schema::connection(is_string($configuration->get('connection')) ? $configuration->get('connection') : null)
                     ->getConnection()->table($roleTable)->whereNull('tenant_id')->exists(), 'Active tenant RBAC contains null-team roles.'),
             $this->check('tenancy.active_owners', $ownerReady, 'Every tenant with active memberships requires an active owner.'),
-            $this->check('tenancy.invitation_proof', $proof instanceof InvitationRecipientProof, 'Tenant invitations require a recipient proof adapter.'),
-            $this->check('tenancy.activity_bridge', $activity instanceof TenantAwareAuthActivityBridge, 'Auth activity integration must implement the tenant-aware bridge contract.'),
+            $this->check('tenancy.invitation_proof', $proofReady, 'Tenant invitations require the configured recipient proof adapter.'),
+            $this->check('tenancy.activity_bridge', $activityReady, 'Auth tenancy requires the configured tenant-aware activity bridge.'),
             $this->check('tenancy.scoped_context', $container->bound(TenantContext::class), 'Tenant context must be registered as a scoped service.'),
             $this->check('tenancy.global_clients', ! $schema->hasColumn(AuthTables::Clients, 'tenant_id'), 'Auth clients must remain global identity records.'),
         ];

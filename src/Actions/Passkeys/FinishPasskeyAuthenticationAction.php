@@ -14,12 +14,15 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\Passkey;
+use Nvl\Auth\Results\CompletedPasskeyAuthentication;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\PasskeyInputValidator;
 use Nvl\Auth\Services\SecretHasher;
+use Nvl\Auth\Services\TenantAuthenticationChallengeIntents;
 use Nvl\Auth\ValueObjects\PasskeyCredential;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Tenancy\ValueObjects\TenantId;
 use Throwable;
 
 /**
@@ -37,6 +40,7 @@ final readonly class FinishPasskeyAuthenticationAction
         private SecretHasher $hasher,
         private PasskeyInputValidator $input,
         private AuthAuditRecorder $audits,
+        private TenantAuthenticationChallengeIntents $tenantIntents,
     ) {}
 
     /**
@@ -44,11 +48,26 @@ final readonly class FinishPasskeyAuthenticationAction
      */
     public function execute(FinishPasskeyAuthenticationData $data): SubjectReference
     {
+        return $this->finish($data)->subject;
+    }
+
+    /** Verify a browser ceremony and recover only its server-owned tenant context. */
+    public function executeForSession(
+        FinishPasskeyAuthenticationData $data,
+        ?TenantId $requestedTenant = null,
+    ): CompletedPasskeyAuthentication {
+        return $this->finish($data, $requestedTenant);
+    }
+
+    private function finish(
+        FinishPasskeyAuthenticationData $data,
+        ?TenantId $requestedTenant = null,
+    ): CompletedPasskeyAuthentication {
         $this->features->assertAllowed(AuthFeature::Passkeys, FeatureOperation::Use);
         $this->input->validate($data->ceremonyId, $data->response);
         $connection = (new Challenge)->getConnectionName();
 
-        $result = DB::connection($connection)->transaction(function () use ($data): SubjectReference|Throwable {
+        $result = DB::connection($connection)->transaction(function () use ($data): array|Throwable {
             /** @var Challenge|null $challenge */
             $challenge = Challenge::query()
                 ->where('type', 'passkey_authentication')
@@ -158,13 +177,16 @@ final readonly class FinishPasskeyAuthenticationAction
                 metadata: ['passkey_id' => $passkey->identifier(), 'user_verified' => $assertion->userVerified],
             );
 
-            return $reference;
+            return ['subject' => $reference, 'challenge' => $challenge];
         }, 3);
 
         if ($result instanceof Throwable) {
             throw $result;
         }
 
-        return $result;
+        return new CompletedPasskeyAuthentication(
+            $result['subject'],
+            $this->tenantIntents->context($result['challenge'], $requestedTenant),
+        );
     }
 }
