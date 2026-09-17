@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -16,6 +17,7 @@ use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\Passkey;
 use Nvl\Auth\Models\RecoveryCode;
 use Nvl\Auth\Models\SocialIdentity;
+use Nvl\Auth\Models\TenantAuthenticationIntent;
 use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
@@ -71,6 +73,14 @@ final readonly class PruneAuthStateAction
             'social_identities' => SocialIdentity::query()->where('revoked_at', '<', $cutoff),
             'client_sessions' => AuthClientSession::query()->where('ended_at', '<', $cutoff),
         ];
+        if (config('tenancy.enabled') === true
+            && Schema::connection((new TenantAuthenticationIntent)->getConnectionName())
+                ->hasTable(TenantAuthenticationIntent::TABLE)) {
+            $queries['tenant_authentication_intents'] = TenantAuthenticationIntent::query()
+                ->where(static fn (Builder $query) => $query
+                    ->where('expires_at', '<', $cutoff)
+                    ->orWhere('consumed_at', '<', $cutoff));
+        }
         $connection = (new Invitation)->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($dryRun, $queries): array {

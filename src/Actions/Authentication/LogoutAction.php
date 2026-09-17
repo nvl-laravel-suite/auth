@@ -10,11 +10,13 @@ use Illuminate\Contracts\Auth\StatefulGuard;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\BrowserSession;
 use Nvl\Auth\Enums\AuthFeature;
+use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\UserLoggedOut;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -34,6 +36,7 @@ final readonly class LogoutAction
         private BrowserSession $session,
         private AuthPipeline $pipeline,
         private AuthAuditRecorder $audits,
+        private AuthOperationBoundary $operations,
     ) {}
 
     /**
@@ -43,6 +46,7 @@ final readonly class LogoutAction
     {
         $this->features->assertAllowed(AuthFeature::Authentication, FeatureOperation::Revoke);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Revoke);
+        $this->operations->central(AuthIdentityOperation::Logout);
         $guard = $this->auth->guard($this->configuration->string('guard', 'web'));
 
         if (! $guard instanceof StatefulGuard) {

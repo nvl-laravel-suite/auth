@@ -15,6 +15,7 @@ use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Data\Mutations\LoginData;
 use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Enums\AuthFeature;
+use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\AuthenticationAttempted;
 use Nvl\Auth\Events\AuthenticationRejected;
@@ -22,10 +23,13 @@ use Nvl\Auth\Events\UserAuthenticated;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Services\TenantAuthenticationIntents;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Tenancy\Contracts\TenantMembershipAccess;
 use SensitiveParameter;
 use Throwable;
 
@@ -47,6 +51,9 @@ final readonly class LoginAction
         private AuthAuditRecorder $audits,
         private AuthenticationEligibility $eligibility,
         private SuccessfulLoginMetadataRecorder $loginMetadata,
+        private AuthOperationBoundary $operations,
+        private TenantAuthenticationIntents $tenantIntents,
+        private TenantMembershipAccess $tenantMemberships,
     ) {}
 
     /**
@@ -59,6 +66,7 @@ final readonly class LoginAction
         $this->features->assertAllowed(AuthFeature::Authentication, FeatureOperation::Use);
         $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Use);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Use);
+        $this->operations->central(AuthIdentityOperation::Login);
         $identifierName = $this->principalAttributes->identifierColumn(
             $this->configuration->string('identifier', 'email'),
         );
@@ -101,6 +109,7 @@ final readonly class LoginAction
         }
 
         $reference = SubjectReference::fromAuthenticatable($subject);
+        $this->operations->central(AuthIdentityOperation::Login, $subject);
 
         try {
             $authenticated = $this->pipeline->run(
@@ -115,6 +124,7 @@ final readonly class LoginAction
             $this->session->regenerateIdentifier();
             $this->loginMetadata->record($authenticated, $requestContext ?? new AuthenticationRequestContext);
             $this->audits->record('authentication.succeeded', subject: $reference, actor: $authenticated);
+            $this->selectTenant($authenticated, $reference, $requestContext);
             UserAuthenticated::dispatch($reference);
 
             return $authenticated;
@@ -134,6 +144,46 @@ final readonly class LoginAction
             );
 
             throw $exception;
+        }
+    }
+
+    /** Treat tenant selection as a separate, non-escalating result of global login. */
+    private function selectTenant(
+        Authenticatable $subject,
+        SubjectReference $reference,
+        ?AuthenticationRequestContext $context,
+    ): void {
+        if (config('tenancy.enabled') !== true
+            || ! is_string($context?->tenantIntentNonce)
+            || ! is_string($context->tenantSessionBinding)
+            || $context->tenantPurpose === null) {
+            return;
+        }
+        try {
+            $tenant = $this->tenantIntents->consume(
+                $context->tenantIntentNonce,
+                $context->tenantPurpose,
+                $context->tenantSessionBinding,
+                $context->tenantIntentSubjectBound ? $reference : null,
+                $context->tenantProvider,
+            );
+            if ($context->requestedTenant !== null && $context->requestedTenant->value !== $tenant->value) {
+                throw new AuthException('tenant_authentication_intent_invalid', 'The tenant authentication intent is invalid.', 410);
+            }
+            $this->tenantMemberships->assertMember($subject, $tenant);
+            $this->audits->record(
+                'authentication.tenant_selected',
+                subject: $reference,
+                actor: $subject,
+                metadata: ['tenant_id' => $tenant->value],
+            );
+        } catch (Throwable) {
+            $this->audits->record(
+                'authentication.tenant_selection_denied',
+                outcome: 'denied',
+                subject: $reference,
+                actor: $subject,
+            );
         }
     }
 }

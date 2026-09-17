@@ -8,9 +8,11 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Enums\AuthFeature;
+use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\SocialIdentity;
+use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\ValueObjects\ExternalIdentity;
@@ -28,6 +30,7 @@ final readonly class LinkSocialIdentityAction
         private FeatureGate $features,
         private SecretHasher $hasher,
         private AuthAuditRecorder $audits,
+        private AuthOperationBoundary $operations,
     ) {}
 
     /**
@@ -38,6 +41,7 @@ final readonly class LinkSocialIdentityAction
         ExternalIdentity $identity,
     ): SocialIdentity {
         $this->features->assertAllowed(AuthFeature::SocialIdentities, FeatureOperation::Enroll);
+        $this->operations->central(AuthIdentityOperation::SocialIdentity, $subject);
         $reference = SubjectReference::fromAuthenticatable($subject);
         $providerUserHash = $this->hasher->hash(
             "social-identity-{$identity->provider}",

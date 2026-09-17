@@ -88,7 +88,7 @@ return [
                 'login_metadata_recorder' => null,
                 'eligibility' => null,
             ],
-            'settings' => [],
+            'settings' => ['tenant_intent_ttl_minutes' => 10],
         ],
         'principal_management' => [
             'enabled' => env('NVL_AUTH_PRINCIPAL_MANAGEMENT_ENABLED', true),

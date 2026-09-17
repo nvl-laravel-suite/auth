@@ -12,6 +12,9 @@ use Nvl\Auth\Actions\SocialIdentities\StartSocialAuthorizationAction;
 use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Tenancy\Contracts\TenantHttpResolver;
+use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
+use Nvl\Tenancy\Exceptions\TenantNotFound;
 
 /**
  * Handles public Socialite authorization and callback transport.
@@ -21,10 +24,28 @@ final class SocialIdentityController
     /**
      * Return an allowlisted provider authorization URL.
      */
-    public function redirect(string $provider, StartSocialAuthorizationAction $action): JsonResponse
-    {
+    public function redirect(
+        string $provider,
+        Request $request,
+        StartSocialAuthorizationAction $action,
+        TenantHttpResolver $tenants,
+    ): JsonResponse {
+        $tenant = null;
+        if (config('tenancy.enabled') === true) {
+            try {
+                $tenant = $tenants->resolve($request);
+            } catch (TenantBoundaryViolation|TenantNotFound) {
+                $tenant = null;
+            }
+        }
+        $returnPath = $request->query('return_path');
+
         return response()->json([
-            'data' => ['url' => $action->execute($provider)],
+            'data' => ['url' => $action->execute(
+                $provider,
+                $tenant,
+                is_string($returnPath) ? $returnPath : null,
+            )],
             'code' => 'social_authorization_started',
             'message' => 'Social authorization was started.',
         ]);
@@ -39,7 +60,11 @@ final class SocialIdentityController
         CompleteSocialAuthorizationAction $action,
         EstablishAuthenticatedSessionAction $sessions,
     ): JsonResponse {
-        $identity = $action->execute($provider);
+        $state = $request->query('state');
+        $identity = $action->execute(
+            $provider,
+            flowReference: is_string($state) ? $state : null,
+        );
         $reference = new SubjectReference($identity->subject_type, $identity->subject_id);
         $sessions->execute(
             $reference,

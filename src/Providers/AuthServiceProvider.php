@@ -50,6 +50,7 @@ use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Contracts\SystemMutationAccess;
+use Nvl\Auth\Contracts\TenantAuthenticationSession;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Exceptions\AuthException;
@@ -130,8 +131,9 @@ final class AuthServiceProvider extends ServiceProvider
         $this->app->scoped(AuthTenantRbacQueries::class);
         $this->app->make(TenantContextParticipants::class)->register(AuthTenantContextParticipant::class);
         $this->registerTenancyResources();
-        $this->app->singleton(BrowserSession::class, LaravelBrowserSession::class);
-        $this->app->singleton(AuthAuditContextProvider::class, LaravelRequestAuditContextProvider::class);
+        $this->app->scoped(BrowserSession::class, LaravelBrowserSession::class);
+        $this->app->scoped(TenantAuthenticationSession::class, LaravelBrowserSession::class);
+        $this->app->scoped(AuthAuditContextProvider::class, LaravelRequestAuditContextProvider::class);
         $this->bindConfiguredContract(
             AuthAuditRecorderContract::class,
             'features.audit.services.recorder',

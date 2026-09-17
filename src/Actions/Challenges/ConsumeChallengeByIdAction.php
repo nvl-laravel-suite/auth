@@ -47,6 +47,7 @@ final readonly class ConsumeChallengeByIdAction
         ): ?Challenge {
             /** @var Challenge|null $challenge */
             $challenge = Challenge::query()
+                ->when(config('tenancy.enabled') === true, fn ($query) => $query->where('ownership_key', 'platform'))
                 ->whereKey($challengeId)
                 ->where('type', $messageType->value)
                 ->where('purpose', $purpose)

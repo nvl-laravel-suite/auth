@@ -13,6 +13,8 @@ use Nvl\Auth\Events\AuthAuditRecorded;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Tenancy\Contracts\TenantContext;
+use Nvl\Tenancy\Enums\TenantContextMode;
 use Nvl\Tenancy\Services\TenantBoundary;
 
 /**
@@ -27,6 +29,7 @@ final readonly class AuthAuditRecorder implements AuthAuditRecorderContract
         private AuthConfiguration $configuration,
         private AuthAuditContextProvider $context,
         private TenantBoundary $tenancy,
+        private TenantContext $tenantContext,
     ) {}
 
     /**
@@ -72,7 +75,7 @@ final readonly class AuthAuditRecorder implements AuthAuditRecorderContract
             ? SubjectReference::fromAuthenticatable($actor)
             : null;
         $audit = AuthAudit::query()->create([
-            ...(config('tenancy.enabled') === true ? $this->tenancy->attributes('auth.audits') : []),
+            ...$this->ownership($action),
             'action' => $action,
             'outcome' => $outcome,
             'subject_type' => $subject?->type,
@@ -93,6 +96,28 @@ final readonly class AuthAuditRecorder implements AuthAuditRecorderContract
         AuthAuditRecorded::dispatch($audit->identifier());
 
         return $audit;
+    }
+
+    /** @return array{tenant_id?: string|null, ownership_key?: string} */
+    private function ownership(string $action): array
+    {
+        if (config('tenancy.enabled') !== true) {
+            return [];
+        }
+        $snapshot = $this->tenantContext->snapshot();
+        if (in_array($snapshot->mode, [TenantContextMode::Tenant, TenantContextMode::Platform], true)) {
+            return $this->tenancy->attributes('auth.audits');
+        }
+        foreach ([
+            'authentication.', 'password.', 'email_verification.', 'social_identity.', 'client.', 'session.',
+            'magic_link.', 'magic_links.', 'security_code.', 'security_codes.', 'passkey.',
+        ] as $prefix) {
+            if (str_starts_with($action, $prefix)) {
+                return ['tenant_id' => null, 'ownership_key' => 'platform'];
+            }
+        }
+
+        throw new AuthException('tenant_audit_context_required', 'Tenant audit ownership is required.', 500);
     }
 
     /**

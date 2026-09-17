@@ -14,6 +14,7 @@ use Nvl\Auth\Contracts\BrowserSession;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Enums\AuthFeature;
+use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\AuthenticationAttempted;
 use Nvl\Auth\Events\AuthenticationRejected;
@@ -21,10 +22,13 @@ use Nvl\Auth\Events\UserAuthenticated;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Services\TenantAuthenticationIntents;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Tenancy\Contracts\TenantMembershipAccess;
 use Throwable;
 
 /**
@@ -45,6 +49,9 @@ final readonly class EstablishAuthenticatedSessionAction
         private AuthenticationEligibility $eligibility,
         private SuccessfulLoginMetadataRecorder $loginMetadata,
         private AuthAuditRecorder $audits,
+        private AuthOperationBoundary $operations,
+        private TenantAuthenticationIntents $tenantIntents,
+        private TenantMembershipAccess $tenantMemberships,
     ) {}
 
     /**
@@ -58,11 +65,13 @@ final readonly class EstablishAuthenticatedSessionAction
     ): Authenticatable {
         $this->features->assertAllowed(AuthFeature::Authentication, FeatureOperation::Use);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Use);
+        $this->operations->central(AuthIdentityOperation::Login);
         $subject = $this->subjects->resolve($reference);
 
         if (! $subject instanceof Authenticatable) {
             throw new AuthException('subject_unavailable', 'The authentication subject is unavailable.', 404);
         }
+        $this->operations->central(AuthIdentityOperation::Login, $subject);
 
         $guard = $this->auth->guard($this->configuration->string('guard', 'web'));
 
@@ -94,6 +103,7 @@ final readonly class EstablishAuthenticatedSessionAction
                 actor: $authenticated,
                 metadata: ['method' => $purpose->value],
             );
+            $this->selectTenant($authenticated, $reference, $requestContext);
             UserAuthenticated::dispatch($reference);
 
             return $authenticated;
@@ -112,6 +122,46 @@ final readonly class EstablishAuthenticatedSessionAction
             AuthenticationRejected::dispatch('subject_reference', $reference->identifier, $reason, $reference);
 
             throw $exception;
+        }
+    }
+
+    /** Keep successful global authentication independent from denied tenant selection. */
+    private function selectTenant(
+        Authenticatable $subject,
+        SubjectReference $reference,
+        ?AuthenticationRequestContext $context,
+    ): void {
+        if (config('tenancy.enabled') !== true
+            || ! is_string($context?->tenantIntentNonce)
+            || ! is_string($context->tenantSessionBinding)
+            || $context->tenantPurpose === null) {
+            return;
+        }
+        try {
+            $tenant = $this->tenantIntents->consume(
+                $context->tenantIntentNonce,
+                $context->tenantPurpose,
+                $context->tenantSessionBinding,
+                $context->tenantIntentSubjectBound ? $reference : null,
+                $context->tenantProvider,
+            );
+            if ($context->requestedTenant !== null && $context->requestedTenant->value !== $tenant->value) {
+                throw new AuthException('tenant_authentication_intent_invalid', 'The tenant authentication intent is invalid.', 410);
+            }
+            $this->tenantMemberships->assertMember($subject, $tenant);
+            $this->audits->record(
+                'authentication.tenant_selected',
+                subject: $reference,
+                actor: $subject,
+                metadata: ['tenant_id' => $tenant->value],
+            );
+        } catch (Throwable) {
+            $this->audits->record(
+                'authentication.tenant_selection_denied',
+                outcome: 'denied',
+                subject: $reference,
+                actor: $subject,
+            );
         }
     }
 }

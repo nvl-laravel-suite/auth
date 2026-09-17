@@ -45,6 +45,11 @@ final readonly class SocialiteIdentityProvider implements SocialIdentityProvider
             }
 
             if ($parameters !== []) {
+                if (array_key_exists('state', $parameters)) {
+                    throw AuthException::invalidConfiguration(
+                        'Socialite state is reserved and cannot be replaced by provider parameters.',
+                    );
+                }
                 $driver->with($parameters);
             }
         }

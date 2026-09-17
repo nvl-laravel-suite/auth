@@ -60,6 +60,7 @@ final readonly class ConsumeChallengeAction
             $secondarySecretHash,
         ): ?Challenge {
             Challenge::query()
+                ->when(config('tenancy.enabled') === true, fn ($query) => $query->where('ownership_key', 'platform'))
                 ->where('type', $messageType->value)
                 ->where('purpose', $purpose)
                 ->where('recipient_hash', $recipientHash)
@@ -69,6 +70,7 @@ final readonly class ConsumeChallengeAction
                 ->update(['active_key' => null]);
             /** @var Challenge|null $challenge */
             $challenge = Challenge::query()
+                ->when(config('tenancy.enabled') === true, fn ($query) => $query->where('ownership_key', 'platform'))
                 ->where('type', $messageType->value)
                 ->where('purpose', $purpose)
                 ->where('recipient_hash', $recipientHash)
@@ -81,6 +83,7 @@ final readonly class ConsumeChallengeAction
             if (! $challenge instanceof Challenge || ! $challenge->isUsable()) {
                 /** @var Challenge|null $active */
                 $active = Challenge::query()
+                    ->when(config('tenancy.enabled') === true, fn ($query) => $query->where('ownership_key', 'platform'))
                     ->where('type', $messageType->value)
                     ->where('purpose', $purpose)
                     ->where('recipient_hash', $recipientHash)
