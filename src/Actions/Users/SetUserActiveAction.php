@@ -19,6 +19,7 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\MutationAuthorizer;
 use Nvl\Auth\Services\UserLocator;
+use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 
@@ -73,7 +74,7 @@ final readonly class SetUserActiveAction
                 actor: $actor,
                 metadata: $metadata,
             );
-            PrincipalChanged::dispatch($this->attributes->identifier($user), $operation, $metadata);
+            PrincipalChanged::dispatch($this->attributes->identifier($user), $operation, $metadata, AuthEventContext::platform());
 
             return $user->refresh();
         }, 3);

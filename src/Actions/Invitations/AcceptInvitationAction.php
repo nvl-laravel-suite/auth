@@ -25,9 +25,11 @@ use Nvl\Auth\Services\MembershipWriter;
 use Nvl\Auth\Services\RbacManager;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\Services\TenantMembershipAssignments;
+use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Tenancy\Enums\TenantContextMode;
 use Nvl\Tenancy\Services\TenantBoundary;
 use Nvl\Tenancy\Services\TenantRunner;
 use Nvl\Tenancy\ValueObjects\TenantId;
@@ -183,7 +185,7 @@ final readonly class AcceptInvitationAction
                         'accepted_by_id' => $reference->identifier,
                         'accepted_at' => $acceptedAt,
                     ])->save();
-                    DB::connection($connection)->afterCommit(function () use ($invitation, $membership, $reference, $subject): void {
+                    DB::connection($connection)->afterCommit(function () use ($invitation, $membership, $reference, $subject, $tenant): void {
                         $this->audits->record(
                             'invitation.accepted',
                             subject: $reference,
@@ -199,6 +201,7 @@ final readonly class AcceptInvitationAction
                             purpose: $invitation->purpose,
                             subject: $reference,
                             acceptedAt: $invitation->accepted_at,
+                            context: new AuthEventContext(TenantContextMode::Tenant, $tenant),
                         );
                     });
 

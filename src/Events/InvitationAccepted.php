@@ -7,6 +7,7 @@ namespace Nvl\Auth\Events;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Foundation\Events\Dispatchable;
+use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
@@ -25,6 +26,7 @@ final class InvitationAccepted implements ShouldDispatchAfterCommit
         public readonly string $purpose,
         public readonly SubjectReference $subject,
         public readonly ?CarbonImmutable $acceptedAt = null,
+        public readonly ?AuthEventContext $context = null,
     ) {}
 
     /**
@@ -45,6 +47,10 @@ final class InvitationAccepted implements ShouldDispatchAfterCommit
             $data['acceptedAt'] = $this->acceptedAt;
         }
 
+        if (isset($this->context)) {
+            $data['context'] = $this->context;
+        }
+
         return $data;
     }
 
@@ -57,6 +63,7 @@ final class InvitationAccepted implements ShouldDispatchAfterCommit
      *     purpose: string,
      *     subject: SubjectReference,
      *     acceptedAt?: CarbonImmutable|null
+     *     context?: AuthEventContext|null
      * }  $data
      */
     public function __unserialize(array $data): void
@@ -66,5 +73,6 @@ final class InvitationAccepted implements ShouldDispatchAfterCommit
         $this->purpose = $data['purpose'];
         $this->subject = $data['subject'];
         $this->acceptedAt = $data['acceptedAt'] ?? null;
+        $this->context = $data['context'] ?? null;
     }
 }

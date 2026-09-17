@@ -18,6 +18,7 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\MutationAuthorizer;
 use Nvl\Auth\Services\UserLocator;
+use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 
@@ -58,7 +59,7 @@ final readonly class DeleteUserAction
             $this->sessions->contain($user, 'deleted', $context);
             $deleted = (bool) $user->delete();
             $this->audits->record('user.deleted', subject: $reference, actor: $actor, metadata: $metadata);
-            PrincipalChanged::dispatch($this->attributes->identifier($user), 'deleted', $metadata);
+            PrincipalChanged::dispatch($this->attributes->identifier($user), 'deleted', $metadata, AuthEventContext::platform());
 
             return $deleted;
         }, 3);

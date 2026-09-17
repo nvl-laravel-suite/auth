@@ -16,6 +16,7 @@ use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\UserLocator;
+use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
@@ -46,7 +47,12 @@ final readonly class UpdateUserAction
             $this->audits->record('user.updated', subject: $reference, actor: $actor, metadata: [
                 'attributes' => array_keys($attributes),
             ]);
-            PrincipalChanged::dispatch($this->attributes->identifier($user), 'updated', ['attributes' => array_keys($attributes)]);
+            PrincipalChanged::dispatch(
+                $this->attributes->identifier($user),
+                'updated',
+                ['attributes' => array_keys($attributes)],
+                AuthEventContext::platform(),
+            );
 
             return $user->refresh()->load(['roles', 'permissions']);
         }, 3);

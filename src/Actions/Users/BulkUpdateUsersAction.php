@@ -22,6 +22,7 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\MutationAuthorizer;
 use Nvl\Auth\Services\UserLocator;
+use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 
@@ -97,7 +98,7 @@ final readonly class BulkUpdateUsersAction
                     UserBulkOperation::Delete => $this->delete($user, $context),
                     UserBulkOperation::Restore => $this->restore($user, $context),
                 };
-                PrincipalChanged::dispatch($this->attributes->identifier($user), $operation->value, $metadata);
+                PrincipalChanged::dispatch($this->attributes->identifier($user), $operation->value, $metadata, AuthEventContext::platform());
             }
 
             $affectedUserIds = array_values($users->map(

@@ -51,6 +51,7 @@ use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Contracts\SystemMutationAccess;
 use Nvl\Auth\Contracts\TenantAuthenticationSession;
+use Nvl\Auth\Contracts\TenantAwareAuthActivityBridge;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Exceptions\AuthException;
@@ -75,6 +76,7 @@ use Nvl\Auth\Services\AuthTenantRbacQueries;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
 use Nvl\Auth\Services\ConfiguredPrincipalAttributeMapper;
 use Nvl\Auth\Services\DenySystemMutationAccess;
+use Nvl\Auth\Services\DisabledTenantAwareAuthActivityBridge;
 use Nvl\Auth\Services\EloquentMembershipPrincipalResolver;
 use Nvl\Auth\Services\EloquentPasswordUpdater;
 use Nvl\Auth\Services\EloquentRbacPrincipalAccess;
@@ -133,6 +135,19 @@ final class AuthServiceProvider extends ServiceProvider
         $this->registerTenancyResources();
         $this->app->scoped(BrowserSession::class, LaravelBrowserSession::class);
         $this->app->scoped(TenantAuthenticationSession::class, LaravelBrowserSession::class);
+        $this->app->singleton(TenantAwareAuthActivityBridge::class, function (Container $container): TenantAwareAuthActivityBridge {
+            $bridge = config('nvl-auth.integrations.activity_bridge', 'disabled');
+            if ($bridge === 'disabled') {
+                return new DisabledTenantAwareAuthActivityBridge;
+            }
+            if (! is_string($bridge) || ! is_a($bridge, TenantAwareAuthActivityBridge::class, true)) {
+                throw AuthException::invalidConfiguration(
+                    'The Auth activity bridge must implement the tenant-aware bridge contract.',
+                );
+            }
+
+            return $container->make($bridge);
+        });
         $this->app->scoped(AuthAuditContextProvider::class, LaravelRequestAuditContextProvider::class);
         $this->bindConfiguredContract(
             AuthAuditRecorderContract::class,

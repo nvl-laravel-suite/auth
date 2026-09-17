@@ -10,6 +10,7 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
+use Nvl\Tenancy\Services\TenantBoundary;
 
 /**
  * Returns one authorized authentication audit fact.
@@ -22,6 +23,7 @@ final readonly class ShowAuthAuditAction
     public function __construct(
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
+        private TenantBoundary $boundary,
     ) {}
 
     /**
@@ -30,8 +32,11 @@ final readonly class ShowAuthAuditAction
     public function execute(Authenticatable $actor, AuthAudit $audit): AuthAudit
     {
         $this->features->assertAllowed(AuthFeature::Audit, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.audits.view', $audit);
+        /** @var AuthAudit $record */
+        $record = $this->boundary->query(AuthAudit::query(), 'auth.audits')
+            ->whereKey($audit->getKey())->firstOrFail();
+        $this->authorization->authorize($actor, 'nvl-auth.audits.view', $record);
 
-        return $audit;
+        return $record;
     }
 }

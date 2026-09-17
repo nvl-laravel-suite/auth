@@ -10,6 +10,7 @@ use JsonException;
 use Nvl\Auth\Data\Display\InvitationDeliveryData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
+use Nvl\Tenancy\Enums\TenantContextMode;
 use Nvl\Tenancy\ValueObjects\TenantId;
 
 /**
@@ -17,6 +18,8 @@ use Nvl\Tenancy\ValueObjects\TenantId;
  */
 final readonly class AuthDeliveryRequest
 {
+    public ?AuthEventContext $eventContext;
+
     /**
      * Create a delivery request.
      *
@@ -35,6 +38,7 @@ final readonly class AuthDeliveryRequest
         public ?SubjectReference $subject = null,
         public ?InvitationDeliveryData $invitation = null,
         public ?TenantId $tenant = null,
+        ?AuthEventContext $eventContext = null,
     ) {
         $supportedType = match ($this->feature) {
             AuthFeature::Invitations => AuthMessageType::Invitation,
@@ -52,6 +56,12 @@ final readonly class AuthDeliveryRequest
         if ($this->invitation !== null && $this->feature !== AuthFeature::Invitations) {
             throw new InvalidArgumentException('Invitation delivery context requires the invitations feature.');
         }
+
+        $this->eventContext = $eventContext ?? ($this->tenant instanceof TenantId
+            ? new AuthEventContext(TenantContextMode::Tenant, $this->tenant)
+            : new AuthEventContext(config('tenancy.enabled') === true
+                ? TenantContextMode::Unresolved
+                : TenantContextMode::Disabled));
 
         if (trim($this->messageId) === ''
             || $this->messageId !== trim($this->messageId)
@@ -105,6 +115,7 @@ final readonly class AuthDeliveryRequest
             'subject_type' => $this->subject?->type,
             'has_invitation' => $this->invitation !== null,
             'tenant_id' => $this->tenant?->value,
+            'event_context' => $this->eventContext->mode->value,
         ];
     }
 
@@ -138,6 +149,10 @@ final readonly class AuthDeliveryRequest
             $data['tenant'] = $this->tenant;
         }
 
+        if (isset($this->eventContext)) {
+            $data['eventContext'] = $this->eventContext;
+        }
+
         return $data;
     }
 
@@ -156,6 +171,7 @@ final readonly class AuthDeliveryRequest
      *     subject?: SubjectReference|null,
      *     invitation?: InvitationDeliveryData|null
      *     tenant?: TenantId|null
+     *     eventContext?: AuthEventContext|null
      * }  $data
      */
     public function __unserialize(array $data): void
@@ -171,5 +187,6 @@ final readonly class AuthDeliveryRequest
         $this->subject = $data['subject'] ?? null;
         $this->invitation = $data['invitation'] ?? null;
         $this->tenant = $data['tenant'] ?? null;
+        $this->eventContext = $data['eventContext'] ?? new AuthEventContext(TenantContextMode::Disabled);
     }
 }

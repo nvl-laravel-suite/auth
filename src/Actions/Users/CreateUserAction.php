@@ -18,6 +18,7 @@ use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacManager;
+use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
@@ -58,7 +59,7 @@ final readonly class CreateUserAction
             $this->audits->record('user.created', subject: $reference, actor: $actor);
             PrincipalChanged::dispatch($this->attributes->identifier($user), 'created', [
                 'email' => $this->attributes->value($user, PrincipalAttribute::Email),
-            ]);
+            ], AuthEventContext::platform());
 
             return $user->refresh()->load(['roles', 'permissions']);
         }, 3);

@@ -6,6 +6,7 @@ namespace Nvl\Auth\Events;
 
 use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Foundation\Events\Dispatchable;
+use Nvl\Auth\ValueObjects\AuthEventContext;
 
 /**
  * Publishes a committed principal mutation for external integrations.
@@ -23,5 +24,6 @@ final class PrincipalChanged implements ShouldDispatchAfterCommit
         public readonly string $userId,
         public readonly string $operation,
         public readonly array $payload = [],
+        public readonly ?AuthEventContext $context = null,
     ) {}
 }

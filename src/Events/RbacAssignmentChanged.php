@@ -6,6 +6,7 @@ namespace Nvl\Auth\Events;
 
 use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Foundation\Events\Dispatchable;
+use Nvl\Auth\ValueObjects\AuthEventContext;
 
 /**
  * Publishes every committed package-owned principal access assignment.
@@ -27,5 +28,6 @@ final class RbacAssignmentChanged implements ShouldDispatchAfterCommit
         public readonly array $roles = [],
         public readonly array $permissions = [],
         public readonly array $metadata = [],
+        public readonly ?AuthEventContext $context = null,
     ) {}
 }

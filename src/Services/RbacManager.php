@@ -10,6 +10,8 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\RbacAssignmentChanged;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\ValueObjects\AuthEventContext;
+use Nvl\Tenancy\Contracts\TenantContext;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
@@ -25,6 +27,7 @@ final readonly class RbacManager
         private AuthModelRegistry $models,
         private RbacPrincipalAccess $principals,
         private PermissionRegistrar $registrar,
+        private TenantContext $tenantContext,
     ) {}
 
     /**
@@ -65,6 +68,7 @@ final readonly class RbacManager
             'assigned',
             $roles,
             $permissions,
+            context: AuthEventContext::capture($this->tenantContext),
         );
     }
 
@@ -85,6 +89,7 @@ final readonly class RbacManager
             $roles,
             [],
             $metadata,
+            AuthEventContext::capture($this->tenantContext),
         );
     }
 
@@ -105,6 +110,7 @@ final readonly class RbacManager
             [],
             $permissions,
             $metadata,
+            AuthEventContext::capture($this->tenantContext),
         );
     }
 

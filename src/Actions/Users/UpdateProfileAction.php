@@ -26,6 +26,7 @@ use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\UserLocator;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
+use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Spatie\LaravelData\Optional;
 
@@ -86,7 +87,7 @@ final readonly class UpdateProfileAction
             ]);
             PrincipalChanged::dispatch($this->attributes->identifier($user), 'profile_updated', [
                 'attributes' => array_keys($attributes),
-            ]);
+            ], AuthEventContext::platform());
 
             if ($emailChanged) {
                 $this->requestEmailVerification($user, $data);

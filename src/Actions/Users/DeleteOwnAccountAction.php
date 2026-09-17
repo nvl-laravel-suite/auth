@@ -25,6 +25,7 @@ use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\UserLocator;
+use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
@@ -72,7 +73,11 @@ final readonly class DeleteOwnAccountAction
             }
             $deleted = (bool) $user->delete();
             $this->audits->record('user.self_deleted', subject: $reference, actor: $user);
-            PrincipalChanged::dispatch($this->attributes->identifier($user), 'self_deleted');
+            PrincipalChanged::dispatch(
+                $this->attributes->identifier($user),
+                'self_deleted',
+                context: AuthEventContext::platform(),
+            );
 
             return $deleted;
         }, 3);

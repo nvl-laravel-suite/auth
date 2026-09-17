@@ -16,6 +16,7 @@ use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\MutationAuthorizer;
 use Nvl\Auth\Services\UserLocator;
+use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 
@@ -52,7 +53,7 @@ final readonly class RestoreUserAction
                 actor: $actor,
                 metadata: $metadata,
             );
-            PrincipalChanged::dispatch($this->attributes->identifier($user), 'restored', $metadata);
+            PrincipalChanged::dispatch($this->attributes->identifier($user), 'restored', $metadata, AuthEventContext::platform());
 
             return $user->refresh();
         }, 3);
