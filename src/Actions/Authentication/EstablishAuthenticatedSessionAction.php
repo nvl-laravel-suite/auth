@@ -29,6 +29,7 @@ use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Tenancy\ValueObjects\TenantId;
 use Throwable;
 
 /**
@@ -138,16 +139,17 @@ final readonly class EstablishAuthenticatedSessionAction
             return;
         }
         try {
+            if (! $context->requestedTenant instanceof TenantId) {
+                throw new AuthException('tenant_authentication_intent_invalid', 'The tenant authentication intent is invalid.', 410);
+            }
             $tenant = $this->tenantIntents->consume(
                 $context->tenantIntentNonce,
                 $context->tenantPurpose,
                 $context->tenantSessionBinding,
+                $context->requestedTenant,
                 $context->tenantIntentSubjectBound ? $reference : null,
                 $context->tenantProvider,
             );
-            if ($context->requestedTenant !== null && $context->requestedTenant->value !== $tenant->value) {
-                throw new AuthException('tenant_authentication_intent_invalid', 'The tenant authentication intent is invalid.', 410);
-            }
             $this->tenantMemberships->assertMember($subject, $tenant);
             $this->audits->record(
                 'authentication.tenant_selected',

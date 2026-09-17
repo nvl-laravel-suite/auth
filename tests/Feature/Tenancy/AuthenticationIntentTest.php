@@ -22,6 +22,7 @@ it('binds and consumes one tenant intent once', function (): void {
         $issued->nonce,
         TenantAuthenticationPurpose::SocialLogin,
         'wrong-flow',
+        $scenario->a(),
         provider: 'github',
     ))->toThrow(AuthException::class)
         ->and(TenantAuthenticationIntent::query()->findOrFail($issued->id)->consumed_at)->toBeNull()
@@ -29,12 +30,14 @@ it('binds and consumes one tenant intent once', function (): void {
             $issued->nonce,
             TenantAuthenticationPurpose::SocialLogin,
             'server-flow-secret',
+            $scenario->a(),
             provider: 'github',
         )->value)->toBe($scenario->a()->value)
         ->and(fn () => $intents->consume(
             $issued->nonce,
             TenantAuthenticationPurpose::SocialLogin,
             'server-flow-secret',
+            $scenario->a(),
             provider: 'github',
         ))->toThrow(AuthException::class);
 });
@@ -45,8 +48,8 @@ it('keeps same-browser concurrent flows independent', function (): void {
     $a = $intents->issue($scenario->a(), TenantAuthenticationPurpose::Login, 'flow-a', returnPath: '/a');
     $b = $intents->issue($scenario->b(), TenantAuthenticationPurpose::Login, 'flow-b', returnPath: '/b');
 
-    expect($intents->consume($b->nonce, TenantAuthenticationPurpose::Login, 'flow-b')->value)
+    expect($intents->consume($b->nonce, TenantAuthenticationPurpose::Login, 'flow-b', $scenario->b())->value)
         ->toBe($scenario->b()->value)
-        ->and($intents->consume($a->nonce, TenantAuthenticationPurpose::Login, 'flow-a')->value)
+        ->and($intents->consume($a->nonce, TenantAuthenticationPurpose::Login, 'flow-a', $scenario->a())->value)
         ->toBe($scenario->a()->value);
 });

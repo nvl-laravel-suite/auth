@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Route;
 use Nvl\Auth\Actions\Challenges\ConsumeMagicLinkAction;
 use Nvl\Auth\Actions\Challenges\RequestMagicLinkAction;
 use Nvl\Auth\Actions\Challenges\RequestMagicLinkAuthenticationAction;
@@ -14,6 +15,7 @@ use Nvl\Auth\Data\Mutations\RequestSecurityCodeData;
 use Nvl\Auth\Data\Mutations\VerifySecurityCodeData;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Http\Middleware\RenderAuthExceptions;
 use Nvl\Auth\Models\Challenge;
 
 it('issues hashed magic links and consumes them once', function (): void {
@@ -76,6 +78,30 @@ it('scopes numeric codes to their recipient and purpose', function (): void {
 
     expect(app(VerifySecurityCodeAction::class)->execute(new VerifySecurityCodeData('user@example.test', 'login', $issued->secret))->consumed_at)
         ->not->toBeNull();
+});
+
+it('keeps generic security-code HTTP proof host-managed and unauthenticated when tenancy is disabled', function (): void {
+    config()->set('nvl-auth.features.security_codes.enabled', true);
+    Event::fake([AuthDeliveryRequested::class]);
+    Route::prefix('api/v1/auth')->name('nvl.auth.public.')
+        ->middleware(RenderAuthExceptions::class)
+        ->group(dirname(__DIR__, 2).'/routes/public/security_codes.php');
+
+    $this->postJson('/api/v1/auth/security-codes', [
+        'recipient' => 'host-managed@example.test',
+        'purpose' => 'email_change',
+    ])->assertAccepted();
+    /** @var AuthDeliveryRequested $delivery */
+    $delivery = Event::dispatched(AuthDeliveryRequested::class)->sole()[0];
+
+    $this->postJson('/api/v1/auth/security-codes/verify', [
+        'recipient' => 'host-managed@example.test',
+        'purpose' => 'email_change',
+        'code' => $delivery->request->payload['secret'],
+    ])->assertOk()->assertJsonPath('code', 'security_code_verified');
+
+    $this->assertGuest();
+    expect(Challenge::query()->sole()->subject_id)->toBeNull();
 });
 
 it('commits failed challenge attempts instead of rolling them back with the response', function (): void {

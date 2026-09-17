@@ -26,7 +26,9 @@ consumes a valid row once.
 
 A subject-bound magic link may establish a Laravel session through
 `AuthSubjectResolver`. Generic security-code verification returns the consumed
-challenge so host policy can decide what it proves.
+challenge so host policy can decide what it proves. The separate
+`security-codes/authentication` flow requires the `passwordless_login` purpose,
+binds the challenge to a resolved subject, and alone establishes a session.
 
 ## Invitations
 

@@ -15,6 +15,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Tenancy\Contracts\TenantHttpResolver;
 use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
 use Nvl\Tenancy\Exceptions\TenantNotFound;
+use Nvl\Tenancy\ValueObjects\TenantId;
 
 /**
  * Handles public Socialite authorization and callback transport.
@@ -30,20 +31,12 @@ final class SocialIdentityController
         StartSocialAuthorizationAction $action,
         TenantHttpResolver $tenants,
     ): JsonResponse {
-        $tenant = null;
-        if (config('tenancy.enabled') === true) {
-            try {
-                $tenant = $tenants->resolve($request);
-            } catch (TenantBoundaryViolation|TenantNotFound) {
-                $tenant = null;
-            }
-        }
         $returnPath = $request->query('return_path');
 
         return response()->json([
             'data' => ['url' => $action->execute(
                 $provider,
-                $tenant,
+                $this->requestedTenant($request, $tenants),
                 is_string($returnPath) ? $returnPath : null,
             )],
             'code' => 'social_authorization_started',
@@ -59,11 +52,13 @@ final class SocialIdentityController
         Request $request,
         CompleteSocialAuthorizationAction $action,
         EstablishAuthenticatedSessionAction $sessions,
+        TenantHttpResolver $tenants,
     ): JsonResponse {
         $state = $request->query('state');
         $identity = $action->execute(
             $provider,
             flowReference: is_string($state) ? $state : null,
+            requestedTenant: $this->requestedTenant($request, $tenants),
         );
         $reference = new SubjectReference($identity->subject_type, $identity->subject_id);
         $sessions->execute(
@@ -81,5 +76,18 @@ final class SocialIdentityController
             'code' => 'social_authenticated',
             'message' => 'Social authentication succeeded.',
         ]);
+    }
+
+    private function requestedTenant(Request $request, TenantHttpResolver $tenants): ?TenantId
+    {
+        if (config('tenancy.enabled') !== true) {
+            return null;
+        }
+
+        try {
+            return $tenants->resolve($request);
+        } catch (TenantBoundaryViolation|TenantNotFound) {
+            return null;
+        }
     }
 }

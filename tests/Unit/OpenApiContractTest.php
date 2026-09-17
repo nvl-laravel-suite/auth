@@ -110,6 +110,8 @@ it('keeps OpenAPI operations and feature metadata identical to the manifest', fu
         'nvl.auth.public.password.reset',
         'nvl.auth.public.security_codes.request',
         'nvl.auth.public.security_codes.verify',
+        'nvl.auth.public.security_codes.authentication.request',
+        'nvl.auth.public.security_codes.authentication.verify',
     ];
     sort($expectedRequestBodyOperations);
 

@@ -15,6 +15,8 @@ with `nvl.auth.` and response envelopes use `data`, `code`, and `message`.
 | `POST magic-links/consume` | `public.magic_links.consume` | magic links/use |
 | `POST security-codes` | `public.security_codes.request` | security codes/issue |
 | `POST security-codes/verify` | `public.security_codes.verify` | security codes/use |
+| `POST security-codes/authentication` | `public.security_codes.authentication.request` | security codes + sessions/issue |
+| `POST security-codes/authentication/verify` | `public.security_codes.authentication.verify` | security codes + sessions/use |
 | `POST invitations/accept` | `public.invitations.accept` | invitations/use |
 | `POST passkeys/authentication/options` | `public.passkeys.authentication.options` | passkeys/use |
 | `POST passkeys/authentication` | `public.passkeys.authentication.finish` | passkeys/use |

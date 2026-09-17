@@ -111,7 +111,12 @@ final class FeatureManifest
                 $readWrite,
                 [AuthFeature::Authentication],
                 ['public' => 'security_codes'],
-                ['public' => ['security_codes.request', 'security_codes.verify']],
+                ['public' => [
+                    'security_codes.request',
+                    'security_codes.verify',
+                    'security_codes.authentication.request',
+                    'security_codes.authentication.verify',
+                ]],
             ),
             new FeatureDefinition(
                 AuthFeature::Invitations,

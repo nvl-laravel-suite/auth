@@ -9,8 +9,10 @@ use Illuminate\Http\Request;
 use Nvl\Auth\Actions\Authentication\EstablishAuthenticatedSessionAction;
 use Nvl\Auth\Actions\Challenges\ConsumeMagicLinkAction;
 use Nvl\Auth\Actions\Challenges\RequestMagicLinkAuthenticationAction;
+use Nvl\Auth\Actions\Challenges\RequestSecurityCodeAction;
 use Nvl\Auth\Actions\Challenges\RequestSecurityCodeAuthenticationAction;
 use Nvl\Auth\Actions\Challenges\VerifySecurityCodeAction;
+use Nvl\Auth\Actions\Challenges\VerifySecurityCodeAuthenticationAction;
 use Nvl\Auth\Data\Mutations\ConsumeMagicLinkData;
 use Nvl\Auth\Data\Mutations\RequestMagicLinkData;
 use Nvl\Auth\Data\Mutations\RequestSecurityCodeData;
@@ -79,13 +81,11 @@ final class ChallengeController
     public function requestSecurityCode(
         RequestSecurityCodeData $data,
         Request $request,
-        RequestSecurityCodeAuthenticationAction $action,
-        TenantHttpResolver $tenants,
+        RequestSecurityCodeAction $action,
     ): JsonResponse {
         $action->execute(
             $data,
             locale: $request->getPreferredLanguage(),
-            tenant: $this->requestedTenant($request, $tenants),
         );
 
         return response()->json(['data' => null, 'code' => 'security_code_requested', 'message' => 'The security code was requested.'], 202);
@@ -96,26 +96,54 @@ final class ChallengeController
      */
     public function verifySecurityCode(
         VerifySecurityCodeData $data,
-        Request $request,
         VerifySecurityCodeAction $action,
-        EstablishAuthenticatedSessionAction $sessions,
-        TenantAuthenticationChallengeIntents $tenantIntents,
-        TenantHttpResolver $tenants,
     ): JsonResponse {
         $challenge = $action->execute($data);
-        if (is_string($challenge->subject_type) && is_string($challenge->subject_id)) {
-            $context = $tenantIntents->context($challenge, $this->requestedTenant($request, $tenants));
-            $sessions->execute(
-                new SubjectReference($challenge->subject_type, $challenge->subject_id),
-                requestContext: $this->requestContext($request, $context),
-                purpose: AuthenticationPurpose::PasswordlessLogin,
-            );
-        }
 
         return response()->json([
             'data' => ['challenge_id' => $challenge->identifier()],
             'code' => 'security_code_verified',
             'message' => 'The security code was verified.',
+        ]);
+    }
+
+    /** Request an explicitly subject-bound passwordless security code. */
+    public function requestSecurityCodeAuthentication(
+        RequestSecurityCodeData $data,
+        Request $request,
+        RequestSecurityCodeAuthenticationAction $action,
+        TenantHttpResolver $tenants,
+    ): JsonResponse {
+        $action->execute(
+            $data,
+            locale: $request->getPreferredLanguage(),
+            tenant: $this->requestedTenant($request, $tenants),
+        );
+
+        return response()->json(['data' => null, 'code' => 'security_code_authentication_requested', 'message' => 'The authentication code was requested.'], 202);
+    }
+
+    /** Verify an explicitly passwordless security code and establish its session. */
+    public function verifySecurityCodeAuthentication(
+        VerifySecurityCodeData $data,
+        Request $request,
+        VerifySecurityCodeAuthenticationAction $action,
+        TenantHttpResolver $tenants,
+    ): JsonResponse {
+        $challenge = $action->execute(
+            $data,
+            new AuthenticationRequestContext(
+                ipAddress: $request->ip(),
+                userAgent: $request->userAgent(),
+                requestId: $request->header('X-Request-ID'),
+                requestedTenant: $this->requestedTenant($request, $tenants),
+            ),
+        );
+
+        return response()->json([
+            'data' => ['challenge_id' => $challenge->identifier()],
+            'code' => 'security_code_authenticated',
+            'message' => 'Security-code authentication succeeded.',
         ]);
     }
 

@@ -63,6 +63,7 @@ final readonly class TenantAuthenticationIntents
         string $nonce,
         TenantAuthenticationPurpose $purpose,
         string $sessionBinding,
+        TenantId $expectedTenant,
         ?SubjectReference $subject = null,
         ?string $provider = null,
     ): TenantId {
@@ -77,6 +78,7 @@ final readonly class TenantAuthenticationIntents
             $purpose,
             $sessionBinding,
             $subject,
+            $expectedTenant,
         ): TenantId {
             /** @var TenantAuthenticationIntent|null $intent */
             $intent = TenantAuthenticationIntent::query()
@@ -96,19 +98,19 @@ final readonly class TenantAuthenticationIntents
                     $this->hasher->hash('tenant-authentication-session', $sessionBinding),
                 )
                 || $intent->purpose !== $purpose
+                || $intent->tenant_id !== $expectedTenant->value
                 || ! $providerMatches
                 || ! $subjectMatches
                 || $intent->consumed_at !== null) {
                 throw new AuthException('tenant_authentication_intent_invalid', 'The tenant authentication intent is invalid.', 410);
             }
 
-            $tenant = new TenantId($intent->tenant_id);
-            $this->assertActiveTenant($tenant);
+            $this->assertActiveTenant($expectedTenant);
             $intent->forceFill([
                 'consumed_at' => CarbonImmutable::instance(now()),
             ])->save();
 
-            return $tenant;
+            return $expectedTenant;
         }, 3);
     }
 

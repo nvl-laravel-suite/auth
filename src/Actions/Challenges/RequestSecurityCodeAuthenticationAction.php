@@ -7,9 +7,14 @@ namespace Nvl\Auth\Actions\Challenges;
 use Nvl\Auth\Contracts\AuthIdentifierResolver;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\RequestSecurityCodeData;
+use Nvl\Auth\Enums\AuthenticationPurpose;
+use Nvl\Auth\Enums\AuthFeature;
+use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\TenantAuthenticationPurpose;
+use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Results\IssuedChallenge;
 use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\TenantAuthenticationChallengeIntents;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Tenancy\ValueObjects\TenantId;
@@ -18,6 +23,7 @@ use Nvl\Tenancy\ValueObjects\TenantId;
 final readonly class RequestSecurityCodeAuthenticationAction
 {
     public function __construct(
+        private FeatureGate $features,
         private AuthConfiguration $configuration,
         private PrincipalAttributeMapper $principalAttributes,
         private AuthIdentifierResolver $identifiers,
@@ -30,6 +36,14 @@ final readonly class RequestSecurityCodeAuthenticationAction
         ?string $locale = null,
         ?TenantId $tenant = null,
     ): ?IssuedChallenge {
+        $this->features->assertAllowed(AuthFeature::SecurityCodes, FeatureOperation::Issue);
+        if ($data->purpose !== AuthenticationPurpose::PasswordlessLogin->value) {
+            throw new AuthException(
+                'security_code_authentication_purpose_invalid',
+                'Security-code authentication requires the passwordless login purpose.',
+                422,
+            );
+        }
         $identifierName = $this->principalAttributes->identifierColumn(
             $this->configuration->string('identifier', 'email'),
         );

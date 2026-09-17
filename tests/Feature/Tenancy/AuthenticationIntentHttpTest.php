@@ -62,7 +62,39 @@ it('carries a subject-bound tenant intent through the real magic-link HTTP trans
     expect(AuthAudit::query()->where('action', 'authentication.tenant_selection_denied')->exists())->toBeTrue();
 });
 
-it('denies mismatched expired and suspended magic-link tenant intents without failing global login', function (string $condition): void {
+it('does not consume a tenant intent for a mismatched HTTP tenant and consumes it once for the correct tenant', function (): void {
+    Event::fake([AuthDeliveryRequested::class]);
+    $scenario = new AuthTenancyScenario;
+    $user = $this->user('magic-mismatch@example.test');
+    $scenario->member($scenario->a(), SubjectReference::fromAuthenticatable($user));
+
+    $this->withSession([])->withHeader('X-Test-Tenant', $scenario->a()->value)
+        ->postJson('/api/v1/auth/magic-links', ['recipient' => $user->email])
+        ->assertAccepted();
+    /** @var AuthDeliveryRequested $delivery */
+    $delivery = Event::dispatched(AuthDeliveryRequested::class)->sole()[0];
+    $challengeId = $delivery->request->payload['challenge_id'];
+
+    $this->withHeader('X-Test-Tenant', $scenario->b()->value)->postJson('/api/v1/auth/magic-links/consume', [
+        'challengeId' => $challengeId,
+        'token' => $delivery->request->payload['secret'],
+    ])->assertOk();
+
+    $this->assertAuthenticatedAs($user);
+    expect(TenantAuthenticationIntent::query()->sole()->consumed_at)->toBeNull()
+        ->and(AuthAudit::query()->where('action', 'authentication.tenant_selection_denied')->count())->toBe(1);
+
+    Challenge::query()->whereKey($challengeId)->update(['consumed_at' => null]);
+    $this->withHeader('X-Test-Tenant', $scenario->a()->value)->postJson('/api/v1/auth/magic-links/consume', [
+        'challengeId' => $challengeId,
+        'token' => $delivery->request->payload['secret'],
+    ])->assertOk();
+
+    expect(TenantAuthenticationIntent::query()->sole()->consumed_at)->not->toBeNull()
+        ->and(AuthAudit::query()->where('action', 'authentication.tenant_selected')->count())->toBe(1);
+});
+
+it('denies expired and suspended magic-link tenant intents without failing global login', function (string $condition): void {
     Event::fake([AuthDeliveryRequested::class]);
     $scenario = new AuthTenancyScenario;
     $user = $this->user("magic-{$condition}@example.test");
@@ -82,16 +114,14 @@ it('denies mismatched expired and suspended magic-link tenant intents without fa
         expect($directory)->toBeInstanceOf(AuthTestTenantDirectory::class);
         $directory->setStatus($scenario->a(), TenantStatus::Suspended);
     }
-    $completionTenant = $condition === 'mismatch' ? $scenario->b() : $scenario->a();
-
-    $this->withHeader('X-Test-Tenant', $completionTenant->value)->postJson('/api/v1/auth/magic-links/consume', [
+    $this->withHeader('X-Test-Tenant', $scenario->a()->value)->postJson('/api/v1/auth/magic-links/consume', [
         'challengeId' => $delivery->request->payload['challenge_id'],
         'token' => $delivery->request->payload['secret'],
     ])->assertOk();
 
     $this->assertAuthenticatedAs($user);
     expect(AuthAudit::query()->where('action', 'authentication.tenant_selection_denied')->exists())->toBeTrue();
-})->with(['mismatch', 'expired', 'suspended']);
+})->with(['expired', 'suspended']);
 
 it('carries tenant intent through real security-code and passkey HTTP transports', function (): void {
     Event::fake([AuthDeliveryRequested::class]);
@@ -99,17 +129,17 @@ it('carries tenant intent through real security-code and passkey HTTP transports
     $user = $this->user('passwordless-http@example.test');
     $scenario->member($scenario->a(), SubjectReference::fromAuthenticatable($user));
 
-    $this->withSession([])->withHeader('X-Test-Tenant', $scenario->a()->value)->postJson('/api/v1/auth/security-codes', [
+    $this->withSession([])->withHeader('X-Test-Tenant', $scenario->a()->value)->postJson('/api/v1/auth/security-codes/authentication', [
         'recipient' => $user->email,
-        'purpose' => 'login',
+        'purpose' => 'passwordless_login',
     ])->assertAccepted();
     /** @var AuthDeliveryRequested $codeDelivery */
     $codeDelivery = Event::dispatched(AuthDeliveryRequested::class)->sole()[0];
-    $this->withHeader('X-Test-Tenant', $scenario->a()->value)->postJson('/api/v1/auth/security-codes/verify', [
+    $this->withHeader('X-Test-Tenant', $scenario->a()->value)->postJson('/api/v1/auth/security-codes/authentication/verify', [
         'recipient' => $user->email,
-        'purpose' => 'login',
+        'purpose' => 'passwordless_login',
         'code' => $codeDelivery->request->payload['secret'],
-    ])->assertOk()->assertJsonPath('code', 'security_code_verified');
+    ])->assertOk()->assertJsonPath('code', 'security_code_authenticated');
 
     auth('web')->logout();
     $this->app->singleton(PasskeyCeremony::class, TestPasskeyCeremony::class);

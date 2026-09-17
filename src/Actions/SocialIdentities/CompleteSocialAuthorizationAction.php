@@ -88,15 +88,16 @@ final readonly class CompleteSocialAuthorizationAction
             $nonce = $this->session->pullAuthenticationIntent($flow);
             if (is_string($nonce)) {
                 try {
+                    if (! $requestedTenant instanceof TenantId) {
+                        throw new AuthException('tenant_authentication_intent_invalid', 'The tenant authentication intent is invalid.', 410);
+                    }
                     $tenant = $this->intents->consume(
                         $nonce,
                         TenantAuthenticationPurpose::SocialLogin,
                         $this->session->authenticationFlowBinding($flow),
+                        $requestedTenant,
                         provider: $provider,
                     );
-                    if ($requestedTenant instanceof TenantId && $requestedTenant->value !== $tenant->value) {
-                        throw new AuthException('tenant_authentication_intent_invalid', 'The tenant authentication intent is invalid.', 410);
-                    }
                     $this->memberships->assertMember($resolvedSubject, $tenant);
                     $this->audits->record(
                         'authentication.tenant_selected',

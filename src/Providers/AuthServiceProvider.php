@@ -78,6 +78,7 @@ use Nvl\Auth\Services\ConfiguredPrincipalAttributeMapper;
 use Nvl\Auth\Services\DenySystemMutationAccess;
 use Nvl\Auth\Services\DisabledInvitationRecipientProof;
 use Nvl\Auth\Services\DisabledTenantAwareAuthActivityBridge;
+use Nvl\Auth\Services\DisabledTenantHttpResolver;
 use Nvl\Auth\Services\EloquentMembershipPrincipalResolver;
 use Nvl\Auth\Services\EloquentPasswordUpdater;
 use Nvl\Auth\Services\EloquentRbacPrincipalAccess;
@@ -98,6 +99,7 @@ use Nvl\Auth\Tenancy\AuthTenancyAdoption;
 use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
 use Nvl\Support\Traits\MergesPackageConfiguration;
+use Nvl\Tenancy\Contracts\TenantHttpResolver;
 use Nvl\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Tenancy\Enums\TenantResourceKind;
 use Nvl\Tenancy\Providers\TenancyServiceProvider;
@@ -123,6 +125,20 @@ final class AuthServiceProvider extends ServiceProvider
         $this->mergePackageConfiguration(dirname(__DIR__, 2).'/config/nvl-auth.php', 'nvl-auth');
         $this->app->register(DataServiceProvider::class);
         $this->app->register(TenancyServiceProvider::class);
+        $this->app->beforeResolving(TenantHttpResolver::class, static function (
+            string $abstract,
+            array $parameters,
+            Container $container,
+        ): void {
+            if ($container->bound(TenantHttpResolver::class)) {
+                return;
+            }
+            if ($container->make(ConfigRepository::class)->get('tenancy.enabled') === true) {
+                throw AuthException::invalidConfiguration('A tenant HTTP resolver is required when tenancy is enabled.');
+            }
+
+            $container->bind(TenantHttpResolver::class, DisabledTenantHttpResolver::class);
+        });
         $this->configureOwnedIdentityStorage();
         $this->app->singleton(AuthConfiguration::class);
         $this->app->singleton(AuthModelRegistry::class);
