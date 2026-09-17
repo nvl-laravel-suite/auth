@@ -108,10 +108,10 @@ final readonly class RegisterInvitationAction
 
         try {
             return DB::connection($connection)->transaction(function () use ($authenticatedRecipient, $connection, $data, $tenant): InvitationRegistrationResult {
-                /** @var Invitation|null $invitation */
                 $query = $tenant instanceof TenantId
                     ? $this->boundary->query(Invitation::query(), 'auth.invitations')
                     : Invitation::query();
+                /** @var Invitation|null $invitation */
                 $invitation = $query
                     ->where('token_hash', $this->hasher->hash('invitation-token', $data->token))
                     ->lockForUpdate()

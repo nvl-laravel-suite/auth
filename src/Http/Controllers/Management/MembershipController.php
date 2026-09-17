@@ -25,6 +25,7 @@ final class MembershipController extends AuthenticatedController
 {
     public function index(Request $request, ListMembershipsAction $action): JsonResponse
     {
+        /** @var array{search?: string|null, per_page?: int|null} $validated */
         $validated = $request->validate(['search' => ['nullable', 'string', 'max:191'], 'per_page' => ['nullable', 'integer', 'min:1', 'max:100']]);
 
         return response()->json([
@@ -51,6 +52,7 @@ final class MembershipController extends AuthenticatedController
 
     public function store(Request $request, EnrollMembershipAction $action): JsonResponse
     {
+        /** @var array{subject_type: string, subject_id: string, roles?: list<string>, permissions?: list<string>} $validated */
         $validated = $request->validate([
             'subject_type' => ['required', 'string', 'max:160'],
             'subject_id' => ['required', 'string', 'max:191'],
@@ -68,6 +70,7 @@ final class MembershipController extends AuthenticatedController
 
     public function status(Request $request, string $membership, SetMembershipStatusAction $action): JsonResponse
     {
+        /** @var array{status: string, expected_revision: int} $validated */
         $validated = $request->validate(['status' => ['required', 'string'], 'expected_revision' => ['required', 'integer', 'min:1']]);
         $status = MembershipStatus::tryFrom($validated['status']);
         abort_if($status === null, 422, 'The membership status is invalid.');
@@ -80,6 +83,7 @@ final class MembershipController extends AuthenticatedController
 
     public function destroy(Request $request, string $membership, RevokeMembershipAction $action): JsonResponse
     {
+        /** @var array{expected_revision: int} $validated */
         $validated = $request->validate(['expected_revision' => ['required', 'integer', 'min:1']]);
         $action->execute($this->subject($request), $membership, $validated['expected_revision']);
 
@@ -88,6 +92,7 @@ final class MembershipController extends AuthenticatedController
 
     public function transfer(Request $request, string $membership, TransferMembershipOwnershipAction $action): JsonResponse
     {
+        /** @var array{recipient_membership_id: string, expected_revision: int} $validated */
         $validated = $request->validate(['recipient_membership_id' => ['required', 'uuid'], 'expected_revision' => ['required', 'integer', 'min:1']]);
 
         return response()->json([

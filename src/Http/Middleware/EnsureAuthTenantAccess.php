@@ -15,7 +15,6 @@ use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
 use Nvl\Tenancy\Exceptions\TenantInactive;
 use Nvl\Tenancy\Exceptions\TenantNotFound;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /** Verifies Auth membership and token ownership before foundation context entry. */
 final readonly class EnsureAuthTenantAccess
@@ -39,7 +38,7 @@ final readonly class EnsureAuthTenantAccess
 
             return $next($request);
         } catch (TenantBoundaryViolation|TenantInactive|TenantNotFound|AuthException $exception) {
-            throw new NotFoundHttpException('Tenant was not found.', $exception);
+            abort(404, 'Tenant was not found.');
         }
     }
 }

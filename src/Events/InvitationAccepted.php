@@ -62,7 +62,7 @@ final class InvitationAccepted implements ShouldDispatchAfterCommit
      *     type: string,
      *     purpose: string,
      *     subject: SubjectReference,
-     *     acceptedAt?: CarbonImmutable|null
+     *     acceptedAt?: CarbonImmutable|null,
      *     context?: AuthEventContext|null
      * }  $data
      */

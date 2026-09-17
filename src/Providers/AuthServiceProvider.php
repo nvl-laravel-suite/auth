@@ -8,7 +8,7 @@ use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Http\Kernel as HttpKernelContract;
-use Illuminate\Foundation\Http\Kernel as HttpKernel;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
 use Nvl\Auth\Adapters\ApiTokens\SanctumApiTokenManager;
@@ -148,7 +148,14 @@ final class AuthServiceProvider extends ServiceProvider
                 );
             }
 
-            return $container->make($bridge);
+            $resolved = $container->make($bridge);
+            if (! $resolved instanceof TenantAwareAuthActivityBridge) {
+                throw AuthException::invalidConfiguration(
+                    'The Auth activity bridge container binding must resolve the tenant-aware bridge contract.',
+                );
+            }
+
+            return $resolved;
         });
         $this->app->scoped(AuthAuditContextProvider::class, LaravelRequestAuditContextProvider::class);
         $this->bindConfiguredContract(
@@ -270,14 +277,17 @@ final class AuthServiceProvider extends ServiceProvider
         if (config('tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Memberships)) {
             $this->app->scoped(TenantMembershipAccess::class, AuthTenantMembershipAccess::class);
             $kernel = $this->app->make(HttpKernelContract::class);
-            if ($kernel instanceof HttpKernel) {
-                $kernel->addToMiddlewarePriorityAfter(AuthenticatesRequests::class, EnsureAuthTenantAccess::class);
+            if (! method_exists($kernel, 'addToMiddlewarePriorityAfter')) {
+                throw AuthException::invalidConfiguration(
+                    'Tenant membership routes require a Laravel HTTP kernel with middleware-priority support.',
+                );
             }
+            $kernel->addToMiddlewarePriorityAfter(AuthenticatesRequests::class, EnsureAuthTenantAccess::class);
         }
         if (config('tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Rbac)) {
             $principal = $this->app->make(AuthModelRegistry::class)->rbacPrincipalClass();
-            $principal::retrieved(fn ($model) => $this->app->make(RbacPrincipalTracker::class)->track($model));
-            $principal::created(fn ($model) => $this->app->make(RbacPrincipalTracker::class)->track($model));
+            $principal::retrieved(fn (Model $model) => $this->app->make(RbacPrincipalTracker::class)->track($model));
+            $principal::created(fn (Model $model) => $this->app->make(RbacPrincipalTracker::class)->track($model));
         }
         $typeScriptSources->register(__DIR__.'/..', 'nvl/auth');
         $this->configureOwnedIdentityStorage();

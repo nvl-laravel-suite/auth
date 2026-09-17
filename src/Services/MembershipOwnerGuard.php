@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Illuminate\Database\Eloquent\Builder;
 use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\TenantMembership;
@@ -29,8 +30,7 @@ final readonly class MembershipOwnerGuard
     public function assertCanRemoveOwner(TenantMembership $membership): void
     {
         if ($membership->is_owner && $membership->status === MembershipStatus::Active
-            && $this->boundary->query(TenantMembership::query(), 'auth.memberships')
-                ->where('status', MembershipStatus::Active->value)->where('is_owner', true)->count() <= 1) {
+            && ! $this->hasSecondActiveOwner($this->boundary->query(TenantMembership::query(), 'auth.memberships'))) {
             throw new AuthException('membership_last_owner', 'The last active tenant owner cannot be removed.', 409);
         }
     }
@@ -45,10 +45,20 @@ final readonly class MembershipOwnerGuard
             if (! $lock instanceof TenantMembershipLock) {
                 throw AuthException::invalidConfiguration('The tenant membership lock is missing.');
             }
-            if (TenantMembership::query()->where('tenant_id', $tenant->value)->where('status', MembershipStatus::Active->value)
-                ->where('is_owner', true)->count() <= 1) {
+            if (! $this->hasSecondActiveOwner(TenantMembership::query()->where('tenant_id', $tenant->value))) {
                 throw new AuthException('membership_last_owner', 'The principal retains last-owner responsibility.', 409);
             }
         }
+    }
+
+    /**
+     * Require two locked owner rows without issuing an aggregate lock query.
+     *
+     * @param  Builder<TenantMembership>  $query
+     */
+    private function hasSecondActiveOwner(Builder $query): bool
+    {
+        return $query->where('status', MembershipStatus::Active->value)->where('is_owner', true)
+            ->limit(2)->lockForUpdate()->get(['id'])->get(1) instanceof TenantMembership;
     }
 }

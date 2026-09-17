@@ -75,7 +75,7 @@ final readonly class CreateInvitationAction
         }
 
         $ownership = $this->boundary->attributes('auth.invitations');
-        $tenant = isset($ownership['tenant_id']) && is_string($ownership['tenant_id'])
+        $tenant = isset($ownership['tenant_id'])
             ? new TenantId($ownership['tenant_id'])
             : null;
         if ($context->tenant !== null && $context->tenant->value !== $tenant?->value) {

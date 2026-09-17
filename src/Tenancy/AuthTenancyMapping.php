@@ -76,7 +76,10 @@ final readonly class AuthTenancyMapping
         }
     }
 
-    /** @param array<string, mixed> $metadata @param list<string> $expected */
+    /**
+     * @param  array<string, mixed>  $metadata
+     * @param  list<string>  $expected
+     */
     private function keys(array $metadata, array $expected): void
     {
         $keys = array_keys($metadata);

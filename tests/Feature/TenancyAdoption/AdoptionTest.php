@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Models\Role;
@@ -88,4 +89,24 @@ it('resumes an immutable run without duplicating adopted rows', function (): voi
 
     config(['tenancy.profile' => 'changed-after-review']);
     expect(fn () => $coordinator->resume($plan->id))->toThrow(TenantConfigurationInvalid::class);
+});
+
+it('classifies legacy history only for installed optional feature tables', function (): void {
+    foreach ([
+        AuthTables::PersonalAccessTokens,
+        AuthTables::Challenges,
+        AuthTables::Invitations,
+        AuthTables::Audits,
+    ] as $table) {
+        Schema::dropIfExists($table);
+    }
+
+    $coordinator = app(TenantAdoptionCoordinator::class);
+    $operation = new PlatformOperation('auth-test.optional-schema-adoption', 'system', 'fixture');
+    $plan = $coordinator->prepare(['auth'], [], $operation);
+    while (! $coordinator->backfill($plan, 100, $operation)) {
+        // Exercise final classification with every optional operational table absent.
+    }
+
+    expect($coordinator->verify($plan)->errors)->toBe([]);
 });

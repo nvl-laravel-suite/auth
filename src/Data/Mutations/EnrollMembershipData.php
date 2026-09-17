@@ -32,7 +32,7 @@ final class EnrollMembershipData extends Data
                 throw new InvalidArgumentException('Membership access identifiers must be distinct and bounded.');
             }
             foreach ($identifiers as $identifier) {
-                if (! is_string($identifier) || trim($identifier) === '' || mb_strlen($identifier) > 160) {
+                if (trim($identifier) === '' || mb_strlen($identifier) > 160) {
                     throw new InvalidArgumentException('Membership access identifiers are invalid.');
                 }
             }

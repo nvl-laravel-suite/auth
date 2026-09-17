@@ -17,20 +17,26 @@ final class ThrowingQueuedAuthDelivery implements ShouldQueue
 
     public function __construct(private TenantContext $context) {}
 
+    public function shouldQueue(AuthDeliveryRequested $event): bool
+    {
+        return $event->request->messageId === 'delivery-a';
+    }
+
     public function handle(AuthDeliveryRequested $event): void
     {
         $tenant = $this->context->requireTenant()->value;
         $attempt = DB::table('nvl_auth_test_delivery_receipts')
             ->where('tenant_id', $tenant)
             ->where('message_id', $event->request->messageId)
+            ->where('attempt', '>=', 10)
             ->max('attempt');
-        $next = is_numeric($attempt) ? (int) $attempt + 1 : 1;
+        $next = is_numeric($attempt) ? (int) $attempt + 1 : 10;
         DB::table('nvl_auth_test_delivery_receipts')->insert([
             'tenant_id' => $tenant,
             'message_id' => $event->request->messageId,
             'attempt' => $next,
         ]);
-        if ($next === 1) {
+        if ($next === 10) {
             throw new RuntimeException('Expected first queued delivery attempt failure.');
         }
     }

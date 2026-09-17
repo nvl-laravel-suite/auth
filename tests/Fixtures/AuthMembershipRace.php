@@ -41,11 +41,9 @@ final class AuthMembershipRace
 
                     continue;
                 }
-                $workerConnection = "auth_membership_worker_{$index}";
                 try {
-                    config()->set("database.connections.{$workerConnection}", $configuration);
-                    config()->set('nvl-auth.connection', $workerConnection);
-                    DB::purge($workerConnection);
+                    config()->set("database.connections.{$connectionName}", $configuration);
+                    DB::purge($connectionName);
                     file_put_contents($ready[$index], 'ready');
                     $deadline = microtime(true) + 10;
                     while (file_get_contents($gate) !== 'go') {

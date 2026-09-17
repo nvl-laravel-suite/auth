@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Builder;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\Permission;
+use Nvl\Auth\Services\AuthTenantRbacQueries;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
@@ -20,6 +22,7 @@ final readonly class ShowPermissionAction
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
         private RbacEntityLocator $entities,
+        private AuthTenantRbacQueries $tenancy,
     ) {}
 
     /** Return one permission. */
@@ -32,9 +35,10 @@ final readonly class ShowPermissionAction
         if (config('tenancy.enabled') !== true) {
             return $permission->load('roles')->loadCount('users');
         }
-        $relation = $permission->roles();
-        $table = $relation->getRelated()->getTable();
-        $permission->setRelation('roles', $relation->where("{$table}.tenant_id", getPermissionsTeamId())->get());
+        $roles = $this->tenancy->roles()
+            ->whereHas('permissions', static fn (Builder $query): Builder => $query->whereKey($permission->id))
+            ->get();
+        $permission->setRelation('roles', $roles);
 
         return $permission->loadCount('users');
     }

@@ -20,7 +20,6 @@ use Nvl\Auth\Models\TenantMembershipLock;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Tenancy\Contracts\TenantContext;
-use Nvl\Tenancy\Services\TenantBoundary;
 
 /** Owns transactional membership mutation mechanics shared by public Actions. */
 final readonly class MembershipMutator
@@ -34,7 +33,6 @@ final readonly class MembershipMutator
         private MembershipOwnerGuard $owners,
         private TenantMembershipAssignments $assignments,
         private TenantContext $context,
-        private TenantBoundary $boundary,
         private AuthAuditRecorder $audits,
     ) {}
 
@@ -139,10 +137,7 @@ final readonly class MembershipMutator
 
         return DB::connection((new TenantMembership)->getConnectionName())->transaction(function () use ($actor, $authority, $subject): TenantMembership {
             $tenant = $this->context->requireTenant();
-            TenantMembershipLock::query()->firstOrCreate([
-                ...$this->boundary->attributes('auth.membership_locks'),
-                'tenant_id' => $tenant->value,
-            ]);
+            TenantMembershipLock::query()->firstOrCreate(['tenant_id' => $tenant->value]);
             $this->owners->lock($tenant);
             $this->principals->resolve($subject, true);
             $membership = $this->writer->enroll($subject);

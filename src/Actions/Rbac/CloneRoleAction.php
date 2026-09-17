@@ -39,7 +39,8 @@ final readonly class CloneRoleAction
         $class = $this->models->roleClass();
 
         return DB::connection($source->getConnectionName())->transaction(function () use ($actor, $class, $displayName, $name, $source): Role {
-            $clone = $class::query()->create([
+            /** @var array{tenant_id?: string|null, name: string, guard_name: string, display_name: string|null, description: string|null, parent_id: string|null, priority: int, is_system: bool, metadata: array<string, mixed>|null} $attributes */
+            $attributes = [
                 ...(config('tenancy.enabled') === true ? $this->tenancy->attributes('auth.roles') : []),
                 'name' => trim($name),
                 'guard_name' => $source->guard_name,
@@ -49,7 +50,8 @@ final readonly class CloneRoleAction
                 'priority' => $source->priority,
                 'is_system' => false,
                 'metadata' => $source->metadata,
-            ]);
+            ];
+            $clone = $class::query()->create($attributes);
             $clone->syncPermissions($source->permissions);
             $this->audits->record('role.cloned', actor: $actor, metadata: [
                 'role_id' => $clone->id,

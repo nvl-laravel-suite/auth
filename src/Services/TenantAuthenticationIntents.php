@@ -39,7 +39,7 @@ final readonly class TenantAuthenticationIntents
         $this->validateReturnPath($returnPath);
         $this->assertActiveTenant($tenant);
         $nonce = $this->tokens->make();
-        $expiresAt = CarbonImmutable::now()->addMinutes($this->configuration->integerBetween(
+        $expiresAt = CarbonImmutable::instance(now())->addMinutes($this->configuration->integerBetween(
             'features.authentication.settings.tenant_intent_ttl_minutes',
             10,
             1,
@@ -81,6 +81,7 @@ final readonly class TenantAuthenticationIntents
             /** @var TenantAuthenticationIntent|null $intent */
             $intent = TenantAuthenticationIntent::query()
                 ->where('nonce_hash', $nonceHash)
+                ->where('expires_at', '>', now())
                 ->lockForUpdate()
                 ->first();
             $payload = $intent?->payload;
@@ -97,14 +98,15 @@ final readonly class TenantAuthenticationIntents
                 || $intent->purpose !== $purpose
                 || ! $providerMatches
                 || ! $subjectMatches
-                || $intent->consumed_at !== null
-                || ! $intent->expires_at->isFuture()) {
+                || $intent->consumed_at !== null) {
                 throw new AuthException('tenant_authentication_intent_invalid', 'The tenant authentication intent is invalid.', 410);
             }
 
             $tenant = new TenantId($intent->tenant_id);
             $this->assertActiveTenant($tenant);
-            $intent->forceFill(['consumed_at' => CarbonImmutable::now()])->save();
+            $intent->forceFill([
+                'consumed_at' => CarbonImmutable::instance(now()),
+            ])->save();
 
             return $tenant;
         }, 3);

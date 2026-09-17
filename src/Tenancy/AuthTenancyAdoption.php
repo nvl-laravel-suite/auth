@@ -7,7 +7,9 @@ namespace Nvl\Auth\Tenancy;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Migrations\Migrator;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\Schema\Builder;
 use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Models\Role;
@@ -80,7 +82,17 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
                 $table->unique(['tenant_id', 'name', 'guard_name'], 'nvl_auth_roles_tenant_name_guard_unique');
             });
         }
-        if ($schema->hasIndex(AuthTables::ModelHasPermissions, 'nvl_auth_model_permissions_primary')) {
+        if (! $schema->hasIndex(AuthTables::ModelHasRoles, 'nvl_auth_model_roles_role_id_index')) {
+            $schema->table(AuthTables::ModelHasRoles, static function (Blueprint $table): void {
+                $table->index('role_id', 'nvl_auth_model_roles_role_id_index');
+            });
+        }
+        if (! $schema->hasIndex(AuthTables::ModelHasPermissions, 'nvl_auth_model_permissions_permission_id_index')) {
+            $schema->table(AuthTables::ModelHasPermissions, static function (Blueprint $table): void {
+                $table->index('permission_id', 'nvl_auth_model_permissions_permission_id_index');
+            });
+        }
+        if ($this->primaryColumns($schema, AuthTables::ModelHasPermissions) !== null) {
             $schema->table(AuthTables::ModelHasPermissions, static function (Blueprint $table): void {
                 $table->dropPrimary('nvl_auth_model_permissions_primary');
                 $table->unique(
@@ -146,7 +158,7 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
             }
         }
         foreach ([AuthTables::Invitations, AuthTables::PersonalAccessTokens, AuthTables::Challenges, AuthTables::Audits] as $table) {
-            if (! $schema->hasColumns($table, ['tenant_id', 'ownership_key'])) {
+            if ($schema->hasTable($table) && ! $schema->hasColumns($table, ['tenant_id', 'ownership_key'])) {
                 $errors[] = $table.'.ownership';
             }
         }
@@ -248,7 +260,7 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
     /** Create one explicit membership and its retained tenant lock. */
     private function backfillMembership(TenantAssignment $assignment): void
     {
-        $metadata = $assignment->metadata;
+        $metadata = $this->membershipMetadata($assignment);
         $reference = new SubjectReference($metadata['subject_type'], $metadata['subject_id']);
         if ($metadata['status'] === 'active') {
             $this->principals->resolve($reference);
@@ -278,7 +290,7 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
     private function backfillRole(TenantAdoptionPlan $plan, TenantAssignment $assignment): void
     {
         $connection = $this->connection($plan);
-        $sourceId = $assignment->metadata['source_id'];
+        $sourceId = $this->roleSourceId($assignment);
         $source = $connection->table(AuthTables::Roles)->where('id', $sourceId)->first();
         if ($source === null) {
             throw new TenantBoundaryViolation('A reviewed Auth role source is unavailable.');
@@ -311,7 +323,10 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
     private function backfillRoleParent(TenantAssignment $assignment): void
     {
         $connection = $this->connectionForModels();
-        $parentId = $assignment->metadata['parent_destination_id'];
+        $parentId = $assignment->metadata['parent_destination_id'] ?? null;
+        if ($parentId !== null && ! is_string($parentId)) {
+            throw new TenantBoundaryViolation('A reviewed Auth role parent is invalid.');
+        }
         if ($parentId !== null && ! $connection->table(AuthTables::Roles)
             ->where('id', $parentId)->where('tenant_id', $assignment->tenantId->value)->exists()) {
             throw new TenantBoundaryViolation('A reviewed Auth role parent is outside the destination tenant.');
@@ -325,7 +340,7 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
     /** Write only the membership's explicitly reviewed role and direct-permission grants. */
     private function backfillGrants(TenantAssignment $assignment): void
     {
-        $metadata = $assignment->metadata;
+        $metadata = $this->membershipMetadata($assignment);
         $connection = $this->connectionForModels();
         foreach ($metadata['role_ids'] as $roleId) {
             if (! $connection->table(AuthTables::Roles)->where('id', $roleId)->where('tenant_id', $assignment->tenantId->value)->exists()) {
@@ -354,6 +369,8 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
     /** Assign one still-live invitation and canonical reviewed grants. */
     private function backfillInvitation(TenantAssignment $assignment): void
     {
+        $roleIds = $this->identifierList($assignment->metadata['role_ids'] ?? null);
+        $permissionIds = $this->identifierList($assignment->metadata['permission_ids'] ?? null);
         $query = $this->connectionForModels()->table(AuthTables::Invitations)->where('id', $assignment->recordId)
             ->whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '>', now());
         if (! (clone $query)->exists()) {
@@ -362,8 +379,8 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
         $query->update([
             'tenant_id' => $assignment->tenantId->value,
             'ownership_key' => 'tenant:'.$assignment->tenantId->value,
-            'roles' => json_encode($assignment->metadata['role_ids'], JSON_THROW_ON_ERROR),
-            'permissions' => json_encode($assignment->metadata['permission_ids'], JSON_THROW_ON_ERROR),
+            'roles' => json_encode($roleIds, JSON_THROW_ON_ERROR),
+            'permissions' => json_encode($permissionIds, JSON_THROW_ON_ERROR),
             'updated_at' => now(),
         ]);
     }
@@ -385,36 +402,54 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
     private function classifyHistoricalRows(TenantAdoptionPlan $plan): void
     {
         $connection = $this->connection($plan);
+        $schema = $connection->getSchemaBuilder();
         $reviewed = [];
         foreach ($this->allAssignments($plan, 'auth.memberships') as $assignment) {
-            $reviewed[$assignment->metadata['subject_type']."\0".$assignment->metadata['subject_id']] = true;
+            $metadata = $this->membershipMetadata($assignment);
+            $reviewed[$metadata['subject_type']."\0".$metadata['subject_id']] = true;
         }
         foreach ([AuthTables::ModelHasRoles, AuthTables::ModelHasPermissions] as $table) {
             foreach ($connection->table($table)->whereNull('tenant_id')->get(['model_type', 'model_id']) as $pivot) {
-                if (isset($reviewed[$pivot->model_type."\0".$pivot->model_id])) {
-                    $connection->table($table)->whereNull('tenant_id')->where('model_type', $pivot->model_type)->where('model_id', $pivot->model_id)->delete();
+                $modelType = $pivot->model_type;
+                $modelId = $pivot->model_id;
+                if (! is_string($modelType) || ! is_string($modelId)) {
+                    throw new TenantBoundaryViolation('A legacy Auth assignment identity is invalid.');
+                }
+                if (isset($reviewed[$modelType."\0".$modelId])) {
+                    $connection->table($table)->whereNull('tenant_id')->where('model_type', $modelType)->where('model_id', $modelId)->delete();
                 }
             }
         }
         $sourceIds = array_values(array_unique(array_map(
-            static fn (TenantAssignment $assignment): string => $assignment->metadata['source_id'],
+            fn (TenantAssignment $assignment): string => $this->roleSourceId($assignment),
             $this->allAssignments($plan, 'auth.roles'),
         )));
         if ($sourceIds !== []) {
             $connection->table(AuthTables::Roles)->whereNull('tenant_id')->whereIn('id', $sourceIds)
                 ->whereNotIn('id', $connection->table(AuthTables::ModelHasRoles)->whereNull('tenant_id')->select('role_id'))->delete();
         }
-        $connection->table(AuthTables::PersonalAccessTokens)->whereNull('tenant_id')->delete();
-        $connection->table(AuthTables::Challenges)->whereNull('tenant_id')->update([
-            'ownership_key' => 'platform',
-            'revoked_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $connection->table(AuthTables::Invitations)->whereNull('tenant_id')
-            ->where(static function ($query): void {
-                $query->whereNotNull('accepted_at')->orWhereNotNull('revoked_at')->orWhere('expires_at', '<=', now());
-            })->update(['ownership_key' => 'platform', 'updated_at' => now()]);
-        $connection->table(AuthTables::Audits)->whereNull('tenant_id')->update(['ownership_key' => 'platform', 'updated_at' => now()]);
+        if ($schema->hasTable(AuthTables::PersonalAccessTokens)) {
+            $connection->table(AuthTables::PersonalAccessTokens)->whereNull('tenant_id')->delete();
+        }
+        if ($schema->hasTable(AuthTables::Challenges)) {
+            $connection->table(AuthTables::Challenges)->whereNull('tenant_id')->update([
+                'ownership_key' => 'platform',
+                'revoked_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+        if ($schema->hasTable(AuthTables::Invitations)) {
+            $connection->table(AuthTables::Invitations)->whereNull('tenant_id')
+                ->where(static function (QueryBuilder $query): void {
+                    $query->whereNotNull('accepted_at')->orWhereNotNull('revoked_at')->orWhere('expires_at', '<=', now());
+                })->update(['ownership_key' => 'platform', 'updated_at' => now()]);
+        }
+        if ($schema->hasTable(AuthTables::Audits)) {
+            $connection->table(AuthTables::Audits)->whereNull('tenant_id')->update([
+                'ownership_key' => 'platform',
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     /** @return list<TenantAssignment> */
@@ -484,10 +519,18 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
         return false;
     }
 
-    /** Replace one legacy Spatie pivot key with its final tenant-leading key. */
-    private function replacePivotPrimary($schema, string $table, array $columns, string $name): void
+    /**
+     * Replace one legacy Spatie pivot key with its final tenant-leading key.
+     *
+     * @param  list<string>  $columns
+     */
+    private function replacePivotPrimary(Builder $schema, string $table, array $columns, string $name): void
     {
-        if ($schema->hasIndex($table, $name)) {
+        $primaryColumns = $this->primaryColumns($schema, $table);
+        if ($primaryColumns === $columns) {
+            return;
+        }
+        if ($primaryColumns !== null) {
             $schema->table($table, static function (Blueprint $blueprint) use ($name): void {
                 $blueprint->dropPrimary($name);
             });
@@ -495,5 +538,75 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
         $schema->table($table, static function (Blueprint $blueprint) use ($columns, $name): void {
             $blueprint->primary($columns, $name);
         });
+    }
+
+    /** @return list<string>|null */
+    private function primaryColumns(Builder $schema, string $table): ?array
+    {
+        foreach ($schema->getIndexes($table) as $index) {
+            if ($index['primary'] === true) {
+                return $index['columns'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Restore the closed membership metadata shape at the persistence boundary.
+     *
+     * @return array{subject_type: string, subject_id: string, status: 'active'|'suspended'|'revoked', is_owner: bool, role_ids: list<string>, permission_ids: list<string>}
+     */
+    private function membershipMetadata(TenantAssignment $assignment): array
+    {
+        $this->mapping->validate($assignment);
+        $metadata = $assignment->metadata;
+        $subjectType = $metadata['subject_type'] ?? null;
+        $subjectId = $metadata['subject_id'] ?? null;
+        $status = $metadata['status'] ?? null;
+        $isOwner = $metadata['is_owner'] ?? null;
+        if (! is_string($subjectType) || ! is_string($subjectId)
+            || ! is_string($status) || ! in_array($status, ['active', 'suspended', 'revoked'], true)
+            || ! is_bool($isOwner)) {
+            throw new TenantBoundaryViolation('Reviewed Auth membership metadata is invalid.');
+        }
+
+        return [
+            'subject_type' => $subjectType,
+            'subject_id' => $subjectId,
+            'status' => $status,
+            'is_owner' => $isOwner,
+            'role_ids' => $this->identifierList($metadata['role_ids'] ?? null),
+            'permission_ids' => $this->identifierList($metadata['permission_ids'] ?? null),
+        ];
+    }
+
+    /** Resolve a reviewed legacy role identifier. */
+    private function roleSourceId(TenantAssignment $assignment): string
+    {
+        $this->mapping->validate($assignment);
+        $sourceId = $assignment->metadata['source_id'] ?? null;
+        if (! is_string($sourceId)) {
+            throw new TenantBoundaryViolation('A reviewed Auth role source is invalid.');
+        }
+
+        return $sourceId;
+    }
+
+    /** @return list<string> */
+    private function identifierList(mixed $value): array
+    {
+        if (! is_array($value) || ! array_is_list($value)) {
+            throw new TenantBoundaryViolation('Reviewed Auth assignment identifiers are invalid.');
+        }
+        $identifiers = [];
+        foreach ($value as $identifier) {
+            if (! is_string($identifier)) {
+                throw new TenantBoundaryViolation('Reviewed Auth assignment identifiers are invalid.');
+            }
+            $identifiers[] = $identifier;
+        }
+
+        return $identifiers;
     }
 }

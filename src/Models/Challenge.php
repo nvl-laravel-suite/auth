@@ -13,6 +13,8 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
 /**
  * Stores one hashed magic-link, verification, or security-code challenge.
  *
+ * @property string|null $tenant_id
+ * @property string|null $ownership_key
  * @property string $type
  * @property string $purpose
  * @property string|null $subject_type

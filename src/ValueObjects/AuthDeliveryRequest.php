@@ -169,8 +169,8 @@ final readonly class AuthDeliveryRequest
      *     locale: string|null,
      *     metadata: array<string, mixed>,
      *     subject?: SubjectReference|null,
-     *     invitation?: InvitationDeliveryData|null
-     *     tenant?: TenantId|null
+     *     invitation?: InvitationDeliveryData|null,
+     *     tenant?: TenantId|null,
      *     eventContext?: AuthEventContext|null
      * }  $data
      */

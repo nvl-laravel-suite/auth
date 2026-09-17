@@ -30,7 +30,7 @@ it('serializes simultaneous owner removals and retains one active owner', functi
         static fn (): array => ['id' => app(RevokeMembershipAction::class)->execute($second, $secondMembership->identifier(), 1)->identifier()],
     ]));
 
-    expect(collect($results)->where('ok', true))->toHaveCount(1)
+    expect(collect($results)->where('ok', true))->toHaveCount(1, json_encode($results, JSON_THROW_ON_ERROR))
         ->and(collect($results)->where('code', 'membership_last_owner'))->toHaveCount(1)
         ->and(TenantMembership::query()->where('tenant_id', $scenario->a()->value)
             ->where('status', MembershipStatus::Active->value)->where('is_owner', true)->count())->toBe(1);

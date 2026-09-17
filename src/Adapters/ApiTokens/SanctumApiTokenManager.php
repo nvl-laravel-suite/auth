@@ -198,7 +198,7 @@ final class SanctumApiTokenManager implements ApiTokenManager, TenantBoundApiTok
     /**
      * Resolve Sanctum's morph-many relationship for contract- or trait-based hosts.
      *
-     * @return Builder<PersonalAccessToken>
+     * @return MorphMany<PersonalAccessToken, Model>
      */
     private function tokens(Model $subject): MorphMany
     {
@@ -215,7 +215,7 @@ final class SanctumApiTokenManager implements ApiTokenManager, TenantBoundApiTok
     /**
      * Restrict the Sanctum relationship to package-managed tokens.
      *
-     * @return MorphMany<PersonalAccessToken, Model>
+     * @return Builder<PersonalAccessToken>
      */
     private function managedTokens(Model $subject): Builder
     {

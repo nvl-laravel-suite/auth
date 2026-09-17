@@ -36,7 +36,7 @@ final readonly class ShowMembershipAction
         return self::data($membership, $principal instanceof Model ? $principal : null);
     }
 
-    public static function data(TenantMembership $membership, ?Model $principal = null): TenantMembershipData
+    private static function data(TenantMembership $membership, ?Model $principal = null): TenantMembershipData
     {
         return new TenantMembershipData(
             id: $membership->identifier(), tenantId: $membership->tenant_id,

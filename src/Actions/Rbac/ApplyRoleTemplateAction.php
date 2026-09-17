@@ -65,15 +65,13 @@ final readonly class ApplyRoleTemplateAction
             try {
                 $role = $this->entities->roleByName($mutation->name, $guard);
             } catch (ModelNotFoundException) {
-                $role = $roleClass::query()->create([
+                /** @var array{tenant_id?: string|null, name: string, guard_name: string} $attributes */
+                $attributes = [
                     ...(config('tenancy.enabled') === true ? $this->tenancy->attributes('auth.roles') : []),
                     'name' => $mutation->name,
                     'guard_name' => $guard,
-                ]);
-            }
-
-            if (! $role instanceof Role) {
-                throw AuthException::invalidConfiguration('The configured role model must extend the package Role model.');
+                ];
+                $role = $roleClass::query()->create($attributes);
             }
 
             $this->hierarchy->assertParentAllowed($role, $parent);

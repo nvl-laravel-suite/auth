@@ -31,7 +31,6 @@ final readonly class MembershipWriter
         }
 
         return TenantMembership::query()->create([
-            ...$this->boundary->attributes('auth.memberships'),
             'tenant_id' => $tenant->value,
             'subject_type' => $subject->type,
             'subject_id' => $subject->identifier,

@@ -18,7 +18,10 @@ final readonly class TenantMembershipAssignments
 {
     public function __construct(private TenantBoundary $boundary, private TenantContext $context) {}
 
-    /** @param list<string> $roles @param list<string> $permissions */
+    /**
+     * @param  list<string>  $roles
+     * @param  list<string>  $permissions
+     */
     public function sync(Authenticatable $principal, array $roles, array $permissions): void
     {
         if (! $principal instanceof Model || ! method_exists($principal, 'syncRoles') || ! method_exists($principal, 'syncPermissions')) {
@@ -42,8 +45,8 @@ final readonly class TenantMembershipAssignments
         [$roleRecords, $permissionRecords] = $this->records($roles, $permissions);
 
         return [
-            'roles' => $roleRecords->pluck('id')->map(static fn (mixed $id): string => (string) $id)->all(),
-            'permissions' => $permissionRecords->pluck('id')->map(static fn (mixed $id): string => (string) $id)->all(),
+            'roles' => array_values($roleRecords->map(static fn (Role $role): string => $role->id)->all()),
+            'permissions' => array_values($permissionRecords->map(static fn (Permission $permission): string => $permission->id)->all()),
         ];
     }
 

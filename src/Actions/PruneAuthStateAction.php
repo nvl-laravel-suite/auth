@@ -59,7 +59,7 @@ final readonly class PruneAuthStateAction
             $this->configuration->integerBetween('cleanup.retention_days', 30, 1, 3_650),
         );
         $snapshot = $this->tenantContext->snapshot();
-        if (config('tenancy.enabled') === true && $snapshot->mode === TenantContextMode::None) {
+        if (config('tenancy.enabled') === true && $snapshot->mode === TenantContextMode::Unresolved) {
             throw new TenantContextMissing('Tenant-aware Auth pruning requires an explicit tenant or platform context.');
         }
         $ownedQueries = [

@@ -33,7 +33,7 @@ final readonly class AuthTenantAdmission
             return;
         }
 
-        $token = $subject->currentAccessToken();
+        $token = (new \ReflectionMethod($subject, 'currentAccessToken'))->invoke($subject);
         if ($token === null || $token instanceof TransientToken) {
             return;
         }

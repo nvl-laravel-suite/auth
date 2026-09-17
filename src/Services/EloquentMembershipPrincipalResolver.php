@@ -31,9 +31,7 @@ final readonly class EloquentMembershipPrincipalResolver implements MembershipPr
             throw new AuthException('membership_principal_unavailable', 'The membership principal is unavailable.', 404);
         }
         $this->assertEligible($principal);
-        if ($principal instanceof Model) {
-            $this->tracker->track($principal);
-        }
+        $this->tracker->track($principal);
 
         return $principal;
     }
@@ -49,6 +47,11 @@ final readonly class EloquentMembershipPrincipalResolver implements MembershipPr
 
     public function connectionName(): string
     {
-        return (new ($this->models->rbacPrincipalClass()))->getConnection()->getName();
+        $name = (new ($this->models->rbacPrincipalClass()))->getConnection()->getName();
+        if (! is_string($name) || trim($name) === '') {
+            throw AuthException::invalidConfiguration('The RBAC principal connection must have a name.');
+        }
+
+        return $name;
     }
 }

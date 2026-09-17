@@ -7,11 +7,15 @@ namespace Nvl\Auth\Models;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Database\Query\Grammars\PostgresGrammar;
 use Nvl\Auth\Database\Factories\RoleFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Relations\TextCastColumnComparison;
 use Spatie\Permission\Models\Role as SpatieRole;
 
 /**
@@ -106,6 +110,7 @@ class Role extends SpatieRole
     }
 
     /** Constrain inverse assignments to the active team and membership. */
+    /** @return BelongsToMany<Model, $this> */
     public function users(): BelongsToMany
     {
         if (config('tenancy.enabled') !== true) {
@@ -115,9 +120,18 @@ class Role extends SpatieRole
         $relation = parent::users()->wherePivot('tenant_id', $tenant);
         $principal = $relation->getRelated();
 
-        return $relation->whereExists(static function ($query) use ($principal, $tenant): void {
-            $query->selectRaw('1')->from(AuthTables::TenantMemberships)
-                ->whereColumn(AuthTables::TenantMemberships.'.subject_id', $principal->qualifyColumn($principal->getKeyName()))
+        return $relation->whereExists(static function (QueryBuilder $query) use ($principal, $tenant): void {
+            $principalKey = $principal->qualifyColumn($principal->getKeyName());
+            $query->selectRaw('1')->from(AuthTables::TenantMemberships);
+            if ($query->getGrammar() instanceof PostgresGrammar) {
+                $query->whereRaw(new TextCastColumnComparison(
+                    $query->getGrammar()->wrap(AuthTables::TenantMemberships.'.subject_id'),
+                    $query->getGrammar()->wrap($principalKey),
+                ));
+            } else {
+                $query->whereColumn(AuthTables::TenantMemberships.'.subject_id', $principalKey);
+            }
+            $query
                 ->where(AuthTables::TenantMemberships.'.subject_type', $principal->getMorphClass())
                 ->where(AuthTables::TenantMemberships.'.tenant_id', $tenant)
                 ->where(AuthTables::TenantMemberships.'.status', 'active');

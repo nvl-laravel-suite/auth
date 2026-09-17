@@ -42,8 +42,11 @@ final readonly class UserLocator
             throw new AuthException('principal_unavailable', 'The principal is unavailable.', 404);
         }
         $identifier = $user instanceof User ? $user->getKey() : $user;
+        if (! is_string($identifier) && ! is_int($identifier)) {
+            throw new AuthException('principal_unavailable', 'The principal is unavailable.', 404);
+        }
 
-        return $this->query($withTrashed)->findOrFail($identifier);
+        return $this->query($withTrashed)->whereKey($identifier)->firstOrFail();
     }
 
     /**

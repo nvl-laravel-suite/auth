@@ -14,7 +14,6 @@ final class TenantMembershipFactory extends Factory
     /** @var class-string<TenantMembership> */
     protected $model = TenantMembership::class;
 
-    /** @return array<string, mixed> */
     public function definition(): array
     {
         return [

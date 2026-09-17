@@ -20,7 +20,7 @@ final readonly class ListOwnMembershipsAction
 {
     public function __construct(private FeatureGate $features, private AuthOperationBoundary $operations) {}
 
-    /** @return Collection<int, array{tenant_id: string, membership_id: string, status: string, revision: int}> */
+    /** @return Collection<int, array{tenant_id: string, membership_id: string, status: 'active'|'suspended'|'revoked', revision: int}> */
     public function execute(Authenticatable $subject): Collection
     {
         $this->features->assertAllowed(AuthFeature::Memberships, FeatureOperation::Read);

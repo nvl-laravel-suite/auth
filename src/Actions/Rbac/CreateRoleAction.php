@@ -58,7 +58,8 @@ final readonly class CreateRoleAction
             }
             $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
             $parent = $data->parentId !== null ? $this->entities->role($data->parentId) : null;
-            $role = $class::query()->create([
+            /** @var array{tenant_id?: string|null, name: string, guard_name: string, display_name: string|null, description: string|null, parent_id: null, priority: int, is_system: bool, metadata: array<string, mixed>|null} $attributes */
+            $attributes = [
                 ...(config('tenancy.enabled') === true ? $this->tenancy->attributes('auth.roles') : []),
                 'name' => trim($data->name),
                 'guard_name' => $guard,
@@ -68,7 +69,8 @@ final readonly class CreateRoleAction
                 'priority' => $data->priority,
                 'is_system' => $data->system,
                 'metadata' => $data->metadata,
-            ]);
+            ];
+            $role = $class::query()->create($attributes);
             $this->hierarchy->assertParentAllowed($role, $parent);
             $role->forceFill(['parent_id' => $parent?->id])->save();
             $role->syncPermissions($data->permissions);
