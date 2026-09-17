@@ -7,6 +7,7 @@ namespace Nvl\Auth\Adapters\ApiTokens;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\DB;
@@ -15,21 +16,27 @@ use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\NewAccessToken;
 use Laravel\Sanctum\PersonalAccessToken;
 use Nvl\Auth\Contracts\ApiTokenManager;
+use Nvl\Auth\Contracts\TenantBoundApiTokenManager;
 use Nvl\Auth\Data\Mutations\ApiTokenData;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Results\IssuedApiToken;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
+use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Tenancy\ValueObjects\TenantId;
 
 /**
  * Manages personal access tokens directly in Sanctum's authoritative table.
  */
-final class SanctumApiTokenManager implements ApiTokenManager
+final class SanctumApiTokenManager implements ApiTokenManager, TenantBoundApiTokenManager
 {
     /**
      * Create the namespaced Sanctum adapter.
      */
-    public function __construct(private readonly AuthConfiguration $configuration) {}
+    public function __construct(
+        private readonly AuthConfiguration $configuration,
+        private readonly TenantBoundary $boundary,
+    ) {}
 
     /**
      * List subject-owned Sanctum tokens.
@@ -51,12 +58,17 @@ final class SanctumApiTokenManager implements ApiTokenManager
     public function create(Authenticatable $subject, ApiTokenData $data): IssuedApiToken
     {
         $model = $this->subject($subject);
-        $created = $this->createToken($model, $data);
+        $connection = $this->tokens($model)->getModel()->getConnectionName();
 
-        return new IssuedApiToken(
-            $this->snapshot($created->accessToken),
-            $created->plainTextToken,
-        );
+        return DB::connection($connection)->transaction(function () use ($data, $model): IssuedApiToken {
+            $created = $this->createToken($model, $data);
+            $created->accessToken->forceFill($this->boundary->attributes('auth.tokens'))->save();
+
+            return new IssuedApiToken(
+                $this->snapshot($created->accessToken->refresh()),
+                $created->plainTextToken,
+            );
+        }, 3);
     }
 
     /**
@@ -126,6 +138,23 @@ final class SanctumApiTokenManager implements ApiTokenManager
         return $deleted;
     }
 
+    /** Resolve exact persisted token ownership without accepting an ambient tenant. */
+    public function tenantForToken(Authenticatable $subject, string $tokenId): ?TenantId
+    {
+        $model = $this->subject($subject);
+        $token = $this->tokens($model)
+            ->whereRaw('name LIKE ?', [$this->namespace().':%'])
+            ->whereKey($tokenId)
+            ->first();
+        $tenantId = $token?->getAttribute('tenant_id');
+        $ownershipKey = $token?->getAttribute('ownership_key');
+        if (! is_string($tenantId) || $ownershipKey !== 'tenant:'.$tenantId) {
+            return null;
+        }
+
+        return new TenantId($tenantId);
+    }
+
     /**
      * Require a Sanctum-capable Eloquent subject.
      */
@@ -169,7 +198,7 @@ final class SanctumApiTokenManager implements ApiTokenManager
     /**
      * Resolve Sanctum's morph-many relationship for contract- or trait-based hosts.
      *
-     * @return MorphMany<PersonalAccessToken, Model>
+     * @return Builder<PersonalAccessToken>
      */
     private function tokens(Model $subject): MorphMany
     {
@@ -188,9 +217,11 @@ final class SanctumApiTokenManager implements ApiTokenManager
      *
      * @return MorphMany<PersonalAccessToken, Model>
      */
-    private function managedTokens(Model $subject): MorphMany
+    private function managedTokens(Model $subject): Builder
     {
-        return $this->tokens($subject)->whereRaw('name LIKE ?', [$this->namespace().':%']);
+        $query = $this->tokens($subject)->whereRaw('name LIKE ?', [$this->namespace().':%'])->getQuery();
+
+        return $this->boundary->query($query, 'auth.tokens');
     }
 
     /**
@@ -244,6 +275,9 @@ final class SanctumApiTokenManager implements ApiTokenManager
             lastUsedAt: $this->date($token->getAttribute('last_used_at')),
             expiresAt: $this->date($token->getAttribute('expires_at')),
             createdAt: $createdAt,
+            tenantId: config('tenancy.enabled') === true
+                ? (is_string($token->getAttribute('tenant_id')) ? $token->getAttribute('tenant_id') : null)
+                : null,
         );
     }
 

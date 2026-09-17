@@ -31,6 +31,7 @@ use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
+use Nvl\Auth\Contracts\TenantBoundApiTokenManager;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -375,6 +376,13 @@ final class AuthDoctorCommand extends Command
             $apiTokens = $this->integration($container, ApiTokenManager::class);
             $abilityProvider = $this->integration($container, ApiTokenAbilityProvider::class);
             $checks[] = $this->check('adapter.api_tokens', $apiTokens !== null && ! $apiTokens instanceof UnavailableApiTokenManager, 'API tokens require a configured provider adapter.');
+            if (config('tenancy.enabled') === true) {
+                $checks[] = $this->check(
+                    'contract.tenant_bound_api_tokens',
+                    $apiTokens instanceof TenantBoundApiTokenManager,
+                    'Tenant token routes require a tenant-bound API token manager.',
+                );
+            }
             $checks[] = $this->check(
                 'contract.api_token_abilities',
                 $this->apiTokenAbilitiesReady($configuration, $abilityProvider),

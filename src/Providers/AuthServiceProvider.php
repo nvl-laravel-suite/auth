@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Providers;
 
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Contracts\Http\Kernel as HttpKernelContract;
+use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
 use Nvl\Auth\Adapters\ApiTokens\SanctumApiTokenManager;
@@ -50,6 +53,7 @@ use Nvl\Auth\Contracts\SystemMutationAccess;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Http\Middleware\EnsureAuthTenantAccess;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\Invitation;
@@ -246,6 +250,10 @@ final class AuthServiceProvider extends ServiceProvider
     ): void {
         if (config('tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Memberships)) {
             $this->app->scoped(TenantMembershipAccess::class, AuthTenantMembershipAccess::class);
+            $kernel = $this->app->make(HttpKernelContract::class);
+            if ($kernel instanceof HttpKernel) {
+                $kernel->addToMiddlewarePriorityAfter(AuthenticatesRequests::class, EnsureAuthTenantAccess::class);
+            }
         }
         if (config('tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Rbac)) {
             $principal = $this->app->make(AuthModelRegistry::class)->rbacPrincipalClass();

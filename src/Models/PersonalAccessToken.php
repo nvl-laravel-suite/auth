@@ -20,6 +20,8 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
  * @property string $name
  * @property string $token
  * @property list<string>|null $abilities
+ * @property string|null $tenant_id
+ * @property string $ownership_key
  */
 #[UseFactory(PersonalAccessTokenFactory::class)]
 class PersonalAccessToken extends SanctumPersonalAccessToken

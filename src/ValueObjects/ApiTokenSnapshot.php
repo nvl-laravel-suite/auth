@@ -23,5 +23,6 @@ final readonly class ApiTokenSnapshot
         public ?CarbonImmutable $lastUsedAt,
         public ?CarbonImmutable $expiresAt,
         public CarbonImmutable $createdAt,
+        public ?string $tenantId = null,
     ) {}
 }

@@ -107,7 +107,10 @@ abstract class TenancyTestCase extends Orchestra
     {
         Route::prefix('api/v1/auth')->name('nvl.auth.')->group(function (): void {
             Route::name('account.')->middleware(['api', 'auth', ApplyAuthSecurityHeaders::class, RenderAuthExceptions::class])
-                ->group(dirname(__DIR__).'/routes/account/memberships.php');
+                ->group(function (): void {
+                    require dirname(__DIR__).'/routes/account/memberships.php';
+                    require dirname(__DIR__).'/routes/account/api_tokens.php';
+                });
             Route::name('management.')->middleware(['api', 'auth', ApplyAuthSecurityHeaders::class, RenderAuthExceptions::class])
                 ->group(dirname(__DIR__).'/routes/management/memberships.php');
         });

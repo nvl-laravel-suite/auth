@@ -106,7 +106,7 @@ final class ApiTokenController extends AuthenticatedController
      */
     private function snapshot(ApiTokenSnapshot $token): array
     {
-        return [
+        $data = [
             'id' => $token->id,
             'name' => $token->name,
             'abilities' => $token->abilities,
@@ -114,5 +114,11 @@ final class ApiTokenController extends AuthenticatedController
             'expires_at' => $token->expiresAt?->toIso8601String(),
             'created_at' => $token->createdAt->toIso8601String(),
         ];
+
+        if (config('tenancy.enabled') === true) {
+            $data['tenant_id'] = $token->tenantId;
+        }
+
+        return $data;
     }
 }

@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Services\ApiTokenPolicy;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
 
@@ -22,6 +23,7 @@ final readonly class ListApiTokensAction
     public function __construct(
         private FeatureGate $features,
         private ApiTokenManager $tokens,
+        private ApiTokenPolicy $policy,
     ) {}
 
     /**
@@ -32,6 +34,7 @@ final readonly class ListApiTokensAction
     public function execute(Authenticatable $subject): array
     {
         $this->features->assertAllowed(AuthFeature::ApiTokens, FeatureOperation::Read);
+        $this->policy->authorizeSubject($subject);
 
         return $this->tokens->list($subject);
     }

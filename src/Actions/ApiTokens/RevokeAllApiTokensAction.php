@@ -9,6 +9,7 @@ use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Services\ApiTokenPolicy;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
@@ -24,6 +25,7 @@ final readonly class RevokeAllApiTokensAction
         private FeatureGate $features,
         private ApiTokenManager $tokens,
         private AuthAuditRecorder $audits,
+        private ApiTokenPolicy $policy,
     ) {}
 
     /**
@@ -32,6 +34,7 @@ final readonly class RevokeAllApiTokensAction
     public function execute(Authenticatable $subject): int
     {
         $this->features->assertAllowed(AuthFeature::ApiTokens, FeatureOperation::Revoke);
+        $this->policy->authorizeSubject($subject);
         $count = $this->tokens->revokeAll($subject);
         $this->audits->record(
             'api_token.revoked_all',
