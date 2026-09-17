@@ -28,6 +28,14 @@ final readonly class ShowPermissionAction
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
         $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
 
-        return $this->entities->permission($permission)->load('roles')->loadCount('users');
+        $permission = $this->entities->permission($permission);
+        if (config('tenancy.enabled') !== true) {
+            return $permission->load('roles')->loadCount('users');
+        }
+        $relation = $permission->roles();
+        $table = $relation->getRelated()->getTable();
+        $permission->setRelation('roles', $relation->where("{$table}.tenant_id", getPermissionsTeamId())->get());
+
+        return $permission->loadCount('users');
     }
 }

@@ -13,7 +13,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 /** Resolves membership principals through the independently configured RBAC model. */
 final readonly class EloquentMembershipPrincipalResolver implements MembershipPrincipalResolver
 {
-    public function __construct(private AuthModelRegistry $models) {}
+    public function __construct(private AuthModelRegistry $models, private RbacPrincipalTracker $tracker) {}
 
     public function resolve(SubjectReference $reference, bool $lock = false): Authenticatable
     {
@@ -31,6 +31,9 @@ final readonly class EloquentMembershipPrincipalResolver implements MembershipPr
             throw new AuthException('membership_principal_unavailable', 'The membership principal is unavailable.', 404);
         }
         $this->assertEligible($principal);
+        if ($principal instanceof Model) {
+            $this->tracker->track($principal);
+        }
 
         return $principal;
     }

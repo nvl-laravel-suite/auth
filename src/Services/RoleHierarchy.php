@@ -22,7 +22,8 @@ final class RoleHierarchy
             return;
         }
 
-        if ($parent->id === $role->id || $parent->guard_name !== $role->guard_name) {
+        if ($parent->id === $role->id || $parent->guard_name !== $role->guard_name
+            || (config('tenancy.enabled') === true && $parent->tenant_id !== $role->tenant_id)) {
             throw new AuthException('invalid_role_parent', 'The selected role parent is invalid.', 422);
         }
 

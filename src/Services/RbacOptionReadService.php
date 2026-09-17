@@ -22,6 +22,7 @@ final readonly class RbacOptionReadService
     public function __construct(
         private AuthModelRegistry $models,
         private RbacPermissionGroupExpressions $groupExpressions,
+        private AuthTenantRbacQueries $tenancy,
     ) {}
 
     /**
@@ -32,7 +33,7 @@ final readonly class RbacOptionReadService
     public function roles(?string $search, int $limit): Collection
     {
         $class = $this->models->roleClass();
-        $query = $class::query()->select([
+        $query = (config('tenancy.enabled') === true ? $this->tenancy->roles() : $class::query())->select([
             'id',
             'name',
             'display_name',
@@ -67,7 +68,7 @@ final readonly class RbacOptionReadService
     public function permissions(?string $search, ?string $group, int $limit): Collection
     {
         $class = $this->models->permissionClass();
-        $query = $class::query()->select([
+        $query = (config('tenancy.enabled') === true ? $this->tenancy->permissions() : $class::query())->select([
             'id',
             'name',
             'display_name',

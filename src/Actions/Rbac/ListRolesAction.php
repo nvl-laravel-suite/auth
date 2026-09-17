@@ -11,6 +11,7 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\AuthTenantRbacQueries;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 
@@ -22,6 +23,7 @@ final readonly class ListRolesAction
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
         private AuthModelRegistry $models,
+        private AuthTenantRbacQueries $tenancy,
     ) {}
 
     /** @return LengthAwarePaginator<int, RoleListItemData> */
@@ -30,7 +32,8 @@ final readonly class ListRolesAction
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
         $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
         $class = $this->models->roleClass();
-        $query = $class::query()->with('parent')->withCount(['users', 'permissions']);
+        $query = (config('tenancy.enabled') === true ? $this->tenancy->roles() : $class::query())
+            ->with('parent')->withCount(['users', 'permissions']);
 
         if ($search !== null && trim($search) !== '') {
             $term = '%'.trim($search).'%';

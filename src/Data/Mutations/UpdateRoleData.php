@@ -109,17 +109,24 @@ final class UpdateRoleData extends Data
         $roles = Config::string('nvl-auth.tables.roles', AuthTables::Roles);
         $permissions = Config::string('nvl-auth.tables.permissions', AuthTables::Permissions);
         $guard = Config::string('nvl-auth.features.rbac.settings.guard', 'web');
+        $tenant = config('tenancy.enabled') === true ? getPermissionsTeamId() : null;
+        $unique = Rule::unique($roles, 'name')->where('guard_name', $guard)->ignore($roleId);
+        $parent = Rule::exists($roles, 'id');
+        if (config('tenancy.enabled') === true) {
+            $unique->where('tenant_id', $tenant);
+            $parent->where('tenant_id', $tenant);
+        }
 
         return [
             'name' => [
                 'required',
                 'string',
                 'max:160',
-                Rule::unique($roles, 'name')->where('guard_name', $guard)->ignore($roleId),
+                $unique,
             ],
             'displayName' => ['nullable', 'string', 'max:160'],
             'description' => ['nullable', 'string', 'max:2000'],
-            'parentId' => ['nullable', 'uuid', "exists:{$roles},id"],
+            'parentId' => ['nullable', 'uuid', $parent],
             'priority' => ['sometimes', 'integer', 'between:-100000,100000'],
             'permissions' => ['sometimes', 'array', 'max:500'],
             'permissions.*' => ['string', 'distinct', "exists:{$permissions},name"],

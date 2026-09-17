@@ -12,6 +12,7 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\AuthTenantRbacQueries;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 
@@ -24,6 +25,7 @@ final readonly class CheckRoleNameAvailabilityAction
         private ManagementAuthorizer $authorization,
         private AuthModelRegistry $models,
         private AuthConfiguration $configuration,
+        private AuthTenantRbacQueries $tenancy,
     ) {}
 
     /** Return availability within the configured RBAC guard. */
@@ -56,7 +58,7 @@ final readonly class CheckRoleNameAvailabilityAction
 
         $class = $this->models->roleClass();
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
-        $conflictingRoleId = $class::query()
+        $conflictingRoleId = (config('tenancy.enabled') === true ? $this->tenancy->roles() : $class::query())
             ->where('guard_name', $guard)
             ->where('name', $name)
             ->when($exceptId !== null, static fn ($query) => $query->whereKeyNot($exceptId))

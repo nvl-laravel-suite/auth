@@ -15,6 +15,7 @@ use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
+use Nvl\Tenancy\Services\TenantBoundary;
 
 /** Clones one role's metadata and permission assignment under a new name. */
 final readonly class CloneRoleAction
@@ -26,6 +27,7 @@ final readonly class CloneRoleAction
         private AuthModelRegistry $models,
         private RbacEntityLocator $entities,
         private AuthAuditRecorder $audits,
+        private TenantBoundary $tenancy,
     ) {}
 
     /** Clone one role. */
@@ -38,6 +40,7 @@ final readonly class CloneRoleAction
 
         return DB::connection($source->getConnectionName())->transaction(function () use ($actor, $class, $displayName, $name, $source): Role {
             $clone = $class::query()->create([
+                ...(config('tenancy.enabled') === true ? $this->tenancy->attributes('auth.roles') : []),
                 'name' => trim($name),
                 'guard_name' => $source->guard_name,
                 'display_name' => $displayName,

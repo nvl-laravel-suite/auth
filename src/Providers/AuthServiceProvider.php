@@ -63,7 +63,9 @@ use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthManagementAbilityCatalog;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\AuthSchemaManager;
+use Nvl\Auth\Services\AuthTenantContextParticipant;
 use Nvl\Auth\Services\AuthTenantMembershipAccess;
+use Nvl\Auth\Services\AuthTenantRbacQueries;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
 use Nvl\Auth\Services\ConfiguredPrincipalAttributeMapper;
 use Nvl\Auth\Services\DenySystemMutationAccess;
@@ -79,6 +81,7 @@ use Nvl\Auth\Services\PackageInvitationSubjectResolver;
 use Nvl\Auth\Services\PasswordAccountConfirmation;
 use Nvl\Auth\Services\PermissionCatalogRegistry;
 use Nvl\Auth\Services\PrincipalEligibility;
+use Nvl\Auth\Services\RbacPrincipalTracker;
 use Nvl\Auth\Services\RoleTemplateRegistry;
 use Nvl\Auth\Services\UnavailableSocialIdentityProvider;
 use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
@@ -90,6 +93,7 @@ use Nvl\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Tenancy\Enums\TenantResourceKind;
 use Nvl\Tenancy\Providers\TenancyServiceProvider;
 use Nvl\Tenancy\Services\TenantAdoptionRegistry;
+use Nvl\Tenancy\Services\TenantContextParticipants;
 use Nvl\Tenancy\Services\TenantResourceRegistry;
 use Nvl\Tenancy\ValueObjects\TenantResourceDefinition;
 
@@ -115,6 +119,10 @@ final class AuthServiceProvider extends ServiceProvider
         $this->app->singleton(AuthSchemaManager::class);
         $this->app->singleton(FeatureManifest::class);
         $this->app->singleton(FeatureGate::class);
+        $this->app->scoped(RbacPrincipalTracker::class);
+        $this->app->scoped(AuthTenantContextParticipant::class);
+        $this->app->scoped(AuthTenantRbacQueries::class);
+        $this->app->make(TenantContextParticipants::class)->register(AuthTenantContextParticipant::class);
         $this->registerTenancyResources();
         $this->app->singleton(BrowserSession::class, LaravelBrowserSession::class);
         $this->app->singleton(AuthAuditContextProvider::class, LaravelRequestAuditContextProvider::class);
@@ -231,6 +239,11 @@ final class AuthServiceProvider extends ServiceProvider
     ): void {
         if (config('tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Memberships)) {
             $this->app->scoped(TenantMembershipAccess::class, AuthTenantMembershipAccess::class);
+        }
+        if (config('tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Rbac)) {
+            $principal = $this->app->make(AuthModelRegistry::class)->rbacPrincipalClass();
+            $principal::retrieved(fn ($model) => $this->app->make(RbacPrincipalTracker::class)->track($model));
+            $principal::created(fn ($model) => $this->app->make(RbacPrincipalTracker::class)->track($model));
         }
         $typeScriptSources->register(__DIR__.'/..', 'nvl/auth');
         $this->configureOwnedIdentityStorage();

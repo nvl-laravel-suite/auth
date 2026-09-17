@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Data\Mutations\ApplyRoleTemplateData;
@@ -20,6 +21,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
 use Nvl\Auth\Services\RoleHierarchy;
 use Nvl\Auth\Services\RoleTemplateRegistry;
+use Nvl\Tenancy\Services\TenantBoundary;
 
 /** Creates or updates one role from the canonical template registry. */
 final readonly class ApplyRoleTemplateAction
@@ -34,6 +36,7 @@ final readonly class ApplyRoleTemplateAction
         private RbacEntityLocator $entities,
         private RoleHierarchy $hierarchy,
         private AuthAuditRecorder $audits,
+        private TenantBoundary $tenancy,
     ) {}
 
     /** Apply one named template. */
@@ -59,18 +62,24 @@ final readonly class ApplyRoleTemplateAction
                 ? $this->entities->roleByName($template->parentRole, $guard)
                 : null;
             $mutation = $template->toMutation($data->roleName, $parent?->id);
-            $role = $roleClass::findOrCreate($mutation->name, $guard);
+            try {
+                $role = $this->entities->roleByName($mutation->name, $guard);
+            } catch (ModelNotFoundException) {
+                $role = $roleClass::query()->create([
+                    ...(config('tenancy.enabled') === true ? $this->tenancy->attributes('auth.roles') : []),
+                    'name' => $mutation->name,
+                    'guard_name' => $guard,
+                ]);
+            }
 
             if (! $role instanceof Role) {
                 throw AuthException::invalidConfiguration('The configured role model must extend the package Role model.');
             }
 
             $this->hierarchy->assertParentAllowed($role, $parent);
-            $permissions = [];
-
-            foreach ($mutation->permissions as $name) {
-                $permissions[] = $permissionClass::findOrCreate($name, $guard);
-            }
+            $permissions = config('tenancy.enabled') === true
+                ? $this->entities->permissionsByIdentifiers($mutation->permissions)->all()
+                : array_map(static fn (string $name) => $permissionClass::findOrCreate($name, $guard), $mutation->permissions);
 
             $attributes = $mutation->except('permissions')->toModelPatch();
             $attributes['is_system'] = $attributes['system'];

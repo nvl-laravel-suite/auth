@@ -14,6 +14,7 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\AuthTenantRbacQueries;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 
@@ -25,6 +26,7 @@ final readonly class ListRoleCatalogAction
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
         private AuthModelRegistry $models,
+        private AuthTenantRbacQueries $tenancy,
     ) {}
 
     /**
@@ -41,7 +43,7 @@ final readonly class ListRoleCatalogAction
         $this->assertMaximumLength($data->search, 160, 'Role search');
         $this->assertMaximumLength($data->guard, 120, 'Role guard');
         $class = $this->models->roleClass();
-        $query = $class::query()
+        $query = (config('tenancy.enabled') === true ? $this->tenancy->roles() : $class::query())
             ->select([
                 'id',
                 'name',

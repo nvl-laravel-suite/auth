@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -23,6 +24,7 @@ final readonly class RbacEntityLocator
         private AuthModelRegistry $models,
         private ?AuthConfiguration $configuration = null,
         private ?RbacConsumerLimits $limits = null,
+        private ?AuthTenantRbacQueries $tenancy = null,
     ) {}
 
     /**
@@ -30,13 +32,9 @@ final readonly class RbacEntityLocator
      */
     public function role(Role|string $role): Role
     {
-        if ($role instanceof Role) {
-            return $role;
-        }
+        $identifier = $role instanceof Role ? $role->id : $role;
 
-        $class = $this->models->roleClass();
-
-        return $class::query()->findOrFail($role);
+        return $this->roleQuery()->findOrFail($identifier);
     }
 
     /** Resolve one canonical role through the configured model and guard. */
@@ -51,7 +49,7 @@ final readonly class RbacEntityLocator
         $identifier = $role instanceof Role ? $role->id : $role;
         $guard = $this->configuration()->string('features.rbac.settings.guard', 'web');
 
-        return $class::query()
+        return $this->roleQuery()
             ->where('guard_name', $guard)
             ->findOrFail($identifier);
     }
@@ -61,9 +59,7 @@ final readonly class RbacEntityLocator
      */
     public function roleByName(string $name, string $guard): Role
     {
-        $class = $this->models->roleClass();
-
-        return $class::query()
+        return $this->roleQuery()
             ->where('name', $name)
             ->where('guard_name', $guard)
             ->firstOrFail();
@@ -74,13 +70,9 @@ final readonly class RbacEntityLocator
      */
     public function permission(Permission|string $permission): Permission
     {
-        if ($permission instanceof Permission) {
-            return $permission;
-        }
+        $identifier = $permission instanceof Permission ? $permission->id : $permission;
 
-        $class = $this->models->permissionClass();
-
-        return $class::query()->findOrFail($permission);
+        return $this->permissionQuery()->findOrFail($identifier);
     }
 
     /**
@@ -106,7 +98,7 @@ final readonly class RbacEntityLocator
         $byId = [];
 
         if ($uuidIdentifiers !== []) {
-            $idMatches = $class::query()
+            $idMatches = $this->roleQuery()
                 ->select(['id', 'name', 'guard_name', 'display_name', 'description', 'is_system'])
                 ->where('guard_name', $guard)
                 ->whereIn('id', $uuidIdentifiers)
@@ -117,7 +109,7 @@ final readonly class RbacEntityLocator
             }
         }
 
-        $nameMatches = $class::query()
+        $nameMatches = $this->roleQuery()
             ->select(['id', 'name', 'guard_name', 'display_name', 'description', 'is_system'])
             ->where('guard_name', $guard)
             ->whereIn('name', $identifiers)
@@ -199,7 +191,7 @@ final readonly class RbacEntityLocator
         $byId = [];
 
         if ($uuidIdentifiers !== []) {
-            $idMatches = $class::query()
+            $idMatches = $this->permissionQuery()
                 ->select(['id', 'name', 'guard_name', 'display_name', 'description', 'group'])
                 ->where('guard_name', $guard)
                 ->whereIn('id', $uuidIdentifiers)
@@ -210,7 +202,7 @@ final readonly class RbacEntityLocator
             }
         }
 
-        $nameMatches = $class::query()
+        $nameMatches = $this->permissionQuery()
             ->select(['id', 'name', 'guard_name', 'display_name', 'description', 'group'])
             ->where('guard_name', $guard)
             ->whereIn('name', $identifiers)
@@ -371,5 +363,27 @@ final readonly class RbacEntityLocator
     private function limits(): RbacConsumerLimits
     {
         return $this->limits ?? app(RbacConsumerLimits::class);
+    }
+
+    /** @return Builder<Role> */
+    private function roleQuery(): Builder
+    {
+        if (config('tenancy.enabled') === true) {
+            return ($this->tenancy ?? app(AuthTenantRbacQueries::class))->roles();
+        }
+        $class = $this->models->roleClass();
+
+        return $class::query();
+    }
+
+    /** @return Builder<Permission> */
+    private function permissionQuery(): Builder
+    {
+        if (config('tenancy.enabled') === true) {
+            return ($this->tenancy ?? app(AuthTenantRbacQueries::class))->permissions();
+        }
+        $class = $this->models->permissionClass();
+
+        return $class::query();
     }
 }

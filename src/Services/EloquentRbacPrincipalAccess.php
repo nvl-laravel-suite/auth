@@ -15,7 +15,7 @@ use Nvl\Auth\Exceptions\AuthException;
 final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
 {
     /** Create the configured Eloquent RBAC adapter. */
-    public function __construct(private ?AuthModelRegistry $models = null) {}
+    public function __construct(private ?AuthModelRegistry $models = null, private ?AuthTenantRbacQueries $tenancy = null) {}
 
     /**
      * Resolve a configured host principal instance or identifier.
@@ -23,7 +23,11 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
     public function find(Authenticatable|string $principal): Authenticatable
     {
         if ($principal instanceof Authenticatable) {
-            return $this->assertCompatible($principal);
+            $principal = $this->assertCompatible($principal);
+
+            return config('tenancy.enabled') === true
+                ? $this->queries()->assertAssignmentPrincipal($principal)
+                : $principal;
         }
 
         $class = $this->principalClass();
@@ -33,7 +37,11 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
             throw AuthException::invalidConfiguration('The configured RBAC principal must implement Authenticatable.');
         }
 
-        return $this->assertCompatible($resolved);
+        $resolved = $this->assertCompatible($resolved);
+
+        return config('tenancy.enabled') === true
+            ? $this->queries()->assertAssignmentPrincipal($resolved)
+            : $resolved;
     }
 
     /**
@@ -68,7 +76,7 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
      */
     public function assign(Authenticatable $principal, array $roles, array $permissions): void
     {
-        $principal = $this->assertCompatible($principal);
+        $principal = $this->assignmentPrincipal($principal);
 
         if ($roles !== []) {
             $principal->assignRole($roles);
@@ -86,7 +94,7 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
      */
     public function syncRoles(Authenticatable $principal, array $roles): void
     {
-        $this->assertCompatible($principal)->syncRoles($roles);
+        $this->assignmentPrincipal($principal)->syncRoles($roles);
     }
 
     /**
@@ -96,7 +104,7 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
      */
     public function syncPermissions(Authenticatable $principal, array $permissions): void
     {
-        $this->assertCompatible($principal)->syncPermissions($permissions);
+        $this->assignmentPrincipal($principal)->syncPermissions($permissions);
     }
 
     /**
@@ -123,6 +131,22 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
     private function principalClass(): string
     {
         return ($this->models ?? app(AuthModelRegistry::class))->rbacPrincipalClass();
+    }
+
+    private function queries(): AuthTenantRbacQueries
+    {
+        return $this->tenancy ?? app(AuthTenantRbacQueries::class);
+    }
+
+    /** @return Model&Authenticatable */
+    private function assignmentPrincipal(Authenticatable $principal): Model
+    {
+        $principal = $this->assertCompatible($principal);
+        if (config('tenancy.enabled') === true) {
+            $principal = $this->queries()->assertAssignmentPrincipal($principal);
+        }
+
+        return $this->assertCompatible($principal);
     }
 
     /**

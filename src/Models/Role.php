@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Nvl\Auth\Database\Factories\RoleFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
@@ -88,13 +89,39 @@ class Role extends SpatieRole
     /** @return BelongsTo<static, $this> */
     public function parent(): BelongsTo
     {
-        return $this->belongsTo(static::class, 'parent_id');
+        $relation = $this->belongsTo(static::class, 'parent_id');
+
+        return config('tenancy.enabled') === true ? $relation->where('tenant_id', $this->tenant_id) : $relation;
     }
 
     /** @return HasMany<static, $this> */
     public function children(): HasMany
     {
-        return $this->hasMany(static::class, 'parent_id')->orderByDesc('priority')->orderBy('name');
+        $relation = $this->hasMany(static::class, 'parent_id');
+        if (config('tenancy.enabled') === true) {
+            $relation->where('tenant_id', $this->tenant_id);
+        }
+
+        return $relation->orderByDesc('priority')->orderBy('name');
+    }
+
+    /** Constrain inverse assignments to the active team and membership. */
+    public function users(): BelongsToMany
+    {
+        if (config('tenancy.enabled') !== true) {
+            return parent::users();
+        }
+        $tenant = getPermissionsTeamId();
+        $relation = parent::users()->wherePivot('tenant_id', $tenant);
+        $principal = $relation->getRelated();
+
+        return $relation->whereExists(static function ($query) use ($principal, $tenant): void {
+            $query->selectRaw('1')->from(AuthTables::TenantMemberships)
+                ->whereColumn(AuthTables::TenantMemberships.'.subject_id', $principal->qualifyColumn($principal->getKeyName()))
+                ->where(AuthTables::TenantMemberships.'.subject_type', $principal->getMorphClass())
+                ->where(AuthTables::TenantMemberships.'.tenant_id', $tenant)
+                ->where(AuthTables::TenantMemberships.'.status', 'active');
+        });
     }
 
     /**

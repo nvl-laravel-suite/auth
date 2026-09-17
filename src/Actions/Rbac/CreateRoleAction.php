@@ -16,8 +16,12 @@ use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
+use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\RbacEntityLocator;
 use Nvl\Auth\Services\RoleHierarchy;
+use Nvl\Tenancy\Contracts\TenantContext;
+use Nvl\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Tenancy\Services\TenantBoundary;
 
 /** Creates one package role and permission assignment. */
 final readonly class CreateRoleAction
@@ -31,6 +35,10 @@ final readonly class CreateRoleAction
         private RoleHierarchy $hierarchy,
         private AuthConfiguration $configuration,
         private AuthAuditRecorder $audits,
+        private TenantBoundary $tenancy,
+        private TenantContext $context,
+        private TenantMembershipAccess $memberships,
+        private MembershipOwnerGuard $owners,
     ) {}
 
     /** Persist one role. */
@@ -38,13 +46,20 @@ final readonly class CreateRoleAction
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Issue);
         $this->authorization->authorize($actor, 'nvl-auth.rbac.manageRoles');
+        if (config('tenancy.enabled') === true) {
+            $this->memberships->assertMember($actor, $this->context->requireTenant());
+        }
         $class = $this->models->roleClass();
         $connection = (new $class)->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($actor, $class, $data): Role {
+            if (config('tenancy.enabled') === true) {
+                $this->owners->lock($this->context->requireTenant());
+            }
             $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
             $parent = $data->parentId !== null ? $this->entities->role($data->parentId) : null;
             $role = $class::query()->create([
+                ...(config('tenancy.enabled') === true ? $this->tenancy->attributes('auth.roles') : []),
                 'name' => trim($data->name),
                 'guard_name' => $guard,
                 'display_name' => $data->displayName,

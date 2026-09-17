@@ -7,6 +7,7 @@ namespace Nvl\Auth\Models;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Nvl\Auth\Database\Factories\PermissionFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Spatie\Permission\Models\Permission as SpatiePermission;
@@ -74,6 +75,25 @@ class Permission extends SpatiePermission
         return is_string($configured) && trim($configured) !== ''
             ? trim($configured)
             : parent::getConnectionName();
+    }
+
+    /** Constrain direct inverse assignments to the active team and membership. */
+    public function users(): BelongsToMany
+    {
+        if (config('tenancy.enabled') !== true) {
+            return parent::users();
+        }
+        $tenant = getPermissionsTeamId();
+        $relation = parent::users()->wherePivot('tenant_id', $tenant);
+        $principal = $relation->getRelated();
+
+        return $relation->whereExists(static function ($query) use ($principal, $tenant): void {
+            $query->selectRaw('1')->from(AuthTables::TenantMemberships)
+                ->whereColumn(AuthTables::TenantMemberships.'.subject_id', $principal->qualifyColumn($principal->getKeyName()))
+                ->where(AuthTables::TenantMemberships.'.subject_type', $principal->getMorphClass())
+                ->where(AuthTables::TenantMemberships.'.tenant_id', $tenant)
+                ->where(AuthTables::TenantMemberships.'.status', 'active');
+        });
     }
 
     /**

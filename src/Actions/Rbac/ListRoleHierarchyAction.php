@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\AuthTenantRbacQueries;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RoleHierarchy;
@@ -21,6 +22,7 @@ final readonly class ListRoleHierarchyAction
         private ManagementAuthorizer $authorization,
         private AuthModelRegistry $models,
         private RoleHierarchy $hierarchy,
+        private AuthTenantRbacQueries $tenancy,
     ) {}
 
     /** @return list<array{id: string, name: string, display_name: string|null, priority: int, user_count: int, children: list<mixed>}> */
@@ -29,7 +31,8 @@ final readonly class ListRoleHierarchyAction
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
         $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
         $class = $this->models->roleClass();
-        $roles = $class::query()->withCount('users')->orderByDesc('priority')->orderBy('name')->get();
+        $roles = (config('tenancy.enabled') === true ? $this->tenancy->roles() : $class::query())
+            ->withCount('users')->orderByDesc('priority')->orderBy('name')->get();
 
         return $this->hierarchy->tree($roles);
     }
