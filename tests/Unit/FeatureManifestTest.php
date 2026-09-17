@@ -12,7 +12,7 @@ it('defines every supported feature exactly once', function (): void {
     $definitions = app(FeatureManifest::class)->definitions();
 
     expect($definitions)
-        ->toHaveCount(16)
+        ->toHaveCount(17)
         ->and(array_keys($definitions))->toBe(array_map(
             static fn (AuthFeature $feature): string => $feature->value,
             AuthFeature::cases(),
@@ -35,6 +35,24 @@ it('requires explicit dependencies without auto enabling them', function (): voi
 
     expect(app(FeatureGate::class)->allows(AuthFeature::Password, FeatureOperation::Use))
         ->toBeFalse();
+});
+
+it('requires audit before admitting membership mutations', function (): void {
+    config()->set('nvl-auth.features.memberships.enabled', true);
+    config()->set('nvl-auth.features.audit.enabled', false);
+
+    expect(app(FeatureGate::class)->allows(AuthFeature::Memberships, FeatureOperation::Enroll))
+        ->toBeFalse();
+
+    try {
+        app(FeatureGate::class)->assertAllowed(AuthFeature::Memberships, FeatureOperation::Enroll);
+    } catch (AuthException $exception) {
+        expect($exception->context['dependencies'] ?? null)->toBe(['audit']);
+
+        return;
+    }
+
+    $this->fail('Membership admission did not report its missing audit dependency.');
 });
 
 it('keeps configuration and route files aligned with the closed feature manifest', function (): void {
@@ -71,7 +89,8 @@ it('keeps configuration and route files aligned with the closed feature manifest
             expect($routeNames[1] ?? [])->toBe($definition->routeNames[$surface]);
         }
 
-        if (array_key_exists('management', $definition->routeFamilies)) {
+        if (array_key_exists('management', $definition->routeFamilies)
+            || $definition->feature === AuthFeature::Memberships) {
             expect($definition->managementAbilities, $definition->feature->value)->not->toBeEmpty();
         } else {
             expect($definition->managementAbilities, $definition->feature->value)->toBeEmpty();

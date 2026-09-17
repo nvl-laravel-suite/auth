@@ -76,6 +76,7 @@ use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
 use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
 use Nvl\Support\Traits\MergesPackageConfiguration;
+use Nvl\Tenancy\Providers\TenancyServiceProvider;
 
 /**
  * Registers the passive package layer and lazy feature integrations.
@@ -91,6 +92,7 @@ final class AuthServiceProvider extends ServiceProvider
     {
         $this->mergePackageConfiguration(dirname(__DIR__, 2).'/config/nvl-auth.php', 'nvl-auth');
         $this->app->register(DataServiceProvider::class);
+        $this->app->register(TenancyServiceProvider::class);
         $this->configureOwnedIdentityStorage();
         $this->app->singleton(AuthConfiguration::class);
         $this->app->singleton(AuthModelRegistry::class);

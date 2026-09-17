@@ -70,6 +70,12 @@ final class FeatureManifest
                 managementAbilities: $managementAbilities->abilitiesFor(AuthFeature::PrincipalManagement),
             ),
             new FeatureDefinition(
+                AuthFeature::Memberships,
+                $all,
+                [AuthFeature::Audit],
+                managementAbilities: $managementAbilities->abilitiesFor(AuthFeature::Memberships),
+            ),
+            new FeatureDefinition(
                 AuthFeature::Password,
                 $readWrite,
                 [AuthFeature::Authentication],

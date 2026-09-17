@@ -29,6 +29,13 @@ it('catalogs every package management ability with policy mapping metadata', fun
         'users.delete',
         'users.restore',
         'users.manageAccess',
+        'memberships.viewAny',
+        'memberships.view',
+        'memberships.enroll',
+        'memberships.update',
+        'memberships.revoke',
+        'memberships.transferOwnership',
+        'memberships.manageAccess',
         'invitations.viewAny',
         'invitations.create',
         'invitations.resend',
@@ -57,7 +64,7 @@ it('catalogs every package management ability with policy mapping metadata', fun
 
     expect(array_keys($catalog->definitions()))->toBe($expectedAliases)
         ->and($catalogAbilities)->toBe($manifestAbilities)
-        ->and($catalog->definitions())->toHaveCount(22)
+        ->and($catalog->definitions())->toHaveCount(29)
         ->and($catalog->definition('users.update'))->toMatchArray([
             'ability' => 'nvl-auth.users.update',
             'feature' => AuthFeature::PrincipalManagement,
@@ -68,7 +75,13 @@ it('catalogs every package management ability with policy mapping metadata', fun
         ->and($catalog->definition('rbac.view')['operation'])->toBe('viewRbac')
         ->and($catalog->definition('rbac.manageRoles')['operation'])->toBe('manageRoles')
         ->and($catalog->definition('rbac.managePermissions')['operation'])->toBe('managePermissions')
-        ->and($catalog->definition('rbac.synchronize')['operation'])->toBe('synchronizeRbac');
+        ->and($catalog->definition('rbac.synchronize')['operation'])->toBe('synchronizeRbac')
+        ->and($catalog->definition('memberships.transferOwnership'))->toMatchArray([
+            'feature' => AuthFeature::Memberships,
+            'operation' => 'transferOwnership',
+            'subject' => 'target',
+            'policy' => 'memberships',
+        ]);
 });
 
 it('delegates configured package aliases to host policies and denies unknown or unmapped access', function (): void {

@@ -11,6 +11,7 @@ use Nvl\Auth\Models\AuthClient;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
+use Nvl\Auth\Models\TenantMembership;
 use Nvl\Auth\Models\User;
 
 /**
@@ -40,6 +41,13 @@ final class AuthManagementAbilityCatalog
             'users.delete' => $this->definitionFor('nvl-auth.users.delete', AuthFeature::PrincipalManagement, 'delete', 'target', 'users', User::class),
             'users.restore' => $this->definitionFor('nvl-auth.users.restore', AuthFeature::PrincipalManagement, 'restore', 'target', 'users', User::class),
             'users.manageAccess' => $this->definitionFor('nvl-auth.users.manageAccess', AuthFeature::PrincipalManagement, 'manageAccess', 'optional', 'users', User::class),
+            'memberships.viewAny' => $this->definitionFor('nvl-auth.memberships.viewAny', AuthFeature::Memberships, 'viewAny', 'none', 'memberships', TenantMembership::class),
+            'memberships.view' => $this->definitionFor('nvl-auth.memberships.view', AuthFeature::Memberships, 'view', 'target', 'memberships', TenantMembership::class),
+            'memberships.enroll' => $this->definitionFor('nvl-auth.memberships.enroll', AuthFeature::Memberships, 'enroll', 'none', 'memberships', TenantMembership::class),
+            'memberships.update' => $this->definitionFor('nvl-auth.memberships.update', AuthFeature::Memberships, 'update', 'target', 'memberships', TenantMembership::class),
+            'memberships.revoke' => $this->definitionFor('nvl-auth.memberships.revoke', AuthFeature::Memberships, 'revoke', 'target', 'memberships', TenantMembership::class),
+            'memberships.transferOwnership' => $this->definitionFor('nvl-auth.memberships.transferOwnership', AuthFeature::Memberships, 'transferOwnership', 'target', 'memberships', TenantMembership::class),
+            'memberships.manageAccess' => $this->definitionFor('nvl-auth.memberships.manageAccess', AuthFeature::Memberships, 'manageAccess', 'target', 'memberships', TenantMembership::class),
             'invitations.viewAny' => $this->definitionFor('nvl-auth.invitations.viewAny', AuthFeature::Invitations, 'viewAny', 'none', 'invitations', Invitation::class),
             'invitations.create' => $this->definitionFor('nvl-auth.invitations.create', AuthFeature::Invitations, 'create', 'none', 'invitations', Invitation::class),
             'invitations.resend' => $this->definitionFor('nvl-auth.invitations.resend', AuthFeature::Invitations, 'resend', 'target', 'invitations', Invitation::class),

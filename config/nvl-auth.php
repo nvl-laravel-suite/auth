@@ -14,6 +14,7 @@ use Nvl\Auth\Services\EloquentRbacPrincipalAccess;
 use Nvl\Auth\Services\LaravelGateAuthManagementAccess;
 use Nvl\Auth\Services\PackagePermissionCatalog;
 use Nvl\Auth\Services\PackageRoleTemplates;
+use Nvl\Auth\Services\VerifiedInvitationRecipientProof;
 
 return [
     /*
@@ -125,6 +126,12 @@ return [
                     'deleted_at' => 'deleted_at',
                 ],
             ],
+        ],
+        'memberships' => [
+            'enabled' => false,
+            'routes' => ['account' => ['enabled' => false], 'management' => ['enabled' => false]],
+            'services' => ['principal_resolver' => null],
+            'settings' => ['per_page' => 25, 'maximum_per_page' => 100],
         ],
         'password' => [
             'enabled' => env('NVL_AUTH_PASSWORD_ENABLED', true),
@@ -248,6 +255,12 @@ return [
             'services' => ['recorder' => null],
             'settings' => ['capture_ip' => true, 'capture_user_agent' => true],
         ],
+    ],
+
+    'tenancy' => [
+        'migrations' => ['enabled' => false],
+        'recipient_proof' => VerifiedInvitationRecipientProof::class,
+        'activity_bridge' => 'disabled',
     ],
 
     /*

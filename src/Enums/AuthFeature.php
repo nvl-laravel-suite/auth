@@ -11,6 +11,7 @@ enum AuthFeature: string
 {
     case Authentication = 'authentication';
     case PrincipalManagement = 'principal_management';
+    case Memberships = 'memberships';
     case Password = 'password';
     case EmailVerification = 'email_verification';
     case MagicLinks = 'magic_links';
