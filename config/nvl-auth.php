@@ -216,7 +216,7 @@ return [
         ],
         'sessions' => [
             'enabled' => env('NVL_AUTH_SESSIONS_ENABLED', true),
-            'routes' => ['account' => ['enabled' => false]],
+            'routes' => ['public' => ['enabled' => false], 'account' => ['enabled' => false]],
             'settings' => [],
         ],
         'api_tokens' => [

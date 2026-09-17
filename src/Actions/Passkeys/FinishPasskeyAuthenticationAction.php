@@ -43,19 +43,13 @@ final readonly class FinishPasskeyAuthenticationAction
         private TenantAuthenticationChallengeIntents $tenantIntents,
     ) {}
 
-    /**
-     * Verify one browser assertion and return the owning host subject reference.
-     */
-    public function execute(FinishPasskeyAuthenticationData $data): SubjectReference
-    {
-        return $this->finish($data)->subject;
-    }
-
     /** Verify a browser ceremony and recover only its server-owned tenant context. */
-    public function executeForSession(
+    public function execute(
         FinishPasskeyAuthenticationData $data,
         ?TenantId $requestedTenant = null,
     ): CompletedPasskeyAuthentication {
+        $this->features->assertAllowed(AuthFeature::Passkeys, FeatureOperation::Use);
+
         return $this->finish($data, $requestedTenant);
     }
 
@@ -63,7 +57,6 @@ final readonly class FinishPasskeyAuthenticationAction
         FinishPasskeyAuthenticationData $data,
         ?TenantId $requestedTenant = null,
     ): CompletedPasskeyAuthentication {
-        $this->features->assertAllowed(AuthFeature::Passkeys, FeatureOperation::Use);
         $this->input->validate($data->ceremonyId, $data->response);
         $connection = (new Challenge)->getConnectionName();
 

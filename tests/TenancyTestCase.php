@@ -77,6 +77,7 @@ abstract class TenancyTestCase extends Orchestra
         $app['config']->set('nvl-auth.routes.middleware', ['api']);
         $app['config']->set('nvl-auth.routes.account.enabled', true);
         $app['config']->set('nvl-auth.routes.management.enabled', true);
+        $app['config']->set('nvl-auth.features.sessions.routes.public.enabled', true);
         $app['config']->set('nvl-auth.features.memberships.routes.account.enabled', true);
         $app['config']->set('nvl-auth.features.memberships.routes.management.enabled', true);
         $app['config']->set('tenancy.enabled', true);
@@ -121,6 +122,7 @@ abstract class TenancyTestCase extends Orchestra
                     require dirname(__DIR__).'/routes/public/magic_links.php';
                     require dirname(__DIR__).'/routes/public/security_codes.php';
                     require dirname(__DIR__).'/routes/public/passkeys.php';
+                    require dirname(__DIR__).'/routes/public/tenant_intents.php';
                 });
         });
     }

@@ -12,6 +12,7 @@ use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\BrowserSession;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
+use Nvl\Auth\Contracts\TenantAuthenticationSession;
 use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
@@ -27,6 +28,7 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\TenantAuthenticationIntents;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
+use Nvl\Auth\ValueObjects\PendingTenantAuthenticationIntent;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Tenancy\ValueObjects\TenantId;
@@ -53,6 +55,7 @@ final readonly class EstablishAuthenticatedSessionAction
         private AuthOperationBoundary $operations,
         private TenantAuthenticationIntents $tenantIntents,
         private TenantMembershipAccess $tenantMemberships,
+        private TenantAuthenticationSession $tenantSession,
     ) {}
 
     /**
@@ -138,10 +141,21 @@ final readonly class EstablishAuthenticatedSessionAction
             || $context->tenantPurpose === null) {
             return;
         }
+        $pending = new PendingTenantAuthenticationIntent(
+            $reference,
+            $context->tenantIntentNonce,
+            $context->tenantSessionBinding,
+            $context->tenantPurpose,
+            $context->tenantProvider,
+            $context->tenantIntentSubjectBound,
+        );
+        if (! $context->requestedTenant instanceof TenantId) {
+            $this->denyTenantSelection($subject, $reference, $pending);
+
+            return;
+        }
+
         try {
-            if (! $context->requestedTenant instanceof TenantId) {
-                throw new AuthException('tenant_authentication_intent_invalid', 'The tenant authentication intent is invalid.', 410);
-            }
             $tenant = $this->tenantIntents->consume(
                 $context->tenantIntentNonce,
                 $context->tenantPurpose,
@@ -150,6 +164,14 @@ final readonly class EstablishAuthenticatedSessionAction
                 $context->tenantIntentSubjectBound ? $reference : null,
                 $context->tenantProvider,
             );
+        } catch (Throwable) {
+            $this->denyTenantSelection($subject, $reference, $pending);
+
+            return;
+        }
+        $this->tenantSession->forgetPendingTenantAuthenticationIntent();
+
+        try {
             $this->tenantMemberships->assertMember($subject, $tenant);
             $this->audits->record(
                 'authentication.tenant_selected',
@@ -165,5 +187,20 @@ final readonly class EstablishAuthenticatedSessionAction
                 actor: $subject,
             );
         }
+    }
+
+    /** Preserve an exact server-side retry after selector denial. */
+    private function denyTenantSelection(
+        Authenticatable $subject,
+        SubjectReference $reference,
+        PendingTenantAuthenticationIntent $pending,
+    ): void {
+        $this->tenantSession->storePendingTenantAuthenticationIntent($pending);
+        $this->audits->record(
+            'authentication.tenant_selection_denied',
+            outcome: 'denied',
+            subject: $reference,
+            actor: $subject,
+        );
     }
 }

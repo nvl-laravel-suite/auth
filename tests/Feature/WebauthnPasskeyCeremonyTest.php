@@ -63,7 +63,7 @@ it('registers and authenticates a real ES256 WebAuthn credential end to end', fu
         new FinishPasskeyRegistrationData($registration->ceremonyId, $authenticator->registrationResponse($registration->options), 'Platform authenticator')
     );
     $authentication = app(BeginPasskeyAuthenticationAction::class)->execute();
-    $reference = app(FinishPasskeyAuthenticationAction::class)->execute(
+    $completed = app(FinishPasskeyAuthenticationAction::class)->execute(
         new FinishPasskeyAuthenticationData($authentication->ceremonyId, $authenticator->authenticationResponse(
             $authentication->options,
             $registration->options['user']['id']
@@ -73,7 +73,7 @@ it('registers and authenticates a real ES256 WebAuthn credential end to end', fu
     expect($passkey->credential_id)->toBe($authenticator->credentialId())
         ->and($passkey->transports)->toBe(['internal'])
         ->and($passkey->signature_counter)->toBe(0)
-        ->and($reference->identifier)->toBe((string) $user->getKey())
+        ->and($completed->subject->identifier)->toBe((string) $user->getKey())
         ->and($passkey->refresh()->signature_counter)->toBe(1)
         ->and($passkey->last_used_at)->not->toBeNull();
 });
@@ -87,12 +87,12 @@ it('supports subject-scoped assertions without a returned user handle', function
         new FinishPasskeyRegistrationData($registration->ceremonyId, $authenticator->registrationResponse($registration->options))
     );
     $authentication = app(BeginPasskeyAuthenticationAction::class)->execute($user);
-    $reference = app(FinishPasskeyAuthenticationAction::class)->execute(
+    $completed = app(FinishPasskeyAuthenticationAction::class)->execute(
         new FinishPasskeyAuthenticationData($authentication->ceremonyId, $authenticator->authenticationResponse($authentication->options, null))
     );
 
     expect($authentication->options['allowCredentials'])->toHaveCount(1)
-        ->and($reference->identifier)->toBe((string) $user->getKey());
+        ->and($completed->subject->identifier)->toBe((string) $user->getKey());
 });
 
 it('accepts authenticators that do not implement signature counters', function (): void {
@@ -104,7 +104,7 @@ it('accepts authenticators that do not implement signature counters', function (
         new FinishPasskeyRegistrationData($registration->ceremonyId, $authenticator->registrationResponse($registration->options))
     );
     $authentication = app(BeginPasskeyAuthenticationAction::class)->execute();
-    $reference = app(FinishPasskeyAuthenticationAction::class)->execute(
+    $completed = app(FinishPasskeyAuthenticationAction::class)->execute(
         new FinishPasskeyAuthenticationData($authentication->ceremonyId, $authenticator->authenticationResponse(
             $authentication->options,
             $registration->options['user']['id'],
@@ -112,7 +112,7 @@ it('accepts authenticators that do not implement signature counters', function (
         ))
     );
 
-    expect($reference->identifier)->toBe((string) $user->getKey())
+    expect($completed->subject->identifier)->toBe((string) $user->getKey())
         ->and($passkey->refresh()->signature_counter)->toBe(0);
 });
 

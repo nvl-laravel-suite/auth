@@ -19,7 +19,12 @@ use Nvl\Auth\Services\TenantAuthenticationChallengeIntents;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Tenancy\ValueObjects\TenantId;
 
-/** Resolves and issues a subject-bound security code for public authentication. */
+/**
+ * Resolves and issues a subject-bound security code for public authentication.
+ *
+ * Delegation to RequestSecurityCodeAction is deliberate domain orchestration:
+ * this workflow adds subject and tenant-intent binding to canonical issuance.
+ */
 final readonly class RequestSecurityCodeAuthenticationAction
 {
     public function __construct(

@@ -27,12 +27,12 @@ it('persists verified passkeys and supplies stored material to the ceremony adap
         new FinishPasskeyRegistrationData($registration->ceremonyId, ['valid' => true], 'Laptop')
     );
     $authentication = app(BeginPasskeyAuthenticationAction::class)->execute();
-    $reference = app(FinishPasskeyAuthenticationAction::class)->execute(
+    $completed = app(FinishPasskeyAuthenticationAction::class)->execute(
         new FinishPasskeyAuthenticationData($authentication->ceremonyId, ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2])
     );
     $adapter = app(PasskeyCeremony::class);
 
-    expect($reference->identifier)->toBe((string) $user->getKey())
+    expect($completed->subject->identifier)->toBe((string) $user->getKey())
         ->and($passkey->refresh()->signature_counter)->toBe(2)
         ->and($passkey->getRawOriginal('credential_id'))->not->toBe('test-credential')
         ->and($passkey->getRawOriginal('public_key'))->not->toBe('test-public-key')

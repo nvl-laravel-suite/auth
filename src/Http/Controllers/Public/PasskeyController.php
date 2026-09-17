@@ -51,7 +51,7 @@ final class PasskeyController
         EstablishAuthenticatedSessionAction $sessions,
         TenantHttpResolver $tenants,
     ): JsonResponse {
-        $completed = $action->executeForSession($data, $this->requestedTenant($request, $tenants));
+        $completed = $action->execute($data, $this->requestedTenant($request, $tenants));
         $sessions->execute($completed->subject, requestContext: new AuthenticationRequestContext(
             ipAddress: $request->ip(),
             userAgent: $request->userAgent(),

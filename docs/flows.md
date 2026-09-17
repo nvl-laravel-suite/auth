@@ -30,6 +30,13 @@ challenge so host policy can decide what it proves. The separate
 `security-codes/authentication` flow requires the `passwordless_login` purpose,
 binds the challenge to a resolved subject, and alone establishes a session.
 
+Magic-link, explicit passwordless-code, and passkey proofs remain exactly-once.
+If their trusted tenant selector conflicts, global authentication succeeds and
+the package stores the exact intent reference only in the authenticated server
+session. `POST tenant-intents/complete` retries tenant selection without accepting
+a nonce, binding, purpose, provider, or subject from the client; success removes
+the pending reference, so replay fails.
+
 ## Invitations
 
 Management creates a simple expiring invitation and receives the plaintext token

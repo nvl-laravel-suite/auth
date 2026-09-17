@@ -175,7 +175,13 @@ final class FeatureManifest
                 ],
                 managementAbilities: $managementAbilities->abilitiesFor(AuthFeature::Clients),
             ),
-            new FeatureDefinition(AuthFeature::Sessions, [FeatureOperation::Read, FeatureOperation::Use, FeatureOperation::Revoke], [AuthFeature::Authentication]),
+            new FeatureDefinition(
+                AuthFeature::Sessions,
+                [FeatureOperation::Read, FeatureOperation::Use, FeatureOperation::Revoke],
+                [AuthFeature::Authentication],
+                ['public' => 'tenant_intents'],
+                ['public' => ['tenant_intents.complete']],
+            ),
             new FeatureDefinition(
                 AuthFeature::ApiTokens,
                 $readWrite,
