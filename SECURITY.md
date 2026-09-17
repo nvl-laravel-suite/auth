@@ -23,3 +23,6 @@ Security-sensitive design rules:
   coordinated data migration.
 
 See [docs/security.md](docs/security.md) for operational guidance.
+
+<!-- tenancy-program-p2 -->
+The configurable-tenancy implementation is present; its consolidated verification matrix remains pending and no release-readiness claim is made.

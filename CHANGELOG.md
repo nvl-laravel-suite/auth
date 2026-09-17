@@ -157,3 +157,6 @@ All notable changes to `nvl/auth` are documented here.
 
 - This is an intentional pre-1.0 configuration and schema break. No compatibility
   shim is provided for the previous overbuilt configuration tree.
+
+<!-- tenancy-program-p2 -->
+Configurable-tenancy implementation and adoption documentation are present. The final consolidated verification matrix is pending; do not treat this package as release-ready until that gate passes.
