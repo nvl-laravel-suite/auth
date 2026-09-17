@@ -105,6 +105,8 @@ use Nvl\Tenancy\Services\TenantAdoptionRegistry;
 use Nvl\Tenancy\Services\TenantContextParticipants;
 use Nvl\Tenancy\Services\TenantResourceRegistry;
 use Nvl\Tenancy\ValueObjects\TenantResourceDefinition;
+use Spatie\Permission\PermissionRegistrar;
+use Throwable;
 
 /**
  * Registers the passive package layer and lazy feature integrations.
@@ -382,7 +384,27 @@ final class AuthServiceProvider extends ServiceProvider
             'model_morph_key' => 'model_id',
             'team_foreign_key' => 'tenant_id',
         ]));
-        $configuration->set('permission.teams', (bool) $configuration->get('tenancy.enabled', false));
+        $configuration->set('permission.teams', false);
+        $this->app->beforeResolving(PermissionRegistrar::class, function () use ($configuration): void {
+            $configuration->set('permission.teams', $this->persistedTenantRbacIsActive($configuration));
+        });
+    }
+
+    /** Enable Spatie teams lazily only after Auth's persisted role marker is active. */
+    private function persistedTenantRbacIsActive(ConfigRepository $configuration): bool
+    {
+        if ((bool) $configuration->get('tenancy.enabled', false) !== true) {
+            return false;
+        }
+        try {
+            $connection = (new Role)->getConnection();
+
+            return $connection->getSchemaBuilder()->hasTable('nvl_tenancy_installation_state')
+                && $connection->table('nvl_tenancy_installation_state')
+                    ->where('resource', 'auth.roles')->where('state', 'active')->exists();
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     /** Register Auth's immutable tenant resource inventory without touching storage. */

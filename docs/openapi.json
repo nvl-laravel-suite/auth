@@ -31,6 +31,7 @@
     },
     "/clients/start": {"post": {"operationId": "nvl.auth.public.clients.start", "x-nvl-feature": "clients", "x-nvl-feature-operation": "use", "x-nvl-route-surface": "public", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/ClientStart"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
     "/logout": {"post": {"operationId": "nvl.auth.account.logout", "x-nvl-feature": "authentication", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}},
+    "/account/memberships": {"get": {"operationId": "nvl.auth.account.memberships.index", "x-nvl-feature": "memberships", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["audit"], "responses": {"200": {"$ref": "#/components/responses/Success"}}}},
     "/password": {"put": {"operationId": "nvl.auth.account.password.update", "x-nvl-feature": "password", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication", "sessions"], "requestBody": {"$ref": "#/components/requestBodies/PasswordUpdate"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
     "/password/confirm": {"post": {"operationId": "nvl.auth.account.password.confirm", "x-nvl-feature": "password", "x-nvl-feature-operation": "use", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication", "sessions"], "requestBody": {"$ref": "#/components/requestBodies/PasswordConfirm"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
     "/email/verification": {"post": {"operationId": "nvl.auth.account.email.request", "x-nvl-feature": "email_verification", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "account", "x-nvl-feature-dependencies": ["authentication"], "responses": {"202": {"$ref": "#/components/responses/Accepted"}}}},
@@ -91,6 +92,17 @@
       "parameters": [{"$ref": "#/components/parameters/invitation"}],
       "delete": {"operationId": "nvl.auth.management.invitations.destroy", "x-nvl-feature": "invitations", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": [], "responses": {"200": {"$ref": "#/components/responses/Success"}}}
     },
+    "/memberships": {
+      "get": {"operationId": "nvl.auth.management.memberships.index", "x-nvl-feature": "memberships", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": ["audit"], "responses": {"200": {"$ref": "#/components/responses/Success"}}},
+      "post": {"operationId": "nvl.auth.management.memberships.store", "x-nvl-feature": "memberships", "x-nvl-feature-operation": "enroll", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": ["audit"], "requestBody": {"$ref": "#/components/requestBodies/MembershipEnroll"}, "responses": {"201": {"$ref": "#/components/responses/Created"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}
+    },
+    "/memberships/{membership}": {
+      "parameters": [{"$ref": "#/components/parameters/membership"}],
+      "get": {"operationId": "nvl.auth.management.memberships.show", "x-nvl-feature": "memberships", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": ["audit"], "responses": {"200": {"$ref": "#/components/responses/Success"}}},
+      "delete": {"operationId": "nvl.auth.management.memberships.destroy", "x-nvl-feature": "memberships", "x-nvl-feature-operation": "revoke", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": ["audit"], "requestBody": {"$ref": "#/components/requestBodies/MembershipRevision"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}
+    },
+    "/memberships/{membership}/status": {"parameters": [{"$ref": "#/components/parameters/membership"}], "patch": {"operationId": "nvl.auth.management.memberships.status", "x-nvl-feature": "memberships", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": ["audit"], "requestBody": {"$ref": "#/components/requestBodies/MembershipStatus"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
+    "/memberships/{membership}/transfer-ownership": {"parameters": [{"$ref": "#/components/parameters/membership"}], "post": {"operationId": "nvl.auth.management.memberships.transfer_ownership", "x-nvl-feature": "memberships", "x-nvl-feature-operation": "update", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": ["audit"], "requestBody": {"$ref": "#/components/requestBodies/MembershipTransfer"}, "responses": {"200": {"$ref": "#/components/responses/Success"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}},
     "/clients": {
       "get": {"operationId": "nvl.auth.management.clients.index", "x-nvl-feature": "clients", "x-nvl-feature-operation": "read", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": ["authentication"], "responses": {"200": {"$ref": "#/components/responses/Success"}}},
       "post": {"operationId": "nvl.auth.management.clients.store", "x-nvl-feature": "clients", "x-nvl-feature-operation": "issue", "x-nvl-route-surface": "management", "x-nvl-feature-dependencies": ["authentication"], "requestBody": {"$ref": "#/components/requestBodies/ClientMutation"}, "responses": {"201": {"$ref": "#/components/responses/Created"}, "422": {"$ref": "#/components/responses/ValidationFailure"}}}
@@ -174,6 +186,7 @@
       "role": {"name": "role", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
       "permission": {"name": "permission", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
       "authAudit": {"name": "authAudit", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+      ,"membership": {"name": "membership", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
     },
     "securitySchemes": {
       "sessionCookie": {"type": "apiKey", "in": "cookie", "name": "laravel_session", "description": "Configured Laravel stateful guard cookie; the host may rename it."},
@@ -225,6 +238,10 @@
       "RoleClone": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string", "maxLength": 160}, "display_name": {"type": ["string", "null"], "maxLength": 160}}},
       "RoleTemplate": {"type": "object", "required": ["template"], "properties": {"template": {"type": "string", "maxLength": 160}, "roleName": {"type": ["string", "null"], "maxLength": 160}}},
       "PermissionMutation": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string", "maxLength": 160}, "display_name": {"type": ["string", "null"], "maxLength": 160}, "description": {"type": ["string", "null"], "maxLength": 2000}, "group": {"type": ["string", "null"], "maxLength": 120}, "metadata": {"type": "object", "additionalProperties": true}}}
+      ,"MembershipEnroll": {"type": "object", "required": ["subject_type", "subject_id"], "properties": {"subject_type": {"type": "string", "maxLength": 160}, "subject_id": {"type": "string", "maxLength": 191}, "roles": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "maxLength": 160}}, "permissions": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "maxLength": 160}}}}
+      ,"MembershipRevision": {"type": "object", "required": ["expected_revision"], "properties": {"expected_revision": {"type": "integer", "minimum": 1}}}
+      ,"MembershipStatus": {"allOf": [{"$ref": "#/components/schemas/MembershipRevision"}, {"type": "object", "required": ["status"], "properties": {"status": {"type": "string", "enum": ["active", "suspended", "revoked"]}}}]}
+      ,"MembershipTransfer": {"type": "object", "required": ["recipient_membership_id", "expected_revision"], "properties": {"recipient_membership_id": {"type": "string", "format": "uuid"}, "expected_revision": {"type": "integer", "minimum": 1}}}
     },
     "requestBodies": {
       "Login": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Login"}}}},
@@ -255,6 +272,10 @@
       ,"RoleClone": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoleClone"}}}}
       ,"RoleTemplate": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RoleTemplate"}}}}
       ,"PermissionMutation": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PermissionMutation"}}}}
+      ,"MembershipEnroll": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MembershipEnroll"}}}}
+      ,"MembershipRevision": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MembershipRevision"}}}}
+      ,"MembershipStatus": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MembershipStatus"}}}}
+      ,"MembershipTransfer": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MembershipTransfer"}}}}
     },
     "responses": {
       "Success": {"description": "Successful Auth operation", "headers": {"Cache-Control": {"schema": {"type": "string", "const": "no-store, private"}}, "Referrer-Policy": {"schema": {"type": "string", "const": "no-referrer"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope"}}}},

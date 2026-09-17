@@ -273,3 +273,14 @@ typed request to the chosen delivery package.
 `cleanup.retention_days` controls `nvl:auth:prune`. It covers terminal or revoked
 operational records only; it does not delete Users, active credentials, tokens,
 RBAC state, or `nvl_auth_audits`.
+
+## Tenancy
+
+Tenancy remains disabled by default. Enabling `tenancy.enabled` requires the
+independently selected Auth tenant migration and an active foundation adoption
+marker. Memberships, invitations, roles, package Sanctum tokens, authentication
+intents, and audit projections become tenant-aware; principals, credentials,
+permissions, clients, and client sessions remain global. The configured Auth,
+principal, and tenancy connections must normalize to the same Laravel connection.
+`features.invitations.services.recipient_proof` must prove the invited recipient,
+and `integrations.activity_bridge` must be `disabled` or a tenant-aware bridge.

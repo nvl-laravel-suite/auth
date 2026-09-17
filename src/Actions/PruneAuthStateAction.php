@@ -21,6 +21,9 @@ use Nvl\Auth\Models\TenantAuthenticationIntent;
 use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Tenancy\Contracts\TenantContext;
+use Nvl\Tenancy\Enums\TenantContextMode;
+use Nvl\Tenancy\Exceptions\TenantContextMissing;
 
 /**
  * Prunes terminal, retention-expired Auth state without deleting audits.
@@ -34,6 +37,7 @@ final readonly class PruneAuthStateAction
         private FeatureGate $features,
         private AuthConfiguration $configuration,
         private AuthAuditRecorder $audits,
+        private TenantContext $tenantContext,
     ) {}
 
     /**
@@ -54,7 +58,11 @@ final readonly class PruneAuthStateAction
         $cutoff = CarbonImmutable::now()->subDays(
             $this->configuration->integerBetween('cleanup.retention_days', 30, 1, 3_650),
         );
-        $queries = [
+        $snapshot = $this->tenantContext->snapshot();
+        if (config('tenancy.enabled') === true && $snapshot->mode === TenantContextMode::None) {
+            throw new TenantContextMissing('Tenant-aware Auth pruning requires an explicit tenant or platform context.');
+        }
+        $ownedQueries = [
             'invitations' => Invitation::query()->where(function (Builder $query) use ($cutoff): void {
                 $query->where('expires_at', '<', $cutoff)
                     ->orWhere('accepted_at', '<', $cutoff)
@@ -65,25 +73,41 @@ final readonly class PruneAuthStateAction
                     ->orWhere('consumed_at', '<', $cutoff)
                     ->orWhere('revoked_at', '<', $cutoff);
             }),
-            'totp_credentials' => TotpCredential::query()->where('revoked_at', '<', $cutoff),
-            'passkeys' => Passkey::query()->where('revoked_at', '<', $cutoff),
-            'recovery_codes' => RecoveryCode::query()->where(function (Builder $query) use ($cutoff): void {
-                $query->where('used_at', '<', $cutoff)->orWhere('revoked_at', '<', $cutoff);
-            }),
-            'social_identities' => SocialIdentity::query()->where('revoked_at', '<', $cutoff),
-            'client_sessions' => AuthClientSession::query()->where('ended_at', '<', $cutoff),
         ];
+        if (config('tenancy.enabled') === true) {
+            foreach ($ownedQueries as $query) {
+                if ($snapshot->mode === TenantContextMode::Tenant) {
+                    $query->where('tenant_id', $snapshot->tenantId?->value)
+                        ->where('ownership_key', 'tenant:'.$snapshot->tenantId?->value);
+                } else {
+                    $query->whereNull('tenant_id')->where('ownership_key', 'platform');
+                }
+            }
+        }
+        $queries = $ownedQueries;
+        if (config('tenancy.enabled') !== true || $snapshot->mode === TenantContextMode::Platform) {
+            $queries += [
+                'totp_credentials' => TotpCredential::query()->where('revoked_at', '<', $cutoff),
+                'passkeys' => Passkey::query()->where('revoked_at', '<', $cutoff),
+                'recovery_codes' => RecoveryCode::query()->where(function (Builder $query) use ($cutoff): void {
+                    $query->where('used_at', '<', $cutoff)->orWhere('revoked_at', '<', $cutoff);
+                }),
+                'social_identities' => SocialIdentity::query()->where('revoked_at', '<', $cutoff),
+                'client_sessions' => AuthClientSession::query()->where('ended_at', '<', $cutoff),
+            ];
+        }
         if (config('tenancy.enabled') === true
             && Schema::connection((new TenantAuthenticationIntent)->getConnectionName())
                 ->hasTable(TenantAuthenticationIntent::TABLE)) {
             $queries['tenant_authentication_intents'] = TenantAuthenticationIntent::query()
+                ->where('tenant_id', $snapshot->tenantId?->value)
                 ->where(static fn (Builder $query) => $query
                     ->where('expires_at', '<', $cutoff)
                     ->orWhere('consumed_at', '<', $cutoff));
         }
         $connection = (new Invitation)->getConnectionName();
 
-        return DB::connection($connection)->transaction(function () use ($dryRun, $queries): array {
+        $counts = DB::connection($connection)->transaction(function () use ($dryRun, $queries): array {
             $counts = [];
 
             foreach ($queries as $name => $query) {
@@ -96,11 +120,12 @@ final readonly class PruneAuthStateAction
                 $counts[$name] = $result;
             }
 
-            if (! $dryRun) {
-                $this->audits->record('auth_state.pruned', metadata: ['counts' => $counts]);
-            }
-
             return $counts;
         }, 3);
+        if (! $dryRun) {
+            $this->audits->record('auth_state.pruned', metadata: ['counts' => $counts]);
+        }
+
+        return $counts;
     }
 }

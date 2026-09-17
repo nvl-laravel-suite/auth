@@ -76,3 +76,16 @@ The manifest and command are intentionally bounded by
 `adoption.maximum_manifest_bytes` and `adoption.maximum_records`. Split larger
 adoptions into a reviewed host migration or raise the limit only for a controlled
 rehearsal and deployment.
+
+## Tenant adoption after principal adoption
+
+Principal adoption does not infer memberships. During maintenance, prepare a
+separate immutable tenancy mapping: destination membership UUIDs identify the
+subject/status/owner and reviewed role/direct-permission destinations; destination
+roles name one legacy source and optional destination parent; live invitations
+carry reviewed grants; audit mappings require a bounded evidence reference.
+Every legacy pivot principal needs an explicit membership disposition before the
+source pivots are removed. Shared legacy roles are cloned to distinct destination
+UUIDs. Unbound package tokens are revoked for reissue, active global flows are
+drained, and unmapped live invitations block activation. Recovery is by the
+rehearsed pre-adoption backup, not by dropping tenant columns.

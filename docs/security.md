@@ -107,6 +107,18 @@ recheck feature admission, reject expired payloads, and prevent observability
 systems from capturing payload values.
 The value object rejects feature/message pairs outside the package-owned map.
 
+## Tenant boundaries
+
+Tenant IDs originate only from verified context, one-use authentication intent,
+invitation proof, or an immutable operator-reviewed adoption mapping. Global
+principals and credentials never become tenant projections. Enabled RBAC has no
+null-team roles; every role lookup, parent edge, inverse relation, and assignment
+must match the active tenant and an active membership. Package Sanctum tokens
+carry immutable tenant ownership and admission rechecks membership on every use.
+Socialite state remains authoritative for OAuth; the separate tenant intent is
+single-use and session-bound. Audit and queued delivery payloads capture tenant
+context at record/dispatch time and restore it fail-closed in workers.
+
 ## Disablement
 
 Disabling a feature blocks normal read/enroll/issue/use/update admission and

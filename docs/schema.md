@@ -72,3 +72,15 @@ Doctor verification.
 authenticators/social links, used or revoked recovery codes, and ended client
 session correlations. It never deletes Users, active credentials, clients,
 roles, permissions, tokens, or immutable `nvl_auth_audits` facts.
+
+## Optional tenant ownership schema
+
+The Auth tenancy migration adds `nvl_auth_tenant_memberships`, retained
+membership locks, and one-use tenant authentication intents. Roles and Spatie
+principal pivots receive a non-null final `tenant_id`; role uniqueness and pivot
+keys become tenant-leading. Invitations, package tokens, challenges, and audits
+use both nullable `tenant_id` and an exact `platform|tenant:<uuid>` ownership key.
+Permissions are a global vocabulary. Users, password/TOTP/passkey/recovery/social
+credentials, clients, and client sessions deliberately receive no tenant column.
+The schema command reports missing tenant columns but activation is owned only by
+the reviewed foundation adoption coordinator.

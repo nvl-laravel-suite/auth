@@ -141,3 +141,14 @@ status for package routes.
 - `AuthenticationRejected(identifierName, identifier, reason, ?SubjectReference)`
 - `UserAuthenticated(SubjectReference)`
 - `UserLoggedOut(?SubjectReference)`
+
+## Tenant APIs
+
+Membership Actions list the authenticated principal's own memberships and offer
+authorized tenant enrollment, status, revocation, ownership transfer, and RBAC
+grant management. They derive tenant identity from verified context or invitation
+proof rather than mutation DTOs. `TenantBoundApiTokenManager` binds issue, list,
+update, rotate, revoke, and admission to the active tenant and a live membership.
+`TenantAuthenticationIntents` supplies one-use session-bound intent for OAuth,
+passwordless, passkey, and invitation entry without replacing Socialite state.
+Global principal administration always requires explicit platform context.

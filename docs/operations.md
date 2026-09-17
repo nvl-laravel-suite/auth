@@ -93,6 +93,21 @@ Schedule::command('nvl:auth:prune')
     ->withoutOverlapping();
 ```
 
+When tenancy is active, schedule bounded commands instead: one
+`nvl:auth:prune --tenant=<uuid>` per host-authorized work item, or
+`nvl:auth:prune --platform` with actor/purpose options accepted by the platform
+adapter. An unscoped tenant-mode prune fails closed.
+
+## Tenant cutover
+
+Enter maintenance and drain writers/workers before `nvl:tenancy:adopt`. Prepare
+with the immutable reviewed Auth JSONL mapping, run bounded backfill/resume,
+verify Doctor and adoption diagnostics, then activate. Activation changes role
+and pivot constraints and switches the current registrar to `tenant_id`; restart
+all serving and queue processes so they load the active marker. Do not use
+`nvl:auth:schema --apply` as an adoption shortcut. Keep the pre-adoption snapshot
+until restore rehearsal and tenant smoke journeys pass.
+
 ## Deployment sequence
 
 ```bash

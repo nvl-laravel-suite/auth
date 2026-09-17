@@ -37,6 +37,20 @@ final readonly class AuthSchemaManager
         AuthTables::Challenges => ['nvl_auth_challenges_secondary_secret_hash_unique'],
     ];
 
+    /** @var array<string, list<string>> */
+    private const array TENANCY_COLUMNS = [
+        AuthTables::TenantMemberships => ['id', 'tenant_id', 'subject_type', 'subject_id', 'status', 'is_owner', 'revision', 'created_at', 'updated_at'],
+        AuthTables::TenantMembershipLocks => ['tenant_id', 'created_at', 'updated_at'],
+        AuthTables::TenantAuthenticationIntents => ['id', 'tenant_id', 'purpose', 'nonce_hash', 'session_binding_hash', 'subject_type', 'subject_id', 'payload', 'expires_at', 'consumed_at', 'created_at', 'updated_at'],
+        AuthTables::Roles => ['tenant_id'],
+        AuthTables::ModelHasRoles => ['tenant_id'],
+        AuthTables::ModelHasPermissions => ['tenant_id'],
+        AuthTables::Invitations => ['tenant_id', 'ownership_key'],
+        AuthTables::PersonalAccessTokens => ['tenant_id', 'ownership_key'],
+        AuthTables::Challenges => ['tenant_id', 'ownership_key'],
+        AuthTables::Audits => ['tenant_id', 'ownership_key'],
+    ];
+
     public function __construct(private AuthConfiguration $configuration) {}
 
     /**
@@ -56,6 +70,12 @@ final readonly class AuthSchemaManager
         $outdated = $this->outdatedTables($schema, $required);
         $missingIndexes = $this->missingIndexes($schema, $required);
         $requiresRepair = $missing !== [] || $outdated !== [] || $missingIndexes !== [];
+
+        if ($apply && config('tenancy.enabled') === true && $this->tenancySchemaMissing($schema, $required)) {
+            throw new RuntimeException(
+                'Auth tenancy schema is adopted only through the reviewed nvl:tenancy:adopt workflow.',
+            );
+        }
 
         if ($apply && $requiresRepair && ! $this->configuration->boolean('migrations.enabled', true)) {
             throw new RuntimeException(
@@ -111,7 +131,17 @@ final readonly class AuthSchemaManager
     {
         $outdated = [];
 
-        foreach (self::REQUIRED_COLUMNS as $table => $columns) {
+        $requirements = self::REQUIRED_COLUMNS;
+        if (config('tenancy.enabled') === true) {
+            foreach (self::TENANCY_COLUMNS as $table => $columns) {
+                $requirements[$table] = array_values(array_unique(array_merge(
+                    $requirements[$table] ?? [],
+                    $columns,
+                )));
+            }
+        }
+
+        foreach ($requirements as $table => $columns) {
             if (! in_array($table, $required, true) || ! $schema->hasTable($table)) {
                 continue;
             }
@@ -127,6 +157,25 @@ final readonly class AuthSchemaManager
         }
 
         return $outdated;
+    }
+
+    /**
+     * Report whether the independently adopted Auth tenant schema is absent.
+     *
+     * @param  list<string>  $required
+     */
+    private function tenancySchemaMissing(Builder $schema, array $required): bool
+    {
+        foreach (self::TENANCY_COLUMNS as $table => $columns) {
+            if (! in_array($table, $required, true)) {
+                continue;
+            }
+            if (! $schema->hasTable($table) || ! $schema->hasColumns($table, $columns)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

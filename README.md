@@ -446,6 +446,14 @@ php artisan nvl:auth:prune --dry-run
 php artisan nvl:auth:prune
 ```
 
+Tenant ownership is opt-in through `tenancy.enabled`. Existing installations
+must use the reviewed `nvl:tenancy:adopt` workflow; `nvl:auth:schema --apply`
+never guesses owners or activates tenant storage. Adoption creates explicit
+memberships, clones reviewed roles per tenant, revokes package-managed unbound
+tokens, classifies historical rows, and only then activates Spatie team mode.
+Restart queue workers after activation. In tenant mode pruning requires exactly
+one of `--tenant=<uuid>` or an authorized `--platform` operation.
+
 ## Documentation
 
 - [Architecture](docs/architecture.md)

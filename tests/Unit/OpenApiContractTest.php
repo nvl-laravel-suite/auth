@@ -84,6 +84,10 @@ it('keeps OpenAPI operations and feature metadata identical to the manifest', fu
         'nvl.auth.management.clients.store',
         'nvl.auth.management.clients.update',
         'nvl.auth.management.invitations.store',
+        'nvl.auth.management.memberships.destroy',
+        'nvl.auth.management.memberships.status',
+        'nvl.auth.management.memberships.store',
+        'nvl.auth.management.memberships.transfer_ownership',
         'nvl.auth.management.permissions.store',
         'nvl.auth.management.permissions.update',
         'nvl.auth.management.roles.apply_template',
@@ -127,6 +131,10 @@ it('keeps OpenAPI operations and feature metadata identical to the manifest', fu
             'PermissionAssignment',
             'RoleMutation',
             'PermissionMutation',
+            'MembershipEnroll',
+            'MembershipRevision',
+            'MembershipStatus',
+            'MembershipTransfer',
         ])
         ->and($document['components']['securitySchemes'])->toHaveKeys(['sessionCookie', 'bearerToken'])
         ->and($document['components']['responses']['Success']['headers'])->toHaveKeys([

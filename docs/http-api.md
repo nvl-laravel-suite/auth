@@ -79,3 +79,14 @@ plain-text token).
 All package responses, including errors, set `Cache-Control: no-store, private`,
 `Pragma: no-cache`, `Referrer-Policy: no-referrer`, and
 `X-Content-Type-Options: nosniff`.
+
+## Tenant surface
+
+With tenancy active, account routes expose membership discovery and tenant-bound
+API-token lifecycle; management routes expose tenant member and access lifecycle.
+The resolved tenant is middleware-owned and never accepted from a writable body
+field. Invitation acceptance additionally requires recipient proof and returns
+only the accepted membership/result projection. Principal, client, permission
+vocabulary, and central identity endpoints remain global/platform surfaces.
+Tenant-bound bearer admission rejects missing context, tenant mismatch, suspended
+or revoked membership, and tokens issued before adoption.

@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Data\Traits\DataTransform;
 use Spatie\LaravelData\Data;
+use Spatie\TypeScriptTransformer\Attributes\LiteralTypeScriptType;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 #[TypeScript]
@@ -16,8 +17,12 @@ final class EnrollMembershipData extends Data
 {
     use DataTransform;
 
-    /** @param list<string> $roles @param list<string> $permissions */
+    /**
+     * @param  list<string>  $roles
+     * @param  list<string>  $permissions
+     */
     public function __construct(
+        #[LiteralTypeScriptType('{ type: string; identifier: string }')]
         public readonly SubjectReference $subject,
         public readonly array $roles = [],
         public readonly array $permissions = [],

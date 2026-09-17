@@ -24,13 +24,16 @@ use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\AuthPipelineStage;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\BrowserSession;
+use Nvl\Auth\Contracts\InvitationRecipientProof;
 use Nvl\Auth\Contracts\InvitationRegistrationMapper;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
+use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
+use Nvl\Auth\Contracts\TenantAwareAuthActivityBridge;
 use Nvl\Auth\Contracts\TenantBoundApiTokenManager;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
@@ -40,6 +43,7 @@ use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthManagementAbilityCatalog;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\AuthSchemaManager;
+use Nvl\Auth\Services\AuthTenantMembershipAccess;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
 use Nvl\Auth\Services\ConfiguredPolicyAuthManagementAccess;
 use Nvl\Auth\Services\FeatureGate;
@@ -53,8 +57,12 @@ use Nvl\Auth\Services\UnavailableInvitationSubjectResolver;
 use Nvl\Auth\Services\UnavailableSocialIdentityProvider;
 use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
 use Nvl\Auth\ValueObjects\FeatureDefinition;
+use Nvl\Tenancy\Contracts\TenantContext;
+use Nvl\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Tenancy\Services\EffectiveTenantConnection;
 use ReflectionMethod;
 use ReflectionNamedType;
+use Spatie\Permission\PermissionRegistrar;
 use Throwable;
 
 /**
@@ -241,6 +249,12 @@ final class AuthDoctorCommand extends Command
             ...$checks,
             ...$this->ownershipChecks($configuration, $manifest, $router),
         ];
+        if (config('tenancy.enabled') === true) {
+            $checks = [
+                ...$checks,
+                ...$this->tenancyChecks($configuration, $container, $schema),
+            ];
+        }
         $principalTable = $this->configuredTable($configuration, AuthTables::Users);
         $attributeCollisions = $configuration->featureEnabled(AuthFeature::PrincipalManagement)
             && $schema->hasTable($principalTable)
@@ -605,6 +619,74 @@ final class AuthDoctorCommand extends Command
         } catch (Throwable) {
             return false;
         }
+    }
+
+    /**
+     * Inspect the active Auth tenancy boundary without mutating installation state.
+     *
+     * @return list<array{name: string, severity: string, passed: bool, message: string}>
+     */
+    private function tenancyChecks(AuthConfiguration $configuration, Container $container, Builder $schema): array
+    {
+        $membership = $this->integration($container, TenantMembershipAccess::class);
+        $principals = $this->integration($container, MembershipPrincipalResolver::class);
+        $proof = $this->integration($container, InvitationRecipientProof::class);
+        $activity = $this->integration($container, TenantAwareAuthActivityBridge::class);
+        $registrar = $this->integration($container, PermissionRegistrar::class);
+        $connectionsReady = false;
+        try {
+            $principalConnection = $principals instanceof MembershipPrincipalResolver ? $principals->connectionName() : '__missing__';
+            $container->make(EffectiveTenantConnection::class)->assertCompatible([
+                is_string(config('tenancy.connection')) ? config('tenancy.connection') : null,
+                is_string($configuration->get('connection')) ? $configuration->get('connection') : null,
+                $principalConnection,
+            ]);
+            $connectionsReady = true;
+        } catch (Throwable) {
+            // Report the normalized connection mismatch as a named diagnostic below.
+        }
+        $roleTable = $this->configuredTable($configuration, AuthTables::Roles);
+        $membershipTable = AuthTables::TenantMemberships;
+        $markerReady = false;
+        if ($schema->hasTable('nvl_tenancy_installation_state')) {
+            $markerReady = ! Schema::connection(is_string($configuration->get('connection')) ? $configuration->get('connection') : null)
+                ->getConnection()->table('nvl_tenancy_installation_state')
+                ->whereIn('resource', ['auth.memberships', 'auth.roles', 'auth.invitations', 'auth.tokens', 'auth.audits'])
+                ->where('state', '!=', 'active')->exists()
+                && Schema::connection(is_string($configuration->get('connection')) ? $configuration->get('connection') : null)
+                    ->getConnection()->table('nvl_tenancy_installation_state')->where('resource', 'auth.roles')->where('state', 'active')->exists();
+        }
+        $ownerReady = $schema->hasTable($membershipTable);
+        if ($ownerReady) {
+            $connection = Schema::connection(is_string($configuration->get('connection')) ? $configuration->get('connection') : null)->getConnection();
+            foreach ($connection->table($membershipTable)->where('status', 'active')->distinct()->pluck('tenant_id') as $tenantId) {
+                if (! $connection->table($membershipTable)->where('tenant_id', $tenantId)->where('status', 'active')->where('is_owner', true)->exists()) {
+                    $ownerReady = false;
+                    break;
+                }
+            }
+        }
+
+        return [
+            $this->check('tenancy.membership_adapter', $membership instanceof AuthTenantMembershipAccess, 'Tenant mode requires AuthTenantMembershipAccess.'),
+            $this->check('tenancy.principal_resolver', $principals instanceof MembershipPrincipalResolver, 'Tenant memberships require a principal resolver.'),
+            $this->check('tenancy.connections', $connectionsReady, 'Auth tenant writes require one normalized connection.'),
+            $this->check('tenancy.schema', $schema->hasTable($membershipTable)
+                && $schema->hasColumns($roleTable, ['tenant_id'])
+                && $schema->hasColumns(AuthTables::Invitations, ['tenant_id', 'ownership_key']), 'Auth optional tenancy schema is incomplete.'),
+            $this->check('tenancy.marker', $markerReady, 'Auth tenancy installation markers are not active and consistent.'),
+            $this->check('tenancy.spatie_teams', config('permission.teams') === true
+                && config('permission.column_names.team_foreign_key') === 'tenant_id'
+                && $registrar instanceof PermissionRegistrar && $registrar->teams && $registrar->teamsKey === 'tenant_id', 'Spatie Permission is not configured for tenant teams.'),
+            $this->check('tenancy.no_null_roles', $schema->hasTable($roleTable)
+                && ! Schema::connection(is_string($configuration->get('connection')) ? $configuration->get('connection') : null)
+                    ->getConnection()->table($roleTable)->whereNull('tenant_id')->exists(), 'Active tenant RBAC contains null-team roles.'),
+            $this->check('tenancy.active_owners', $ownerReady, 'Every tenant with active memberships requires an active owner.'),
+            $this->check('tenancy.invitation_proof', $proof instanceof InvitationRecipientProof, 'Tenant invitations require a recipient proof adapter.'),
+            $this->check('tenancy.activity_bridge', $activity instanceof TenantAwareAuthActivityBridge, 'Auth activity integration must implement the tenant-aware bridge contract.'),
+            $this->check('tenancy.scoped_context', $container->bound(TenantContext::class), 'Tenant context must be registered as a scoped service.'),
+            $this->check('tenancy.global_clients', ! $schema->hasColumn(AuthTables::Clients, 'tenant_id'), 'Auth clients must remain global identity records.'),
+        ];
     }
 
     /**

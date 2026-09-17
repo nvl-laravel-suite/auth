@@ -16,6 +16,13 @@ route file, HTTP table, and OpenAPI operation in the same change.
 The document intentionally describes transport shape and feature ownership. It
 does not imply that routes are enabled by default.
 
+Tenant membership operations are present only when the opt-in tenant schema is
+active. Their tenant identifier is middleware-derived, not writable request
+input. Account membership discovery is self-only; management enrollment,
+status/revocation, and ownership transfer require the tenant admission boundary.
+Tenant API-token operations use the same paths as disabled mode but require a
+tenant-bound token manager and live membership when tenancy is active.
+
 Request bodies are defined for every operation that requires JSON input, with
 write-only credential fields and the same bounds enforced by controllers. Shared
 response components document the stable envelope and non-cacheable security
