@@ -26,10 +26,14 @@ use Nvl\Auth\Services\InvitationDeliveryMetadataPolicy;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\OpaqueTokenFactory;
 use Nvl\Auth\Services\SecretHasher;
+use Nvl\Auth\Services\TenantMembershipAssignments;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Tenancy\ValueObjects\TenantId;
 
 /**
  * Issues one simple invitation and publishes its delivery payload after commit.
@@ -47,6 +51,9 @@ final readonly class CreateInvitationAction
         private ManagementAuthorizer $authorization,
         private AuthPipeline $pipeline,
         private AuthAuditRecorder $audits,
+        private TenantBoundary $boundary,
+        private TenantMembershipAccess $membershipAccess,
+        private TenantMembershipAssignments $assignments,
         private ?InvitationDeliveryMetadataPolicy $deliveryMetadata = null,
     ) {}
 
@@ -67,13 +74,33 @@ final readonly class CreateInvitationAction
             throw new AuthException('forbidden', 'Actorless invitation issuance was not explicitly authorized.', 403);
         }
 
+        $ownership = $this->boundary->attributes('auth.invitations');
+        $tenant = isset($ownership['tenant_id']) && is_string($ownership['tenant_id'])
+            ? new TenantId($ownership['tenant_id'])
+            : null;
+        if ($context->tenant !== null && $context->tenant->value !== $tenant?->value) {
+            throw new AuthException('invitation_invalid', 'The invitation request is invalid.', 410);
+        }
+        if ($tenant !== null) {
+            if (! $actor instanceof Authenticatable) {
+                throw new AuthException('forbidden', 'Tenant invitation issuance requires an authenticated member.', 403);
+            }
+            $this->membershipAccess->assertMember($actor, $tenant);
+        } elseif (config('tenancy.enabled') === true && ($data->roles !== [] || $data->permissions !== [])) {
+            throw new AuthException('invitation_assignment_invalid', 'Platform invitations cannot carry tenant access assignments.', 422);
+        }
+
         if ($data->roles !== [] || $data->permissions !== []) {
             $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
         }
 
         $recipient = mb_strtolower(trim($data->recipient));
         $recipientHash = $this->hasher->hash('invitation-recipient', $recipient);
-        $activeKey = $this->hasher->hash('active-invitation', $recipientHash."\0".$data->purpose);
+        $ownershipKey = is_string($ownership['ownership_key'] ?? null) ? $ownership['ownership_key'] : 'platform';
+        $activeKey = $this->hasher->hash('active-invitation', $ownershipKey."\0".$recipientHash."\0".$data->purpose);
+        $grants = $tenant === null
+            ? ['roles' => $data->roles, 'permissions' => $data->permissions]
+            : $this->assignments->canonicalIdentifiers($data->roles, $data->permissions);
         $actorReference = $actor instanceof Authenticatable
             ? SubjectReference::fromAuthenticatable($actor)
             : null;
@@ -85,7 +112,7 @@ final readonly class CreateInvitationAction
                 'purpose' => $data->purpose,
                 'context' => $data->context,
             ], $actorReference),
-            function () use ($activeKey, $actor, $actorReference, $context, $data, $recipient, $recipientHash): IssuedInvitation {
+            function () use ($activeKey, $actor, $actorReference, $context, $data, $grants, $ownership, $recipient, $recipientHash, $tenant): IssuedInvitation {
                 $connection = (new Invitation)->getConnectionName();
 
                 try {
@@ -95,14 +122,18 @@ final readonly class CreateInvitationAction
                         $actorReference,
                         $data,
                         $context,
+                        $connection,
                         $recipient,
                         $recipientHash,
+                        $grants,
+                        $ownership,
+                        $tenant,
                     ): IssuedInvitation {
-                        Invitation::query()
+                        $this->boundary->query(Invitation::query(), 'auth.invitations')
                             ->where('active_key', $activeKey)
                             ->where('expires_at', '<=', CarbonImmutable::now())
                             ->update(['active_key' => null]);
-                        $duplicate = Invitation::query()
+                        $duplicate = $this->boundary->query(Invitation::query(), 'auth.invitations')
                             ->where('active_key', $activeKey)
                             ->exists();
 
@@ -121,6 +152,7 @@ final readonly class CreateInvitationAction
                             ),
                         );
                         $invitation = Invitation::query()->create([
+                            ...$ownership,
                             'token_hash' => $this->hasher->hash('invitation-token', $token),
                             'active_key' => $activeKey,
                             'recipient' => $recipient,
@@ -132,8 +164,8 @@ final readonly class CreateInvitationAction
                             'purpose' => $data->purpose,
                             'inviter_type' => $actorReference?->type,
                             'inviter_id' => $actorReference?->identifier,
-                            'roles' => $data->roles,
-                            'permissions' => $data->permissions,
+                            'roles' => $grants['roles'],
+                            'permissions' => $grants['permissions'],
                             'metadata' => [
                                 ...$data->metadata,
                                 'return_path' => $context->returnPath,
@@ -145,7 +177,7 @@ final readonly class CreateInvitationAction
                             'expires_at' => $expiresAt,
                         ]);
 
-                        AuthDeliveryRequested::dispatch(new AuthDeliveryRequest(
+                        $delivery = new AuthDeliveryRequest(
                             messageId: $messageId,
                             feature: AuthFeature::Invitations,
                             type: AuthMessageType::Invitation,
@@ -166,12 +198,16 @@ final readonly class CreateInvitationAction
                             invitation: ($this->deliveryMetadata ?? new InvitationDeliveryMetadataPolicy(
                                 $this->configuration,
                             ))->deliveryData($invitation),
-                        ));
-                        $this->audits->record(
-                            'invitation.issued',
-                            actor: $actor,
-                            metadata: ['invitation_id' => $invitation->identifier(), 'purpose' => $data->purpose],
+                            tenant: $tenant,
                         );
+                        DB::connection($connection)->afterCommit(function () use ($actor, $data, $delivery, $invitation): void {
+                            $this->audits->record(
+                                'invitation.issued',
+                                actor: $actor,
+                                metadata: ['invitation_id' => $invitation->identifier(), 'purpose' => $data->purpose],
+                            );
+                            AuthDeliveryRequested::dispatch($delivery);
+                        });
 
                         return new IssuedInvitation($invitation, $token);
                     }, 3);

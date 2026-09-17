@@ -14,6 +14,7 @@ use Nvl\Auth\Enums\InvitationDeliveryStatus;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Tenancy\Services\TenantBoundary;
 
 /**
  * Records one bounded host delivery result against the current invitation message.
@@ -26,6 +27,7 @@ final readonly class RecordInvitationDeliveryOutcomeAction
     public function __construct(
         private FeatureGate $features,
         private AuthAuditRecorder $audits,
+        private TenantBoundary $boundary,
     ) {}
 
     /**
@@ -50,7 +52,8 @@ final readonly class RecordInvitationDeliveryOutcomeAction
             $status,
         ): void {
             /** @var Invitation|null $invitation */
-            $invitation = Invitation::query()->lockForUpdate()->find($invitationId);
+            $invitation = $this->boundary->query(Invitation::query(), 'auth.invitations')
+                ->lockForUpdate()->find($invitationId);
 
             if (! $invitation instanceof Invitation) {
                 throw new AuthException('invitation_unavailable', 'The invitation is unavailable.', 404);

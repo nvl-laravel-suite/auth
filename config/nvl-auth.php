@@ -160,6 +160,7 @@ return [
             'services' => [
                 'subject_resolver' => null,
                 'registration_mapper' => null,
+                'recipient_proof' => null,
             ],
             'settings' => [
                 'ttl_hours' => 72,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Http\Controllers\Public;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Nvl\Auth\Actions\Invitations\RegisterInvitationAction;
 use Nvl\Auth\Data\Mutations\AcceptInvitationData;
 use Nvl\Auth\Http\Controllers\Concerns\InteractsWithValidatedInput;
@@ -23,8 +24,9 @@ final class InvitationController
     public function accept(
         AcceptInvitationData $data,
         RegisterInvitationAction $register,
+        Request $request,
     ): JsonResponse {
-        $registered = $register->execute($data);
+        $registered = $register->execute($data, $request->user());
         $reference = SubjectReference::fromAuthenticatable($registered->subject);
 
         return response()->json([

@@ -17,6 +17,7 @@ use Nvl\Auth\Services\InvitationDeliveryMetadataPolicy;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
+use Nvl\Tenancy\Services\TenantBoundary;
 
 /**
  * Finds one active invitation through an explicitly trusted read boundary.
@@ -31,6 +32,7 @@ final readonly class FindActiveInvitationAction
         private ManagementAuthorizer $authorization,
         private SecretHasher $hasher,
         private InvitationDeliveryMetadataPolicy $deliveryMetadata,
+        private TenantBoundary $boundary,
     ) {}
 
     /**
@@ -75,7 +77,7 @@ final readonly class FindActiveInvitationAction
         }
 
         $filters = new InvitationIndexQueryData(types: $types);
-        $invitation = Invitation::query()
+        $invitation = $this->boundary->query(Invitation::query(), 'auth.invitations')
             ->where('recipient_hash', $this->hasher->hash('invitation-recipient', $recipient))
             ->where('purpose', $purpose)
             ->whereNull('accepted_at')

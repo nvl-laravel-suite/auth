@@ -6,6 +6,7 @@ namespace Nvl\Auth\ValueObjects;
 
 use Carbon\CarbonImmutable;
 use InvalidArgumentException;
+use Nvl\Tenancy\ValueObjects\TenantId;
 
 /**
  * Carries trusted host issuance policy that must never be hydrated from public input.
@@ -17,6 +18,7 @@ final readonly class InvitationIssuanceContext
         public bool $actorlessAuthorized = false,
         public ?CarbonImmutable $expiresAt = null,
         public ?string $returnPath = null,
+        public ?TenantId $tenant = null,
     ) {
         if ($this->expiresAt !== null
             && (! $this->expiresAt->isFuture() || $this->expiresAt->isAfter(CarbonImmutable::now()->addYear()))) {

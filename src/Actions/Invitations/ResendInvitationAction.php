@@ -26,6 +26,8 @@ use Nvl\Auth\Services\OpaqueTokenFactory;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
+use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Tenancy\ValueObjects\TenantId;
 
 /**
  * Rotates and republishes one still-active invitation token.
@@ -42,6 +44,7 @@ final readonly class ResendInvitationAction
         private SecretHasher $hasher,
         private ManagementAuthorizer $authorization,
         private AuthAuditRecorder $audits,
+        private TenantBoundary $boundary,
         private ?InvitationDeliveryMetadataPolicy $deliveryMetadata = null,
     ) {}
 
@@ -67,9 +70,10 @@ final readonly class ResendInvitationAction
             ? $invitation->getConnectionName()
             : (new Invitation)->getConnectionName();
 
-        return DB::connection($connection)->transaction(function () use ($actor, $context, $identifier, $locale): IssuedInvitation {
+        return DB::connection($connection)->transaction(function () use ($actor, $connection, $context, $identifier, $locale): IssuedInvitation {
             /** @var Invitation $locked */
-            $locked = Invitation::query()->lockForUpdate()->findOrFail($identifier);
+            $locked = $this->boundary->query(Invitation::query(), 'auth.invitations')
+                ->lockForUpdate()->findOrFail($identifier);
 
             if ($actor instanceof Authenticatable) {
                 $this->authorization->authorize($actor, 'nvl-auth.invitations.resend', $locked);
@@ -104,7 +108,8 @@ final readonly class ResendInvitationAction
                 'last_sent_at' => CarbonImmutable::now(),
                 'expires_at' => $context->expiresAt ?? $locked->expires_at,
             ])->save();
-            AuthDeliveryRequested::dispatch(new AuthDeliveryRequest(
+            $tenant = is_string($locked->tenant_id) ? new TenantId($locked->tenant_id) : null;
+            $delivery = new AuthDeliveryRequest(
                 messageId: $messageId,
                 feature: AuthFeature::Invitations,
                 type: AuthMessageType::Invitation,
@@ -124,12 +129,16 @@ final readonly class ResendInvitationAction
                 invitation: ($this->deliveryMetadata ?? new InvitationDeliveryMetadataPolicy(
                     $this->configuration,
                 ))->deliveryData($locked),
-            ));
-            $this->audits->record(
-                'invitation.resent',
-                actor: $actor,
-                metadata: ['invitation_id' => $locked->identifier()],
+                tenant: $tenant,
             );
+            DB::connection($connection)->afterCommit(function () use ($actor, $delivery, $locked): void {
+                AuthDeliveryRequested::dispatch($delivery);
+                $this->audits->record(
+                    'invitation.resent',
+                    actor: $actor,
+                    metadata: ['invitation_id' => $locked->identifier()],
+                );
+            });
 
             return new IssuedInvitation($locked, $token);
         }, 3);

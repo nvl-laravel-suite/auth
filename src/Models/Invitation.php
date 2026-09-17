@@ -15,6 +15,8 @@ use Nvl\Auth\Enums\InvitationDeliveryStatus;
  * Represents one bounded, bearer-token invitation.
  *
  * @property string $token_hash
+ * @property string|null $tenant_id
+ * @property string $ownership_key
  * @property string|null $active_key
  * @property string $recipient
  * @property string $recipient_hash

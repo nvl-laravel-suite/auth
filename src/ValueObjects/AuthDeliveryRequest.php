@@ -10,6 +10,7 @@ use JsonException;
 use Nvl\Auth\Data\Display\InvitationDeliveryData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
+use Nvl\Tenancy\ValueObjects\TenantId;
 
 /**
  * Carries a transport-neutral message request to host delivery listeners.
@@ -33,6 +34,7 @@ final readonly class AuthDeliveryRequest
         public array $metadata = [],
         public ?SubjectReference $subject = null,
         public ?InvitationDeliveryData $invitation = null,
+        public ?TenantId $tenant = null,
     ) {
         $supportedType = match ($this->feature) {
             AuthFeature::Invitations => AuthMessageType::Invitation,
@@ -102,6 +104,7 @@ final readonly class AuthDeliveryRequest
             'metadata_keys' => array_keys($this->metadata),
             'subject_type' => $this->subject?->type,
             'has_invitation' => $this->invitation !== null,
+            'tenant_id' => $this->tenant?->value,
         ];
     }
 
@@ -131,6 +134,10 @@ final readonly class AuthDeliveryRequest
             $data['invitation'] = $this->invitation;
         }
 
+        if (isset($this->tenant)) {
+            $data['tenant'] = $this->tenant;
+        }
+
         return $data;
     }
 
@@ -148,6 +155,7 @@ final readonly class AuthDeliveryRequest
      *     metadata: array<string, mixed>,
      *     subject?: SubjectReference|null,
      *     invitation?: InvitationDeliveryData|null
+     *     tenant?: TenantId|null
      * }  $data
      */
     public function __unserialize(array $data): void
@@ -162,5 +170,6 @@ final readonly class AuthDeliveryRequest
         $this->metadata = $data['metadata'];
         $this->subject = $data['subject'] ?? null;
         $this->invitation = $data['invitation'] ?? null;
+        $this->tenant = $data['tenant'] ?? null;
     }
 }

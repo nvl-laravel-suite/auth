@@ -43,6 +43,7 @@ it('issues consumes and audits a simple invitation without delivery persistence'
     ]);
     $actor = $this->user('actor@example.test');
     $consumer = $this->user('consumer@example.test');
+    $consumer->markEmailAsVerified();
     $issued = app(CreateInvitationAction::class)->execute(
         new StoreInvitationData(
             recipient: 'consumer@example.test',

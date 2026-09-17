@@ -13,6 +13,7 @@ use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\SecretHasher;
+use Nvl\Tenancy\Services\TenantBoundary;
 
 /**
  * Lists invitation records after host business authorization.
@@ -26,6 +27,7 @@ final readonly class ListInvitationsAction
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
         private SecretHasher $hasher,
+        private TenantBoundary $boundary,
     ) {}
 
     /**
@@ -42,7 +44,7 @@ final readonly class ListInvitationsAction
         $this->authorization->authorize($actor, 'nvl-auth.invitations.viewAny');
 
         $filters ??= new InvitationIndexQueryData;
-        $query = Invitation::query()
+        $query = $this->boundary->query(Invitation::query(), 'auth.invitations')
             ->when($filters->recipient !== null, fn ($query) => $query->where(
                 'recipient_hash',
                 $this->hasher->hash('invitation-recipient', mb_strtolower(trim((string) $filters->recipient))),

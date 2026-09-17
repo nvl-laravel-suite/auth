@@ -14,6 +14,7 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
+use Nvl\Tenancy\Services\TenantBoundary;
 
 /**
  * Revokes one invitation as a containment operation.
@@ -27,6 +28,7 @@ final readonly class RevokeInvitationAction
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
         private AuthAuditRecorder $audits,
+        private TenantBoundary $boundary,
     ) {}
 
     /**
@@ -42,9 +44,10 @@ final readonly class RevokeInvitationAction
             ? $invitation->getConnectionName()
             : (new Invitation)->getConnectionName();
 
-        return DB::connection($connection)->transaction(function () use ($actor, $identifier): Invitation {
+        return DB::connection($connection)->transaction(function () use ($actor, $connection, $identifier): Invitation {
             /** @var Invitation $locked */
-            $locked = Invitation::query()->lockForUpdate()->findOrFail($identifier);
+            $locked = $this->boundary->query(Invitation::query(), 'auth.invitations')
+                ->lockForUpdate()->findOrFail($identifier);
             $this->authorization->authorize($actor, 'nvl-auth.invitations.revoke', $locked);
 
             if ($locked->revoked_at === null && $locked->accepted_at === null) {
@@ -52,11 +55,11 @@ final readonly class RevokeInvitationAction
                     'active_key' => null,
                     'revoked_at' => CarbonImmutable::now(),
                 ])->save();
-                $this->audits->record(
+                DB::connection($connection)->afterCommit(fn () => $this->audits->record(
                     'invitation.revoked',
                     actor: $actor,
                     metadata: ['invitation_id' => $locked->identifier()],
-                );
+                ));
             }
 
             return $locked;

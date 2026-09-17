@@ -32,6 +32,7 @@ it('synchronizes spatie catalogs and applies invitation role payloads', function
     config()->set('nvl-auth.features.rbac.services.role_templates', [TestRoleTemplates::class]);
     $actor = $this->user('actor@example.test');
     $consumer = $this->user('consumer@example.test');
+    $consumer->markEmailAsVerified();
     Event::fake([RbacAssignmentChanged::class]);
 
     expect(app(SynchronizePermissionCatalogAction::class)->execute($actor))->toBe(2)

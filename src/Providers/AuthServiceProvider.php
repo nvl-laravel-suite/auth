@@ -32,6 +32,7 @@ use Nvl\Auth\Contracts\AuthIdentifierResolver;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\BrowserSession;
+use Nvl\Auth\Contracts\InvitationRecipientProof;
 use Nvl\Auth\Contracts\InvitationRegistrationMapper;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Contracts\MembershipPrincipalResolver;
@@ -85,6 +86,7 @@ use Nvl\Auth\Services\RbacPrincipalTracker;
 use Nvl\Auth\Services\RoleTemplateRegistry;
 use Nvl\Auth\Services\UnavailableSocialIdentityProvider;
 use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
+use Nvl\Auth\Services\VerifiedInvitationRecipientProof;
 use Nvl\Auth\Tenancy\AuthTenancyAdoption;
 use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
@@ -220,6 +222,11 @@ final class AuthServiceProvider extends ServiceProvider
             InvitationRegistrationMapper::class,
             'features.invitations.services.registration_mapper',
             PackageInvitationRegistrationMapper::class,
+        );
+        $this->bindConfiguredContract(
+            InvitationRecipientProof::class,
+            'features.invitations.services.recipient_proof',
+            VerifiedInvitationRecipientProof::class,
         );
         $this->bindConfiguredContract(
             MembershipPrincipalResolver::class,
