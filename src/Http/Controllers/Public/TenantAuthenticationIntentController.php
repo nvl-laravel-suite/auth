@@ -25,6 +25,13 @@ final class TenantAuthenticationIntentController
         TenantHttpResolver $tenants,
     ): JsonResponse {
         try {
+            if ($request->all() !== []) {
+                throw new AuthException(
+                    'tenant_authentication_intent_input_invalid',
+                    'Tenant intent completion does not accept client intent state.',
+                    422,
+                );
+            }
             $tenant = $action->execute($this->requestedTenant($request, $tenants));
         } catch (AuthException $exception) {
             return response()->json([

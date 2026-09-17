@@ -17,7 +17,7 @@ with `nvl.auth.` and response envelopes use `data`, `code`, and `message`.
 | `POST security-codes/verify` | `public.security_codes.verify` | security codes/use |
 | `POST security-codes/authentication` | `public.security_codes.authentication.request` | security codes + sessions/issue |
 | `POST security-codes/authentication/verify` | `public.security_codes.authentication.verify` | security codes + sessions/use |
-| `POST tenant-intents/complete` | `public.tenant_intents.complete` | authenticated sessions/use |
+| `POST tenant-intents/complete` | `public.tenant_intents.complete` | configured-guard session; empty body; sessions/use |
 | `POST invitations/accept` | `public.invitations.accept` | invitations/use |
 | `POST passkeys/authentication/options` | `public.passkeys.authentication.options` | passkeys/use |
 | `POST passkeys/authentication` | `public.passkeys.authentication.finish` | passkeys/use |

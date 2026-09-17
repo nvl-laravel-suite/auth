@@ -6,5 +6,5 @@ use Illuminate\Support\Facades\Route;
 use Nvl\Auth\Http\Controllers\Public\TenantAuthenticationIntentController;
 
 Route::post('tenant-intents/complete', [TenantAuthenticationIntentController::class, 'complete'])
-    ->middleware(['auth', 'nvl-auth.feature:sessions,use'])
+    ->middleware(['nvl-auth.guard', 'nvl-auth.feature:sessions,use'])
     ->name('tenant_intents.complete');

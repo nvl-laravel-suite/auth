@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Nvl\Auth\Services;
+namespace Nvl\Auth\Adapters\Laravel;
 
 use Illuminate\Http\Request;
 use Nvl\Auth\Exceptions\AuthException;

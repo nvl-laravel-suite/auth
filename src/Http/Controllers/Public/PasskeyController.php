@@ -60,6 +60,8 @@ final class PasskeyController
             tenantSessionBinding: $completed->requestContext?->tenantSessionBinding,
             tenantPurpose: $completed->requestContext?->tenantPurpose,
             tenantProvider: $completed->requestContext?->tenantProvider,
+            tenantIntentTenant: $completed->requestContext?->tenantIntentTenant,
+            tenantIntentExpiresAt: $completed->requestContext?->tenantIntentExpiresAt,
             requestedTenant: $completed->requestContext?->requestedTenant,
             tenantIntentSubjectBound: $completed->requestContext instanceof AuthenticationRequestContext
                 && $completed->requestContext->tenantIntentSubjectBound,

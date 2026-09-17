@@ -13,6 +13,7 @@ use Illuminate\Support\ServiceProvider;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Http\Middleware\ApplyAuthSecurityHeaders;
+use Nvl\Auth\Http\Middleware\AuthenticateAuthGuard;
 use Nvl\Auth\Http\Middleware\EnsureAuthFeatureAvailable;
 use Nvl\Auth\Http\Middleware\RenderAuthExceptions;
 use Nvl\Auth\Services\AuthConfiguration;
@@ -35,6 +36,7 @@ final class RouteServiceProvider extends ServiceProvider
         FeatureGate $features,
     ): void {
         $router->aliasMiddleware('nvl-auth.feature', EnsureAuthFeatureAvailable::class);
+        $router->aliasMiddleware('nvl-auth.guard', AuthenticateAuthGuard::class);
         $this->registerRateLimiters();
 
         if ($this->app->routesAreCached()

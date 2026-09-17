@@ -32,10 +32,11 @@ binds the challenge to a resolved subject, and alone establishes a session.
 
 Magic-link, explicit passwordless-code, and passkey proofs remain exactly-once.
 If their trusted tenant selector conflicts, global authentication succeeds and
-the package stores the exact intent reference only in the authenticated server
-session. `POST tenant-intents/complete` retries tenant selection without accepting
-a nonce, binding, purpose, provider, or subject from the client; success removes
-the pending reference, so replay fails.
+the package stores a bounded, expiring collection of exact intent references only
+in the authenticated server session. `POST tenant-intents/complete` authenticates
+through the configured Auth guard and selects one unambiguous entry from its trusted
+tenant and subject. It rejects all client intent input; success removes only that
+entry, so concurrent browser-tab flows remain independent and replay fails.
 
 ## Invitations
 

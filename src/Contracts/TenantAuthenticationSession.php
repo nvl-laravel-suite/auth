@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Nvl\Auth\Contracts;
 
 use Nvl\Auth\ValueObjects\PendingTenantAuthenticationIntent;
+use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Tenancy\ValueObjects\TenantId;
 
 /** Stores server-only tenant intent state alongside Socialite's authoritative OAuth state. */
 interface TenantAuthenticationSession
@@ -19,7 +21,10 @@ interface TenantAuthenticationSession
 
     public function storePendingTenantAuthenticationIntent(PendingTenantAuthenticationIntent $intent): void;
 
-    public function pendingTenantAuthenticationIntent(): ?PendingTenantAuthenticationIntent;
+    public function pendingTenantAuthenticationIntent(
+        TenantId $tenant,
+        SubjectReference $subject,
+    ): ?PendingTenantAuthenticationIntent;
 
-    public function forgetPendingTenantAuthenticationIntent(): void;
+    public function forgetPendingTenantAuthenticationIntent(PendingTenantAuthenticationIntent $intent): void;
 }

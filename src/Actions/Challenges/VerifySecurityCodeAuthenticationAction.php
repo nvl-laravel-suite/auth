@@ -61,6 +61,8 @@ final readonly class VerifySecurityCodeAuthenticationAction
                 tenantSessionBinding: $tenant?->tenantSessionBinding,
                 tenantPurpose: $tenant?->tenantPurpose,
                 tenantProvider: $tenant?->tenantProvider,
+                tenantIntentTenant: $tenant?->tenantIntentTenant,
+                tenantIntentExpiresAt: $tenant?->tenantIntentExpiresAt,
                 requestedTenant: $tenant?->requestedTenant,
                 tenantIntentSubjectBound: $tenant instanceof AuthenticationRequestContext
                     && $tenant->tenantIntentSubjectBound,

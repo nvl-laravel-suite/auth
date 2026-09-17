@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\ValueObjects;
 
+use Carbon\CarbonImmutable;
 use Nvl\Auth\Enums\TenantAuthenticationPurpose;
+use Nvl\Tenancy\ValueObjects\TenantId;
 
 /**
  * Carries one server-owned post-authentication tenant-selection retry.
@@ -19,5 +21,7 @@ final readonly class PendingTenantAuthenticationIntent
         public TenantAuthenticationPurpose $purpose,
         public ?string $provider,
         public bool $subjectBound,
+        public TenantId $tenant,
+        public CarbonImmutable $expiresAt,
     ) {}
 }

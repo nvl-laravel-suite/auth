@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Adapters\Laravel;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Nvl\Auth\Contracts\BrowserSession;
 use Nvl\Auth\Contracts\TenantAuthenticationSession;
@@ -11,6 +12,7 @@ use Nvl\Auth\Enums\TenantAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\ValueObjects\PendingTenantAuthenticationIntent;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Tenancy\ValueObjects\TenantId;
 use Throwable;
 
 /**
@@ -22,7 +24,9 @@ final readonly class LaravelBrowserSession implements BrowserSession, TenantAuth
 
     private const string TENANT_FLOW_INTENTS = 'nvl-auth.tenant-flow-intents';
 
-    private const string PENDING_TENANT_AUTHENTICATION_INTENT = 'nvl-auth.pending-tenant-authentication-intent';
+    private const int MAXIMUM_PENDING_TENANT_AUTHENTICATION_INTENTS = 8;
+
+    private const string PENDING_TENANT_AUTHENTICATION_INTENTS = 'nvl-auth.pending-tenant-authentication-intents';
 
     /**
      * Create the Laravel browser-session adapter.
@@ -136,31 +140,89 @@ final readonly class LaravelBrowserSession implements BrowserSession, TenantAuth
             throw new AuthException('authentication_flow_unavailable', 'The authentication flow is unavailable.', 400);
         }
 
-        $this->request->session()->put(self::PENDING_TENANT_AUTHENTICATION_INTENT, [
-            'subject_type' => $intent->subject->type,
-            'subject_id' => $intent->subject->identifier,
-            'nonce' => $intent->nonce,
-            'session_binding' => $intent->sessionBinding,
-            'purpose' => $intent->purpose->value,
-            'provider' => $intent->provider,
-            'subject_bound' => $intent->subjectBound,
-        ]);
+        $pending = $this->pendingTenantAuthenticationIntents();
+        if (! $intent->expiresAt->isFuture()) {
+            $this->persistPendingTenantAuthenticationIntents($pending);
+
+            return;
+        }
+        $pending[$this->pendingKey($intent)] = $intent;
+        uksort($pending, static function (string $left, string $right) use ($pending): int {
+            $expiry = $pending[$left]->expiresAt->getTimestamp() <=> $pending[$right]->expiresAt->getTimestamp();
+
+            return $expiry !== 0 ? $expiry : strcmp($left, $right);
+        });
+        while (count($pending) > self::MAXIMUM_PENDING_TENANT_AUTHENTICATION_INTENTS) {
+            $oldest = array_key_first($pending);
+            unset($pending[$oldest]);
+        }
+        $this->persistPendingTenantAuthenticationIntents($pending);
     }
 
-    /** Read the pending intent without consuming it before tenant validation succeeds. */
-    public function pendingTenantAuthenticationIntent(): ?PendingTenantAuthenticationIntent
+    /** Select one unambiguous pending intent using only trusted tenant and subject state. */
+    public function pendingTenantAuthenticationIntent(
+        TenantId $tenant,
+        SubjectReference $subject,
+    ): ?PendingTenantAuthenticationIntent {
+        $matches = array_values(array_filter(
+            $this->pendingTenantAuthenticationIntents(),
+            static fn (PendingTenantAuthenticationIntent $intent): bool => $intent->tenant->value === $tenant->value
+                && $intent->subject->type === $subject->type
+                && $intent->subject->identifier === $subject->identifier,
+        ));
+        if (count($matches) > 1) {
+            throw new AuthException(
+                'tenant_authentication_intent_ambiguous',
+                'More than one tenant authentication intent matches this session.',
+                409,
+            );
+        }
+
+        return $matches[0] ?? null;
+    }
+
+    /** Forget only the selected pending reference after successful consumption. */
+    public function forgetPendingTenantAuthenticationIntent(PendingTenantAuthenticationIntent $intent): void
     {
         if (! $this->request->hasSession()) {
-            return null;
+            return;
         }
-        $state = $this->request->session()->get(self::PENDING_TENANT_AUTHENTICATION_INTENT);
-        if ($state === null) {
-            return null;
+        $pending = $this->pendingTenantAuthenticationIntents();
+        unset($pending[$this->pendingKey($intent)]);
+        $this->persistPendingTenantAuthenticationIntents($pending);
+    }
+
+    /** @return array<string, PendingTenantAuthenticationIntent> */
+    private function pendingTenantAuthenticationIntents(): array
+    {
+        if (! $this->request->hasSession()) {
+            return [];
         }
-        if (! is_array($state)) {
+        $stored = $this->request->session()->get(self::PENDING_TENANT_AUTHENTICATION_INTENTS, []);
+        if (! is_array($stored)) {
             throw new AuthException('tenant_authentication_intent_invalid', 'The tenant authentication intent is invalid.', 410);
         }
 
+        $pending = [];
+        foreach ($stored as $key => $state) {
+            if (! is_string($key) || ! is_array($state)) {
+                throw new AuthException('tenant_authentication_intent_invalid', 'The tenant authentication intent is invalid.', 410);
+            }
+            $intent = $this->hydratePendingTenantAuthenticationIntent($state);
+            if ($intent->expiresAt->isFuture()) {
+                $pending[$key] = $intent;
+            }
+        }
+        if (count($pending) !== count($stored)) {
+            $this->persistPendingTenantAuthenticationIntents($pending);
+        }
+
+        return $pending;
+    }
+
+    /** @param array<array-key, mixed> $state */
+    private function hydratePendingTenantAuthenticationIntent(array $state): PendingTenantAuthenticationIntent
+    {
         try {
             $purpose = is_string($state['purpose'] ?? null)
                 ? TenantAuthenticationPurpose::tryFrom($state['purpose'])
@@ -172,7 +234,9 @@ final readonly class LaravelBrowserSession implements BrowserSession, TenantAuth
                 || ! is_string($state['session_binding'] ?? null)
                 || ! $purpose instanceof TenantAuthenticationPurpose
                 || ($provider !== null && ! is_string($provider))
-                || ! is_bool($state['subject_bound'] ?? null)) {
+                || ! is_bool($state['subject_bound'] ?? null)
+                || ! is_string($state['tenant_id'] ?? null)
+                || ! is_string($state['expires_at'] ?? null)) {
                 throw new AuthException('tenant_authentication_intent_invalid', 'The tenant authentication intent is invalid.', 410);
             }
 
@@ -183,6 +247,8 @@ final readonly class LaravelBrowserSession implements BrowserSession, TenantAuth
                 $purpose,
                 $provider,
                 $state['subject_bound'],
+                new TenantId($state['tenant_id']),
+                CarbonImmutable::parse($state['expires_at']),
             );
         } catch (AuthException $exception) {
             throw $exception;
@@ -191,11 +257,28 @@ final readonly class LaravelBrowserSession implements BrowserSession, TenantAuth
         }
     }
 
-    /** Forget the pending reference only after successful intent consumption. */
-    public function forgetPendingTenantAuthenticationIntent(): void
+    private function pendingKey(PendingTenantAuthenticationIntent $intent): string
     {
-        if ($this->request->hasSession()) {
-            $this->request->session()->forget(self::PENDING_TENANT_AUTHENTICATION_INTENT);
+        return hash('sha256', $intent->sessionBinding."\0".$intent->nonce);
+    }
+
+    /** @param array<string, PendingTenantAuthenticationIntent> $pending */
+    private function persistPendingTenantAuthenticationIntents(array $pending): void
+    {
+        $stored = [];
+        foreach ($pending as $key => $intent) {
+            $stored[$key] = [
+                'subject_type' => $intent->subject->type,
+                'subject_id' => $intent->subject->identifier,
+                'nonce' => $intent->nonce,
+                'session_binding' => $intent->sessionBinding,
+                'purpose' => $intent->purpose->value,
+                'provider' => $intent->provider,
+                'subject_bound' => $intent->subjectBound,
+                'tenant_id' => $intent->tenant->value,
+                'expires_at' => $intent->expiresAt->toIso8601String(),
+            ];
         }
+        $this->request->session()->put(self::PENDING_TENANT_AUTHENTICATION_INTENTS, $stored);
     }
 }

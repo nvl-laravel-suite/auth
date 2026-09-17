@@ -44,20 +44,18 @@ final readonly class CompletePendingTenantAuthenticationIntentAction
             throw new AuthException('tenant_authentication_intent_unavailable', 'No tenant authentication intent is pending.', 410);
         }
 
-        $pending = $this->session->pendingTenantAuthenticationIntent();
-        if ($pending === null) {
-            throw new AuthException('tenant_authentication_intent_unavailable', 'No tenant authentication intent is pending.', 410);
-        }
         $subject = $this->auth->guard($this->configuration->string('guard', 'web'))->user();
         if (! $subject instanceof Authenticatable) {
             throw new AuthException('authentication_required', 'Authentication is required.', 401);
         }
         $reference = SubjectReference::fromAuthenticatable($subject);
-        if ($reference->type !== $pending->subject->type
-            || $reference->identifier !== $pending->subject->identifier
-            || ! $expectedTenant instanceof TenantId) {
+        if (! $expectedTenant instanceof TenantId) {
             $this->deny($subject, $reference);
             throw new AuthException('tenant_authentication_intent_invalid', 'The tenant authentication intent is invalid.', 410);
+        }
+        $pending = $this->session->pendingTenantAuthenticationIntent($expectedTenant, $reference);
+        if ($pending === null) {
+            throw new AuthException('tenant_authentication_intent_unavailable', 'No tenant authentication intent is pending.', 410);
         }
 
         $consumed = false;
@@ -74,7 +72,7 @@ final readonly class CompletePendingTenantAuthenticationIntentAction
             $this->memberships->assertMember($subject, $tenant);
         } catch (Throwable $exception) {
             if ($consumed) {
-                $this->session->forgetPendingTenantAuthenticationIntent();
+                $this->session->forgetPendingTenantAuthenticationIntent($pending);
             }
             $this->deny($subject, $reference);
 
@@ -88,7 +86,7 @@ final readonly class CompletePendingTenantAuthenticationIntentAction
                 );
         }
 
-        $this->session->forgetPendingTenantAuthenticationIntent();
+        $this->session->forgetPendingTenantAuthenticationIntent($pending);
         $this->audits->record(
             'authentication.tenant_selected',
             subject: $reference,

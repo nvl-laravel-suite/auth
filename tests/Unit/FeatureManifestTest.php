@@ -101,6 +101,11 @@ it('keeps configuration and route files aligned with the closed feature manifest
 it('keeps feature admission as the first statement of every public Action', function (): void {
     $directory = dirname(__DIR__, 2).'/src/Actions';
     $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory));
+    $mixedRbacBoundaries = [
+        'BootstrapRbacAction.php',
+        'CreatePermissionWithRolesAction.php',
+        'SynchronizeRbacAction.php',
+    ];
 
     foreach ($files as $file) {
         if (! $file->isFile() || $file->getExtension() !== 'php') {
@@ -116,8 +121,12 @@ it('keeps feature admission as the first statement of every public Action', func
             $method,
         );
 
+        $expectedFirstStatement = in_array($file->getFilename(), $mixedRbacBoundaries, true)
+            ? '$this->operations->rejectMixedRbacOperation();'
+            : '$this->features->assertAllowed(';
+
         expect($method['first'] ?? null, $file->getFilename())
-            ->toStartWith('$this->features->assertAllowed(');
+            ->toStartWith($expectedFirstStatement);
     }
 });
 

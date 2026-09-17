@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\ValueObjects;
 
+use Carbon\CarbonImmutable;
 use Nvl\Auth\Enums\TenantAuthenticationPurpose;
 use Nvl\Tenancy\ValueObjects\TenantId;
 
@@ -23,6 +24,8 @@ final readonly class AuthenticationRequestContext
         public ?string $tenantSessionBinding = null,
         public ?TenantAuthenticationPurpose $tenantPurpose = null,
         public ?string $tenantProvider = null,
+        public ?TenantId $tenantIntentTenant = null,
+        public ?CarbonImmutable $tenantIntentExpiresAt = null,
         public ?TenantId $requestedTenant = null,
         public bool $tenantIntentSubjectBound = false,
     ) {}

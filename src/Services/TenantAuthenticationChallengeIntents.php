@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Carbon\CarbonImmutable;
 use Nvl\Auth\Contracts\TenantAuthenticationSession;
 use Nvl\Auth\Enums\TenantAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
@@ -47,6 +48,8 @@ final readonly class TenantAuthenticationChallengeIntents
             'purpose' => $purpose->value,
             'provider' => $provider,
             'subject_bound' => $subject instanceof SubjectReference,
+            'tenant_id' => $tenant->value,
+            'expires_at' => $issued->expiresAt->toIso8601String(),
         ];
         $challenge->forceFill(['payload' => $payload])->save();
     }
@@ -66,7 +69,14 @@ final readonly class TenantAuthenticationChallengeIntents
         $purpose = $state['purpose'] ?? null;
         $provider = $state['provider'] ?? null;
         $subjectBound = $state['subject_bound'] ?? null;
-        if (! is_string($nonce) || ! is_string($purpose) || ! is_string($provider) || ! is_bool($subjectBound)) {
+        $tenantId = $state['tenant_id'] ?? null;
+        $expiresAt = $state['expires_at'] ?? null;
+        if (! is_string($nonce)
+            || ! is_string($purpose)
+            || ! is_string($provider)
+            || ! is_bool($subjectBound)
+            || ! is_string($tenantId)
+            || ! is_string($expiresAt)) {
             throw new AuthException('tenant_authentication_intent_invalid', 'The tenant authentication intent is invalid.', 410);
         }
         $tenantPurpose = TenantAuthenticationPurpose::tryFrom($purpose);
@@ -79,6 +89,8 @@ final readonly class TenantAuthenticationChallengeIntents
             tenantSessionBinding: $this->session->authenticationFlowBinding($this->flow($provider, $challenge->identifier())),
             tenantPurpose: $tenantPurpose,
             tenantProvider: $provider,
+            tenantIntentTenant: new TenantId($tenantId),
+            tenantIntentExpiresAt: CarbonImmutable::parse($expiresAt),
             requestedTenant: $requestedTenant,
             tenantIntentSubjectBound: $subjectBound,
         );

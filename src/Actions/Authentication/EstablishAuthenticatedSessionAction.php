@@ -138,7 +138,9 @@ final readonly class EstablishAuthenticatedSessionAction
         if (config('tenancy.enabled') !== true
             || ! is_string($context?->tenantIntentNonce)
             || ! is_string($context->tenantSessionBinding)
-            || $context->tenantPurpose === null) {
+            || $context->tenantPurpose === null
+            || ! $context->tenantIntentTenant instanceof TenantId
+            || $context->tenantIntentExpiresAt === null) {
             return;
         }
         $pending = new PendingTenantAuthenticationIntent(
@@ -148,6 +150,8 @@ final readonly class EstablishAuthenticatedSessionAction
             $context->tenantPurpose,
             $context->tenantProvider,
             $context->tenantIntentSubjectBound,
+            $context->tenantIntentTenant,
+            $context->tenantIntentExpiresAt,
         );
         if (! $context->requestedTenant instanceof TenantId) {
             $this->denyTenantSelection($subject, $reference, $pending);
@@ -169,8 +173,6 @@ final readonly class EstablishAuthenticatedSessionAction
 
             return;
         }
-        $this->tenantSession->forgetPendingTenantAuthenticationIntent();
-
         try {
             $this->tenantMemberships->assertMember($subject, $tenant);
             $this->audits->record(
