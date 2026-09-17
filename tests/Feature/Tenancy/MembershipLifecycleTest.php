@@ -60,7 +60,7 @@ it('lists only the authenticated principal own active memberships', function ():
     $memberships = app(ListOwnMembershipsAction::class)->execute($member);
 
     expect($memberships)->toHaveCount(2)
-        ->and($memberships->pluck('tenantId')->all())->toBe([$scenario->a()->value, $scenario->b()->value]);
+        ->and($memberships->pluck('tenant_id')->all())->toBe([$scenario->a()->value, $scenario->b()->value]);
 });
 
 it('rejects stale revisions and removal of the sole owner', function (): void {

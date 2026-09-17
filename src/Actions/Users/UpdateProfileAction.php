@@ -13,6 +13,7 @@ use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\UpdateProfileData;
 use Nvl\Auth\Enums\AuthFeature;
+use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\PrincipalAttribute;
@@ -21,6 +22,7 @@ use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\UserLocator;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
@@ -40,12 +42,14 @@ final readonly class UpdateProfileAction
         private PrincipalAttributeMapper $attributes,
         private AccountConfirmation $confirmation,
         private AuthConfiguration $configuration,
+        private AuthOperationBoundary $operations,
     ) {}
 
     /** Persist self-service profile changes. */
     public function execute(Authenticatable $subject, UpdateProfileData $data): User
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Update);
+        $this->operations->central(AuthIdentityOperation::Profile, $subject);
         $user = $this->users->authenticated($subject);
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($data, $user): User {

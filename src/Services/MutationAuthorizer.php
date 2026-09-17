@@ -20,6 +20,7 @@ final readonly class MutationAuthorizer
     public function __construct(
         private ManagementAuthorizer $management,
         private SystemMutationAccess $systems,
+        private AuthOperationBoundary $operations,
     ) {}
 
     /**
@@ -30,6 +31,9 @@ final readonly class MutationAuthorizer
         string $ability,
         mixed $target = null,
     ): ?Authenticatable {
+        if (str_starts_with($ability, 'nvl-auth.users.')) {
+            $this->operations->requirePlatformAdministration();
+        }
         if ($authority instanceof Authenticatable) {
             $this->management->authorize($authority, $ability, $target);
 

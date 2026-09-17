@@ -6,21 +6,26 @@ namespace Nvl\Auth\Tests;
 
 use Illuminate\Contracts\Foundation\MaintenanceMode;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Support\Facades\Route;
 use Laravel\Sanctum\SanctumServiceProvider;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\SystemMutationAccess;
+use Nvl\Auth\Http\Middleware\ApplyAuthSecurityHeaders;
+use Nvl\Auth\Http\Middleware\RenderAuthExceptions;
 use Nvl\Auth\Providers\AuthServiceProvider;
 use Nvl\Auth\Tests\Fixtures\AllowAllManagementAccess;
 use Nvl\Auth\Tests\Fixtures\AllowAllSystemMutationAccess;
 use Nvl\Auth\Tests\Fixtures\AuthTestMaintenanceMode;
 use Nvl\Auth\Tests\Fixtures\AuthTestPlatformAccess;
 use Nvl\Auth\Tests\Fixtures\AuthTestTenantDirectory;
+use Nvl\Auth\Tests\Fixtures\AuthTestTenantHttpResolver;
 use Nvl\Auth\Tests\Fixtures\TestSubjectResolver;
 use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Tenancy\Contracts\PlatformAccess;
 use Nvl\Tenancy\Contracts\TenantDirectory;
+use Nvl\Tenancy\Contracts\TenantHttpResolver;
 use Nvl\Tenancy\Providers\TenancyServiceProvider;
 use Nvl\Tenancy\Services\DenyTenantMembershipAccess;
 use Nvl\Tenancy\Services\TenantAdoptionCoordinator;
@@ -66,15 +71,22 @@ abstract class TenancyTestCase extends Orchestra
             $app['config']->set("nvl-auth.features.{$feature}.enabled", true);
         }
         $app['config']->set('nvl-auth.features.api_tokens.settings.abilities', ['profile:read']);
-        $app['config']->set('nvl-auth.routes.enabled', false);
+        $app['config']->set('nvl-auth.routes.enabled', true);
+        $app['config']->set('nvl-auth.routes.middleware', ['api']);
+        $app['config']->set('nvl-auth.routes.account.enabled', true);
+        $app['config']->set('nvl-auth.routes.management.enabled', true);
+        $app['config']->set('nvl-auth.features.memberships.routes.account.enabled', true);
+        $app['config']->set('nvl-auth.features.memberships.routes.management.enabled', true);
         $app['config']->set('tenancy.enabled', true);
         $app['config']->set('tenancy.access.membership', DenyTenantMembershipAccess::class);
         $app['config']->set('tenancy.access.platform', AuthTestPlatformAccess::class);
         $app['config']->set('tenancy.directory', ['driver' => 'host', 'adapter' => AuthTestTenantDirectory::class]);
+        $app['config']->set('tenancy.resolvers.http', AuthTestTenantHttpResolver::class);
         $app['config']->set('nvl-auth.tenancy.migrations.enabled', true);
         $app->singleton(TenantDirectory::class, AuthTestTenantDirectory::class);
         $app->singleton(PlatformAccess::class, AuthTestPlatformAccess::class);
         $app->singleton(MaintenanceMode::class, AuthTestMaintenanceMode::class);
+        $app->singleton(TenantHttpResolver::class, AuthTestTenantHttpResolver::class);
     }
 
     /** Bind host contracts and activate the real empty Auth adoption. */
@@ -85,6 +97,20 @@ abstract class TenancyTestCase extends Orchestra
         $this->app->singleton(AuthSubjectResolver::class, TestSubjectResolver::class);
         $this->app->singleton(SystemMutationAccess::class, AllowAllSystemMutationAccess::class);
         $this->activateEmptyAuthTenancy();
+        if ($this->deactivateMaintenanceAfterSetup()) {
+            $this->app->make(MaintenanceMode::class)->deactivate();
+        }
+    }
+
+    /** Register only the tenancy route surfaces exercised by this fixture. */
+    protected function defineRoutes($router): void
+    {
+        Route::prefix('api/v1/auth')->name('nvl.auth.')->group(function (): void {
+            Route::name('account.')->middleware(['api', 'auth', ApplyAuthSecurityHeaders::class, RenderAuthExceptions::class])
+                ->group(dirname(__DIR__).'/routes/account/memberships.php');
+            Route::name('management.')->middleware(['api', 'auth', ApplyAuthSecurityHeaders::class, RenderAuthExceptions::class])
+                ->group(dirname(__DIR__).'/routes/management/memberships.php');
+        });
     }
 
     /** Load the opt-in foundation core after Testbench refreshes storage. */
@@ -110,6 +136,12 @@ abstract class TenancyTestCase extends Orchestra
             throw new RuntimeException('Auth test adoption failed verification.');
         }
         $coordinator->activate($plan, $operation);
+    }
+
+    /** Allow explicit adoption tests to retain their maintenance lease. */
+    protected function deactivateMaintenanceAfterSetup(): bool
+    {
+        return true;
     }
 
     /** Create one conventional fixture user. */

@@ -19,8 +19,10 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Results\BulkUserResult;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\MutationAuthorizer;
 use Nvl\Auth\Services\UserLocator;
+use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
@@ -36,6 +38,7 @@ final readonly class BulkUpdateUsersAction
         private AuthAuditRecorder $audits,
         private PrincipalAttributeMapper $attributes,
         private PrincipalSessionContainment $sessions,
+        private MembershipOwnerGuard $owners,
     ) {}
 
     /**
@@ -117,6 +120,9 @@ final readonly class BulkUpdateUsersAction
         ?SystemMutationContext $context = null,
     ): bool {
         if (! $data->active) {
+            if (config('tenancy.enabled') === true) {
+                $this->owners->assertPrincipalCanBeDisabled(SubjectReference::fromAuthenticatable($user));
+            }
             $this->sessions->contain($user, 'disabled', $context);
         }
 
@@ -126,6 +132,9 @@ final readonly class BulkUpdateUsersAction
     /** Soft-delete one principal and revoke its tokens. */
     private function delete(User $user, ?SystemMutationContext $context): bool
     {
+        if (config('tenancy.enabled') === true) {
+            $this->owners->assertPrincipalCanBeDisabled(SubjectReference::fromAuthenticatable($user));
+        }
         $this->sessions->contain($user, 'deleted', $context);
 
         return (bool) $user->delete();

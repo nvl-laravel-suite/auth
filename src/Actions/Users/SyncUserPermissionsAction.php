@@ -38,7 +38,8 @@ final readonly class SyncUserPermissionsAction
         SyncUserPermissionsData $data,
     ): Authenticatable {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
-        $actor = $this->authorization->authorize($authority, 'nvl-auth.users.manageAccess', $user);
+        $ability = config('tenancy.enabled') === true ? 'nvl-auth.memberships.manageAccess' : 'nvl-auth.users.manageAccess';
+        $actor = $this->authorization->authorize($authority, $ability, $user);
         $metadata = $this->authorization->metadata($authority);
         $user = $this->principals->find($user);
 

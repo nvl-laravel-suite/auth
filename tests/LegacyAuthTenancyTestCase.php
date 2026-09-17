@@ -8,4 +8,9 @@ namespace Nvl\Auth\Tests;
 abstract class LegacyAuthTenancyTestCase extends TenancyTestCase
 {
     protected function activateEmptyAuthTenancy(): void {}
+
+    protected function deactivateMaintenanceAfterSetup(): bool
+    {
+        return false;
+    }
 }

@@ -73,6 +73,14 @@ final class FeatureManifest
                 AuthFeature::Memberships,
                 $all,
                 [AuthFeature::Audit],
+                routeFamilies: ['account' => 'memberships', 'management' => 'memberships'],
+                routeNames: [
+                    'account' => ['memberships.index'],
+                    'management' => [
+                        'memberships.index', 'memberships.store', 'memberships.show',
+                        'memberships.status', 'memberships.destroy', 'memberships.transfer_ownership',
+                    ],
+                ],
                 managementAbilities: $managementAbilities->abilitiesFor(AuthFeature::Memberships),
             ),
             new FeatureDefinition(

@@ -16,6 +16,7 @@ use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\MutationAuthorizer;
 use Nvl\Auth\Services\UserLocator;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -34,6 +35,7 @@ final readonly class SetUserActiveAction
         private AuthAuditRecorder $audits,
         private PrincipalAttributeMapper $attributes,
         private PrincipalSessionContainment $sessions,
+        private MembershipOwnerGuard $owners,
     ) {}
 
     /** Persist the principal activation state. */
@@ -55,6 +57,9 @@ final readonly class SetUserActiveAction
         }
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $context, $data, $metadata, $user): User {
+            if (! $data->active && config('tenancy.enabled') === true) {
+                $this->owners->assertPrincipalCanBeDisabled(SubjectReference::fromAuthenticatable($user));
+            }
             $user->update($this->attributes->map($data->toArray()));
 
             if (! $data->active) {

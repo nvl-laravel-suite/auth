@@ -41,7 +41,10 @@ final readonly class MembershipOwnerGuard
             ->where('status', MembershipStatus::Active->value)->where('is_owner', true)->orderBy('tenant_id')->get();
         foreach ($owners as $owner) {
             $tenant = new TenantId($owner->tenant_id);
-            $this->lock($tenant);
+            $lock = TenantMembershipLock::query()->where('tenant_id', $tenant->value)->lockForUpdate()->first();
+            if (! $lock instanceof TenantMembershipLock) {
+                throw AuthException::invalidConfiguration('The tenant membership lock is missing.');
+            }
             if (TenantMembership::query()->where('tenant_id', $tenant->value)->where('status', MembershipStatus::Active->value)
                 ->where('is_owner', true)->count() <= 1) {
                 throw new AuthException('membership_last_owner', 'The principal retains last-owner responsibility.', 409);

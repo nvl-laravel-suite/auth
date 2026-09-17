@@ -15,6 +15,7 @@ use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\MutationAuthorizer;
 use Nvl\Auth\Services\UserLocator;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -33,6 +34,7 @@ final readonly class DeleteUserAction
         private AuthAuditRecorder $audits,
         private PrincipalAttributeMapper $attributes,
         private PrincipalSessionContainment $sessions,
+        private MembershipOwnerGuard $owners,
     ) {}
 
     /** Soft delete one principal. */
@@ -50,6 +52,9 @@ final readonly class DeleteUserAction
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $context, $metadata, $user): bool {
             $reference = SubjectReference::fromAuthenticatable($user);
+            if (config('tenancy.enabled') === true) {
+                $this->owners->assertPrincipalCanBeDisabled($reference);
+            }
             $this->sessions->contain($user, 'deleted', $context);
             $deleted = (bool) $user->delete();
             $this->audits->record('user.deleted', subject: $reference, actor: $actor, metadata: $metadata);

@@ -37,11 +37,13 @@ final readonly class UserLocator
      */
     public function find(User|string $user, bool $withTrashed = false): User
     {
-        if ($user instanceof User) {
-            return $user;
+        $class = $this->models->userClass();
+        if ($user instanceof User && ! $user instanceof $class) {
+            throw new AuthException('principal_unavailable', 'The principal is unavailable.', 404);
         }
+        $identifier = $user instanceof User ? $user->getKey() : $user;
 
-        return $this->query($withTrashed)->findOrFail($user);
+        return $this->query($withTrashed)->findOrFail($identifier);
     }
 
     /**
@@ -57,6 +59,11 @@ final readonly class UserLocator
             );
         }
 
-        return $subject;
+        $identifier = $subject->getAuthIdentifier();
+        if (! is_string($identifier) && ! is_int($identifier)) {
+            throw AuthException::invalidConfiguration('Authenticated principals require scalar identifiers.');
+        }
+
+        return $this->find((string) $identifier);
     }
 }

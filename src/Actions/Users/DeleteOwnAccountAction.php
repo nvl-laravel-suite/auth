@@ -15,11 +15,15 @@ use Nvl\Auth\Contracts\BrowserSession;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\DeleteOwnAccountData;
 use Nvl\Auth\Enums\AuthFeature;
+use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\UserLocator;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
@@ -38,6 +42,8 @@ final readonly class DeleteOwnAccountAction
         private BrowserSession $session,
         private AuthAuditRecorder $audits,
         private PrincipalAttributeMapper $attributes,
+        private AuthOperationBoundary $operations,
+        private MembershipOwnerGuard $owners,
     ) {}
 
     /** Delete the authenticated package principal and revoke every active credential. */
@@ -45,6 +51,7 @@ final readonly class DeleteOwnAccountAction
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Revoke);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Revoke);
+        $this->operations->central(AuthIdentityOperation::Profile, $subject);
         $user = $this->users->authenticated($subject);
         $this->confirmation->assertConfirmed($user, $data->currentPassword);
         $guard = $this->auth->guard($this->configuration->string('guard', 'web'));
@@ -55,6 +62,9 @@ final readonly class DeleteOwnAccountAction
 
         $deleted = DB::connection($user->getConnectionName())->transaction(function () use ($user): bool {
             $reference = SubjectReference::fromAuthenticatable($user);
+            if (config('tenancy.enabled') === true) {
+                $this->owners->assertPrincipalCanBeDisabled($reference);
+            }
             $tokens = $user->tokens();
 
             if (Schema::connection($user->getConnectionName())->hasTable($tokens->getModel()->getTable())) {
@@ -70,6 +80,9 @@ final readonly class DeleteOwnAccountAction
         $guard->logout();
         $this->session->invalidate();
         $this->session->regenerateCsrfToken();
+        if ($subject instanceof User) {
+            $subject->setRawAttributes($user->getAttributes(), true);
+        }
 
         return $deleted;
     }
