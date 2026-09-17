@@ -34,6 +34,7 @@ use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\BrowserSession;
 use Nvl\Auth\Contracts\InvitationRegistrationMapper;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
+use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PermissionCatalogProvider;
@@ -62,9 +63,11 @@ use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthManagementAbilityCatalog;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\AuthSchemaManager;
+use Nvl\Auth\Services\AuthTenantMembershipAccess;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
 use Nvl\Auth\Services\ConfiguredPrincipalAttributeMapper;
 use Nvl\Auth\Services\DenySystemMutationAccess;
+use Nvl\Auth\Services\EloquentMembershipPrincipalResolver;
 use Nvl\Auth\Services\EloquentPasswordUpdater;
 use Nvl\Auth\Services\EloquentRbacPrincipalAccess;
 use Nvl\Auth\Services\EloquentSuccessfulLoginMetadataRecorder;
@@ -83,6 +86,7 @@ use Nvl\Auth\Tenancy\AuthTenancyAdoption;
 use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
 use Nvl\Support\Traits\MergesPackageConfiguration;
+use Nvl\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Tenancy\Enums\TenantResourceKind;
 use Nvl\Tenancy\Providers\TenancyServiceProvider;
 use Nvl\Tenancy\Services\TenantAdoptionRegistry;
@@ -209,6 +213,11 @@ final class AuthServiceProvider extends ServiceProvider
             'features.invitations.services.registration_mapper',
             PackageInvitationRegistrationMapper::class,
         );
+        $this->bindConfiguredContract(
+            MembershipPrincipalResolver::class,
+            'features.memberships.services.principal_resolver',
+            EloquentMembershipPrincipalResolver::class,
+        );
         $this->registerExtensionRegistries();
         $this->app->register(RouteServiceProvider::class);
     }
@@ -220,6 +229,9 @@ final class AuthServiceProvider extends ServiceProvider
         AuthConfiguration $configuration,
         TypeScriptSourceRegistry $typeScriptSources,
     ): void {
+        if (config('tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Memberships)) {
+            $this->app->scoped(TenantMembershipAccess::class, AuthTenantMembershipAccess::class);
+        }
         $typeScriptSources->register(__DIR__.'/..', 'nvl/auth');
         $this->configureOwnedIdentityStorage();
         $root = dirname(__DIR__, 2);

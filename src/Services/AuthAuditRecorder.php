@@ -13,6 +13,7 @@ use Nvl\Auth\Events\AuthAuditRecorded;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Tenancy\Services\TenantBoundary;
 
 /**
  * Records package audit facts when the audit feature is enabled.
@@ -25,6 +26,7 @@ final readonly class AuthAuditRecorder implements AuthAuditRecorderContract
     public function __construct(
         private AuthConfiguration $configuration,
         private AuthAuditContextProvider $context,
+        private TenantBoundary $tenancy,
     ) {}
 
     /**
@@ -70,6 +72,7 @@ final readonly class AuthAuditRecorder implements AuthAuditRecorderContract
             ? SubjectReference::fromAuthenticatable($actor)
             : null;
         $audit = AuthAudit::query()->create([
+            ...(config('tenancy.enabled') === true ? $this->tenancy->attributes('auth.audits') : []),
             'action' => $action,
             'outcome' => $outcome,
             'subject_type' => $subject?->type,
