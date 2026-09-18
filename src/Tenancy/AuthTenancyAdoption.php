@@ -140,7 +140,11 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
         return new TenantBackfillResult(null, 0);
     }
 
-    /** Verify prepared ownership, reviewed dispositions, and same-tenant RBAC references. */
+    /**
+     * Verify prepared ownership, reviewed dispositions, and same-tenant RBAC references.
+     *
+     * @phpstan-impure
+     */
     public function verify(TenantAdoptionPlan $plan): TenantVerification
     {
         $this->assertConnections($plan);

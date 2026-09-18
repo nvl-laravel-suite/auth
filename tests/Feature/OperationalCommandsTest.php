@@ -313,6 +313,7 @@ it('reports missing host route evidence and conflicting package route ownership'
         'principal_management.management',
         'password.public',
         'password.account',
+        'sessions.public',
         'api_tokens.account',
         'rbac.management',
         'audit.management',

@@ -101,6 +101,7 @@ use Nvl\Data\Services\TypeScriptSourceRegistry;
 use Nvl\Support\Traits\MergesPackageConfiguration;
 use Nvl\Tenancy\Contracts\TenantHttpResolver;
 use Nvl\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Tenancy\Definitions\Tables\TenancyTables;
 use Nvl\Tenancy\Enums\TenantResourceKind;
 use Nvl\Tenancy\Providers\TenancyServiceProvider;
 use Nvl\Tenancy\Services\TenantAdoptionRegistry;
@@ -435,8 +436,8 @@ final class AuthServiceProvider extends ServiceProvider
         try {
             $connection = (new Role)->getConnection();
 
-            return $connection->getSchemaBuilder()->hasTable('nvl_tenancy_installation_state')
-                && $connection->table('nvl_tenancy_installation_state')
+            return $connection->getSchemaBuilder()->hasTable(TenancyTables::InstallationState)
+                && $connection->table(TenancyTables::InstallationState)
                     ->where('resource', 'auth.roles')->where('state', 'active')->exists();
         } catch (Throwable) {
             return false;

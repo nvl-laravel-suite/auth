@@ -61,6 +61,7 @@ use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
 use Nvl\Auth\ValueObjects\FeatureDefinition;
 use Nvl\Tenancy\Contracts\TenantContext;
 use Nvl\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Tenancy\Definitions\Tables\TenancyTables;
 use Nvl\Tenancy\Services\EffectiveTenantConnection;
 use ReflectionMethod;
 use ReflectionNamedType;
@@ -662,13 +663,13 @@ final class AuthDoctorCommand extends Command
         $roleTable = $this->configuredTable($configuration, AuthTables::Roles);
         $membershipTable = AuthTables::TenantMemberships;
         $markerReady = false;
-        if ($schema->hasTable('nvl_tenancy_installation_state')) {
+        if ($schema->hasTable(TenancyTables::InstallationState)) {
             $markerReady = ! Schema::connection(is_string($configuration->get('connection')) ? $configuration->get('connection') : null)
-                ->getConnection()->table('nvl_tenancy_installation_state')
+                ->getConnection()->table(TenancyTables::InstallationState)
                 ->whereIn('resource', ['auth.memberships', 'auth.roles', 'auth.invitations', 'auth.tokens', 'auth.audits'])
                 ->where('state', '!=', 'active')->exists()
                 && Schema::connection(is_string($configuration->get('connection')) ? $configuration->get('connection') : null)
-                    ->getConnection()->table('nvl_tenancy_installation_state')->where('resource', 'auth.roles')->where('state', 'active')->exists();
+                    ->getConnection()->table(TenancyTables::InstallationState)->where('resource', 'auth.roles')->where('state', 'active')->exists();
         }
         $ownerReady = $schema->hasTable($membershipTable);
         if ($ownerReady) {
@@ -693,6 +694,7 @@ final class AuthDoctorCommand extends Command
                 && config('permission.column_names.team_foreign_key') === 'tenant_id'
                 && $registrar instanceof PermissionRegistrar && $registrar->teams && $registrar->teamsKey === 'tenant_id', 'Spatie Permission is not configured for tenant teams.'),
             $this->check('tenancy.no_null_roles', $schema->hasTable($roleTable)
+                && $schema->hasColumns($roleTable, ['tenant_id'])
                 && ! Schema::connection(is_string($configuration->get('connection')) ? $configuration->get('connection') : null)
                     ->getConnection()->table($roleTable)->whereNull('tenant_id')->exists(), 'Active tenant RBAC contains null-team roles.'),
             $this->check('tenancy.active_owners', $ownerReady, 'Every tenant with active memberships requires an active owner.'),
