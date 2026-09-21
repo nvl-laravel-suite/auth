@@ -4,6 +4,12 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-09-21
+
+### Changed
+
+- Released unchanged under the suite's shared version.
+
 ## [2.0.0] - 2026-08-29
 
 ### Changed
