@@ -4,6 +4,14 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-09-23
+
+### Changed
+
+- Replace bulk-user and role-clone Form Requests and inline membership
+  validation with Data contracts. Preserve the existing HTTP responses and
+  snake-case input while also accepting the generated camel-case aliases.
+
 ## [2.0.1] - 2026-09-22
 
 ### Changed
