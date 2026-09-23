@@ -100,4 +100,22 @@ it('serves configurable principal profile and RBAC APIs without Inertia', functi
     $this->getJson('/api/v1/auth/users?perPage=0')
         ->assertUnprocessable()
         ->assertJsonValidationErrors('perPage');
+
+    $this->postJson("/api/v1/auth/roles/{$roleId}/clone", ['name' => 'publisher-copy', 'display_name' => 'Publisher copy'])
+        ->assertCreated()
+        ->assertJsonPath('data.name', 'publisher-copy')
+        ->assertJsonPath('data.display_name', 'Publisher copy');
+    $this->postJson("/api/v1/auth/roles/{$roleId}/clone", ['name' => 'publisher-copy'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('name');
+    $this->postJson("/api/v1/auth/roles/{$roleId}/clone", ['name' => 'publisher-camel', 'displayName' => 'Publisher camel'])
+        ->assertCreated()
+        ->assertJsonPath('data.display_name', 'Publisher camel');
+
+    $this->postJson('/api/v1/auth/users/bulk', ['operation' => 'disable', 'user_ids' => ['invalid-id']])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('user_ids.0');
+    $this->postJson('/api/v1/auth/users/bulk', ['operation' => 'disable', 'userIds' => [$userId]])
+        ->assertOk()
+        ->assertJsonPath('code', 'users_bulk_updated');
 });

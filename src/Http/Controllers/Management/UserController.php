@@ -19,6 +19,7 @@ use Nvl\Auth\Actions\Users\SyncUserPermissionsAction;
 use Nvl\Auth\Actions\Users\SyncUserRolesAction;
 use Nvl\Auth\Actions\Users\UpdateUserAction;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Data\Mutations\BulkUserData;
 use Nvl\Auth\Data\Mutations\StoreUserData;
 use Nvl\Auth\Data\Mutations\SyncUserPermissionsData;
 use Nvl\Auth\Data\Mutations\SyncUserRolesData;
@@ -27,9 +28,8 @@ use Nvl\Auth\Data\Mutations\UpdateUserStatusData;
 use Nvl\Auth\Data\Queries\UserIndexQueryData;
 use Nvl\Auth\Data\Queries\UserSuggestionQueryData;
 use Nvl\Auth\Enums\PrincipalAttribute;
-use Nvl\Auth\Enums\UserBulkOperation;
+use Nvl\Auth\Http\AuthRequestInput;
 use Nvl\Auth\Http\Controllers\Account\AuthenticatedController;
-use Nvl\Auth\Http\Requests\BulkUserRequest;
 
 /** Handles package-owned principal management API transport. */
 final class UserController extends AuthenticatedController
@@ -137,10 +137,10 @@ final class UserController extends AuthenticatedController
     }
 
     /** Apply one bounded bulk lifecycle operation. */
-    public function bulk(BulkUserRequest $request, BulkUpdateUsersAction $action): JsonResponse
+    public function bulk(Request $request, BulkUpdateUsersAction $action): JsonResponse
     {
-        $operation = UserBulkOperation::from($this->stringInput($request, 'operation'));
-        $result = $action->execute($this->subject($request), $operation, $this->stringListInput($request, 'user_ids'));
+        $data = BulkUserData::validateAndCreate(AuthRequestInput::aliased($request->all(), ['user_ids' => ['userIds']]));
+        $result = $action->execute($this->subject($request), $data->operation, $data->userIds);
 
         return response()->json(['data' => $result, 'code' => 'users_bulk_updated', 'message' => 'The bulk user operation completed.']);
     }

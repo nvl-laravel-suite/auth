@@ -17,11 +17,12 @@ use Nvl\Auth\Actions\Rbac\ShowRbacAnalyticsAction;
 use Nvl\Auth\Actions\Rbac\ShowRoleAction;
 use Nvl\Auth\Actions\Rbac\UpdateRoleAction;
 use Nvl\Auth\Data\Mutations\ApplyRoleTemplateData;
+use Nvl\Auth\Data\Mutations\CloneRoleData;
 use Nvl\Auth\Data\Mutations\StoreRoleData;
 use Nvl\Auth\Data\Mutations\UpdateRoleData;
 use Nvl\Auth\Data\Queries\RoleIndexQueryData;
+use Nvl\Auth\Http\AuthRequestInput;
 use Nvl\Auth\Http\Controllers\Account\AuthenticatedController;
-use Nvl\Auth\Http\Requests\CloneRoleRequest;
 
 /** Handles package-owned role, hierarchy, template, and analytics transport. */
 final class RoleController extends AuthenticatedController
@@ -81,14 +82,16 @@ final class RoleController extends AuthenticatedController
     }
 
     /** Clone one role. */
-    public function clone(CloneRoleRequest $request, string $role, CloneRoleAction $action): JsonResponse
+    public function clone(Request $request, string $role, CloneRoleAction $action): JsonResponse
     {
+        $data = CloneRoleData::validateAndCreate(AuthRequestInput::aliased($request->all(), ['display_name' => ['displayName']]));
+
         return response()->json([
             'data' => $action->execute(
                 $this->subject($request),
                 $role,
-                $this->stringInput($request, 'name'),
-                $this->optionalStringInput($request, 'display_name'),
+                $data->name,
+                $data->displayName,
             ),
             'code' => 'role_cloned',
             'message' => 'The role was cloned.',

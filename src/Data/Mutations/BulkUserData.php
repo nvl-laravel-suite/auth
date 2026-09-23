@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Data\Mutations;
 
 use Illuminate\Validation\Rule;
-use InvalidArgumentException;
-use Nvl\Auth\Enums\MembershipStatus;
+use Nvl\Auth\Enums\UserBulkOperation;
 use Nvl\Data\Traits\DataTransform;
 use Spatie\LaravelData\Attributes\MapInputName;
 use Spatie\LaravelData\Attributes\MapOutputName;
@@ -15,27 +14,27 @@ use Spatie\LaravelData\Mappers\CamelCaseMapper;
 use Spatie\LaravelData\Mappers\SnakeCaseMapper;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
+/** Validated bounded bulk principal operation. */
 #[MapInputName(SnakeCaseMapper::class)]
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]
-/** Describes one optimistic membership status mutation. */
-final class UpdateMembershipStatusData extends Data
+final class BulkUserData extends Data
 {
     use DataTransform;
 
-    public function __construct(public readonly MembershipStatus $status, public readonly int $expectedRevision)
-    {
-        if ($this->expectedRevision < 1) {
-            throw new InvalidArgumentException('Membership revision must be positive.');
-        }
-    }
+    /** @param list<string> $userIds */
+    public function __construct(
+        public readonly UserBulkOperation $operation,
+        public readonly array $userIds,
+    ) {}
 
     /** @return array<string, mixed> */
     public static function rules(): array
     {
         return [
-            'status' => ['required', Rule::enum(MembershipStatus::class)],
-            'expected_revision' => ['required', 'integer', 'min:1'],
+            'operation' => ['required', Rule::enum(UserBulkOperation::class)],
+            'user_ids' => ['required', 'array', 'min:1', 'max:100'],
+            'user_ids.*' => ['required', 'uuid', 'distinct'],
         ];
     }
 }
