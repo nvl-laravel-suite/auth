@@ -1,5 +1,7 @@
 # Security policy
 
+Submit reports through [this package's private vulnerability reporting form](https://github.com/nvl-laravel-suite/auth/security/advisories/new).
+
 Report vulnerabilities privately to the package maintainers. Do not open a
 public issue containing secrets, exploit details, or affected production data.
 

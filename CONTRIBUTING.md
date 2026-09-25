@@ -1,6 +1,12 @@
 # Contributing
 
-NVL Auth follows the repository backend architecture rules.
+This public repository is a publication mirror of private source. Open an issue
+here for a bug or proposal; include a reproduction and, if helpful, a patch.
+Maintainers apply accepted changes in source and publish a mirror release.
+Direct mirror pull requests do not update source. See the
+[organization contribution guide](https://github.com/nvl-laravel-suite/.github/blob/main/CONTRIBUTING.md).
+
+NVL Auth follows the package boundaries below.
 
 ## Required boundaries
 
@@ -18,12 +24,11 @@ NVL Auth follows the repository backend architecture rules.
 
 ## Quality commands
 
-From `packages/nvl/auth`:
+From a standalone checkout of the public Auth repository:
 
 ```bash
-../../../vendor/bin/pest --compact
-../../../vendor/bin/phpstan analyse -c phpstan.neon.dist --memory-limit=2G
-../../../vendor/bin/pint --format agent
+composer install
+composer quality
 composer validate --strict
 ```
 

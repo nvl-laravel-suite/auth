@@ -2,6 +2,9 @@
 
 [← NVL Laravel Suite](https://github.com/nvl-laravel-suite)
 
+For support, [open an issue](https://github.com/nvl-laravel-suite/auth/issues). For vulnerabilities, use
+[private reporting](https://github.com/nvl-laravel-suite/auth/security/advisories/new). See [Contributing](CONTRIBUTING.md).
+
 ## Quick reference
 
 | Item | Value |
@@ -471,10 +474,11 @@ one of `--tenant=<uuid>` or an authorized `--platform` operation.
 
 ## Verification
 
+From a standalone checkout of the public Auth repository:
+
 ```bash
-vendor/bin/pest --configuration=packages/nvl/auth/phpunit.xml.dist packages/nvl/auth/tests
-vendor/bin/phpstan analyse --configuration=packages/nvl/auth/phpstan.neon.dist
-vendor/bin/pint --format agent packages/nvl/auth
+composer install
+composer quality
 ```
 
 ## License
