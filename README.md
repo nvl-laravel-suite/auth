@@ -5,6 +5,8 @@
 For support, [open an issue](https://github.com/nvl-laravel-suite/auth/issues). For vulnerabilities, use
 [private reporting](https://github.com/nvl-laravel-suite/auth/security/advisories/new). See [Contributing](CONTRIBUTING.md).
 
+See the [installation and publishing guide](https://github.com/nvl-laravel-suite/laravel-suite/blob/main/INSTALLATION.md) for Composer setup, configuration, migration ownership, and agent skills.
+
 ## Quick reference
 
 | Item | Value |
@@ -40,9 +42,8 @@ php artisan nvl:auth:schema
 php artisan nvl:auth:doctor
 ```
 
-Package discovery registers the root Suite provider, which selects
-`AuthServiceProvider` through `config/nvl-suite.php`. With the default
-configuration NVL Auth supplies the application's authentication User model,
+Laravel package discovery registers `AuthServiceProvider` directly. With the
+default `config/nvl-auth.php` settings, NVL Auth supplies the application's authentication User model,
 password-reset repository, Spatie Role and Permission models, and Sanctum
 PersonalAccessToken model. Routes remain off until explicitly enabled. When
 global Auth ingress is disabled, provider registration is passive and does not
