@@ -32,15 +32,20 @@ push, or another transport without coupling Auth to delivery infrastructure.
 
 ## Installation
 
+For a clean application, review the Auth configuration before running migrations:
+
 ```bash
 composer require nvl/auth:^2.0
 php artisan vendor:publish --tag=auth-config
-php artisan vendor:publish --tag=auth-skills
-php artisan vendor:publish --tag=auth-adoption
 php artisan migrate
 php artisan nvl:auth:schema
 php artisan nvl:auth:doctor
 ```
+
+Publish `auth-skills` only if the application's agents need the bundled
+guidance. The `auth-adoption` tag creates a principal-adoption manifest for an
+existing identity schema; it is not part of a clean installation. Follow the
+[principal adoption guide](docs/principal-adoption.md) before using that tag.
 
 Laravel package discovery registers `AuthServiceProvider` directly. With the
 default `config/nvl-auth.php` settings, NVL Auth supplies the application's authentication User model,
