@@ -42,10 +42,16 @@ php artisan nvl:auth:schema
 php artisan nvl:auth:doctor
 ```
 
-Publish `auth-skills` only if the application's agents need the bundled
-guidance. The `auth-adoption` tag creates a principal-adoption manifest for an
-existing identity schema; it is not part of a clean installation. Follow the
-[principal adoption guide](docs/principal-adoption.md) before using that tag.
+Publish the bundled guidance only if the application's agents need it:
+
+```bash
+php artisan vendor:publish --tag=auth-skills
+```
+
+For an existing identity schema, follow the
+[principal adoption guide](docs/principal-adoption.md) before publishing its
+principal-adoption manifest with `php artisan vendor:publish --tag=auth-adoption`.
+This tag is not part of a clean installation.
 
 Laravel package discovery registers `AuthServiceProvider` directly. With the
 default `config/nvl-auth.php` settings, NVL Auth supplies the application's authentication User model,
