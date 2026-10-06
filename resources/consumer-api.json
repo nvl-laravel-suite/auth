@@ -1,0 +1,3506 @@
+{
+    "schema_version": 1,
+    "package": "nvl/auth",
+    "psr4": {
+        "Nvl\\Auth\\": "src",
+        "Nvl\\Auth\\Database\\Factories\\": "database/factories"
+    },
+    "symbols": {
+        "Nvl\\Auth\\Actions\\ApiTokens\\CreateApiTokenAction": {
+            "kind": "class",
+            "file": "src/Actions/ApiTokens/CreateApiTokenAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\ApiTokens\\ListApiTokensAction": {
+            "kind": "class",
+            "file": "src/Actions/ApiTokens/ListApiTokensAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\ApiTokens\\RevokeAllApiTokensAction": {
+            "kind": "class",
+            "file": "src/Actions/ApiTokens/RevokeAllApiTokensAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\ApiTokens\\RevokeApiTokenAction": {
+            "kind": "class",
+            "file": "src/Actions/ApiTokens/RevokeApiTokenAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\ApiTokens\\RotateApiTokenAction": {
+            "kind": "class",
+            "file": "src/Actions/ApiTokens/RotateApiTokenAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\ApiTokens\\UpdateApiTokenAction": {
+            "kind": "class",
+            "file": "src/Actions/ApiTokens/UpdateApiTokenAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Audit\\ListAuthAuditsAction": {
+            "kind": "class",
+            "file": "src/Actions/Audit/ListAuthAuditsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Audit\\ShowAuthAuditAction": {
+            "kind": "class",
+            "file": "src/Actions/Audit/ShowAuthAuditAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Authentication\\CompletePendingTenantAuthenticationIntentAction": {
+            "kind": "class",
+            "file": "src/Actions/Authentication/CompletePendingTenantAuthenticationIntentAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Authentication\\EstablishAuthenticatedSessionAction": {
+            "kind": "class",
+            "file": "src/Actions/Authentication/EstablishAuthenticatedSessionAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Authentication\\LoginAction": {
+            "kind": "class",
+            "file": "src/Actions/Authentication/LoginAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Authentication\\LogoutAction": {
+            "kind": "class",
+            "file": "src/Actions/Authentication/LogoutAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Authentication\\RequestEmailVerificationAction": {
+            "kind": "class",
+            "file": "src/Actions/Authentication/RequestEmailVerificationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Authentication\\VerifyEmailAction": {
+            "kind": "class",
+            "file": "src/Actions/Authentication/VerifyEmailAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Challenges\\ConsumeMagicLinkAction": {
+            "kind": "class",
+            "file": "src/Actions/Challenges/ConsumeMagicLinkAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Challenges\\RequestMagicLinkAction": {
+            "kind": "class",
+            "file": "src/Actions/Challenges/RequestMagicLinkAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Challenges\\RequestMagicLinkAuthenticationAction": {
+            "kind": "class",
+            "file": "src/Actions/Challenges/RequestMagicLinkAuthenticationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Challenges\\RequestSecurityCodeAction": {
+            "kind": "class",
+            "file": "src/Actions/Challenges/RequestSecurityCodeAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Challenges\\RequestSecurityCodeAuthenticationAction": {
+            "kind": "class",
+            "file": "src/Actions/Challenges/RequestSecurityCodeAuthenticationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Challenges\\VerifySecurityCodeAction": {
+            "kind": "class",
+            "file": "src/Actions/Challenges/VerifySecurityCodeAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Challenges\\VerifySecurityCodeAuthenticationAction": {
+            "kind": "class",
+            "file": "src/Actions/Challenges/VerifySecurityCodeAuthenticationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Clients\\CreateAuthClientAction": {
+            "kind": "class",
+            "file": "src/Actions/Clients/CreateAuthClientAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Clients\\DeleteAuthClientAction": {
+            "kind": "class",
+            "file": "src/Actions/Clients/DeleteAuthClientAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Clients\\EndAuthClientSessionAction": {
+            "kind": "class",
+            "file": "src/Actions/Clients/EndAuthClientSessionAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Clients\\ListAuthClientsAction": {
+            "kind": "class",
+            "file": "src/Actions/Clients/ListAuthClientsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Clients\\RecordAuthClientSessionAction": {
+            "kind": "class",
+            "file": "src/Actions/Clients/RecordAuthClientSessionAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Clients\\SetAuthClientActiveAction": {
+            "kind": "class",
+            "file": "src/Actions/Clients/SetAuthClientActiveAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Clients\\ShowAuthClientAction": {
+            "kind": "class",
+            "file": "src/Actions/Clients/ShowAuthClientAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Clients\\StartAuthClientAction": {
+            "kind": "class",
+            "file": "src/Actions/Clients/StartAuthClientAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Clients\\TouchAuthClientSessionAction": {
+            "kind": "class",
+            "file": "src/Actions/Clients/TouchAuthClientSessionAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Clients\\UpdateAuthClientAction": {
+            "kind": "class",
+            "file": "src/Actions/Clients/UpdateAuthClientAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Invitations\\AcceptInvitationAction": {
+            "kind": "class",
+            "file": "src/Actions/Invitations/AcceptInvitationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Invitations\\CreateInvitationAction": {
+            "kind": "class",
+            "file": "src/Actions/Invitations/CreateInvitationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Invitations\\FindActiveInvitationAction": {
+            "kind": "class",
+            "file": "src/Actions/Invitations/FindActiveInvitationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Invitations\\ListInvitationProjectionsAction": {
+            "kind": "class",
+            "file": "src/Actions/Invitations/ListInvitationProjectionsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Invitations\\ListInvitationsAction": {
+            "kind": "class",
+            "file": "src/Actions/Invitations/ListInvitationsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Invitations\\PreviewInvitationAction": {
+            "kind": "class",
+            "file": "src/Actions/Invitations/PreviewInvitationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Invitations\\RecordInvitationDeliveryOutcomeAction": {
+            "kind": "class",
+            "file": "src/Actions/Invitations/RecordInvitationDeliveryOutcomeAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Invitations\\RegisterInvitationAction": {
+            "kind": "class",
+            "file": "src/Actions/Invitations/RegisterInvitationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Invitations\\ResendInvitationAction": {
+            "kind": "class",
+            "file": "src/Actions/Invitations/ResendInvitationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Invitations\\RevokeInvitationAction": {
+            "kind": "class",
+            "file": "src/Actions/Invitations/RevokeInvitationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Memberships\\EnrollMembershipAction": {
+            "kind": "class",
+            "file": "src/Actions/Memberships/EnrollMembershipAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Memberships\\ListMembershipsAction": {
+            "kind": "class",
+            "file": "src/Actions/Memberships/ListMembershipsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Memberships\\ListOwnMembershipsAction": {
+            "kind": "class",
+            "file": "src/Actions/Memberships/ListOwnMembershipsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Memberships\\ProvisionTenantOwnerAction": {
+            "kind": "class",
+            "file": "src/Actions/Memberships/ProvisionTenantOwnerAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Memberships\\RevokeMembershipAction": {
+            "kind": "class",
+            "file": "src/Actions/Memberships/RevokeMembershipAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Memberships\\SetMembershipStatusAction": {
+            "kind": "class",
+            "file": "src/Actions/Memberships/SetMembershipStatusAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Memberships\\ShowMembershipAction": {
+            "kind": "class",
+            "file": "src/Actions/Memberships/ShowMembershipAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Memberships\\TransferMembershipOwnershipAction": {
+            "kind": "class",
+            "file": "src/Actions/Memberships/TransferMembershipOwnershipAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Passkeys\\BeginPasskeyAuthenticationAction": {
+            "kind": "class",
+            "file": "src/Actions/Passkeys/BeginPasskeyAuthenticationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Passkeys\\BeginPasskeyRegistrationAction": {
+            "kind": "class",
+            "file": "src/Actions/Passkeys/BeginPasskeyRegistrationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Passkeys\\FinishPasskeyAuthenticationAction": {
+            "kind": "class",
+            "file": "src/Actions/Passkeys/FinishPasskeyAuthenticationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Passkeys\\FinishPasskeyRegistrationAction": {
+            "kind": "class",
+            "file": "src/Actions/Passkeys/FinishPasskeyRegistrationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Passkeys\\RevokePasskeyAction": {
+            "kind": "class",
+            "file": "src/Actions/Passkeys/RevokePasskeyAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Passwords\\ConfirmPasswordAction": {
+            "kind": "class",
+            "file": "src/Actions/Passwords/ConfirmPasswordAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Passwords\\RequestPasswordResetAction": {
+            "kind": "class",
+            "file": "src/Actions/Passwords/RequestPasswordResetAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Passwords\\ResetPasswordAction": {
+            "kind": "class",
+            "file": "src/Actions/Passwords/ResetPasswordAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Passwords\\UpdatePasswordAction": {
+            "kind": "class",
+            "file": "src/Actions/Passwords/UpdatePasswordAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\AddRolePermissionsAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/AddRolePermissionsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ApplyRoleTemplateAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ApplyRoleTemplateAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\BootstrapRbacAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/BootstrapRbacAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\CheckRoleNameAvailabilityAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/CheckRoleNameAvailabilityAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\CloneRoleAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/CloneRoleAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\CreatePermissionAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/CreatePermissionAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\CreatePermissionWithRolesAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/CreatePermissionWithRolesAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\CreateRoleAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/CreateRoleAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\DeletePermissionAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/DeletePermissionAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\DeleteRoleAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/DeleteRoleAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ListPermissionCatalogAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ListPermissionCatalogAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ListPermissionGroupsAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ListPermissionGroupsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ListPermissionOptionsAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ListPermissionOptionsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ListPermissionsAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ListPermissionsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ListRoleCatalogAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ListRoleCatalogAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ListRoleHierarchyAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ListRoleHierarchyAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ListRoleOptionsAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ListRoleOptionsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ListRoleTemplatesAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ListRoleTemplatesAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ListRolesAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ListRolesAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ResolvePermissionIdentifiersAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ResolvePermissionIdentifiersAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ResolveRoleIdentifiersAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ResolveRoleIdentifiersAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ShowPermissionAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ShowPermissionAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ShowRbacAnalyticsAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ShowRbacAnalyticsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ShowRoleAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ShowRoleAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\ShowRoleAnalyticsAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/ShowRoleAnalyticsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\SuggestPermissionsAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/SuggestPermissionsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\SuggestRolesAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/SuggestRolesAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\SyncRolePermissionsAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/SyncRolePermissionsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\SynchronizePermissionCatalogAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/SynchronizePermissionCatalogAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\SynchronizeRbacAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/SynchronizeRbacAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\SynchronizeRoleTemplatesAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/SynchronizeRoleTemplatesAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\UpdatePermissionAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/UpdatePermissionAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Rbac\\UpdateRoleAction": {
+            "kind": "class",
+            "file": "src/Actions/Rbac/UpdateRoleAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\RecoveryCodes\\ConsumeRecoveryCodeAction": {
+            "kind": "class",
+            "file": "src/Actions/RecoveryCodes/ConsumeRecoveryCodeAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\RecoveryCodes\\RegenerateRecoveryCodesAction": {
+            "kind": "class",
+            "file": "src/Actions/RecoveryCodes/RegenerateRecoveryCodesAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\RecoveryCodes\\RevokeRecoveryCodesAction": {
+            "kind": "class",
+            "file": "src/Actions/RecoveryCodes/RevokeRecoveryCodesAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\SocialIdentities\\CompleteSocialAuthorizationAction": {
+            "kind": "class",
+            "file": "src/Actions/SocialIdentities/CompleteSocialAuthorizationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\SocialIdentities\\LinkSocialIdentityAction": {
+            "kind": "class",
+            "file": "src/Actions/SocialIdentities/LinkSocialIdentityAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\SocialIdentities\\RevokeSocialIdentityAction": {
+            "kind": "class",
+            "file": "src/Actions/SocialIdentities/RevokeSocialIdentityAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\SocialIdentities\\StartSocialAuthorizationAction": {
+            "kind": "class",
+            "file": "src/Actions/SocialIdentities/StartSocialAuthorizationAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Totp\\ConfirmTotpEnrollmentAction": {
+            "kind": "class",
+            "file": "src/Actions/Totp/ConfirmTotpEnrollmentAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Totp\\RevokeTotpCredentialAction": {
+            "kind": "class",
+            "file": "src/Actions/Totp/RevokeTotpCredentialAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Totp\\StartTotpEnrollmentAction": {
+            "kind": "class",
+            "file": "src/Actions/Totp/StartTotpEnrollmentAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Totp\\VerifyTotpAction": {
+            "kind": "class",
+            "file": "src/Actions/Totp/VerifyTotpAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Users\\BulkUpdateUsersAction": {
+            "kind": "class",
+            "file": "src/Actions/Users/BulkUpdateUsersAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Users\\CreateUserAction": {
+            "kind": "class",
+            "file": "src/Actions/Users/CreateUserAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Users\\DeleteOwnAccountAction": {
+            "kind": "class",
+            "file": "src/Actions/Users/DeleteOwnAccountAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Users\\DeleteUserAction": {
+            "kind": "class",
+            "file": "src/Actions/Users/DeleteUserAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Users\\ListUsersAction": {
+            "kind": "class",
+            "file": "src/Actions/Users/ListUsersAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Users\\RestoreUserAction": {
+            "kind": "class",
+            "file": "src/Actions/Users/RestoreUserAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Users\\SetUserActiveAction": {
+            "kind": "class",
+            "file": "src/Actions/Users/SetUserActiveAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Users\\ShowProfileAction": {
+            "kind": "class",
+            "file": "src/Actions/Users/ShowProfileAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Users\\ShowUserAction": {
+            "kind": "class",
+            "file": "src/Actions/Users/ShowUserAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Users\\SuggestUsersAction": {
+            "kind": "class",
+            "file": "src/Actions/Users/SuggestUsersAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Users\\SyncUserPermissionsAction": {
+            "kind": "class",
+            "file": "src/Actions/Users/SyncUserPermissionsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Users\\SyncUserRolesAction": {
+            "kind": "class",
+            "file": "src/Actions/Users/SyncUserRolesAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Users\\UpdateProfileAction": {
+            "kind": "class",
+            "file": "src/Actions/Users/UpdateProfileAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Actions\\Users\\UpdateUserAction": {
+            "kind": "class",
+            "file": "src/Actions/Users/UpdateUserAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\AccountConfirmation": {
+            "kind": "interface",
+            "file": "src/Contracts/AccountConfirmation.php",
+            "methods": [
+                "assertConfirmed"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ApiTokenAbilityProvider": {
+            "kind": "interface",
+            "file": "src/Contracts/ApiTokenAbilityProvider.php",
+            "methods": [
+                "abilities"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ApiTokenManager": {
+            "kind": "interface",
+            "file": "src/Contracts/ApiTokenManager.php",
+            "methods": [
+                "create",
+                "list",
+                "revoke",
+                "revokeAll",
+                "rotate",
+                "update"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\AuthAuditContextProvider": {
+            "kind": "interface",
+            "file": "src/Contracts/AuthAuditContextProvider.php",
+            "methods": [
+                "ipAddress",
+                "requestId",
+                "userAgent"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\AuthAuditRecorder": {
+            "kind": "interface",
+            "file": "src/Contracts/AuthAuditRecorder.php",
+            "methods": [
+                "record"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\AuthIdentifierResolver": {
+            "kind": "interface",
+            "file": "src/Contracts/AuthIdentifierResolver.php",
+            "methods": [
+                "resolve"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\AuthManagementAccess": {
+            "kind": "interface",
+            "file": "src/Contracts/AuthManagementAccess.php",
+            "methods": [
+                "allows"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\AuthPipelineStage": {
+            "kind": "interface",
+            "file": "src/Contracts/AuthPipelineStage.php",
+            "methods": [
+                "handle"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\AuthSubjectResolver": {
+            "kind": "interface",
+            "file": "src/Contracts/AuthSubjectResolver.php",
+            "methods": [
+                "resolve"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\AuthenticationEligibility": {
+            "kind": "interface",
+            "file": "src/Contracts/AuthenticationEligibility.php",
+            "methods": [
+                "assertEligible"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\BrowserSession": {
+            "kind": "interface",
+            "file": "src/Contracts/BrowserSession.php",
+            "methods": [
+                "confirmPassword",
+                "invalidate",
+                "regenerateCsrfToken",
+                "regenerateIdentifier"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\InvitationSubjectResolver": {
+            "kind": "interface",
+            "file": "src/Contracts/InvitationSubjectResolver.php",
+            "methods": [
+                "resolve"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\PasskeyCeremony": {
+            "kind": "interface",
+            "file": "src/Contracts/PasskeyCeremony.php",
+            "methods": [
+                "beginAuthentication",
+                "beginRegistration",
+                "credentialId",
+                "finishAuthentication",
+                "finishRegistration"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\PasswordUpdater": {
+            "kind": "interface",
+            "file": "src/Contracts/PasswordUpdater.php",
+            "methods": [
+                "update"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\PermissionCatalogProvider": {
+            "kind": "interface",
+            "file": "src/Contracts/PermissionCatalogProvider.php",
+            "methods": [
+                "permissions"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\PrincipalAttributeMapper": {
+            "kind": "interface",
+            "file": "src/Contracts/PrincipalAttributeMapper.php",
+            "methods": [
+                "column",
+                "identifier",
+                "identifierColumn",
+                "map",
+                "value"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\PrincipalSessionContainment": {
+            "kind": "interface",
+            "file": "src/Contracts/PrincipalSessionContainment.php",
+            "methods": [
+                "contain"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RbacPrincipalAccess": {
+            "kind": "interface",
+            "file": "src/Contracts/RbacPrincipalAccess.php",
+            "methods": [
+                "assign",
+                "connectionName",
+                "find",
+                "identifier",
+                "refresh",
+                "syncPermissions",
+                "syncRoles"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RoleTemplateProvider": {
+            "kind": "interface",
+            "file": "src/Contracts/RoleTemplateProvider.php",
+            "methods": [
+                "roles"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SocialIdentityProvider": {
+            "kind": "interface",
+            "file": "src/Contracts/SocialIdentityProvider.php",
+            "methods": [
+                "redirectUrl",
+                "user"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SocialSubjectResolver": {
+            "kind": "interface",
+            "file": "src/Contracts/SocialSubjectResolver.php",
+            "methods": [
+                "resolve"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SuccessfulLoginMetadataRecorder": {
+            "kind": "interface",
+            "file": "src/Contracts/SuccessfulLoginMetadataRecorder.php",
+            "methods": [
+                "record"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SystemMutationAccess": {
+            "kind": "interface",
+            "file": "src/Contracts/SystemMutationAccess.php",
+            "methods": [
+                "allows"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\TenantBoundApiTokenManager": {
+            "kind": "interface",
+            "file": "src/Contracts/TenantBoundApiTokenManager.php",
+            "methods": [
+                "tenantForToken"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Display\\AuthSubjectReferenceData": {
+            "kind": "class",
+            "file": "src/Data/Display/AuthSubjectReferenceData.php",
+            "methods": [
+                "__construct",
+                "fromReference",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "id",
+                "type"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Display\\InvitationDeliveryData": {
+            "kind": "class",
+            "file": "src/Data/Display/InvitationDeliveryData.php",
+            "methods": [
+                "__construct",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "expiresAt",
+                "id",
+                "inviter",
+                "metadata",
+                "permissions",
+                "purpose",
+                "recipient",
+                "resendCount",
+                "roles",
+                "type"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Display\\InvitationReadData": {
+            "kind": "class",
+            "file": "src/Data/Display/InvitationReadData.php",
+            "methods": [
+                "__construct",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "acceptedAt",
+                "acceptedBy",
+                "deliveredAt",
+                "deliveryAttemptedAt",
+                "deliveryFailedAt",
+                "deliveryFailureCode",
+                "deliveryStatus",
+                "expiresAt",
+                "id",
+                "inviter",
+                "lastSentAt",
+                "lifecycle",
+                "metadata",
+                "permissions",
+                "purpose",
+                "recipient",
+                "resendCount",
+                "revokedAt",
+                "roles",
+                "type"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Display\\PermissionGroupData": {
+            "kind": "class",
+            "file": "src/Data/Display/PermissionGroupData.php",
+            "methods": [
+                "__construct",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "label",
+                "permissionsCount",
+                "value"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Display\\PermissionListItemData": {
+            "kind": "class",
+            "file": "src/Data/Display/PermissionListItemData.php",
+            "methods": [
+                "__construct",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "createdAt",
+                "description",
+                "group",
+                "guard",
+                "id",
+                "label",
+                "name",
+                "roleIds",
+                "rolesCount",
+                "usersCount"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Display\\PermissionOptionData": {
+            "kind": "class",
+            "file": "src/Data/Display/PermissionOptionData.php",
+            "methods": [
+                "__construct",
+                "normalizeGroup",
+                "normalizeNullableGroup",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "description",
+                "group",
+                "id",
+                "label",
+                "name"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Display\\RoleAnalyticsData": {
+            "kind": "class",
+            "file": "src/Data/Display/RoleAnalyticsData.php",
+            "methods": [
+                "__construct",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "activeUsers",
+                "children",
+                "descendants",
+                "inactiveUsers",
+                "parentName",
+                "permissionGroups",
+                "permissions",
+                "roleId",
+                "users"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Display\\RoleListItemData": {
+            "kind": "class",
+            "file": "src/Data/Display/RoleListItemData.php",
+            "methods": [
+                "__construct",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "createdAt",
+                "description",
+                "guard",
+                "id",
+                "isSystem",
+                "label",
+                "name",
+                "parentId",
+                "parentName",
+                "permissionIds",
+                "permissionsCount",
+                "priority",
+                "usersCount"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Display\\RoleNameAvailabilityData": {
+            "kind": "class",
+            "file": "src/Data/Display/RoleNameAvailabilityData.php",
+            "methods": [
+                "__construct",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "available",
+                "conflictingRoleId",
+                "name"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Display\\RoleOptionData": {
+            "kind": "class",
+            "file": "src/Data/Display/RoleOptionData.php",
+            "methods": [
+                "__construct",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "description",
+                "id",
+                "isSystem",
+                "label",
+                "name"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Display\\TenantMembershipData": {
+            "kind": "class",
+            "file": "src/Data/Display/TenantMembershipData.php",
+            "methods": [
+                "__construct",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "email",
+                "id",
+                "name",
+                "owner",
+                "revision",
+                "status",
+                "subjectId",
+                "subjectType",
+                "tenantId"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\AcceptInvitationData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/AcceptInvitationData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "toRegistrationArray",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "extensions",
+                "locale",
+                "name",
+                "password",
+                "passwordConfirmation",
+                "registrationMethod",
+                "timezone",
+                "token"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\ApiTokenData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/ApiTokenData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "abilities",
+                "expiresAt",
+                "name"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\ApplyRoleTemplateData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/ApplyRoleTemplateData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "roleName",
+                "template"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\ConfirmPasswordData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/ConfirmPasswordData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "password"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\ConfirmTotpEnrollmentData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/ConfirmTotpEnrollmentData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "code"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\ConsumeMagicLinkData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/ConsumeMagicLinkData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "challengeId",
+                "recipient",
+                "token"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\ConsumeRecoveryCodeData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/ConsumeRecoveryCodeData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "code"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\DeleteOwnAccountData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/DeleteOwnAccountData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "currentPassword"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\EnrollMembershipData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/EnrollMembershipData.php",
+            "methods": [
+                "__construct",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "permissions",
+                "roles",
+                "subject"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\FinishPasskeyAuthenticationData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/FinishPasskeyAuthenticationData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "ceremonyId",
+                "response"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\FinishPasskeyRegistrationData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/FinishPasskeyRegistrationData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "ceremonyId",
+                "name",
+                "response"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\LoginData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/LoginData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "identifier",
+                "password",
+                "remember"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\RequestMagicLinkData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/RequestMagicLinkData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "purpose",
+                "recipient"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\RequestPasswordResetData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/RequestPasswordResetData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "identifier"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\RequestSecurityCodeData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/RequestSecurityCodeData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "purpose",
+                "recipient"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\ResetPasswordData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/ResetPasswordData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "identifier",
+                "password",
+                "passwordConfirmation",
+                "token"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\StartClientAuthData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/StartClientAuthData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "clientId",
+                "flow",
+                "origin",
+                "returnPath"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\StartTotpEnrollmentData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/StartTotpEnrollmentData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "accountName",
+                "name"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\StoreClientData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/StoreClientData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "active",
+                "allowedFlows",
+                "allowedOrigins",
+                "baseUrl",
+                "metadata",
+                "name",
+                "returnPaths",
+                "surface"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\StoreInvitationData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/StoreInvitationData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "context",
+                "locale",
+                "metadata",
+                "permissions",
+                "purpose",
+                "recipient",
+                "roles",
+                "type"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\StorePermissionData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/StorePermissionData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "description",
+                "displayName",
+                "group",
+                "metadata",
+                "name",
+                "system"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\StoreRoleData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/StoreRoleData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "description",
+                "displayName",
+                "metadata",
+                "name",
+                "parentId",
+                "permissions",
+                "priority",
+                "system"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\StoreUserData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/StoreUserData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "active",
+                "email",
+                "emailVerified",
+                "locale",
+                "name",
+                "password",
+                "permissions",
+                "preferences",
+                "profile",
+                "roles",
+                "timezone"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\SyncUserPermissionsData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/SyncUserPermissionsData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "permissions"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\SyncUserRolesData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/SyncUserRolesData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "roles"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\TransferMembershipOwnershipData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/TransferMembershipOwnershipData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "expectedRevision",
+                "recipientMembershipId"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\UpdateClientData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/UpdateClientData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "active",
+                "allowedFlows",
+                "allowedOrigins",
+                "baseUrl",
+                "metadata",
+                "name",
+                "returnPaths",
+                "surface"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\UpdateMembershipStatusData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/UpdateMembershipStatusData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "expectedRevision",
+                "status"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\UpdatePasswordData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/UpdatePasswordData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "currentPassword",
+                "password",
+                "passwordConfirmation"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\UpdatePermissionData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/UpdatePermissionData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages",
+                "validateForUpdate"
+            ],
+            "properties": [
+                "description",
+                "displayName",
+                "group",
+                "metadata",
+                "name",
+                "system"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\UpdateProfileData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/UpdateProfileData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "currentPassword",
+                "email",
+                "locale",
+                "name",
+                "preferences",
+                "profile",
+                "timezone"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\UpdateRoleData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/UpdateRoleData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages",
+                "validateForUpdate"
+            ],
+            "properties": [
+                "description",
+                "displayName",
+                "metadata",
+                "name",
+                "parentId",
+                "permissions",
+                "priority",
+                "system"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\UpdateUserData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/UpdateUserData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages",
+                "validateForUpdate"
+            ],
+            "properties": [
+                "email",
+                "emailVerified",
+                "locale",
+                "name",
+                "password",
+                "preferences",
+                "profile",
+                "timezone"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\UpdateUserStatusData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/UpdateUserStatusData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "active"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\VerifySecurityCodeData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/VerifySecurityCodeData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "code",
+                "purpose",
+                "recipient"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Mutations\\VerifyTotpData": {
+            "kind": "class",
+            "file": "src/Data/Mutations/VerifyTotpData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "code"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Queries\\InvitationIndexQueryData": {
+            "kind": "class",
+            "file": "src/Data/Queries/InvitationIndexQueryData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "context",
+                "expiresAfter",
+                "expiresBefore",
+                "lifecycle",
+                "perPage",
+                "purpose",
+                "recipient",
+                "type",
+                "types"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Queries\\PermissionIndexQueryData": {
+            "kind": "class",
+            "file": "src/Data/Queries/PermissionIndexQueryData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "direction",
+                "group",
+                "guard",
+                "includeAssignments",
+                "perPage",
+                "search",
+                "sort"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Queries\\RoleIndexQueryData": {
+            "kind": "class",
+            "file": "src/Data/Queries/RoleIndexQueryData.php",
+            "methods": [
+                "__construct",
+                "rules",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "direction",
+                "guard",
+                "includeAssignments",
+                "isSystem",
+                "perPage",
+                "search",
+                "sort"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Enums\\AuthFeature": {
+            "kind": "enum",
+            "file": "src/Enums/AuthFeature.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "ApiTokens",
+                "Audit",
+                "Authentication",
+                "Clients",
+                "EmailVerification",
+                "Invitations",
+                "MagicLinks",
+                "Memberships",
+                "Passkeys",
+                "Password",
+                "PrincipalManagement",
+                "Rbac",
+                "RecoveryCodes",
+                "SecurityCodes",
+                "Sessions",
+                "SocialIdentities",
+                "Totp"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\AuthenticationPurpose": {
+            "kind": "enum",
+            "file": "src/Enums/AuthenticationPurpose.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "CredentialLogin",
+                "PasswordReset",
+                "PasswordlessLogin",
+                "SocialLogin"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\FeatureOperation": {
+            "kind": "enum",
+            "file": "src/Enums/FeatureOperation.php",
+            "methods": [
+                "cases",
+                "from",
+                "isContainment",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "Cleanup",
+                "Enroll",
+                "Issue",
+                "Read",
+                "Revoke",
+                "Update",
+                "Use"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\InvitationDeliveryStatus": {
+            "kind": "enum",
+            "file": "src/Enums/InvitationDeliveryStatus.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "Delivered",
+                "Failed",
+                "Pending"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\MembershipStatus": {
+            "kind": "enum",
+            "file": "src/Enums/MembershipStatus.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "Active",
+                "Revoked",
+                "Suspended"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\PrincipalAttribute": {
+            "kind": "enum",
+            "file": "src/Enums/PrincipalAttribute.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "Active",
+                "CreatedAt",
+                "DeletedAt",
+                "Email",
+                "EmailVerifiedAt",
+                "Id",
+                "LastLoginAt",
+                "LastLoginIp",
+                "Locale",
+                "LockedUntil",
+                "Name",
+                "Password",
+                "Preferences",
+                "Profile",
+                "RememberToken",
+                "Timezone",
+                "UpdatedAt"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\TenantAuthenticationPurpose": {
+            "kind": "enum",
+            "file": "src/Enums/TenantAuthenticationPurpose.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "Invitation",
+                "Login",
+                "MagicLink",
+                "PasskeyLogin",
+                "SecurityCode",
+                "SocialLink",
+                "SocialLogin"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\UserBulkOperation": {
+            "kind": "enum",
+            "file": "src/Enums/UserBulkOperation.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "Delete",
+                "Disable",
+                "Enable",
+                "Restore"
+            ]
+        },
+        "Nvl\\Auth\\Models\\AuthAudit": {
+            "kind": "class",
+            "file": "src/Models/AuthAudit.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Models\\AuthClient": {
+            "kind": "class",
+            "file": "src/Models/AuthClient.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Models\\AuthClientSession": {
+            "kind": "class",
+            "file": "src/Models/AuthClientSession.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Models\\Challenge": {
+            "kind": "class",
+            "file": "src/Models/Challenge.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Models\\Invitation": {
+            "kind": "class",
+            "file": "src/Models/Invitation.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Models\\Passkey": {
+            "kind": "class",
+            "file": "src/Models/Passkey.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Models\\Permission": {
+            "kind": "class",
+            "file": "src/Models/Permission.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Models\\RecoveryCode": {
+            "kind": "class",
+            "file": "src/Models/RecoveryCode.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Models\\Role": {
+            "kind": "class",
+            "file": "src/Models/Role.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Models\\SocialIdentity": {
+            "kind": "class",
+            "file": "src/Models/SocialIdentity.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Models\\TenantMembership": {
+            "kind": "class",
+            "file": "src/Models/TenantMembership.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Models\\TotpCredential": {
+            "kind": "class",
+            "file": "src/Models/TotpCredential.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Models\\User": {
+            "kind": "class",
+            "file": "src/Models/User.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Results\\AuthClientStartResult": {
+            "kind": "class",
+            "file": "src/Results/AuthClientStartResult.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "client",
+                "flow",
+                "returnUrl"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Results\\BulkUserResult": {
+            "kind": "class",
+            "file": "src/Results/BulkUserResult.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "affected",
+                "operation",
+                "userIds"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Results\\CompletedPasskeyAuthentication": {
+            "kind": "class",
+            "file": "src/Results/CompletedPasskeyAuthentication.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "requestContext",
+                "subject"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Results\\GeneratedRecoveryCodes": {
+            "kind": "class",
+            "file": "src/Results/GeneratedRecoveryCodes.php",
+            "methods": [
+                "__construct",
+                "__debugInfo"
+            ],
+            "properties": [
+                "batchId",
+                "codes"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Results\\InvitationRegistrationResult": {
+            "kind": "class",
+            "file": "src/Results/InvitationRegistrationResult.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "invitation",
+                "subject"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Results\\IssuedApiToken": {
+            "kind": "class",
+            "file": "src/Results/IssuedApiToken.php",
+            "methods": [
+                "__construct",
+                "__debugInfo"
+            ],
+            "properties": [
+                "plainTextToken",
+                "token"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Results\\IssuedChallenge": {
+            "kind": "class",
+            "file": "src/Results/IssuedChallenge.php",
+            "methods": [
+                "__construct",
+                "__debugInfo"
+            ],
+            "properties": [
+                "challenge",
+                "fallbackCode",
+                "secret"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Results\\IssuedInvitation": {
+            "kind": "class",
+            "file": "src/Results/IssuedInvitation.php",
+            "methods": [
+                "__construct",
+                "__debugInfo"
+            ],
+            "properties": [
+                "invitation",
+                "token"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Results\\RbacAnalytics": {
+            "kind": "class",
+            "file": "src/Results/RbacAnalytics.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "directPermissionAssignments",
+                "largestRoles",
+                "permissions",
+                "roleAssignments",
+                "roles",
+                "unassignedRoles"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Results\\RbacSynchronizationResult": {
+            "kind": "class",
+            "file": "src/Results/RbacSynchronizationResult.php",
+            "methods": [
+                "__construct",
+                "jsonSerialize"
+            ],
+            "properties": [
+                "guard",
+                "permissionsCreated",
+                "rolesSynchronized"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Results\\TotpEnrollment": {
+            "kind": "class",
+            "file": "src/Results/TotpEnrollment.php",
+            "methods": [
+                "__construct",
+                "__debugInfo"
+            ],
+            "properties": [
+                "credential",
+                "provisioningUri",
+                "secret"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\FeatureGate": {
+            "kind": "class",
+            "file": "src/Services/FeatureGate.php",
+            "methods": [
+                "__construct",
+                "allows",
+                "assertAllowed"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\ApiTokenSnapshot": {
+            "kind": "class",
+            "file": "src/ValueObjects/ApiTokenSnapshot.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "abilities",
+                "createdAt",
+                "expiresAt",
+                "id",
+                "lastUsedAt",
+                "name",
+                "tenantId"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\AuthPipelineContext": {
+            "kind": "class",
+            "file": "src/ValueObjects/AuthPipelineContext.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "attributes",
+                "name",
+                "subject"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\AuthenticationRequestContext": {
+            "kind": "class",
+            "file": "src/ValueObjects/AuthenticationRequestContext.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "ipAddress",
+                "requestId",
+                "requestedTenant",
+                "tenantIntentExpiresAt",
+                "tenantIntentNonce",
+                "tenantIntentSubjectBound",
+                "tenantIntentTenant",
+                "tenantProvider",
+                "tenantPurpose",
+                "tenantSessionBinding",
+                "userAgent"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\ExternalIdentity": {
+            "kind": "class",
+            "file": "src/ValueObjects/ExternalIdentity.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "avatar",
+                "email",
+                "emailVerificationSource",
+                "emailVerified",
+                "name",
+                "profile",
+                "provider",
+                "providerUserId"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\InvitationIssuanceContext": {
+            "kind": "class",
+            "file": "src/ValueObjects/InvitationIssuanceContext.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "actorlessAuthorized",
+                "expiresAt",
+                "returnPath",
+                "tenant"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\PasskeyAssertion": {
+            "kind": "class",
+            "file": "src/ValueObjects/PasskeyAssertion.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "backedUp",
+                "backupEligible",
+                "credentialId",
+                "signatureCounter",
+                "userVerified"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\PasskeyCeremonyOptions": {
+            "kind": "class",
+            "file": "src/ValueObjects/PasskeyCeremonyOptions.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "ceremonyId",
+                "expiresAt",
+                "options",
+                "state"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\PasskeyCredential": {
+            "kind": "class",
+            "file": "src/ValueObjects/PasskeyCredential.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "backedUp",
+                "backupEligible",
+                "credentialId",
+                "publicKey",
+                "signatureCounter",
+                "userHandle"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\PasskeyRegistration": {
+            "kind": "class",
+            "file": "src/ValueObjects/PasskeyRegistration.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "backedUp",
+                "backupEligible",
+                "credentialId",
+                "publicKey",
+                "signatureCounter",
+                "transports",
+                "userHandle"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\RoleTemplate": {
+            "kind": "class",
+            "file": "src/ValueObjects/RoleTemplate.php",
+            "methods": [
+                "__construct",
+                "toArray",
+                "toMutation"
+            ],
+            "properties": [
+                "description",
+                "displayName",
+                "key",
+                "metadata",
+                "parentRole",
+                "permissions",
+                "priority",
+                "roleName",
+                "system"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\SubjectReference": {
+            "kind": "class",
+            "file": "src/ValueObjects/SubjectReference.php",
+            "methods": [
+                "__construct",
+                "fromAuthenticatable"
+            ],
+            "properties": [
+                "identifier",
+                "type"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\SystemMutationContext": {
+            "kind": "class",
+            "file": "src/ValueObjects/SystemMutationContext.php",
+            "methods": [
+                "__construct",
+                "auditMetadata"
+            ],
+            "properties": [
+                "actor",
+                "correlationId",
+                "metadata",
+                "reason"
+            ],
+            "constants": []
+        }
+    },
+    "models": {
+        "Nvl\\Auth\\Models\\AuthAudit": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        },
+        "Nvl\\Auth\\Models\\AuthClient": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        },
+        "Nvl\\Auth\\Models\\AuthClientSession": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        },
+        "Nvl\\Auth\\Models\\Challenge": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        },
+        "Nvl\\Auth\\Models\\Invitation": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        },
+        "Nvl\\Auth\\Models\\Passkey": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        },
+        "Nvl\\Auth\\Models\\Permission": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        },
+        "Nvl\\Auth\\Models\\RecoveryCode": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        },
+        "Nvl\\Auth\\Models\\Role": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        },
+        "Nvl\\Auth\\Models\\SocialIdentity": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        },
+        "Nvl\\Auth\\Models\\TenantMembership": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        },
+        "Nvl\\Auth\\Models\\TotpCredential": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        },
+        "Nvl\\Auth\\Models\\User": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        }
+    },
+    "capability_relations": {},
+    "tables": {
+        "audits": "nvl_auth_audits",
+        "challenges": "nvl_auth_challenges",
+        "client_sessions": "nvl_auth_client_sessions",
+        "clients": "nvl_auth_clients",
+        "invitations": "nvl_auth_invitations",
+        "model_has_permissions": "nvl_auth_model_has_permissions",
+        "model_has_roles": "nvl_auth_model_has_roles",
+        "passkeys": "nvl_auth_passkeys",
+        "password_reset_tokens": "nvl_auth_password_reset_tokens",
+        "permissions": "nvl_auth_permissions",
+        "personal_access_tokens": "nvl_auth_personal_access_tokens",
+        "recovery_codes": "nvl_auth_recovery_codes",
+        "role_has_permissions": "nvl_auth_role_has_permissions",
+        "roles": "nvl_auth_roles",
+        "social_identities": "nvl_auth_social_identities",
+        "tenant_authentication_intents": "nvl_auth_tenant_authentication_intents",
+        "tenant_membership_locks": "nvl_auth_tenant_membership_locks",
+        "tenant_memberships": "nvl_auth_tenant_memberships",
+        "totp_credentials": "nvl_auth_totp_credentials",
+        "users": "nvl_auth_users"
+    }
+}
