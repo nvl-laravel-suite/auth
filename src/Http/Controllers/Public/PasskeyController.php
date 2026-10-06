@@ -36,8 +36,7 @@ final class PasskeyController
 
         return response()->json([
             'data' => ['ceremony_id' => $options->ceremonyId, 'options' => $options->options, 'expires_at' => $options->expiresAt->toIso8601String()],
-            'code' => 'passkey_authentication_started',
-            'message' => 'The passkey ceremony was started.',
+            'code' => 'passkey_authentication_started', 'message' => trans('nvl-auth::responsecode.passkey_authentication_started'),
         ]);
     }
 
@@ -69,8 +68,7 @@ final class PasskeyController
 
         return response()->json([
             'data' => ['subject' => ['type' => $completed->subject->type, 'id' => $completed->subject->identifier]],
-            'code' => 'passkey_authenticated',
-            'message' => 'Passkey authentication succeeded.',
+            'code' => 'passkey_authenticated', 'message' => trans('nvl-auth::responsecode.passkey_authenticated'),
         ]);
     }
 

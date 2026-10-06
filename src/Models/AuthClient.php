@@ -76,4 +76,13 @@ final class AuthClient extends AuthModel
     {
         return $this->hasMany(AuthClientSession::class, 'client_id');
     }
+
+    /** Return the runtime package fixture factory.
+     *
+     * @internal
+     */
+    protected static function newFactory(): AuthClientFactory
+    {
+        return AuthClientFactory::new();
+    }
 }

@@ -16,6 +16,7 @@ use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
+use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
@@ -33,6 +34,7 @@ final readonly class CloneRoleAction implements CloneRoleContract
         private RbacEntityLocator $entities,
         private AuthAuditRecorder $audits,
         private TenantBoundary $tenancy,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /** Clone one role. */
@@ -62,7 +64,7 @@ final readonly class CloneRoleAction implements CloneRoleContract
                 'role_id' => $clone->id,
                 'source_role_id' => $source->id,
             ]);
-            RbacChanged::dispatch('role', $clone->id, 'cloned', ['source_role_id' => $source->id]);
+            $this->domainEvents->dispatch(new RbacChanged('role', $clone->id, 'cloned', ['source_role_id' => $source->id]), $clone->getConnection());
 
             return $clone->refresh()->load('permissions');
         }, 3);

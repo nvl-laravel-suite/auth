@@ -129,4 +129,13 @@ final class Invitation extends AuthModel
             && $this->revoked_at === null
             && $this->expires_at->isFuture();
     }
+
+    /** Return the runtime package fixture factory.
+     *
+     * @internal
+     */
+    protected static function newFactory(): InvitationFactory
+    {
+        return InvitationFactory::new();
+    }
 }

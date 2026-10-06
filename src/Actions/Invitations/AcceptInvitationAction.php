@@ -19,6 +19,7 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\TenantMembership;
 use Nvl\Auth\Pipelines\AuthPipeline;
+use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\InvitationTenantBootstrap;
 use Nvl\Auth\Services\ManagementAuthorizer;
@@ -30,6 +31,7 @@ use Nvl\Auth\Services\TenantMembershipAssignments;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Support\Tenancy\Contracts\TenantRunner;
@@ -62,6 +64,8 @@ final readonly class AcceptInvitationAction implements AcceptInvitationContract
         private ManagementAuthorizer $authorization,
         private AuthPipeline $pipeline,
         private AuthAuditRecorder $audits,
+        private AuthCommittedAudit $committedAudits,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /**
@@ -115,13 +119,13 @@ final readonly class AcceptInvitationAction implements AcceptInvitationContract
                         actor: $subject,
                         metadata: ['invitation_id' => $invitation->identifier()],
                     );
-                    InvitationAccepted::dispatch(
+                    $this->domainEvents->dispatch(new InvitationAccepted(
                         invitationId: $invitation->identifier(),
                         type: $invitation->type,
                         purpose: $invitation->purpose,
                         subject: $reference,
                         acceptedAt: $invitation->accepted_at,
-                    );
+                    ), $invitation->getConnection());
 
                     return $invitation;
                 }, 3);
@@ -184,25 +188,24 @@ final readonly class AcceptInvitationAction implements AcceptInvitationContract
                             'accepted_by_id' => $reference->identifier,
                             'accepted_at' => $acceptedAt,
                         ])->save();
-                        DB::connection($connection)->afterCommit(function () use ($invitation, $membership, $reference, $subject, $tenant): void {
-                            $this->audits->record(
-                                'invitation.accepted',
-                                subject: $reference,
-                                actor: $subject,
-                                metadata: [
-                                    'invitation_id' => $invitation->identifier(),
-                                    'membership_id' => $membership->identifier(),
-                                ],
-                            );
-                            InvitationAccepted::dispatch(
-                                invitationId: $invitation->identifier(),
-                                type: $invitation->type,
-                                purpose: $invitation->purpose,
-                                subject: $reference,
-                                acceptedAt: $invitation->accepted_at,
-                                context: new AuthEventContext(TenantContextMode::Tenant, $tenant),
-                            );
-                        });
+
+                        $this->committedAudits->record(DB::connection($connection),
+                            'invitation.accepted',
+                            subject: $reference,
+                            actor: $subject,
+                            metadata: [
+                                'invitation_id' => $invitation->identifier(),
+                                'membership_id' => $membership->identifier(),
+                            ],
+                        );
+                        $this->domainEvents->dispatch(new InvitationAccepted(
+                            invitationId: $invitation->identifier(),
+                            type: $invitation->type,
+                            purpose: $invitation->purpose,
+                            subject: $reference,
+                            acceptedAt: $invitation->accepted_at,
+                            context: new AuthEventContext(TenantContextMode::Tenant, $tenant),
+                        ), $invitation->getConnection());
 
                         return $invitation;
                     }, 1);

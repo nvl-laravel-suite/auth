@@ -13,6 +13,7 @@ use Nvl\Auth\Data\Mutations\EnrollMembershipData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\TenantMembership;
+use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\MembershipWriter;
@@ -28,6 +29,9 @@ use Nvl\Support\Tenancy\Contracts\TenantContext;
  */
 final readonly class EnrollMembershipAction implements EnrollMembershipContract
 {
+    /** Records through the audit recorder supplied to this use case. */
+    private AuthCommittedAudit $committedAudits;
+
     public function __construct(
         private FeatureGate $features,
         private MutationAuthorizer $authorization,
@@ -36,8 +40,11 @@ final readonly class EnrollMembershipAction implements EnrollMembershipContract
         private MembershipOwnerGuard $owners,
         private TenantMembershipAssignments $assignments,
         private TenantContext $context,
-        private AuthAuditRecorder $audits,
-    ) {}
+        AuthAuditRecorder $audits,
+        AuthCommittedAudit $committedAudits,
+    ) {
+        $this->committedAudits = $committedAudits->withRecorder($audits);
+    }
 
     public function execute(Authenticatable|SystemMutationContext $authority, EnrollMembershipData $data): TenantMembership
     {
@@ -50,10 +57,10 @@ final readonly class EnrollMembershipAction implements EnrollMembershipContract
             $principal = $this->principals->resolve($data->subject, true);
             $membership = $this->writer->enroll($data->subject);
             $this->assignments->sync($principal, $data->roles, $data->permissions);
-            DB::connection($membership->getConnectionName())->afterCommit(fn () => $this->audits->record(
+            $this->committedAudits->record(DB::connection($membership->getConnectionName()),
                 'membership.enrolled', subject: $data->subject, actor: $actor,
                 metadata: ['membership_id' => $membership->identifier(), ...$this->authorization->metadata($authority)],
-            ));
+            );
 
             return $membership;
         }, 1);

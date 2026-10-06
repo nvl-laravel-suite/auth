@@ -76,4 +76,13 @@ final class TotpCredential extends AuthModel
             'revoked_at' => 'immutable_datetime',
         ];
     }
+
+    /** Return the runtime package fixture factory.
+     *
+     * @internal
+     */
+    protected static function newFactory(): TotpCredentialFactory
+    {
+        return TotpCredentialFactory::new();
+    }
 }

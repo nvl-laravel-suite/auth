@@ -7,12 +7,14 @@ namespace Nvl\Auth\Actions\Authentication;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Model;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\VerifyEmailContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\ConnectionCommitCallbacks;
 
 /**
  * Marks one host-owned email as verified after transport signature validation.
@@ -27,6 +29,7 @@ final readonly class VerifyEmailAction implements VerifyEmailContract
     public function __construct(
         private FeatureGate $features,
         private AuthAuditRecorder $audits,
+        private ConnectionCommitCallbacks $eventCommits,
     ) {}
 
     /**
@@ -40,14 +43,25 @@ final readonly class VerifyEmailAction implements VerifyEmailContract
             return false;
         }
 
-        if (! $subject->markEmailAsVerified()) {
-            return false;
-        }
+        $verify = function () use ($subject): bool {
+            if (! $subject->markEmailAsVerified()) {
+                return false;
+            }
 
-        $reference = SubjectReference::fromAuthenticatable($subject);
-        event(new Verified($subject));
-        $this->audits->record('email.verified', subject: $reference, actor: $subject);
+            $reference = SubjectReference::fromAuthenticatable($subject);
+            $event = new Verified($subject);
+            if ($subject instanceof Model) {
+                $this->eventCommits->afterCommit($subject->getConnection(), static function () use ($event): void {
+                    event($event);
+                });
+            } else {
+                event($event);
+            }
+            $this->audits->record('email.verified', subject: $reference, actor: $subject);
 
-        return true;
+            return true;
+        };
+
+        return $subject instanceof Model ? $subject->getConnection()->transaction($verify) : $verify();
     }
 }

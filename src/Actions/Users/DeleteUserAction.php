@@ -22,6 +22,7 @@ use Nvl\Auth\Services\UserLocator;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Soft deletes one principal while revoking active API tokens.
@@ -39,6 +40,7 @@ final readonly class DeleteUserAction implements DeleteUserContract
         private PrincipalAttributeMapper $attributes,
         private PrincipalSessionContainment $sessions,
         private MembershipOwnerGuard $owners,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /** Soft delete one principal. */
@@ -62,7 +64,7 @@ final readonly class DeleteUserAction implements DeleteUserContract
             $this->sessions->contain($user, 'deleted', $context);
             $deleted = (bool) $user->delete();
             $this->audits->record('user.deleted', subject: $reference, actor: $actor, metadata: $metadata);
-            PrincipalChanged::dispatch($this->attributes->identifier($user), 'deleted', $metadata, AuthEventContext::platform());
+            $this->domainEvents->dispatch(new PrincipalChanged($this->attributes->identifier($user), 'deleted', $metadata, AuthEventContext::platform()), $user->getConnection());
 
             return $deleted;
         }, 3);

@@ -61,4 +61,13 @@ final class TenantMembership extends AuthModel
     {
         return PackageStorage::connectionName($this->connection ?? PackageStorage::connection('auth') ?? parent::getConnectionName());
     }
+
+    /** Return the runtime package fixture factory.
+     *
+     * @internal
+     */
+    protected static function newFactory(): TenantMembershipFactory
+    {
+        return TenantMembershipFactory::new();
+    }
 }

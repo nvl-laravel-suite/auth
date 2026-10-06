@@ -23,6 +23,7 @@ use Nvl\Auth\Services\UserLocator;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Enables or disables one package principal and contains active tokens on disable.
@@ -40,6 +41,7 @@ final readonly class SetUserActiveAction implements SetUserActiveContract
         private PrincipalAttributeMapper $attributes,
         private PrincipalSessionContainment $sessions,
         private MembershipOwnerGuard $owners,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /** Persist the principal activation state. */
@@ -77,7 +79,7 @@ final readonly class SetUserActiveAction implements SetUserActiveContract
                 actor: $actor,
                 metadata: $metadata,
             );
-            PrincipalChanged::dispatch($this->attributes->identifier($user), $operation, $metadata, AuthEventContext::platform());
+            $this->domainEvents->dispatch(new PrincipalChanged($this->attributes->identifier($user), $operation, $metadata, AuthEventContext::platform()), $user->getConnection());
 
             return $user->refresh();
         }, 3);

@@ -26,8 +26,7 @@ final class PasskeyController extends AuthenticatedController
 
         return response()->json([
             'data' => ['ceremony_id' => $options->ceremonyId, 'options' => $options->options, 'expires_at' => $options->expiresAt->toIso8601String()],
-            'code' => 'passkey_registration_started',
-            'message' => 'Passkey registration was started.',
+            'code' => 'passkey_registration_started', 'message' => trans('nvl-auth::responsecode.passkey_registration_started'),
         ]);
     }
 
@@ -43,8 +42,7 @@ final class PasskeyController extends AuthenticatedController
 
         return response()->json([
             'data' => ['passkey_id' => $passkey->identifier(), 'name' => $passkey->name],
-            'code' => 'passkey_registered',
-            'message' => 'The passkey was registered.',
+            'code' => 'passkey_registered', 'message' => trans('nvl-auth::responsecode.passkey_registered'),
         ], 201);
     }
 
@@ -58,6 +56,6 @@ final class PasskeyController extends AuthenticatedController
     ): JsonResponse {
         $action->execute($this->subject($request), $passkey);
 
-        return response()->json(['data' => null, 'code' => 'passkey_revoked', 'message' => 'The passkey was revoked.']);
+        return response()->json(['data' => null, 'code' => 'passkey_revoked', 'message' => trans('nvl-auth::responsecode.passkey_revoked')]);
     }
 }

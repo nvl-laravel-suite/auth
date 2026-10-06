@@ -36,8 +36,7 @@ final class TotpController extends AuthenticatedController
                 'secret' => $result->secret,
                 'provisioning_uri' => $result->provisioningUri,
             ],
-            'code' => 'totp_enrollment_started',
-            'message' => 'TOTP enrollment was started.',
+            'code' => 'totp_enrollment_started', 'message' => trans('nvl-auth::responsecode.totp_enrollment_started'),
         ], 201);
     }
 
@@ -56,7 +55,7 @@ final class TotpController extends AuthenticatedController
             $data,
         );
 
-        return response()->json(['data' => ['credential_id' => $confirmed->identifier()], 'code' => 'totp_enrolled', 'message' => 'TOTP was enrolled.']);
+        return response()->json(['data' => ['credential_id' => $confirmed->identifier()], 'code' => 'totp_enrolled', 'message' => trans('nvl-auth::responsecode.totp_enrolled')]);
     }
 
     /**
@@ -66,7 +65,7 @@ final class TotpController extends AuthenticatedController
     {
         $credential = $action->execute($this->subject($request), $data);
 
-        return response()->json(['data' => ['credential_id' => $credential->identifier()], 'code' => 'totp_verified', 'message' => 'TOTP was verified.']);
+        return response()->json(['data' => ['credential_id' => $credential->identifier()], 'code' => 'totp_verified', 'message' => trans('nvl-auth::responsecode.totp_verified')]);
     }
 
     /**
@@ -79,6 +78,6 @@ final class TotpController extends AuthenticatedController
     ): JsonResponse {
         $action->execute($this->subject($request), $credential);
 
-        return response()->json(['data' => null, 'code' => 'totp_revoked', 'message' => 'The TOTP credential was revoked.']);
+        return response()->json(['data' => null, 'code' => 'totp_revoked', 'message' => trans('nvl-auth::responsecode.totp_revoked')]);
     }
 }

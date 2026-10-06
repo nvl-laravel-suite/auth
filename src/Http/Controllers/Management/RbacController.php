@@ -26,8 +26,7 @@ final class RbacController extends AuthenticatedController
 
         return response()->json([
             'data' => $result,
-            'code' => 'rbac_synchronized',
-            'message' => 'Spatie Permission catalogs were synchronized.',
+            'code' => 'rbac_synchronized', 'message' => trans('nvl-auth::responsecode.rbac_synchronized'),
         ]);
     }
 }

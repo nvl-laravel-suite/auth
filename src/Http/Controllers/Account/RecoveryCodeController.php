@@ -25,8 +25,7 @@ final class RecoveryCodeController extends AuthenticatedController
 
         return response()->json([
             'data' => ['batch_id' => $result->batchId, 'codes' => $result->codes],
-            'code' => 'recovery_codes_regenerated',
-            'message' => 'Recovery codes were regenerated.',
+            'code' => 'recovery_codes_regenerated', 'message' => trans('nvl-auth::responsecode.recovery_codes_regenerated'),
         ], 201);
     }
 
@@ -37,7 +36,7 @@ final class RecoveryCodeController extends AuthenticatedController
     {
         $record = $action->execute($this->subject($request), $data);
 
-        return response()->json(['data' => ['batch_id' => $record->batch_id], 'code' => 'recovery_code_consumed', 'message' => 'The recovery code was consumed.']);
+        return response()->json(['data' => ['batch_id' => $record->batch_id], 'code' => 'recovery_code_consumed', 'message' => trans('nvl-auth::responsecode.recovery_code_consumed')]);
     }
 
     /**
@@ -47,6 +46,6 @@ final class RecoveryCodeController extends AuthenticatedController
     {
         $count = $action->execute($this->subject($request));
 
-        return response()->json(['data' => ['count' => $count], 'code' => 'recovery_codes_revoked', 'message' => 'Recovery codes were revoked.']);
+        return response()->json(['data' => ['count' => $count], 'code' => 'recovery_codes_revoked', 'message' => trans('nvl-auth::responsecode.recovery_codes_revoked')]);
     }
 }

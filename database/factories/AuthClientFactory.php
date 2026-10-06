@@ -10,6 +10,8 @@ use Nvl\Auth\Models\AuthClient;
 /**
  * Builds package-managed first-party clients for tests and seeders.
  *
+ * @api
+ *
  * @extends Factory<AuthClient>
  */
 final class AuthClientFactory extends Factory
@@ -19,6 +21,8 @@ final class AuthClientFactory extends Factory
 
     /**
      * Define a valid client record.
+     *
+     * @return array<model-property<AuthClient>, mixed>
      */
     public function definition(): array
     {

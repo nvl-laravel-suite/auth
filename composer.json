@@ -13,12 +13,12 @@
         "totp"
     ],
     "require": {
-        "php": "^8.3",
+        "php": "^8.4",
         "ext-ctype": "*",
         "ext-filter": "*",
         "ext-json": "*",
         "ext-mbstring": "*",
-        "laravel/framework": "^13.0",
+        "laravel/framework": "^12.0 || ^13.0",
         "laravel/sanctum": "^4.3",
         "nesbot/carbon": "^2.72 || ^3.0",
         "nvl/core": "^5.0",
@@ -26,11 +26,10 @@
         "pragmarx/google2fa": "^9.0",
         "spatie/laravel-data": "^4.23",
         "spatie/laravel-permission": "^8.0",
-        "spatie/typescript-transformer": "^3.3",
         "symfony/http-foundation": "^7.2 || ^8.0",
         "symfony/serializer": "^7.2 || ^8.0",
         "symfony/uid": "^7.2 || ^8.0",
-        "web-auth/webauthn-lib": "5.3.*"
+        "web-auth/webauthn-lib": "^5.3"
     },
     "require-dev": {
         "ext-openssl": "*",
@@ -40,9 +39,10 @@
         "laravel/socialite": "^5.29",
         "mockery/mockery": "^1.6",
         "nvl/tenancy": "^5.0",
-        "orchestra/testbench": "^11.0",
+        "orchestra/testbench": "^10.0 || ^11.0",
         "pestphp/pest": "^4.0",
         "pestphp/pest-plugin-laravel": "^4.0",
+        "spatie/typescript-transformer": "^3.3",
         "spomky-labs/cbor-php": "^3.0",
         "web-auth/cose-lib": "^4.2.3"
     },
@@ -51,7 +51,8 @@
         "laravel/socialite": "Enables the optional OAuth identity adapter.",
         "nvl/activity": "Can consume the package's after-commit audit and authentication events.",
         "nvl/mail-notifications": "Can consume AuthDeliveryRequested events and deliver the typed payloads.",
-        "nvl/tenancy": "Enables enforcing tenant ownership, scoped execution, adoption, and captured tenant queue contexts."
+        "nvl/tenancy": "Enables enforcing tenant ownership, scoped execution, adoption, and captured tenant queue contexts.",
+        "spatie/typescript-transformer": "Consume the declared TypeScript attributes and metadata (^3.3); Core retains the runtime transformation engine."
     },
     "autoload": {
         "psr-4": {
@@ -107,7 +108,12 @@
             "/phpunit.xml.dist",
             "/tests",
             "/.DS_Store",
-            "/**/.DS_Store"
+            "/**/.DS_Store",
+            "/.gitattributes",
+            "/**/.gitattributes",
+            "/.gitignore",
+            "/**/.gitignore",
+            "/**/.gitkeep"
         ]
     },
     "minimum-stability": "stable",
@@ -116,5 +122,19 @@
         "nvl/activity": "<5.0 || >=6.0",
         "nvl/mail-notifications": "<5.0 || >=6.0",
         "nvl/tenancy": "<5.0 || >=6.0"
+    },
+    "homepage": "https://github.com/nvl-laravel-suite/auth",
+    "authors": [
+        {
+            "name": "Nicolas Vlachos",
+            "homepage": "https://github.com/nicolasvlachos",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "source": "https://github.com/nvl-laravel-suite/auth",
+        "docs": "https://github.com/nvl-laravel-suite/auth#readme",
+        "issues": "https://github.com/nvl-laravel-suite/auth/issues",
+        "security": "https://github.com/nvl-laravel-suite/auth/security/policy"
     }
 }

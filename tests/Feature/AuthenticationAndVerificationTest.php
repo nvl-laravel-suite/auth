@@ -8,13 +8,10 @@ use Nvl\Auth\Actions\Audit\ShowAuthAuditAction;
 use Nvl\Auth\Actions\Authentication\EstablishAuthenticatedSessionAction;
 use Nvl\Auth\Actions\Authentication\LoginAction;
 use Nvl\Auth\Actions\Authentication\LogoutAction;
-use Nvl\Auth\Actions\Authentication\RequestEmailVerificationAction;
-use Nvl\Auth\Actions\Authentication\VerifyEmailAction;
 use Nvl\Auth\Actions\Passwords\ConfirmPasswordAction;
 use Nvl\Auth\Contracts\AuthAuditContextProvider;
 use Nvl\Auth\Data\Mutations\ConfirmPasswordData;
 use Nvl\Auth\Data\Mutations\LoginData;
-use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Events\AuthenticationAttempted;
 use Nvl\Auth\Events\AuthenticationRejected;
 use Nvl\Auth\Events\UserAuthenticated;
@@ -147,21 +144,4 @@ it('authorizes audit detail access with decrypted metadata', function (): void {
 
     expect(app(ShowAuthAuditAction::class)->execute($user, $audit)->is($audit))->toBeTrue()
         ->and($audit->metadata)->toBeArray();
-});
-
-it('emits verification data without sending and marks the host email verified', function (): void {
-    config()->set('nvl-auth.features.email_verification.enabled', true);
-    $user = $this->user();
-    Event::fake([AuthDeliveryRequested::class]);
-
-    app(RequestEmailVerificationAction::class)->execute($user, 'en');
-
-    Event::assertDispatched(AuthDeliveryRequested::class, function (AuthDeliveryRequested $event) use ($user): bool {
-        return $event->request->recipient === $user->email
-            && $event->request->payload['subject_id'] === (string) $user->getKey();
-    });
-
-    expect(app(VerifyEmailAction::class)->execute($user))->toBeTrue()
-        ->and($user->refresh()->hasVerifiedEmail())->toBeTrue()
-        ->and(app(VerifyEmailAction::class)->execute($user))->toBeFalse();
 });

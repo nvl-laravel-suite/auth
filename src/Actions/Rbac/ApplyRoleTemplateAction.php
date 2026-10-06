@@ -22,6 +22,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
 use Nvl\Auth\Services\RoleHierarchy;
 use Nvl\Auth\Services\RoleTemplateRegistry;
+use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
@@ -42,6 +43,7 @@ final readonly class ApplyRoleTemplateAction implements ApplyRoleTemplateContrac
         private RoleHierarchy $hierarchy,
         private AuthAuditRecorder $audits,
         private TenantBoundary $tenancy,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /** Apply one named template. */
@@ -94,10 +96,10 @@ final readonly class ApplyRoleTemplateAction implements ApplyRoleTemplateContrac
                 'template' => $templateKey,
                 'target_role' => $mutation->name,
             ]);
-            RbacChanged::dispatch('role', $role->id, 'template_applied', [
+            $this->domainEvents->dispatch(new RbacChanged('role', $role->id, 'template_applied', [
                 'template' => $templateKey,
                 'target_role' => $mutation->name,
-            ]);
+            ]), $role->getConnection());
 
             return $role->refresh()->load(['parent', 'permissions']);
         }, 3);

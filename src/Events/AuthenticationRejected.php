@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Events;
 
-use Illuminate\Foundation\Events\Dispatchable;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Contracts\DomainEvent;
 
 /**
  * Publishes one rejected package authentication with a stable reason code.
+ *
+ * @api
  */
-final class AuthenticationRejected
+final class AuthenticationRejected implements DomainEvent
 {
-    use Dispatchable;
-
     /**
      * Create an authentication-rejection event.
      */
@@ -22,5 +22,12 @@ final class AuthenticationRejected
         public readonly string $identifier,
         public readonly string $reason,
         public readonly ?SubjectReference $subject = null,
+        public readonly int $schemaVersion = 1,
     ) {}
+
+    /** Return the immutable event payload schema version. */
+    public function schemaVersion(): int
+    {
+        return $this->schemaVersion;
+    }
 }

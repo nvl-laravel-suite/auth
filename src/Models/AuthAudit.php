@@ -83,4 +83,13 @@ final class AuthAudit extends AuthModel
     {
         return $this->belongsTo(AuthClient::class, 'client_id');
     }
+
+    /** Return the runtime package fixture factory.
+     *
+     * @internal
+     */
+    protected static function newFactory(): AuthAuditFactory
+    {
+        return AuthAuditFactory::new();
+    }
 }

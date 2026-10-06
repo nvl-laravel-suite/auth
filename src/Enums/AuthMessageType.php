@@ -6,6 +6,8 @@ namespace Nvl\Auth\Enums;
 
 /**
  * Identifies transport-neutral messages emitted by Auth.
+ *
+ * @api
  */
 enum AuthMessageType: string
 {

@@ -10,6 +10,8 @@ use Nvl\Auth\Models\Invitation;
 /**
  * Builds simple invitation records without exposing a bearer token.
  *
+ * @api
+ *
  * @extends Factory<Invitation>
  */
 final class InvitationFactory extends Factory
@@ -19,6 +21,8 @@ final class InvitationFactory extends Factory
 
     /**
      * Define a valid invitation record.
+     *
+     * @return array<model-property<Invitation>, mixed>
      */
     public function definition(): array
     {

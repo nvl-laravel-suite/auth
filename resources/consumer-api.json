@@ -3596,6 +3596,140 @@
             ],
             "constants": []
         },
+        "Nvl\\Auth\\Database\\Factories\\AuthAuditFactory": {
+            "kind": "class",
+            "file": "database/factories/AuthAuditFactory.php",
+            "methods": [
+                "definition"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Database\\Factories\\AuthClientFactory": {
+            "kind": "class",
+            "file": "database/factories/AuthClientFactory.php",
+            "methods": [
+                "definition"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Database\\Factories\\AuthClientSessionFactory": {
+            "kind": "class",
+            "file": "database/factories/AuthClientSessionFactory.php",
+            "methods": [
+                "definition"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Database\\Factories\\ChallengeFactory": {
+            "kind": "class",
+            "file": "database/factories/ChallengeFactory.php",
+            "methods": [
+                "definition"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Database\\Factories\\InvitationFactory": {
+            "kind": "class",
+            "file": "database/factories/InvitationFactory.php",
+            "methods": [
+                "definition"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Database\\Factories\\PasskeyFactory": {
+            "kind": "class",
+            "file": "database/factories/PasskeyFactory.php",
+            "methods": [
+                "definition",
+                "forSubject"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Database\\Factories\\PermissionFactory": {
+            "kind": "class",
+            "file": "database/factories/PermissionFactory.php",
+            "methods": [
+                "definition"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Database\\Factories\\PersonalAccessTokenFactory": {
+            "kind": "class",
+            "file": "database/factories/PersonalAccessTokenFactory.php",
+            "methods": [
+                "definition"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Database\\Factories\\RecoveryCodeFactory": {
+            "kind": "class",
+            "file": "database/factories/RecoveryCodeFactory.php",
+            "methods": [
+                "definition",
+                "forSubject"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Database\\Factories\\RoleFactory": {
+            "kind": "class",
+            "file": "database/factories/RoleFactory.php",
+            "methods": [
+                "definition"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Database\\Factories\\SocialIdentityFactory": {
+            "kind": "class",
+            "file": "database/factories/SocialIdentityFactory.php",
+            "methods": [
+                "definition",
+                "forSubject"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Database\\Factories\\TenantMembershipFactory": {
+            "kind": "class",
+            "file": "database/factories/TenantMembershipFactory.php",
+            "methods": [
+                "definition",
+                "forSubject",
+                "forTenant"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Database\\Factories\\TotpCredentialFactory": {
+            "kind": "class",
+            "file": "database/factories/TotpCredentialFactory.php",
+            "methods": [
+                "definition",
+                "forSubject"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Database\\Factories\\UserFactory": {
+            "kind": "class",
+            "file": "database/factories/UserFactory.php",
+            "methods": [
+                "definition",
+                "disabled",
+                "unverified"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Enums\\AuthFeature": {
             "kind": "enum",
             "file": "src/Enums/AuthFeature.php",
@@ -3626,6 +3760,226 @@
                 "Sessions",
                 "SocialIdentities",
                 "Totp"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\AuthMessageType": {
+            "kind": "enum",
+            "file": "src/Enums/AuthMessageType.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "EmailVerification",
+                "Invitation",
+                "MagicLink",
+                "PasswordReset",
+                "SecurityCode"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\AuthResponseCode": {
+            "kind": "enum",
+            "file": "src/Enums/AuthResponseCode.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "AccountConfirmationInvalid",
+                "AccountConfirmationRequired",
+                "AccountDeleted",
+                "AmbiguousPermissionIdentifier",
+                "AmbiguousRoleIdentifier",
+                "ApiTokenAbilityForbidden",
+                "AuthAuditShown",
+                "AuthAuditsListed",
+                "Authenticated",
+                "AuthenticationRequired",
+                "ChallengeInvalid",
+                "ChallengeIssueConflict",
+                "ClientActivated",
+                "ClientCreated",
+                "ClientDeactivated",
+                "ClientDeleted",
+                "ClientOriginInvalid",
+                "ClientRedirectInvalid",
+                "ClientSessionConflict",
+                "ClientSessionEnded",
+                "ClientSessionInputInvalid",
+                "ClientSessionReasonInvalid",
+                "ClientSessionUnavailable",
+                "ClientShown",
+                "ClientStarted",
+                "ClientUnavailable",
+                "ClientUpdated",
+                "ClientsListed",
+                "CredentialsInvalid",
+                "DuplicatePermissionIdentifier",
+                "DuplicateRoleIdentifier",
+                "EmailUnavailable",
+                "EmailVerificationRequested",
+                "EmailVerified",
+                "FeatureUnavailable",
+                "Forbidden",
+                "InvalidAuditMetadata",
+                "InvalidBulkSelection",
+                "InvalidConfiguration",
+                "InvalidMembershipFilter",
+                "InvalidPermissionCatalogQuery",
+                "InvalidPermissionGroup",
+                "InvalidPermissionIdentifier",
+                "InvalidPermissionSearch",
+                "InvalidRoleCatalogQuery",
+                "InvalidRoleIdentifier",
+                "InvalidRoleName",
+                "InvalidRoleParent",
+                "InvalidRoleSearch",
+                "InvalidUserFilter",
+                "InvalidUserSearch",
+                "InvitationAccepted",
+                "InvitationAssignmentInvalid",
+                "InvitationDeliveryMetadataInvalid",
+                "InvitationExists",
+                "InvitationIdentityProofRequired",
+                "InvitationInvalid",
+                "InvitationIssued",
+                "InvitationPrincipalConflict",
+                "InvitationRegistrationInvalid",
+                "InvitationResendLimited",
+                "InvitationResent",
+                "InvitationRevoked",
+                "InvitationUnavailable",
+                "InvitationsListed",
+                "LoggedOut",
+                "MagicLinkConsumed",
+                "MagicLinkRequested",
+                "MembershipAssignmentInvalid",
+                "MembershipEnrolled",
+                "MembershipLastOwner",
+                "MembershipOwnershipInvalid",
+                "MembershipOwnershipTransferred",
+                "MembershipPrincipalIneligible",
+                "MembershipPrincipalUnavailable",
+                "MembershipRevisionConflict",
+                "MembershipRevoked",
+                "MembershipShown",
+                "MembershipStatusUpdated",
+                "MembershipUnavailable",
+                "MembershipsListed",
+                "OperationFailed",
+                "PasskeyAuthenticated",
+                "PasskeyAuthenticationStarted",
+                "PasskeyBackupStateInvalid",
+                "PasskeyCeremonyInvalid",
+                "PasskeyCounterRegression",
+                "PasskeyExists",
+                "PasskeyInputInvalid",
+                "PasskeyInvalid",
+                "PasskeyLimitReached",
+                "PasskeyProviderUnavailable",
+                "PasskeyRegistered",
+                "PasskeyRegistrationStarted",
+                "PasskeyRevoked",
+                "PasskeyUnavailable",
+                "PasskeyUserVerificationRequired",
+                "PasswordConfirmed",
+                "PasswordInvalid",
+                "PasswordResetInvalid",
+                "PasswordUpdated",
+                "PermissionCreated",
+                "PermissionDeleted",
+                "PermissionIdentifierNotFound",
+                "PermissionShown",
+                "PermissionUpdated",
+                "PermissionsListed",
+                "PrincipalUnavailable",
+                "ProfileShown",
+                "ProfileUpdated",
+                "RbacAnalyticsShown",
+                "RbacMixedContextOperation",
+                "RbacSynchronized",
+                "RecoveryCodeConsumed",
+                "RecoveryCodeInvalid",
+                "RecoveryCodesRegenerated",
+                "RecoveryCodesRevoked",
+                "RoleCloned",
+                "RoleCreated",
+                "RoleDeleted",
+                "RoleHierarchyCycle",
+                "RoleHierarchyShown",
+                "RoleIdentifierNotFound",
+                "RoleShown",
+                "RoleTemplateApplied",
+                "RoleTemplateNotFound",
+                "RoleTemplatesListed",
+                "RoleUpdated",
+                "RolesListed",
+                "SecurityCodeAuthenticated",
+                "SecurityCodeAuthenticationPurposeInvalid",
+                "SecurityCodeAuthenticationRequested",
+                "SecurityCodeRequested",
+                "SecurityCodeVerified",
+                "SelfBulkOperationForbidden",
+                "SelfDeleteForbidden",
+                "SelfDisableForbidden",
+                "SessionUnavailable",
+                "SocialAuthenticated",
+                "SocialAuthorizationFailed",
+                "SocialAuthorizationStarted",
+                "SocialEmailUnverified",
+                "SocialIdentityConflict",
+                "SocialIdentityLinked",
+                "SocialIdentityRevoked",
+                "SocialIdentityUnavailable",
+                "SocialLinkStarted",
+                "SocialProviderUnavailable",
+                "SubjectIneligible",
+                "SubjectUnavailable",
+                "SystemMutationForbidden",
+                "SystemPermissionDeleteForbidden",
+                "SystemPermissionImmutable",
+                "SystemRoleDeleteForbidden",
+                "SystemRoleImmutable",
+                "TenantAuditContextRequired",
+                "TenantAuthenticationIntentCompleted",
+                "TenantAuthenticationIntentInputInvalid",
+                "TenantAuthenticationIntentInvalid",
+                "TenantAuthenticationIntentUnavailable",
+                "TenantContextRequired",
+                "TenantMembershipRequired",
+                "TenantTokenInvalid",
+                "TooManyPermissionIdentifiers",
+                "TooManyRoleIdentifiers",
+                "TotpEnrolled",
+                "TotpEnrollmentStarted",
+                "TotpInvalid",
+                "TotpRevoked",
+                "TotpUnavailable",
+                "TotpVerified",
+                "Unauthenticated",
+                "UserCreated",
+                "UserDeleted",
+                "UserDisabled",
+                "UserEnabled",
+                "UserPermissionsSynchronized",
+                "UserRestored",
+                "UserRolesSynchronized",
+                "UserShown",
+                "UserSuggestionsListed",
+                "UserUpdated",
+                "UsersBulkUpdated",
+                "UsersListed",
+                "VerificationInvalid"
             ]
         },
         "Nvl\\Auth\\Enums\\AuthenticationPurpose": {
@@ -3779,6 +4133,182 @@
                 "Restore"
             ]
         },
+        "Nvl\\Auth\\Events\\AuthAuditRecorded": {
+            "kind": "class",
+            "file": "src/Events/AuthAuditRecorded.php",
+            "methods": [
+                "__construct",
+                "schemaVersion"
+            ],
+            "properties": [
+                "auditId",
+                "schemaVersion"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Events\\AuthDeliveryRequested": {
+            "kind": "class",
+            "file": "src/Events/AuthDeliveryRequested.php",
+            "methods": [
+                "__construct",
+                "schemaVersion",
+                "tenantJobEnvelope"
+            ],
+            "properties": [
+                "request",
+                "schemaVersion"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Events\\AuthenticationAttempted": {
+            "kind": "class",
+            "file": "src/Events/AuthenticationAttempted.php",
+            "methods": [
+                "__construct",
+                "schemaVersion"
+            ],
+            "properties": [
+                "identifier",
+                "identifierName",
+                "schemaVersion"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Events\\AuthenticationRejected": {
+            "kind": "class",
+            "file": "src/Events/AuthenticationRejected.php",
+            "methods": [
+                "__construct",
+                "schemaVersion"
+            ],
+            "properties": [
+                "identifier",
+                "identifierName",
+                "reason",
+                "schemaVersion",
+                "subject"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Events\\InvitationAccepted": {
+            "kind": "class",
+            "file": "src/Events/InvitationAccepted.php",
+            "methods": [
+                "__construct",
+                "__serialize",
+                "__unserialize",
+                "schemaVersion"
+            ],
+            "properties": [
+                "acceptedAt",
+                "context",
+                "invitationId",
+                "purpose",
+                "schemaVersion",
+                "subject",
+                "type"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Events\\PrincipalChanged": {
+            "kind": "class",
+            "file": "src/Events/PrincipalChanged.php",
+            "methods": [
+                "__construct",
+                "schemaVersion"
+            ],
+            "properties": [
+                "context",
+                "operation",
+                "payload",
+                "schemaVersion",
+                "userId"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Events\\RbacAssignmentChanged": {
+            "kind": "class",
+            "file": "src/Events/RbacAssignmentChanged.php",
+            "methods": [
+                "__construct",
+                "schemaVersion"
+            ],
+            "properties": [
+                "context",
+                "metadata",
+                "operation",
+                "permissions",
+                "principalId",
+                "roles",
+                "schemaVersion"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Events\\RbacChanged": {
+            "kind": "class",
+            "file": "src/Events/RbacChanged.php",
+            "methods": [
+                "__construct",
+                "schemaVersion"
+            ],
+            "properties": [
+                "entityId",
+                "entityType",
+                "operation",
+                "payload",
+                "schemaVersion"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Events\\UserAuthenticated": {
+            "kind": "class",
+            "file": "src/Events/UserAuthenticated.php",
+            "methods": [
+                "__construct",
+                "schemaVersion"
+            ],
+            "properties": [
+                "schemaVersion",
+                "subject"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Events\\UserLoggedOut": {
+            "kind": "class",
+            "file": "src/Events/UserLoggedOut.php",
+            "methods": [
+                "__construct",
+                "schemaVersion"
+            ],
+            "properties": [
+                "schemaVersion",
+                "subject"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Exceptions\\AuthException": {
+            "kind": "class",
+            "file": "src/Exceptions/AuthException.php",
+            "methods": [
+                "__construct",
+                "because",
+                "featureUnavailable",
+                "invalidConfiguration",
+                "package",
+                "publicContext",
+                "responseCode",
+                "responseHeaders",
+                "suggestedStatus",
+                "translationKey",
+                "translationParameters"
+            ],
+            "properties": [
+                "context",
+                "errorCode",
+                "status"
+            ],
+            "constants": []
+        },
         "Nvl\\Auth\\Models\\AuthAudit": {
             "kind": "class",
             "file": "src/Models/AuthAudit.php",
@@ -3889,6 +4419,24 @@
                 "relationLoaded"
             ],
             "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Models\\PersonalAccessToken": {
+            "kind": "class",
+            "file": "src/Models/PersonalAccessToken.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [
+                "id"
+            ],
             "constants": []
         },
         "Nvl\\Auth\\Models\\RecoveryCode": {
@@ -4162,6 +4710,46 @@
             ],
             "constants": []
         },
+        "Nvl\\Auth\\ValueObjects\\AuthDeliveryRequest": {
+            "kind": "class",
+            "file": "src/ValueObjects/AuthDeliveryRequest.php",
+            "methods": [
+                "__construct",
+                "__debugInfo",
+                "__serialize",
+                "__unserialize"
+            ],
+            "properties": [
+                "eventContext",
+                "expiresAt",
+                "feature",
+                "invitation",
+                "locale",
+                "messageId",
+                "metadata",
+                "payload",
+                "recipient",
+                "subject",
+                "tenant",
+                "type"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\AuthEventContext": {
+            "kind": "class",
+            "file": "src/ValueObjects/AuthEventContext.php",
+            "methods": [
+                "__construct",
+                "capture",
+                "envelope",
+                "platform"
+            ],
+            "properties": [
+                "mode",
+                "tenantId"
+            ],
+            "constants": []
+        },
         "Nvl\\Auth\\ValueObjects\\AuthPipelineContext": {
             "kind": "class",
             "file": "src/ValueObjects/AuthPipelineContext.php",
@@ -4427,6 +5015,22 @@
         },
         "Nvl\\Auth\\Models\\Permission": {
             "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        },
+        "Nvl\\Auth\\Models\\PersonalAccessToken": {
+            "read": [
+                "id"
+            ],
             "identity_methods": [
                 "getKey",
                 "getKeyName",

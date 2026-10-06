@@ -27,7 +27,7 @@ final class ApiTokenController extends AuthenticatedController
     {
         $tokens = array_map($this->snapshot(...), $action->execute($this->subject($request)));
 
-        return response()->json(['data' => $tokens, 'code' => 'api_tokens_listed', 'message' => 'API tokens were listed.']);
+        return response()->json(['data' => $tokens, 'code' => 'api_tokens_listed', 'message' => trans('nvl-auth::responsecode.api_tokens_listed')]);
     }
 
     /**
@@ -39,8 +39,7 @@ final class ApiTokenController extends AuthenticatedController
 
         return response()->json([
             'data' => [...$this->snapshot($issued->token), 'plain_text_token' => $issued->plainTextToken],
-            'code' => 'api_token_issued',
-            'message' => 'The API token was issued.',
+            'code' => 'api_token_issued', 'message' => trans('nvl-auth::responsecode.api_token_issued'),
         ], 201);
     }
 
@@ -55,7 +54,7 @@ final class ApiTokenController extends AuthenticatedController
     ): JsonResponse {
         $token = $action->execute($this->subject($request), $tokenId, $data);
 
-        return response()->json(['data' => $this->snapshot($token), 'code' => 'api_token_updated', 'message' => 'The API token was updated.']);
+        return response()->json(['data' => $this->snapshot($token), 'code' => 'api_token_updated', 'message' => trans('nvl-auth::responsecode.api_token_updated')]);
     }
 
     /**
@@ -71,8 +70,7 @@ final class ApiTokenController extends AuthenticatedController
 
         return response()->json([
             'data' => [...$this->snapshot($issued->token), 'plain_text_token' => $issued->plainTextToken],
-            'code' => 'api_token_rotated',
-            'message' => 'The API token was rotated.',
+            'code' => 'api_token_rotated', 'message' => trans('nvl-auth::responsecode.api_token_rotated'),
         ]);
     }
 
@@ -86,7 +84,7 @@ final class ApiTokenController extends AuthenticatedController
     ): JsonResponse {
         $action->execute($this->subject($request), $tokenId);
 
-        return response()->json(['data' => null, 'code' => 'api_token_revoked', 'message' => 'The API token was revoked.']);
+        return response()->json(['data' => null, 'code' => 'api_token_revoked', 'message' => trans('nvl-auth::responsecode.api_token_revoked')]);
     }
 
     /**
@@ -96,7 +94,7 @@ final class ApiTokenController extends AuthenticatedController
     {
         $count = $action->execute($this->subject($request));
 
-        return response()->json(['data' => ['count' => $count], 'code' => 'api_tokens_revoked', 'message' => 'API tokens were revoked.']);
+        return response()->json(['data' => ['count' => $count], 'code' => 'api_tokens_revoked', 'message' => trans('nvl-auth::responsecode.api_tokens_revoked')]);
     }
 
     /**

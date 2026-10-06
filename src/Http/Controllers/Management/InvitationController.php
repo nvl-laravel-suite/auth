@@ -30,7 +30,7 @@ final class InvitationController extends AuthenticatedController
     ): JsonResponse {
         $page = $action->execute($this->subject($request), $data);
 
-        return response()->json(['data' => $page, 'code' => 'invitations_listed', 'message' => 'Invitations were listed.']);
+        return response()->json(['data' => $page, 'code' => 'invitations_listed', 'message' => trans('nvl-auth::responsecode.invitations_listed')]);
     }
 
     /**
@@ -43,8 +43,7 @@ final class InvitationController extends AuthenticatedController
 
         return response()->json([
             'data' => ['invitation_id' => $result->invitation->identifier(), 'expires_at' => $result->invitation->expires_at->toIso8601String()],
-            'code' => 'invitation_issued',
-            'message' => 'The invitation was issued.',
+            'code' => 'invitation_issued', 'message' => trans('nvl-auth::responsecode.invitation_issued'),
         ], 201);
     }
 
@@ -58,7 +57,7 @@ final class InvitationController extends AuthenticatedController
     ): JsonResponse {
         $action->execute($invitation, $this->subject($request), $request->getPreferredLanguage());
 
-        return response()->json(['data' => null, 'code' => 'invitation_resent', 'message' => 'The invitation was resent.']);
+        return response()->json(['data' => null, 'code' => 'invitation_resent', 'message' => trans('nvl-auth::responsecode.invitation_resent')]);
     }
 
     /**
@@ -71,6 +70,6 @@ final class InvitationController extends AuthenticatedController
     ): JsonResponse {
         $action->execute($invitation, $this->subject($request));
 
-        return response()->json(['data' => null, 'code' => 'invitation_revoked', 'message' => 'The invitation was revoked.']);
+        return response()->json(['data' => null, 'code' => 'invitation_revoked', 'message' => trans('nvl-auth::responsecode.invitation_revoked')]);
     }
 }

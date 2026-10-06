@@ -7,14 +7,18 @@ namespace Nvl\Auth\Http\Middleware;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as LaravelResponse;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Support\Http\PackageExceptionPayload;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Renders stable JSON envelopes only for package routes.
  */
-final class RenderAuthExceptions
+final readonly class RenderAuthExceptions
 {
+    public function __construct(private PackageExceptionPayload $payload) {}
+
     /**
      * Render package failures without taking over the host exception handler.
      *
@@ -23,13 +27,27 @@ final class RenderAuthExceptions
     public function handle(Request $request, Closure $next): Response
     {
         try {
-            return $next($request);
+            $response = $next($request);
         } catch (AuthException $exception) {
-            return new JsonResponse([
-                'data' => null,
-                'code' => $exception->errorCode,
-                'message' => $exception->getMessage(),
-            ], $exception->status);
+            return $this->response($exception);
         }
+        if (($response instanceof JsonResponse || $response instanceof LaravelResponse)
+            && $response->exception instanceof AuthException) {
+            return $this->response($response->exception);
+        }
+
+        return $response;
+    }
+
+    /** Preserve the native Auth envelope and established status. */
+    private function response(AuthException $exception): JsonResponse
+    {
+        $payload = $this->payload->for($exception);
+
+        return new JsonResponse([
+            'data' => null,
+            'code' => $payload['code'],
+            'message' => $payload['message'],
+        ], $exception->status, $this->payload->headers($exception));
     }
 }

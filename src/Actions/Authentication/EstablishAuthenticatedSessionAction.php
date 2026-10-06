@@ -22,6 +22,7 @@ use Nvl\Auth\Events\AuthenticationAttempted;
 use Nvl\Auth\Events\AuthenticationRejected;
 use Nvl\Auth\Events\UserAuthenticated;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthOperationBoundary;
@@ -31,6 +32,7 @@ use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\PendingTenantAuthenticationIntent;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Support\Tenancy\ValueObjects\TenantId;
 use Throwable;
@@ -59,6 +61,7 @@ final readonly class EstablishAuthenticatedSessionAction implements EstablishAut
         private TenantAuthenticationIntents $tenantIntents,
         private TenantMembershipAccess $tenantMemberships,
         private TenantAuthenticationSession $tenantSession,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /**
@@ -86,7 +89,7 @@ final readonly class EstablishAuthenticatedSessionAction implements EstablishAut
             throw AuthException::invalidConfiguration('Passwordless authentication requires a stateful guard.');
         }
 
-        AuthenticationAttempted::dispatch('subject_reference', $reference->identifier);
+        $this->domainEvents->dispatch(new AuthenticationAttempted('subject_reference', $reference->identifier), (new AuthAudit)->getConnection());
         $guardMutationStarted = false;
 
         try {
@@ -111,7 +114,7 @@ final readonly class EstablishAuthenticatedSessionAction implements EstablishAut
                 metadata: ['method' => $purpose->value],
             );
             $this->selectTenant($authenticated, $reference, $requestContext);
-            UserAuthenticated::dispatch($reference);
+            $this->domainEvents->dispatch(new UserAuthenticated($reference), (new AuthAudit)->getConnection());
 
             return $authenticated;
         } catch (Throwable $exception) {
@@ -126,7 +129,7 @@ final readonly class EstablishAuthenticatedSessionAction implements EstablishAut
                 actor: $subject,
                 metadata: ['method' => $purpose->value, 'reason' => $reason],
             );
-            AuthenticationRejected::dispatch('subject_reference', $reference->identifier, $reason, $reference);
+            $this->domainEvents->dispatch(new AuthenticationRejected('subject_reference', $reference->identifier, $reason, $reference), (new AuthAudit)->getConnection());
 
             throw $exception;
         }

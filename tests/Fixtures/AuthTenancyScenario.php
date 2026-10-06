@@ -45,15 +45,17 @@ final class AuthTenancyScenario
 
     public function member(TenantId $tenant, SubjectReference $subject, bool $owner = false): TenantMembership
     {
-        TenantMembershipLock::query()->firstOrCreate(['tenant_id' => $tenant->value]);
+        return $this->run($tenant, function () use ($tenant, $subject, $owner): TenantMembership {
+            TenantMembershipLock::query()->firstOrCreate(['tenant_id' => $tenant->value]);
 
-        return TenantMembership::factory()->create([
-            'tenant_id' => $tenant->value,
-            'subject_type' => $subject->type,
-            'subject_id' => $subject->identifier,
-            'status' => MembershipStatus::Active,
-            'is_owner' => $owner,
-            'revision' => 1,
-        ]);
+            return TenantMembership::factory()->create([
+                'tenant_id' => $tenant->value,
+                'subject_type' => $subject->type,
+                'subject_id' => $subject->identifier,
+                'status' => MembershipStatus::Active,
+                'is_owner' => $owner,
+                'revision' => 1,
+            ]);
+        });
     }
 }

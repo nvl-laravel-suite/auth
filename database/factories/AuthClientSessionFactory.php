@@ -11,6 +11,8 @@ use Nvl\Auth\Models\AuthClientSession;
 /**
  * Builds client-to-Laravel-session correlation records.
  *
+ * @api
+ *
  * @extends Factory<AuthClientSession>
  */
 final class AuthClientSessionFactory extends Factory
@@ -20,6 +22,8 @@ final class AuthClientSessionFactory extends Factory
 
     /**
      * Define a valid client-session record.
+     *
+     * @return array<model-property<AuthClientSession>, mixed>
      */
     public function definition(): array
     {

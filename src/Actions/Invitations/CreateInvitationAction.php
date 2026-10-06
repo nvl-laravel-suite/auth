@@ -21,6 +21,7 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Results\IssuedInvitation;
+use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\InvitationDeliveryMetadataPolicy;
@@ -32,6 +33,7 @@ use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Support\Tenancy\ValueObjects\TenantId;
@@ -43,6 +45,9 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
  */
 final readonly class CreateInvitationAction implements CreateInvitationContract
 {
+    /** Records through the audit recorder supplied to this use case. */
+    private AuthCommittedAudit $committedAudits;
+
     /**
      * Create the invitation issuance use case.
      */
@@ -53,12 +58,16 @@ final readonly class CreateInvitationAction implements CreateInvitationContract
         private SecretHasher $hasher,
         private ManagementAuthorizer $authorization,
         private AuthPipeline $pipeline,
-        private AuthAuditRecorder $audits,
+        AuthAuditRecorder $audits,
         private TenantBoundary $boundary,
         private TenantMembershipAccess $membershipAccess,
         private TenantMembershipAssignments $assignments,
+        AuthCommittedAudit $committedAudits,
+        private DomainEventDispatcher $domainEvents,
         private ?InvitationDeliveryMetadataPolicy $deliveryMetadata = null,
-    ) {}
+    ) {
+        $this->committedAudits = $committedAudits->withRecorder($audits);
+    }
 
     /**
      * Issue one invitation.
@@ -203,14 +212,13 @@ final readonly class CreateInvitationAction implements CreateInvitationContract
                             ))->deliveryData($invitation),
                             tenant: $tenant,
                         );
-                        DB::connection($connection)->afterCommit(function () use ($actor, $data, $delivery, $invitation): void {
-                            $this->audits->record(
-                                'invitation.issued',
-                                actor: $actor,
-                                metadata: ['invitation_id' => $invitation->identifier(), 'purpose' => $data->purpose],
-                            );
-                            AuthDeliveryRequested::dispatch($delivery);
-                        });
+
+                        $this->committedAudits->record(DB::connection($connection),
+                            'invitation.issued',
+                            actor: $actor,
+                            metadata: ['invitation_id' => $invitation->identifier(), 'purpose' => $data->purpose],
+                        );
+                        $this->domainEvents->dispatch(new AuthDeliveryRequested($delivery), $invitation->getConnection());
 
                         return new IssuedInvitation($invitation, $token);
                     }, 3);

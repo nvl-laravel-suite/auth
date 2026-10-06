@@ -10,6 +10,8 @@ use Nvl\Auth\Models\Challenge;
 /**
  * Builds one-time authentication challenges.
  *
+ * @api
+ *
  * @extends Factory<Challenge>
  */
 final class ChallengeFactory extends Factory
@@ -19,6 +21,8 @@ final class ChallengeFactory extends Factory
 
     /**
      * Define a valid challenge record.
+     *
+     * @return array<model-property<Challenge>, mixed>
      */
     public function definition(): array
     {

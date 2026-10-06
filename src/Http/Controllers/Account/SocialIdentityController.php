@@ -21,7 +21,7 @@ final class SocialIdentityController extends AuthenticatedController
      */
     public function redirect(string $provider, StartSocialAuthorizationAction $action): JsonResponse
     {
-        return response()->json(['data' => ['url' => $action->execute($provider)], 'code' => 'social_link_started', 'message' => 'Social identity linking was started.']);
+        return response()->json(['data' => ['url' => $action->execute($provider)], 'code' => 'social_link_started', 'message' => trans('nvl-auth::responsecode.social_link_started')]);
     }
 
     /**
@@ -34,7 +34,7 @@ final class SocialIdentityController extends AuthenticatedController
     ): JsonResponse {
         $identity = $action->execute($provider, $this->subject($request));
 
-        return response()->json(['data' => ['social_identity_id' => $identity->identifier(), 'provider' => $identity->provider], 'code' => 'social_identity_linked', 'message' => 'The social identity was linked.']);
+        return response()->json(['data' => ['social_identity_id' => $identity->identifier(), 'provider' => $identity->provider], 'code' => 'social_identity_linked', 'message' => trans('nvl-auth::responsecode.social_identity_linked')]);
     }
 
     /**
@@ -47,6 +47,6 @@ final class SocialIdentityController extends AuthenticatedController
     ): JsonResponse {
         $action->execute($this->subject($request), $socialIdentity);
 
-        return response()->json(['data' => null, 'code' => 'social_identity_revoked', 'message' => 'The social identity was revoked.']);
+        return response()->json(['data' => null, 'code' => 'social_identity_revoked', 'message' => trans('nvl-auth::responsecode.social_identity_revoked')]);
     }
 }

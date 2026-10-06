@@ -44,8 +44,7 @@ final class EmailVerificationController
 
         return response()->json([
             'data' => ['changed' => $changed],
-            'code' => 'email_verified',
-            'message' => 'The email address was verified.',
+            'code' => 'email_verified', 'message' => trans('nvl-auth::responsecode.email_verified'),
         ]);
     }
 }

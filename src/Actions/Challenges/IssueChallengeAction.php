@@ -22,6 +22,7 @@ use Nvl\Auth\Services\OpaqueTokenFactory;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Issues one hashed challenge and emits a transport-neutral delivery payload.
@@ -38,6 +39,7 @@ final readonly class IssueChallengeAction
         private OpaqueTokenFactory $tokens,
         private SecretHasher $hasher,
         private AuthAuditRecorder $audits,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /**
@@ -145,7 +147,7 @@ final readonly class IssueChallengeAction
                     'max_attempts' => $maxAttempts,
                     'expires_at' => $expiresAt,
                 ]);
-                AuthDeliveryRequested::dispatch(new AuthDeliveryRequest(
+                $this->domainEvents->dispatch(new AuthDeliveryRequested(new AuthDeliveryRequest(
                     messageId: (string) Str::uuid(),
                     feature: $feature,
                     type: $messageType,
@@ -161,7 +163,7 @@ final readonly class IssueChallengeAction
                     locale: $locale,
                     metadata: ['challenge_id' => $challenge->identifier(), ...$metadata],
                     subject: $subject,
-                ));
+                )), $challenge->getConnection());
                 $this->audits->record(
                     "{$feature->value}.issued",
                     subject: $subject,

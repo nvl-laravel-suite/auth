@@ -15,6 +15,7 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\TenantMembership;
+use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\MembershipLocator;
 use Nvl\Auth\Services\MembershipOwnerGuard;
@@ -31,6 +32,9 @@ use Nvl\Support\Tenancy\Contracts\TenantContext;
  */
 final readonly class SetMembershipStatusAction implements SetMembershipStatusContract
 {
+    /** Records through the audit recorder supplied to this use case. */
+    private AuthCommittedAudit $committedAudits;
+
     public function __construct(
         private FeatureGate $features,
         private MutationAuthorizer $authorization,
@@ -39,8 +43,11 @@ final readonly class SetMembershipStatusAction implements SetMembershipStatusCon
         private MembershipOwnerGuard $owners,
         private MembershipWriter $writer,
         private TenantContext $context,
-        private AuthAuditRecorder $audits,
-    ) {}
+        AuthAuditRecorder $audits,
+        AuthCommittedAudit $committedAudits,
+    ) {
+        $this->committedAudits = $committedAudits->withRecorder($audits);
+    }
 
     public function execute(Authenticatable|SystemMutationContext $authority, TenantMembership|string $membership, UpdateMembershipStatusData $data): TenantMembership
     {
@@ -60,12 +67,12 @@ final readonly class SetMembershipStatusAction implements SetMembershipStatusCon
                 $this->owners->assertCanRemoveOwner($target);
             }
             $updated = $this->writer->setStatus($target, $data->status);
-            DB::connection($updated->getConnectionName())->afterCommit(fn () => $this->audits->record(
+            $this->committedAudits->record(DB::connection($updated->getConnectionName()),
                 'membership.status_changed',
                 subject: new SubjectReference($updated->subject_type, $updated->subject_id),
                 actor: $actor,
                 metadata: ['membership_id' => $updated->identifier(), ...$this->authorization->metadata($authority)],
-            ));
+            );
 
             return $updated;
         }, 1);

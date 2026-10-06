@@ -45,7 +45,7 @@ final class ChallengeController
     ): JsonResponse {
         $action->execute($data, $request->getPreferredLanguage(), $this->requestedTenant($request, $tenants));
 
-        return response()->json(['data' => null, 'code' => 'magic_link_requested', 'message' => 'The magic link was requested.'], 202);
+        return response()->json(['data' => null, 'code' => 'magic_link_requested', 'message' => trans('nvl-auth::responsecode.magic_link_requested')], 202);
     }
 
     /**
@@ -72,7 +72,7 @@ final class ChallengeController
             );
         }
 
-        return response()->json(['data' => null, 'code' => 'magic_link_consumed', 'message' => 'The magic link was consumed.']);
+        return response()->json(['data' => null, 'code' => 'magic_link_consumed', 'message' => trans('nvl-auth::responsecode.magic_link_consumed')]);
     }
 
     /**
@@ -88,7 +88,7 @@ final class ChallengeController
             locale: $request->getPreferredLanguage(),
         );
 
-        return response()->json(['data' => null, 'code' => 'security_code_requested', 'message' => 'The security code was requested.'], 202);
+        return response()->json(['data' => null, 'code' => 'security_code_requested', 'message' => trans('nvl-auth::responsecode.security_code_requested')], 202);
     }
 
     /**
@@ -102,8 +102,7 @@ final class ChallengeController
 
         return response()->json([
             'data' => ['challenge_id' => $challenge->identifier()],
-            'code' => 'security_code_verified',
-            'message' => 'The security code was verified.',
+            'code' => 'security_code_verified', 'message' => trans('nvl-auth::responsecode.security_code_verified'),
         ]);
     }
 
@@ -120,7 +119,7 @@ final class ChallengeController
             tenant: $this->requestedTenant($request, $tenants),
         );
 
-        return response()->json(['data' => null, 'code' => 'security_code_authentication_requested', 'message' => 'The authentication code was requested.'], 202);
+        return response()->json(['data' => null, 'code' => 'security_code_authentication_requested', 'message' => trans('nvl-auth::responsecode.security_code_authentication_requested')], 202);
     }
 
     /** Verify an explicitly passwordless security code and establish its session. */
@@ -142,8 +141,7 @@ final class ChallengeController
 
         return response()->json([
             'data' => ['challenge_id' => $challenge->identifier()],
-            'code' => 'security_code_authenticated',
-            'message' => 'Security-code authentication succeeded.',
+            'code' => 'security_code_authenticated', 'message' => trans('nvl-auth::responsecode.security_code_authenticated'),
         ]);
     }
 

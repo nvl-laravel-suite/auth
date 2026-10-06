@@ -18,6 +18,7 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
 use Nvl\Auth\Services\RoleHierarchy;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Updates one package role and its permission assignment.
@@ -33,6 +34,7 @@ final readonly class UpdateRoleAction implements UpdateRoleContract
         private RbacEntityLocator $entities,
         private RoleHierarchy $hierarchy,
         private AuthAuditRecorder $audits,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /** Persist one role mutation. */
@@ -59,7 +61,7 @@ final readonly class UpdateRoleAction implements UpdateRoleContract
             ])->save();
             $role->syncPermissions($data->permissions);
             $this->audits->record('role.updated', actor: $actor, metadata: ['role_id' => $role->id]);
-            RbacChanged::dispatch('role', $role->id, 'updated');
+            $this->domainEvents->dispatch(new RbacChanged('role', $role->id, 'updated'), $role->getConnection());
 
             return $role->refresh()->load(['parent', 'permissions']);
         }, 3);

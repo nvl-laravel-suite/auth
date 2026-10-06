@@ -67,4 +67,13 @@ final class SocialIdentity extends AuthModel
             'revoked_at' => 'immutable_datetime',
         ];
     }
+
+    /** Return the runtime package fixture factory.
+     *
+     * @internal
+     */
+    protected static function newFactory(): SocialIdentityFactory
+    {
+        return SocialIdentityFactory::new();
+    }
 }

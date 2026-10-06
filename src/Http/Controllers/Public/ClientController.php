@@ -25,8 +25,7 @@ final class ClientController
 
         return response()->json([
             'data' => ['client_id' => $result->client->identifier(), 'flow' => $result->flow, 'return_url' => $result->returnUrl],
-            'code' => 'client_started',
-            'message' => 'The client authentication flow may start.',
+            'code' => 'client_started', 'message' => trans('nvl-auth::responsecode.client_started'),
         ]);
     }
 }

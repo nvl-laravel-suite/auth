@@ -121,4 +121,13 @@ class Permission extends SpatiePermission
             'metadata' => 'array',
         ];
     }
+
+    /** Return the runtime package fixture factory.
+     *
+     * @internal
+     */
+    protected static function newFactory(): PermissionFactory
+    {
+        return PermissionFactory::new();
+    }
 }

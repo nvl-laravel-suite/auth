@@ -19,6 +19,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\UserLocator;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Updates one package principal without changing its access assignment.
@@ -34,6 +35,7 @@ final readonly class UpdateUserAction implements UpdateUserContract
         private UserLocator $users,
         private AuthAuditRecorder $audits,
         private PrincipalAttributeMapper $attributes,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /** Persist a partial principal mutation. */
@@ -50,12 +52,12 @@ final readonly class UpdateUserAction implements UpdateUserContract
             $this->audits->record('user.updated', subject: $reference, actor: $actor, metadata: [
                 'attributes' => array_keys($attributes),
             ]);
-            PrincipalChanged::dispatch(
+            $this->domainEvents->dispatch(new PrincipalChanged(
                 $this->attributes->identifier($user),
                 'updated',
                 ['attributes' => array_keys($attributes)],
                 AuthEventContext::platform(),
-            );
+            ), $user->getConnection());
 
             return $user->refresh()->load(['roles', 'permissions']);
         }, 3);

@@ -9,6 +9,7 @@ use Illuminate\Auth\Passwords\PasswordBrokerManager;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Contracts\Auth\PasswordBroker as PasswordBrokerContract;
+use Illuminate\Database\Eloquent\Model;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\PasswordUpdater;
@@ -21,9 +22,11 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\EloquentPasswordUpdater;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\ConnectionCommitCallbacks;
 use SensitiveParameter;
 
 /**
@@ -45,6 +48,7 @@ final readonly class ResetPasswordAction implements ResetPasswordContract
         private AuthPipeline $pipeline,
         private AuthAuditRecorder $audits,
         private AuthenticationEligibility $eligibility,
+        private ConnectionCommitCallbacks $eventCommits,
     ) {}
 
     /**
@@ -85,13 +89,27 @@ final readonly class ResetPasswordAction implements ResetPasswordContract
                             throw $exception;
                         }
 
-                        $this->passwords->update($subject, $newPassword);
+                        $update = function () use ($subject, $newPassword): void {
+                            $this->passwords->update($subject, $newPassword);
 
-                        event(new PasswordReset($subject));
-                        $this->audits->record(
-                            'password.reset',
-                            subject: SubjectReference::fromAuthenticatable($subject),
-                        );
+                            $event = new PasswordReset($subject);
+                            if ($this->passwords instanceof EloquentPasswordUpdater && $subject instanceof Model) {
+                                $this->eventCommits->afterCommit($subject->getConnection(), static function () use ($event): void {
+                                    event($event);
+                                });
+                            } else {
+                                event($event);
+                            }
+                            $this->audits->record(
+                                'password.reset',
+                                subject: SubjectReference::fromAuthenticatable($subject),
+                            );
+                        };
+                        if ($this->passwords instanceof EloquentPasswordUpdater && $subject instanceof Model) {
+                            $subject->getConnection()->transaction($update);
+                        } else {
+                            $update();
+                        }
                     },
                 );
 

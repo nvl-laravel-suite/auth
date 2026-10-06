@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Nvl\Auth\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\RbacPrincipalAccess;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\RbacAssignmentChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\ValueObjects\AuthEventContext;
+use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -28,6 +30,7 @@ final readonly class RbacManager
         private RbacPrincipalAccess $principals,
         private PermissionRegistrar $registrar,
         private TenantContext $tenantContext,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /**
@@ -61,15 +64,17 @@ final readonly class RbacManager
             );
         }
 
-        $this->principals->assign($subject, $roles, $permissions);
-        $this->registrar->forgetCachedPermissions();
-        RbacAssignmentChanged::dispatch(
-            $this->principals->identifier($subject),
-            'assigned',
-            $roles,
-            $permissions,
-            context: AuthEventContext::capture($this->tenantContext),
-        );
+        DB::connection($this->principals->connectionName($subject))->transaction(function () use ($subject, $roles, $permissions): void {
+            $this->principals->assign($subject, $roles, $permissions);
+            $this->registrar->forgetCachedPermissions();
+            $this->domainEvents->dispatch(new RbacAssignmentChanged(
+                $this->principals->identifier($subject),
+                'assigned',
+                $roles,
+                $permissions,
+                context: AuthEventContext::capture($this->tenantContext),
+            ), DB::connection($this->principals->connectionName($subject)));
+        });
     }
 
     /**
@@ -81,16 +86,18 @@ final readonly class RbacManager
     public function syncRoles(Authenticatable $subject, array $roles, array $metadata = []): void
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
-        $this->principals->syncRoles($subject, $roles);
-        $this->registrar->forgetCachedPermissions();
-        RbacAssignmentChanged::dispatch(
-            $this->principals->identifier($subject),
-            'roles_synchronized',
-            $roles,
-            [],
-            $metadata,
-            AuthEventContext::capture($this->tenantContext),
-        );
+        DB::connection($this->principals->connectionName($subject))->transaction(function () use ($subject, $roles, $metadata): void {
+            $this->principals->syncRoles($subject, $roles);
+            $this->registrar->forgetCachedPermissions();
+            $this->domainEvents->dispatch(new RbacAssignmentChanged(
+                $this->principals->identifier($subject),
+                'roles_synchronized',
+                $roles,
+                [],
+                $metadata,
+                AuthEventContext::capture($this->tenantContext),
+            ), DB::connection($this->principals->connectionName($subject)));
+        });
     }
 
     /**
@@ -102,16 +109,18 @@ final readonly class RbacManager
     public function syncPermissions(Authenticatable $subject, array $permissions, array $metadata = []): void
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
-        $this->principals->syncPermissions($subject, $permissions);
-        $this->registrar->forgetCachedPermissions();
-        RbacAssignmentChanged::dispatch(
-            $this->principals->identifier($subject),
-            'permissions_synchronized',
-            [],
-            $permissions,
-            $metadata,
-            AuthEventContext::capture($this->tenantContext),
-        );
+        DB::connection($this->principals->connectionName($subject))->transaction(function () use ($subject, $permissions, $metadata): void {
+            $this->principals->syncPermissions($subject, $permissions);
+            $this->registrar->forgetCachedPermissions();
+            $this->domainEvents->dispatch(new RbacAssignmentChanged(
+                $this->principals->identifier($subject),
+                'permissions_synchronized',
+                [],
+                $permissions,
+                $metadata,
+                AuthEventContext::capture($this->tenantContext),
+            ), DB::connection($this->principals->connectionName($subject)));
+        });
     }
 
     /**

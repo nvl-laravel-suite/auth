@@ -26,6 +26,7 @@ use Nvl\Auth\Services\UserLocator;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Applies one bounded principal lifecycle operation atomically.
@@ -43,6 +44,7 @@ final readonly class BulkUpdateUsersAction implements BulkUpdateUsersContract
         private PrincipalAttributeMapper $attributes,
         private PrincipalSessionContainment $sessions,
         private MembershipOwnerGuard $owners,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /**
@@ -101,7 +103,7 @@ final readonly class BulkUpdateUsersAction implements BulkUpdateUsersContract
                     UserBulkOperation::Delete => $this->delete($user, $context),
                     UserBulkOperation::Restore => $this->restore($user, $context),
                 };
-                PrincipalChanged::dispatch($this->attributes->identifier($user), $operation->value, $metadata, AuthEventContext::platform());
+                $this->domainEvents->dispatch(new PrincipalChanged($this->attributes->identifier($user), $operation->value, $metadata, AuthEventContext::platform()), $user->getConnection());
             }
 
             $affectedUserIds = array_values($users->map(

@@ -20,6 +20,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\RbacEntityLocator;
 use Nvl\Auth\Services\RoleHierarchy;
+use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
@@ -44,6 +45,7 @@ final readonly class CreateRoleAction implements CreateRoleContract
         private TenantContext $context,
         private TenantMembershipAccess $memberships,
         private MembershipOwnerGuard $owners,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /** Persist one role. */
@@ -80,7 +82,7 @@ final readonly class CreateRoleAction implements CreateRoleContract
             $role->forceFill(['parent_id' => $parent?->id])->save();
             $role->syncPermissions($data->permissions);
             $this->audits->record('role.created', actor: $actor, metadata: ['role_id' => $role->id]);
-            RbacChanged::dispatch('role', $role->id, 'created', ['name' => $role->name]);
+            $this->domainEvents->dispatch(new RbacChanged('role', $role->id, 'created', ['name' => $role->name]), $role->getConnection());
 
             return $role->refresh()->load(['parent', 'permissions']);
         }, 3);

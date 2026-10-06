@@ -17,6 +17,7 @@ use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Deletes one non-system package permission.
@@ -32,6 +33,7 @@ final readonly class DeletePermissionAction implements DeletePermissionContract
         private RbacEntityLocator $entities,
         private AuthAuditRecorder $audits,
         private AuthOperationBoundary $operations,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /** Delete one permission. */
@@ -50,7 +52,7 @@ final readonly class DeletePermissionAction implements DeletePermissionContract
             $identifier = $permission->id;
             $deleted = (bool) $permission->delete();
             $this->audits->record('permission.deleted', actor: $actor, metadata: ['permission_id' => $identifier]);
-            RbacChanged::dispatch('permission', $identifier, 'deleted');
+            $this->domainEvents->dispatch(new RbacChanged('permission', $identifier, 'deleted'), $permission->getConnection());
 
             return $deleted;
         }, 3);

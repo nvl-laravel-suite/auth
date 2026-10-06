@@ -8,12 +8,17 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Config;
 use Nvl\Auth\Models\Role;
 
-/** @extends Factory<Role> */
+/** @api
+ * @extends Factory<Role> */
 final class RoleFactory extends Factory
 {
     /** @var class-string<Role> */
     protected $model = Role::class;
 
+    /** Define native package fixture attributes.
+     *
+     * @return array<model-property<Role>, mixed>
+     */
     public function definition(): array
     {
         return [

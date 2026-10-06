@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Contracts\AuthAuditRecorder as AuthAuditRecorderContract;
 use Nvl\Auth\Enums\AuthIdentityOperation;
@@ -41,25 +42,47 @@ final readonly class AuthAuditRecorder implements AuthAuditRecorderContract
         ?string $clientId = null,
         array $metadata = [],
     ): ?AuthAudit {
-        $snapshot = $this->tenantContext->snapshot();
-        if (config('nvl-tenancy.enabled') !== true
-            || in_array($snapshot->mode, [TenantContextMode::Tenant, TenantContextMode::Platform], true)) {
-            return $this->writer->write(
-                new AuthEventContext($snapshot->mode, $snapshot->tenantId),
-                $action,
-                $outcome,
-                $subject,
-                $actor,
-                $clientId,
-                $metadata,
-            );
-        }
-        $operation = $this->centralOperation($action);
-        if (! $operation instanceof AuthIdentityOperation || $clientId !== null) {
-            throw new AuthException('tenant_audit_context_required', 'Tenant audit ownership is required.', 500);
-        }
+        return ($this->prepare($action, $outcome, $subject, $actor, $clientId, $metadata))();
+    }
 
-        return $this->central->record($operation, $action, $outcome, $subject, $actor, $metadata);
+    /**
+     * Capture ownership before a deferred native audit is registered.
+     *
+     * @internal
+     *
+     * @param  array<string, mixed>  $metadata
+     * @return Closure(): ?AuthAudit
+     */
+    public function prepare(
+        string $action,
+        string $outcome = 'success',
+        ?SubjectReference $subject = null,
+        ?Authenticatable $actor = null,
+        ?string $clientId = null,
+        array $metadata = [],
+    ): Closure {
+        $snapshot = $this->tenantContext->snapshot();
+
+        return function () use ($snapshot, $action, $outcome, $subject, $actor, $clientId, $metadata): ?AuthAudit {
+            if (config('nvl-tenancy.enabled') !== true
+                || in_array($snapshot->mode, [TenantContextMode::Tenant, TenantContextMode::Platform], true)) {
+                return $this->writer->write(
+                    new AuthEventContext($snapshot->mode, $snapshot->tenantId),
+                    $action,
+                    $outcome,
+                    $subject,
+                    $actor,
+                    $clientId,
+                    $metadata,
+                );
+            }
+            $operation = $this->centralOperation($action);
+            if (! $operation instanceof AuthIdentityOperation || $clientId !== null) {
+                throw new AuthException('tenant_audit_context_required', 'Tenant audit ownership is required.', 500);
+            }
+
+            return $this->central->record($operation, $action, $outcome, $subject, $actor, $metadata);
+        };
     }
 
     private function centralOperation(string $action): ?AuthIdentityOperation

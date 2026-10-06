@@ -23,6 +23,10 @@ use Nvl\Support\Config\PackageStorage;
  * @property list<string>|null $abilities
  * @property string|null $tenant_id
  * @property string $ownership_key
+ *
+ * @api
+ *
+ * @nvl-consumer-read id
  */
 #[UseFactory(PersonalAccessTokenFactory::class)]
 class PersonalAccessToken extends SanctumPersonalAccessToken
@@ -60,5 +64,14 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
     public function getConnectionName(): ?string
     {
         return PackageStorage::connectionName($this->connection ?? PackageStorage::connection('auth') ?? parent::getConnectionName());
+    }
+
+    /** Return the runtime package fixture factory.
+     *
+     * @internal
+     */
+    protected static function newFactory(): PersonalAccessTokenFactory
+    {
+        return PersonalAccessTokenFactory::new();
     }
 }

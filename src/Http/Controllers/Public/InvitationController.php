@@ -34,8 +34,7 @@ final class InvitationController
                 'invitation_id' => $registered->invitation->identifier(),
                 'subject' => ['type' => $reference->type, 'id' => $reference->identifier],
             ],
-            'code' => 'invitation_accepted',
-            'message' => 'The invitation was accepted.',
+            'code' => 'invitation_accepted', 'message' => trans('nvl-auth::responsecode.invitation_accepted'),
         ]);
     }
 }

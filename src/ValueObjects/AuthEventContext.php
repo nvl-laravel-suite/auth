@@ -11,7 +11,10 @@ use Nvl\Support\Tenancy\ValueObjects\TenantContextSnapshot;
 use Nvl\Support\Tenancy\ValueObjects\TenantId;
 use Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope;
 
-/** Captures immutable Auth event ownership before context can change. */
+/** Captures immutable Auth event ownership before context can change.
+ *
+ * @api
+ */
 final readonly class AuthEventContext
 {
     public function __construct(

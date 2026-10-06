@@ -1,5 +1,28 @@
 # NVL Auth — API and usage
 
+## Quickstart
+
+```sh
+composer require nvl/auth:^5.0
+php artisan nvl:install auth --dry-run
+php artisan nvl:install auth
+```
+
+Required NVL dependencies: `nvl/core` (`^5.0`). Select Auth features deliberately and bind host identity/management policies. Installing the package does not adopt your existing auth guards or user model.
+Review the published common config, select one migration owner, and run schema preflight before existing-table upgrades. The installer does not enable features or run migrations. Follow the detailed installation and capability sections below before invoking a storage/provider operation.
+
+Inject `Nvl\Auth\Contracts\ListUsersContract` in a host service. After supplying the trusted inputs described above, the first public call is:
+
+```php
+use Nvl\Auth\Contracts\ListUsersContract;
+
+/** @var ListUsersContract $capability */
+$result = $capability->execute($actor);
+```
+
+Use the [event catalog](docs/events.md) and [Testing your app](#testing-your-app) below. The suite [getting-started guide](https://github.com/nvl-laravel-suite/laravel-suite/blob/main/docs/getting-started.md) provides a complete Comments host fixture; package archives retain their own local references.
+
+
 [← NVL Laravel Suite](https://github.com/nvl-laravel-suite)
 
 For support, [open an issue](https://github.com/nvl-laravel-suite/auth/issues). For vulnerabilities, use
@@ -120,6 +143,7 @@ For a clean application, review the Auth configuration before running migrations
 
 ```bash
 composer require nvl/auth:^5.0
+php artisan vendor:publish --tag=nvl-auth-translations
 php artisan vendor:publish --tag=nvl-auth-config
 php artisan migrate
 php artisan nvl:auth:schema
@@ -583,10 +607,6 @@ The source `@api` declarations identify supported workflows, extension contracts
 
 A package model returned or accepted by a public workflow is an identity/result handle. Use its declared type and `getKey()`, `getKeyName()`, `getMorphClass()`, `getRouteKey()`, `getRouteKeyName()`, `is()`, `isNot()`, and `relationLoaded()`. Read only explicitly declared in-memory `@nvl-consumer-read` fields; ordinary model PHPDocs and fillable attributes do not grant consumer reads. Obtain display projections through public reads. Persistence, additional model queries, relation access/loading, and generic model serialization are outside this contract. Host-model queries remain available, while traversal or aggregates of package capability relations require the package public reader or authorized adapter.
 
-## License
-
-NVL Auth is released under the MIT License. See [LICENSE](LICENSE).
-
 ## Shared consumer diagnostics
 
 Run `php artisan nvl:doctor --strict --format=json` to combine the read-only checks from loaded NVL package providers. Errors fail the gate, and strict mode also fails warnings. This package's existing Doctor command remains available and uses the same package-owned inspection service.
@@ -623,3 +643,260 @@ Migration filenames contain `nvl_auth_`. Existing installations must complete th
 ## Canonical configuration ownership
 
 Use `nvl-auth` settings in `config/nvl-auth.php` and canonical package environment names. Old generic roots are foreign unless an upgrading NVL host explicitly selects them in Core's default-off compatibility. Canonical false/null/empty values win; no old roots are populated or written back. Keep logical package/resource IDs unchanged. Review [Core's rename inventory and cache/worker cutover](https://github.com/nvl-laravel-suite/core/blob/main/UPGRADING.md#major-5-canonical-configuration-and-environment).
+
+## Testing your app
+
+Inject the supported contract rather than constructing its concrete Action or querying package tables. Replace `Nvl\Auth\Contracts\ListUsersContract` in Laravel's native container for a host-workflow test:
+
+```php
+use Nvl\Auth\Contracts\ListUsersContract;
+
+$double = Mockery::mock(ListUsersContract::class);
+$this->app->instance(ListUsersContract::class, $double);
+// Configure the exact execute arguments and documented return value for your host case.
+```
+
+The package's conditional native binding preserves host substitutions. Production uses the real contract; test doubles do not prove its storage/authorization behavior.
+
+A detached fixture for a returned identity/data handle is:
+
+```php
+use Nvl\Auth\Models\User;
+$fixture = User::factory()->withoutParents()->make();
+```
+
+Ordinary `make()` may persist declared package parents. `withoutParents()->make()` disables parent expansion/admission for detached fixtures; use explicit persisted parents/owners and matching effective connections for a real `create()`. Factories do not authorize workflows, call Stripe, create backing Media objects or publish Template artifacts. Enabled tenancy requires explicit admitted persisted tenants/parents. Your host test installation supplies Faker; no test runner is a runtime package dependency.
+
+Use Laravel `Event::fake()`, `Queue::fake()`, `Mail::fake()` or `Storage::fake()` only for the effects the host test intends to isolate. Use real commits/listeners for timing proof. Add the optional Core consumer boundary rules to host PHPStan:
+
+```neon
+includes:
+    - vendor/nvl/core/support/consumer-audit.neon
+parameters:
+    nvlConsumer:
+        testPaths: [tests]
+        tableNames: []
+        exceptions: []
+```
+
+Rules read installed public metadata without suite boot. They flag internal symbols, package model queries/writes, capability relations and owned tables; they cannot prove dynamic code or runtime authorization. Exact exceptions require `file`, `identifier`, `symbol`, and a documented `reason`. New C3/C4/E tests, archives and guide execution remain pending until the integration phase records results.
+
+### Shipped factory states
+
+These runtime builders keep Laravel's native Factory API. The listed methods name explicit supported parent/owner/lifecycle states; follow each factory's native admission requirements. Detached examples above do not assert persistence validity.
+
+| Factory | Explicit states |
+| --- | --- |
+| [`AuthAuditFactory`](database/factories/AuthAuditFactory.php) | Native Factory states only |
+| [`AuthClientFactory`](database/factories/AuthClientFactory.php) | Native Factory states only |
+| [`AuthClientSessionFactory`](database/factories/AuthClientSessionFactory.php) | Native Factory states only |
+| [`ChallengeFactory`](database/factories/ChallengeFactory.php) | Native Factory states only |
+| [`InvitationFactory`](database/factories/InvitationFactory.php) | Native Factory states only |
+| [`PasskeyFactory`](database/factories/PasskeyFactory.php) | `forSubject(User $subject)` |
+| [`PermissionFactory`](database/factories/PermissionFactory.php) | Native Factory states only |
+| [`PersonalAccessTokenFactory`](database/factories/PersonalAccessTokenFactory.php) | Native Factory states only |
+| [`RecoveryCodeFactory`](database/factories/RecoveryCodeFactory.php) | `forSubject(User $subject)` |
+| [`RoleFactory`](database/factories/RoleFactory.php) | Native Factory states only |
+| [`SocialIdentityFactory`](database/factories/SocialIdentityFactory.php) | `forSubject(User $subject)` |
+| [`TenantMembershipFactory`](database/factories/TenantMembershipFactory.php) | `forTenant(TenantId $tenant)`, `forSubject(User $subject)` |
+| [`TotpCredentialFactory`](database/factories/TotpCredentialFactory.php) | `forSubject(User $subject)` |
+| [`UserFactory`](database/factories/UserFactory.php) | `unverified()`, `disabled()` |
+
+## Error codes and events
+
+All recognized package failures implement `Nvl\Support\Contracts\PackageException`; only `RespondableException` opts into safe response metadata. Keep native PHP programmer errors and Laravel/SDK exceptions distinct. The optional `PackageExceptionRenderer` is registered by the host in `withExceptions`; it leaves unrelated, marker-only and non-JSON handling to the host. Its JSON envelope is `{message:string, code:string, context:object}`. Request locale is host-owned; diagnostics/previous exceptions are not public copy. Event schemas and source connections are documented in [events](docs/events.md).
+
+The table lists enum discriminators, including any successful codes retained for compatibility. A code is not itself an HTTP status; the throwing exception's `suggestedStatus()` is authoritative, especially legacy/custom constructors. Empty context renders as `{}`; only documented JSON-safe context is presented.
+
+| Code | Suggested status | Public context | Translation key |
+| --- | --- | --- | --- |
+| `operation_failed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.operation_failed` |
+| `invalid_configuration` | 500 | {} | `nvl-auth::responsecode.invalid_configuration` |
+| `feature_unavailable` | Exception-defined; see `suggestedStatus()` | {feature, operation, dependencies} | `nvl-auth::responsecode.feature_unavailable` |
+| `invitation_invalid` | 410 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invitation_invalid` |
+| `invitation_principal_conflict` | 409 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invitation_principal_conflict` |
+| `invitation_identity_proof_required` | 403 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invitation_identity_proof_required` |
+| `invitation_unavailable` | 404/410 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invitation_unavailable` |
+| `invitation_resend_limited` | 429 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invitation_resend_limited` |
+| `invitation_assignment_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invitation_assignment_invalid` |
+| `invitation_exists` | 409 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invitation_exists` |
+| `invitation_registration_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invitation_registration_invalid` |
+| `invitation_delivery_metadata_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invitation_delivery_metadata_invalid` |
+| `unauthenticated` | 401 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.unauthenticated` |
+| `authentication_required` | 401 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.authentication_required` |
+| `forbidden` | 403 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.forbidden` |
+| `api_token_ability_forbidden` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.api_token_ability_forbidden` |
+| `tenant_context_required` | 403 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.tenant_context_required` |
+| `system_mutation_forbidden` | 403 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.system_mutation_forbidden` |
+| `tenant_membership_required` | 403 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.tenant_membership_required` |
+| `verification_invalid` | 403 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.verification_invalid` |
+| `recovery_code_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.recovery_code_invalid` |
+| `tenant_authentication_intent_input_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.tenant_authentication_intent_input_invalid` |
+| `tenant_authentication_intent_unavailable` | 410 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.tenant_authentication_intent_unavailable` |
+| `tenant_authentication_intent_invalid` | 410 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.tenant_authentication_intent_invalid` |
+| `invalid_audit_metadata` | 500 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invalid_audit_metadata` |
+| `tenant_audit_context_required` | 500 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.tenant_audit_context_required` |
+| `credentials_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.credentials_invalid` |
+| `membership_principal_unavailable` | 404 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.membership_principal_unavailable` |
+| `membership_principal_ineligible` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.membership_principal_ineligible` |
+| `subject_unavailable` | 404 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.subject_unavailable` |
+| `subject_ineligible` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.subject_ineligible` |
+| `membership_assignment_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.membership_assignment_invalid` |
+| `password_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.password_invalid` |
+| `password_reset_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.password_reset_invalid` |
+| `session_unavailable` | 409 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.session_unavailable` |
+| `client_unavailable` | 404 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.client_unavailable` |
+| `client_redirect_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.client_redirect_invalid` |
+| `client_origin_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.client_origin_invalid` |
+| `client_session_input_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.client_session_input_invalid` |
+| `client_session_ended` | 409 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.client_session_ended` |
+| `client_session_conflict` | 409 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.client_session_conflict` |
+| `client_session_unavailable` | 404 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.client_session_unavailable` |
+| `client_session_reason_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.client_session_reason_invalid` |
+| `passkey_ceremony_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.passkey_ceremony_invalid` |
+| `passkey_limit_reached` | 409 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.passkey_limit_reached` |
+| `passkey_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.passkey_invalid` |
+| `passkey_exists` | 409 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.passkey_exists` |
+| `passkey_provider_unavailable` | 502 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.passkey_provider_unavailable` |
+| `passkey_unavailable` | 404 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.passkey_unavailable` |
+| `passkey_input_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.passkey_input_invalid` |
+| `passkey_counter_regression` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.passkey_counter_regression` |
+| `passkey_backup_state_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.passkey_backup_state_invalid` |
+| `passkey_user_verification_required` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.passkey_user_verification_required` |
+| `social_provider_unavailable` | 404/502 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.social_provider_unavailable` |
+| `social_identity_unavailable` | 404 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.social_identity_unavailable` |
+| `social_identity_conflict` | 409 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.social_identity_conflict` |
+| `social_authorization_failed` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.social_authorization_failed` |
+| `social_email_unverified` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.social_email_unverified` |
+| `role_template_not_found` | 404 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.role_template_not_found` |
+| `system_permission_immutable` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.system_permission_immutable` |
+| `system_permission_delete_forbidden` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.system_permission_delete_forbidden` |
+| `invalid_permission_catalog_query` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invalid_permission_catalog_query` |
+| `invalid_role_catalog_query` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invalid_role_catalog_query` |
+| `invalid_role_search` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invalid_role_search` |
+| `invalid_permission_search` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invalid_permission_search` |
+| `invalid_permission_group` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invalid_permission_group` |
+| `system_role_immutable` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.system_role_immutable` |
+| `system_role_delete_forbidden` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.system_role_delete_forbidden` |
+| `invalid_role_name` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invalid_role_name` |
+| `invalid_role_identifier` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invalid_role_identifier` |
+| `invalid_permission_identifier` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invalid_permission_identifier` |
+| `invalid_membership_filter` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invalid_membership_filter` |
+| `membership_revision_conflict` | 409 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.membership_revision_conflict` |
+| `membership_ownership_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.membership_ownership_invalid` |
+| `rbac_mixed_context_operation` | 409 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.rbac_mixed_context_operation` |
+| `account_confirmation_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.account_confirmation_invalid` |
+| `tenant_token_invalid` | 403 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.tenant_token_invalid` |
+| `membership_last_owner` | 409 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.membership_last_owner` |
+| `membership_unavailable` | 404 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.membership_unavailable` |
+| `principal_unavailable` | 404 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.principal_unavailable` |
+| `role_identifier_not_found` | 404/422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.role_identifier_not_found` |
+| `permission_identifier_not_found` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.permission_identifier_not_found` |
+| `ambiguous_role_identifier` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.ambiguous_role_identifier` |
+| `ambiguous_permission_identifier` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.ambiguous_permission_identifier` |
+| `duplicate_role_identifier` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.duplicate_role_identifier` |
+| `duplicate_permission_identifier` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.duplicate_permission_identifier` |
+| `too_many_role_identifiers` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.too_many_role_identifiers` |
+| `too_many_permission_identifiers` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.too_many_permission_identifiers` |
+| `invalid_role_parent` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invalid_role_parent` |
+| `role_hierarchy_cycle` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.role_hierarchy_cycle` |
+| `totp_unavailable` | 404 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.totp_unavailable` |
+| `totp_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.totp_invalid` |
+| `self_delete_forbidden` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.self_delete_forbidden` |
+| `invalid_bulk_selection` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invalid_bulk_selection` |
+| `self_bulk_operation_forbidden` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.self_bulk_operation_forbidden` |
+| `self_disable_forbidden` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.self_disable_forbidden` |
+| `invalid_user_filter` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invalid_user_filter` |
+| `invalid_user_search` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invalid_user_search` |
+| `account_confirmation_required` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.account_confirmation_required` |
+| `email_unavailable` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.email_unavailable` |
+| `security_code_authentication_purpose_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.security_code_authentication_purpose_invalid` |
+| `challenge_issue_conflict` | 409 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.challenge_issue_conflict` |
+| `challenge_invalid` | 422 | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.challenge_invalid` |
+| `logged_out` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.logged_out` |
+| `password_updated` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.password_updated` |
+| `password_confirmed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.password_confirmed` |
+| `email_verification_requested` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.email_verification_requested` |
+| `roles_listed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.roles_listed` |
+| `role_hierarchy_shown` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.role_hierarchy_shown` |
+| `role_templates_listed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.role_templates_listed` |
+| `rbac_analytics_shown` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.rbac_analytics_shown` |
+| `role_created` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.role_created` |
+| `role_shown` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.role_shown` |
+| `role_updated` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.role_updated` |
+| `role_cloned` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.role_cloned` |
+| `role_template_applied` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.role_template_applied` |
+| `role_deleted` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.role_deleted` |
+| `passkey_registration_started` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.passkey_registration_started` |
+| `passkey_registered` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.passkey_registered` |
+| `passkey_revoked` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.passkey_revoked` |
+| `authenticated` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.authenticated` |
+| `invitations_listed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invitations_listed` |
+| `invitation_issued` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invitation_issued` |
+| `invitation_resent` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invitation_resent` |
+| `invitation_revoked` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invitation_revoked` |
+| `rbac_synchronized` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.rbac_synchronized` |
+| `permissions_listed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.permissions_listed` |
+| `permission_created` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.permission_created` |
+| `permission_shown` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.permission_shown` |
+| `permission_updated` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.permission_updated` |
+| `permission_deleted` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.permission_deleted` |
+| `auth_audits_listed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.auth_audits_listed` |
+| `auth_audit_shown` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.auth_audit_shown` |
+| `totp_enrollment_started` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.totp_enrollment_started` |
+| `totp_enrolled` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.totp_enrolled` |
+| `totp_verified` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.totp_verified` |
+| `totp_revoked` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.totp_revoked` |
+| `passkey_authentication_started` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.passkey_authentication_started` |
+| `passkey_authenticated` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.passkey_authenticated` |
+| `social_link_started` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.social_link_started` |
+| `social_identity_linked` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.social_identity_linked` |
+| `social_identity_revoked` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.social_identity_revoked` |
+| `invitation_accepted` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.invitation_accepted` |
+| `client_started` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.client_started` |
+| `clients_listed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.clients_listed` |
+| `client_created` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.client_created` |
+| `client_shown` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.client_shown` |
+| `client_updated` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.client_updated` |
+| `client_deleted` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.client_deleted` |
+| `client_activated` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.client_activated` |
+| `client_deactivated` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.client_deactivated` |
+| `social_authorization_started` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.social_authorization_started` |
+| `social_authenticated` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.social_authenticated` |
+| `tenant_authentication_intent_completed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.tenant_authentication_intent_completed` |
+| `memberships_listed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.memberships_listed` |
+| `membership_shown` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.membership_shown` |
+| `membership_enrolled` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.membership_enrolled` |
+| `membership_status_updated` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.membership_status_updated` |
+| `membership_revoked` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.membership_revoked` |
+| `membership_ownership_transferred` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.membership_ownership_transferred` |
+| `users_listed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.users_listed` |
+| `user_suggestions_listed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.user_suggestions_listed` |
+| `user_created` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.user_created` |
+| `user_shown` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.user_shown` |
+| `user_updated` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.user_updated` |
+| `user_enabled` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.user_enabled` |
+| `user_disabled` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.user_disabled` |
+| `user_deleted` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.user_deleted` |
+| `user_restored` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.user_restored` |
+| `users_bulk_updated` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.users_bulk_updated` |
+| `user_roles_synchronized` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.user_roles_synchronized` |
+| `user_permissions_synchronized` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.user_permissions_synchronized` |
+| `recovery_codes_regenerated` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.recovery_codes_regenerated` |
+| `recovery_code_consumed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.recovery_code_consumed` |
+| `recovery_codes_revoked` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.recovery_codes_revoked` |
+| `profile_shown` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.profile_shown` |
+| `profile_updated` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.profile_updated` |
+| `account_deleted` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.account_deleted` |
+| `magic_link_requested` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.magic_link_requested` |
+| `magic_link_consumed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.magic_link_consumed` |
+| `security_code_requested` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.security_code_requested` |
+| `security_code_verified` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.security_code_verified` |
+| `security_code_authentication_requested` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.security_code_authentication_requested` |
+| `security_code_authenticated` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.security_code_authenticated` |
+| `email_verified` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.email_verified` |
+
+
+## License
+
+NVL Auth is released under the MIT License. See [LICENSE](LICENSE).

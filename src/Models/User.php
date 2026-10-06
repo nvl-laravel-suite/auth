@@ -362,4 +362,13 @@ class User extends Authenticatable implements CanResetPasswordContract, HasApiTo
             ? $configured
             : ($attribute === PrincipalAttribute::Active ? 'is_active' : $attribute->value);
     }
+
+    /** Return the runtime package fixture factory.
+     *
+     * @internal
+     */
+    protected static function newFactory(): UserFactory
+    {
+        return UserFactory::new();
+    }
 }

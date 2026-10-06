@@ -15,8 +15,7 @@ final class MembershipController extends AuthenticatedController
     {
         return response()->json([
             'data' => $action->execute($this->subject($request)),
-            'code' => 'memberships_listed',
-            'message' => 'Memberships were listed.',
+            'code' => 'memberships_listed', 'message' => trans('nvl-auth::responsecode.memberships_listed'),
         ]);
     }
 }

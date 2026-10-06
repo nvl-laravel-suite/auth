@@ -15,6 +15,7 @@ use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\PersonalAccessToken;
 use Nvl\Auth\Models\TenantMembership;
+use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\MembershipLocator;
 use Nvl\Auth\Services\MembershipOwnerGuard;
@@ -32,6 +33,9 @@ use Nvl\Support\Tenancy\Contracts\TenantContext;
  */
 final readonly class RevokeMembershipAction implements RevokeMembershipContract
 {
+    /** Records through the audit recorder supplied to this use case. */
+    private AuthCommittedAudit $committedAudits;
+
     public function __construct(
         private FeatureGate $features,
         private MutationAuthorizer $authorization,
@@ -41,8 +45,11 @@ final readonly class RevokeMembershipAction implements RevokeMembershipContract
         private MembershipWriter $writer,
         private TenantMembershipAssignments $assignments,
         private TenantContext $context,
-        private AuthAuditRecorder $audits,
-    ) {}
+        AuthAuditRecorder $audits,
+        AuthCommittedAudit $committedAudits,
+    ) {
+        $this->committedAudits = $committedAudits->withRecorder($audits);
+    }
 
     public function execute(Authenticatable|SystemMutationContext $authority, TenantMembership|string $membership, int $expectedRevision): TenantMembership
     {
@@ -65,10 +72,10 @@ final readonly class RevokeMembershipAction implements RevokeMembershipContract
             PersonalAccessToken::query()->where('tenant_id', $tenant->value)
                 ->where('tokenable_type', $target->subject_type)->where('tokenable_id', $target->subject_id)->delete();
             $updated = $this->writer->setStatus($target, MembershipStatus::Revoked);
-            DB::connection($updated->getConnectionName())->afterCommit(fn () => $this->audits->record(
+            $this->committedAudits->record(DB::connection($updated->getConnectionName()),
                 'membership.revoked', subject: $reference, actor: $actor,
                 metadata: ['membership_id' => $updated->identifier(), ...$this->authorization->metadata($authority)],
-            ));
+            );
 
             return $updated;
         }, 1);

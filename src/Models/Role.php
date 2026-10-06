@@ -150,4 +150,13 @@ class Role extends SpatieRole
             'metadata' => 'array',
         ];
     }
+
+    /** Return the runtime package fixture factory.
+     *
+     * @internal
+     */
+    protected static function newFactory(): RoleFactory
+    {
+        return RoleFactory::new();
+    }
 }

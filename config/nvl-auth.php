@@ -17,11 +17,14 @@ use Nvl\Auth\Services\PackageRoleTemplates;
 use Nvl\Auth\Services\VerifiedInvitationRecipientProof;
 use Nvl\Support\Config\PackageEnvironment;
 
+/** Complete runtime defaults; publication sections are declared in ../resources/config/sections.json. */
 return [
     'adoption' => [
         'principal_model' => ['enabled' => false, 'guard' => null, 'provider' => null],
         'password_broker' => ['enabled' => false, 'broker' => null],
         'spatie_storage' => ['enabled' => false],
+        'maximum_manifest_bytes' => 1_048_576,
+        'maximum_records' => 10_000,
     ],
     /*
     |--------------------------------------------------------------------------
@@ -301,11 +304,6 @@ return [
 
     'cleanup' => [
         'retention_days' => PackageEnvironment::get('NVL_AUTH_RETENTION_DAYS', 30),
-    ],
-
-    'adoption' => [
-        'maximum_manifest_bytes' => 1_048_576,
-        'maximum_records' => 10_000,
     ],
 
     /*

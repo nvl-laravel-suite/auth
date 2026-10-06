@@ -14,10 +14,12 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\AuthDeliveryRequested;
+use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Emits email-verification delivery data without sending a notification.
@@ -33,6 +35,7 @@ final readonly class RequestEmailVerificationAction implements RequestEmailVerif
         private FeatureGate $features,
         private AuthConfiguration $configuration,
         private AuthAuditRecorder $audits,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /**
@@ -57,7 +60,7 @@ final readonly class RequestEmailVerificationAction implements RequestEmailVerif
                 10_080,
             ),
         );
-        AuthDeliveryRequested::dispatch(new AuthDeliveryRequest(
+        $this->domainEvents->dispatch(new AuthDeliveryRequested(new AuthDeliveryRequest(
             messageId: (string) Str::uuid(),
             feature: AuthFeature::EmailVerification,
             type: AuthMessageType::EmailVerification,
@@ -69,7 +72,7 @@ final readonly class RequestEmailVerificationAction implements RequestEmailVerif
             ],
             expiresAt: $expiresAt,
             locale: $locale,
-        ));
+        )), (new AuthAudit)->getConnection());
         $this->audits->record('email_verification.requested', subject: $reference, actor: $subject);
     }
 }

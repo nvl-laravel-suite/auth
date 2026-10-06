@@ -15,6 +15,7 @@ use Nvl\Auth\Models\Role;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacAssignmentService;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Replaces all permissions assigned to one role.
@@ -29,6 +30,7 @@ final readonly class SyncRolePermissionsAction implements SyncRolePermissionsCon
         private ManagementAuthorizer $authorization,
         private RbacAssignmentService $assignments,
         private AuthAuditRecorder $audits,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /**
@@ -51,10 +53,10 @@ final readonly class SyncRolePermissionsAction implements SyncRolePermissionsCon
                     'permission_ids' => $result['permissionIds'],
                     'permission_count' => count($result['permissionIds']),
                 ]);
-                RbacChanged::dispatch('role', $result['role']->id, 'permissions_synchronized', [
+                $this->domainEvents->dispatch(new RbacChanged('role', $result['role']->id, 'permissions_synchronized', [
                     'permission_ids' => $result['permissionIds'],
                     'permission_names' => $result['permissionNames'],
-                ]);
+                ]), $result['role']->getConnection());
 
                 return $result;
             },

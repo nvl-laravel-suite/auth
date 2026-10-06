@@ -47,7 +47,7 @@ final class UserController extends AuthenticatedController
             $query->perPage ?? 25,
         );
 
-        return response()->json(['data' => $page, 'code' => 'users_listed', 'message' => 'Users were listed.']);
+        return response()->json(['data' => $page, 'code' => 'users_listed', 'message' => trans('nvl-auth::responsecode.users_listed')]);
     }
 
     /** Return minimal principal suggestions. */
@@ -61,8 +61,7 @@ final class UserController extends AuthenticatedController
                 $query->search,
                 $query->limit,
             ),
-            'code' => 'user_suggestions_listed',
-            'message' => 'User suggestions were listed.',
+            'code' => 'user_suggestions_listed', 'message' => trans('nvl-auth::responsecode.user_suggestions_listed'),
         ]);
     }
 
@@ -78,7 +77,7 @@ final class UserController extends AuthenticatedController
 
         $user = $action->execute($this->subject($request), $data);
 
-        return response()->json(['data' => $user, 'code' => 'user_created', 'message' => 'The user was created.'], 201);
+        return response()->json(['data' => $user, 'code' => 'user_created', 'message' => trans('nvl-auth::responsecode.user_created')], 201);
     }
 
     /** Show one principal, including soft-deleted principals. */
@@ -86,8 +85,7 @@ final class UserController extends AuthenticatedController
     {
         return response()->json([
             'data' => $action->execute($this->subject($request), $user),
-            'code' => 'user_shown',
-            'message' => 'The user was shown.',
+            'code' => 'user_shown', 'message' => trans('nvl-auth::responsecode.user_shown'),
         ]);
     }
 
@@ -97,7 +95,7 @@ final class UserController extends AuthenticatedController
         $data = UpdateUserData::validateForUpdate($this->requestPayload($request), $user);
         $updated = $action->execute($this->subject($request), $user, $data);
 
-        return response()->json(['data' => $updated, 'code' => 'user_updated', 'message' => 'The user was updated.']);
+        return response()->json(['data' => $updated, 'code' => 'user_updated', 'message' => trans('nvl-auth::responsecode.user_updated')]);
     }
 
     /** Enable or disable one principal. */
@@ -114,7 +112,7 @@ final class UserController extends AuthenticatedController
         return response()->json([
             'data' => $updated,
             'code' => $active ? 'user_enabled' : 'user_disabled',
-            'message' => $active ? 'The user was enabled.' : 'The user was disabled.',
+            'message' => $active ? trans('nvl-auth::responsecode.user_enabled') : trans('nvl-auth::responsecode.user_disabled'),
         ]);
     }
 
@@ -123,7 +121,7 @@ final class UserController extends AuthenticatedController
     {
         $action->execute($this->subject($request), $user);
 
-        return response()->json(['data' => null, 'code' => 'user_deleted', 'message' => 'The user was deleted.']);
+        return response()->json(['data' => null, 'code' => 'user_deleted', 'message' => trans('nvl-auth::responsecode.user_deleted')]);
     }
 
     /** Restore one principal. */
@@ -131,8 +129,7 @@ final class UserController extends AuthenticatedController
     {
         return response()->json([
             'data' => $action->execute($this->subject($request), $user),
-            'code' => 'user_restored',
-            'message' => 'The user was restored.',
+            'code' => 'user_restored', 'message' => trans('nvl-auth::responsecode.user_restored'),
         ]);
     }
 
@@ -142,7 +139,7 @@ final class UserController extends AuthenticatedController
         $data = BulkUserData::validateAndCreate(AuthRequestInput::aliased($request->all(), ['user_ids' => ['userIds']]));
         $result = $action->execute($this->subject($request), $data->operation, $data->userIds);
 
-        return response()->json(['data' => $result, 'code' => 'users_bulk_updated', 'message' => 'The bulk user operation completed.']);
+        return response()->json(['data' => $result, 'code' => 'users_bulk_updated', 'message' => trans('nvl-auth::responsecode.users_bulk_updated')]);
     }
 
     /** Replace one principal's roles. */
@@ -150,8 +147,7 @@ final class UserController extends AuthenticatedController
     {
         return response()->json([
             'data' => $action->execute($this->subject($request), $user, $data),
-            'code' => 'user_roles_synchronized',
-            'message' => 'The user roles were synchronized.',
+            'code' => 'user_roles_synchronized', 'message' => trans('nvl-auth::responsecode.user_roles_synchronized'),
         ]);
     }
 
@@ -160,8 +156,7 @@ final class UserController extends AuthenticatedController
     {
         return response()->json([
             'data' => $action->execute($this->subject($request), $user, $data),
-            'code' => 'user_permissions_synchronized',
-            'message' => 'The user permissions were synchronized.',
+            'code' => 'user_permissions_synchronized', 'message' => trans('nvl-auth::responsecode.user_permissions_synchronized'),
         ]);
     }
 }

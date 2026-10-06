@@ -19,6 +19,7 @@ use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Creates one package permission.
@@ -35,6 +36,7 @@ final readonly class CreatePermissionAction implements CreatePermissionContract
         private AuthConfiguration $configuration,
         private AuthAuditRecorder $audits,
         private AuthOperationBoundary $operations,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /** Persist one permission. */
@@ -57,7 +59,7 @@ final readonly class CreatePermissionAction implements CreatePermissionContract
                 'metadata' => $data->metadata,
             ]);
             $this->audits->record('permission.created', actor: $actor, metadata: ['permission_id' => $permission->id]);
-            RbacChanged::dispatch('permission', $permission->id, 'created', ['name' => $permission->name]);
+            $this->domainEvents->dispatch(new RbacChanged('permission', $permission->id, 'created', ['name' => $permission->name]), $permission->getConnection());
 
             return $permission->refresh();
         }, 3);

@@ -30,8 +30,7 @@ final class MembershipController extends AuthenticatedController
 
         return response()->json([
             'data' => $action->execute($this->subject($request), $query->search, $query->perPage ?? 25),
-            'code' => 'memberships_listed',
-            'message' => 'Memberships were listed.',
+            'code' => 'memberships_listed', 'message' => trans('nvl-auth::responsecode.memberships_listed'),
         ]);
     }
 
@@ -44,10 +43,10 @@ final class MembershipController extends AuthenticatedController
                 throw $exception;
             }
 
-            return response()->json(['data' => null, 'code' => 'membership_unavailable', 'message' => 'The tenant membership is unavailable.'], 404);
+            return response()->json(['data' => null, 'code' => 'membership_unavailable', 'message' => trans('nvl-auth::responsecode.membership_unavailable')], 404);
         }
 
-        return response()->json(['data' => $data, 'code' => 'membership_shown', 'message' => 'The membership was shown.']);
+        return response()->json(['data' => $data, 'code' => 'membership_shown', 'message' => trans('nvl-auth::responsecode.membership_shown')]);
     }
 
     public function store(Request $request, EnrollMembershipAction $action): JsonResponse
@@ -58,7 +57,7 @@ final class MembershipController extends AuthenticatedController
         ]));
         $membership = $action->execute($this->subject($request), $data->enrollment());
 
-        return response()->json(['data' => $membership, 'code' => 'membership_enrolled', 'message' => 'The membership was enrolled.'], 201);
+        return response()->json(['data' => $membership, 'code' => 'membership_enrolled', 'message' => trans('nvl-auth::responsecode.membership_enrolled')], 201);
     }
 
     public function status(Request $request, string $membership, SetMembershipStatusAction $action): JsonResponse
@@ -67,7 +66,7 @@ final class MembershipController extends AuthenticatedController
 
         return response()->json([
             'data' => $action->execute($this->subject($request), $membership, $data),
-            'code' => 'membership_status_updated', 'message' => 'The membership status was updated.',
+            'code' => 'membership_status_updated', 'message' => trans('nvl-auth::responsecode.membership_status_updated'),
         ]);
     }
 
@@ -76,7 +75,7 @@ final class MembershipController extends AuthenticatedController
         $data = MembershipRevisionData::validateAndCreate(AuthRequestInput::aliased($request->all(), ['expected_revision' => ['expectedRevision']]));
         $action->execute($this->subject($request), $membership, $data->expectedRevision);
 
-        return response()->json(['data' => null, 'code' => 'membership_revoked', 'message' => 'The membership was revoked.']);
+        return response()->json(['data' => null, 'code' => 'membership_revoked', 'message' => trans('nvl-auth::responsecode.membership_revoked')]);
     }
 
     public function transfer(Request $request, string $membership, TransferMembershipOwnershipAction $action): JsonResponse
@@ -88,7 +87,7 @@ final class MembershipController extends AuthenticatedController
 
         return response()->json([
             'data' => $action->execute($this->subject($request), $membership, $data),
-            'code' => 'membership_ownership_transferred', 'message' => 'Membership ownership was transferred.',
+            'code' => 'membership_ownership_transferred', 'message' => trans('nvl-auth::responsecode.membership_ownership_transferred'),
         ]);
     }
 }

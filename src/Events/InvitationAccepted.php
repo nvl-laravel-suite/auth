@@ -5,18 +5,17 @@ declare(strict_types=1);
 namespace Nvl\Auth\Events;
 
 use Carbon\CarbonImmutable;
-use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
-use Illuminate\Foundation\Events\Dispatchable;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Contracts\DomainEvent;
 
 /**
  * Publishes one privacy-bounded invitation acceptance after storage commits.
+ *
+ * @api
  */
-final class InvitationAccepted implements ShouldDispatchAfterCommit
+final class InvitationAccepted implements DomainEvent
 {
-    use Dispatchable;
-
     /**
      * Create the committed invitation acceptance event.
      */
@@ -27,6 +26,7 @@ final class InvitationAccepted implements ShouldDispatchAfterCommit
         public readonly SubjectReference $subject,
         public readonly ?CarbonImmutable $acceptedAt = null,
         public readonly ?AuthEventContext $context = null,
+        public readonly int $schemaVersion = 1,
     ) {}
 
     /**
@@ -41,6 +41,7 @@ final class InvitationAccepted implements ShouldDispatchAfterCommit
             'type' => $this->type,
             'purpose' => $this->purpose,
             'subject' => $this->subject,
+            'schemaVersion' => $this->schemaVersion,
         ];
 
         if (isset($this->acceptedAt)) {
@@ -63,7 +64,8 @@ final class InvitationAccepted implements ShouldDispatchAfterCommit
      *     purpose: string,
      *     subject: SubjectReference,
      *     acceptedAt?: CarbonImmutable|null,
-     *     context?: AuthEventContext|null
+     *     context?: AuthEventContext|null,
+     *     schemaVersion?: int
      * }  $data
      */
     public function __unserialize(array $data): void
@@ -74,5 +76,12 @@ final class InvitationAccepted implements ShouldDispatchAfterCommit
         $this->subject = $data['subject'];
         $this->acceptedAt = $data['acceptedAt'] ?? null;
         $this->context = $data['context'] ?? null;
+        $this->schemaVersion = $data['schemaVersion'] ?? 1;
+    }
+
+    /** Return the immutable event payload schema version. */
+    public function schemaVersion(): int
+    {
+        return $this->schemaVersion;
     }
 }

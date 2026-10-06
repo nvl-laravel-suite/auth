@@ -10,6 +10,7 @@ use Laravel\Sanctum\SanctumServiceProvider;
 use Nvl\Auth\Providers\AuthServiceProvider;
 use Nvl\Auth\Tests\Fixtures\HostPersonalAccessToken;
 use Nvl\Auth\Tests\Fixtures\TestUser;
+use Nvl\Support\Providers\LocaleServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -28,6 +29,7 @@ abstract class DisabledAuthProviderTestCase extends Orchestra
     protected function getPackageProviders($app): array
     {
         return [
+            LocaleServiceProvider::class,
             PermissionServiceProvider::class,
             SanctumServiceProvider::class,
             AuthServiceProvider::class,

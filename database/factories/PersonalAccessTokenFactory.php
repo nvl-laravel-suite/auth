@@ -9,12 +9,17 @@ use Illuminate\Support\Str;
 use Nvl\Auth\Models\PersonalAccessToken;
 use Nvl\Auth\Models\User;
 
-/** @extends Factory<PersonalAccessToken> */
+/** @api
+ * @extends Factory<PersonalAccessToken> */
 final class PersonalAccessTokenFactory extends Factory
 {
     /** @var class-string<PersonalAccessToken> */
     protected $model = PersonalAccessToken::class;
 
+    /** Define native package fixture attributes.
+     *
+     * @return array<model-property<PersonalAccessToken>, mixed>
+     */
     public function definition(): array
     {
         return [

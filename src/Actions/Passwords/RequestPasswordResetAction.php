@@ -21,12 +21,14 @@ use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Creates a Laravel password-broker token and delegates its delivery by event.
@@ -46,6 +48,7 @@ final readonly class RequestPasswordResetAction implements RequestPasswordResetC
         private AuthPipeline $pipeline,
         private AuthAuditRecorder $audits,
         private AuthenticationEligibility $eligibility,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /**
@@ -104,7 +107,7 @@ final readonly class RequestPasswordResetAction implements RequestPasswordResetC
                         10_080,
                     ),
                 );
-                AuthDeliveryRequested::dispatch(new AuthDeliveryRequest(
+                $this->domainEvents->dispatch(new AuthDeliveryRequested(new AuthDeliveryRequest(
                     messageId: (string) Str::uuid(),
                     feature: AuthFeature::Password,
                     type: AuthMessageType::PasswordReset,
@@ -112,7 +115,7 @@ final readonly class RequestPasswordResetAction implements RequestPasswordResetC
                     payload: ['token' => $token, 'identifier' => $data->identifier],
                     expiresAt: $expiresAt,
                     locale: $locale,
-                ));
+                )), (new AuthAudit)->getConnection());
                 $reference = SubjectReference::fromAuthenticatable($subject);
                 $this->audits->record(
                     'password.reset_requested',

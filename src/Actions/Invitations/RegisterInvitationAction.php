@@ -25,6 +25,7 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Results\InvitationRegistrationResult;
+use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\InvitationTenantBootstrap;
@@ -37,6 +38,7 @@ use Nvl\Auth\Services\TenantMembershipAssignments;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Support\Tenancy\Contracts\TenantRunner;
@@ -50,6 +52,9 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
  */
 final readonly class RegisterInvitationAction implements RegisterInvitationContract
 {
+    /** Records through the audit recorder supplied to this use case. */
+    private AuthCommittedAudit $committedAudits;
+
     /** Create the atomic invitation registration use case. */
     public function __construct(
         private FeatureGate $features,
@@ -59,7 +64,7 @@ final readonly class RegisterInvitationAction implements RegisterInvitationContr
         private InvitationTenantBootstrap $bootstrap,
         private RbacManager $rbac,
         private AuthPipeline $pipeline,
-        private AuthAuditRecorder $audits,
+        AuthAuditRecorder $audits,
         private AuthModelRegistry $models,
         private PrincipalAttributeMapper $attributes,
         private TenantRunner $runner,
@@ -70,7 +75,11 @@ final readonly class RegisterInvitationAction implements RegisterInvitationContr
         private TenantMembershipAssignments $assignments,
         private TenantMembershipAccess $membershipAccess,
         private ManagementAuthorizer $authorization,
-    ) {}
+        AuthCommittedAudit $committedAudits,
+        private DomainEventDispatcher $domainEvents,
+    ) {
+        $this->committedAudits = $committedAudits->withRecorder($audits);
+    }
 
     /** Register the invited subject and return the consumed invitation and subject. */
     public function execute(
@@ -166,30 +175,29 @@ final readonly class RegisterInvitationAction implements RegisterInvitationContr
                             'accepted_by_id' => $reference->identifier,
                             'accepted_at' => $acceptedAt,
                         ])->save();
-                        DB::connection($connection)->afterCommit(function () use ($invitation, $membership, $reference, $subject, $tenant): void {
-                            $metadata = ['invitation_id' => $invitation->identifier()];
-                            if ($membership !== null) {
-                                $metadata['membership_id'] = $membership->identifier();
-                            }
-                            $this->audits->record('invitation.accepted', subject: $reference, actor: $subject, metadata: $metadata);
-                            InvitationAccepted::dispatch(
-                                invitationId: $invitation->identifier(),
-                                type: $invitation->type,
-                                purpose: $invitation->purpose,
-                                subject: $reference,
-                                acceptedAt: $invitation->accepted_at,
-                                context: $tenant instanceof TenantId
-                                    ? new AuthEventContext(TenantContextMode::Tenant, $tenant)
-                                    : null,
-                            );
-                            PrincipalChanged::dispatch(
-                                $reference->identifier,
-                                'invitation_registered',
-                                context: $tenant instanceof TenantId
-                                    ? new AuthEventContext(TenantContextMode::Tenant, $tenant)
-                                    : null,
-                            );
-                        });
+
+                        $metadata = ['invitation_id' => $invitation->identifier()];
+                        if ($membership !== null) {
+                            $metadata['membership_id'] = $membership->identifier();
+                        }
+                        $this->committedAudits->record(DB::connection($connection), 'invitation.accepted', subject: $reference, actor: $subject, metadata: $metadata);
+                        $this->domainEvents->dispatch(new InvitationAccepted(
+                            invitationId: $invitation->identifier(),
+                            type: $invitation->type,
+                            purpose: $invitation->purpose,
+                            subject: $reference,
+                            acceptedAt: $invitation->accepted_at,
+                            context: $tenant instanceof TenantId
+                                ? new AuthEventContext(TenantContextMode::Tenant, $tenant)
+                                : null,
+                        ), $invitation->getConnection());
+                        $this->domainEvents->dispatch(new PrincipalChanged(
+                            $reference->identifier,
+                            'invitation_registered',
+                            context: $tenant instanceof TenantId
+                                ? new AuthEventContext(TenantContextMode::Tenant, $tenant)
+                                : null,
+                        ), $invitation->getConnection());
 
                         return new InvitationRegistrationResult($invitation, $subject);
                     },

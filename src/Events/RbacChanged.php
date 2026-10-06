@@ -4,16 +4,15 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Events;
 
-use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
-use Illuminate\Foundation\Events\Dispatchable;
+use Nvl\Support\Contracts\DomainEvent;
 
 /**
  * Publishes a committed role, permission, or assignment mutation.
+ *
+ * @api
  */
-final class RbacChanged implements ShouldDispatchAfterCommit
+final class RbacChanged implements DomainEvent
 {
-    use Dispatchable;
-
     /**
      * Create the RBAC event.
      *
@@ -24,5 +23,12 @@ final class RbacChanged implements ShouldDispatchAfterCommit
         public readonly string $entityId,
         public readonly string $operation,
         public readonly array $payload = [],
+        public readonly int $schemaVersion = 1,
     ) {}
+
+    /** Return the immutable event payload schema version. */
+    public function schemaVersion(): int
+    {
+        return $this->schemaVersion;
+    }
 }

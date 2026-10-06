@@ -22,6 +22,7 @@ use Nvl\Auth\Events\AuthenticationAttempted;
 use Nvl\Auth\Events\AuthenticationRejected;
 use Nvl\Auth\Events\UserAuthenticated;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthOperationBoundary;
@@ -30,6 +31,7 @@ use Nvl\Auth\Services\TenantAuthenticationIntents;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Support\Tenancy\ValueObjects\TenantId;
 use SensitiveParameter;
@@ -58,6 +60,7 @@ final readonly class LoginAction implements LoginContract
         private AuthOperationBoundary $operations,
         private TenantAuthenticationIntents $tenantIntents,
         private TenantMembershipAccess $tenantMemberships,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /**
@@ -82,11 +85,11 @@ final readonly class LoginAction implements LoginContract
             );
         }
 
-        AuthenticationAttempted::dispatch($identifierName, $data->identifier);
+        $this->domainEvents->dispatch(new AuthenticationAttempted($identifierName, $data->identifier), (new AuthAudit)->getConnection());
 
         if (! $guard->attempt([$identifierName => $data->identifier, 'password' => $data->password], $data->remember)) {
             $this->audits->record('authentication.failed', outcome: 'failure');
-            AuthenticationRejected::dispatch($identifierName, $data->identifier, 'credentials_invalid');
+            $this->domainEvents->dispatch(new AuthenticationRejected($identifierName, $data->identifier, 'credentials_invalid'), (new AuthAudit)->getConnection());
             throw new AuthException('credentials_invalid', 'The supplied credentials are invalid.', 422);
         }
 
@@ -102,12 +105,12 @@ final readonly class LoginAction implements LoginContract
         } catch (AuthException $exception) {
             $guard->logout();
             $this->audits->record('authentication.failed', outcome: 'failure');
-            AuthenticationRejected::dispatch(
+            $this->domainEvents->dispatch(new AuthenticationRejected(
                 $identifierName,
                 $data->identifier,
                 $exception->errorCode,
                 SubjectReference::fromAuthenticatable($subject),
-            );
+            ), (new AuthAudit)->getConnection());
 
             throw $exception;
         }
@@ -129,7 +132,7 @@ final readonly class LoginAction implements LoginContract
             $this->loginMetadata->record($authenticated, $requestContext ?? new AuthenticationRequestContext);
             $this->audits->record('authentication.succeeded', subject: $reference, actor: $authenticated);
             $this->selectTenant($authenticated, $reference, $requestContext);
-            UserAuthenticated::dispatch($reference);
+            $this->domainEvents->dispatch(new UserAuthenticated($reference), (new AuthAudit)->getConnection());
 
             return $authenticated;
         } catch (Throwable $exception) {
@@ -140,12 +143,12 @@ final readonly class LoginAction implements LoginContract
                 subject: $reference,
                 actor: $subject,
             );
-            AuthenticationRejected::dispatch(
+            $this->domainEvents->dispatch(new AuthenticationRejected(
                 $identifierName,
                 $data->identifier,
                 'pipeline_rejected',
                 $reference,
-            );
+            ), (new AuthAudit)->getConnection());
 
             throw $exception;
         }

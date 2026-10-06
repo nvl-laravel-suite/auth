@@ -19,6 +19,7 @@ use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Updates one package permission.
@@ -34,6 +35,7 @@ final readonly class UpdatePermissionAction implements UpdatePermissionContract
         private RbacEntityLocator $entities,
         private AuthAuditRecorder $audits,
         private AuthOperationBoundary $operations,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /** Persist one permission mutation. */
@@ -57,7 +59,7 @@ final readonly class UpdatePermissionAction implements UpdatePermissionContract
                 'metadata' => $data->metadata,
             ])->save();
             $this->audits->record('permission.updated', actor: $actor, metadata: ['permission_id' => $permission->id]);
-            RbacChanged::dispatch('permission', $permission->id, 'updated');
+            $this->domainEvents->dispatch(new RbacChanged('permission', $permission->id, 'updated'), $permission->getConnection());
 
             return $permission->refresh();
         }, 3);

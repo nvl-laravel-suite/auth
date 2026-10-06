@@ -11,6 +11,7 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Support\Http\PackageExceptionPayload;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -21,7 +22,7 @@ final readonly class EnsureAuthFeatureAvailable
     /**
      * Create the route feature gate.
      */
-    public function __construct(private FeatureGate $features) {}
+    public function __construct(private FeatureGate $features, private PackageExceptionPayload $payload) {}
 
     /**
      * Require the configured feature operation.
@@ -44,11 +45,13 @@ final readonly class EnsureAuthFeatureAvailable
         try {
             $this->features->assertAllowed($resolvedFeature, $resolvedOperation);
         } catch (AuthException $exception) {
+            $payload = $this->payload->for($exception);
+
             return new JsonResponse([
                 'data' => null,
-                'code' => $exception->errorCode,
-                'message' => $exception->getMessage(),
-            ], $exception->status);
+                'code' => $payload['code'],
+                'message' => $payload['message'],
+            ], $exception->status, $this->payload->headers($exception));
         }
 
         return $next($request);

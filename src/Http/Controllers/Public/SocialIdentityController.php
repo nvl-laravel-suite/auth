@@ -39,8 +39,7 @@ final class SocialIdentityController
                 $this->requestedTenant($request, $tenants),
                 is_string($returnPath) ? $returnPath : null,
             )],
-            'code' => 'social_authorization_started',
-            'message' => 'Social authorization was started.',
+            'code' => 'social_authorization_started', 'message' => trans('nvl-auth::responsecode.social_authorization_started'),
         ]);
     }
 
@@ -73,8 +72,7 @@ final class SocialIdentityController
 
         return response()->json([
             'data' => ['subject' => ['type' => $reference->type, 'id' => $reference->identifier]],
-            'code' => 'social_authenticated',
-            'message' => 'Social authentication succeeded.',
+            'code' => 'social_authenticated', 'message' => trans('nvl-auth::responsecode.social_authenticated'),
         ]);
     }
 

@@ -15,6 +15,8 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Carries a transport-neutral message request to host delivery listeners.
+ *
+ * @api
  */
 final readonly class AuthDeliveryRequest
 {

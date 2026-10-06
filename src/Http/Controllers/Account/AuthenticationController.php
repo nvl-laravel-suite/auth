@@ -28,7 +28,7 @@ final class AuthenticationController extends AuthenticatedController
     {
         $action->execute();
 
-        return response()->json(['data' => null, 'code' => 'logged_out', 'message' => 'The session was ended.']);
+        return response()->json(['data' => null, 'code' => 'logged_out', 'message' => trans('nvl-auth::responsecode.logged_out')]);
     }
 
     /**
@@ -50,7 +50,7 @@ final class AuthenticationController extends AuthenticatedController
             $data,
         );
 
-        return response()->json(['data' => null, 'code' => 'password_updated', 'message' => 'The password was updated.']);
+        return response()->json(['data' => null, 'code' => 'password_updated', 'message' => trans('nvl-auth::responsecode.password_updated')]);
     }
 
     /**
@@ -62,8 +62,7 @@ final class AuthenticationController extends AuthenticatedController
 
         return response()->json([
             'data' => null,
-            'code' => 'password_confirmed',
-            'message' => 'The password was confirmed.',
+            'code' => 'password_confirmed', 'message' => trans('nvl-auth::responsecode.password_confirmed'),
         ]);
     }
 
@@ -82,6 +81,6 @@ final class AuthenticationController extends AuthenticatedController
 
         $action->execute($subject, $request->getPreferredLanguage());
 
-        return response()->json(['data' => null, 'code' => 'email_verification_requested', 'message' => 'Email verification was requested.'], 202);
+        return response()->json(['data' => null, 'code' => 'email_verification_requested', 'message' => trans('nvl-auth::responsecode.email_verification_requested')], 202);
     }
 }

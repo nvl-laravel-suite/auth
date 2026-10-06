@@ -30,7 +30,7 @@ final class ClientController extends AuthenticatedController
     {
         $page = $action->execute($this->subject($request), (int) $request->integer('per_page', 25));
 
-        return response()->json(['data' => $page, 'code' => 'clients_listed', 'message' => 'Auth clients were listed.']);
+        return response()->json(['data' => $page, 'code' => 'clients_listed', 'message' => trans('nvl-auth::responsecode.clients_listed')]);
     }
 
     /**
@@ -40,7 +40,7 @@ final class ClientController extends AuthenticatedController
     {
         $client = $action->execute($this->subject($request), $data);
 
-        return response()->json(['data' => $client, 'code' => 'client_created', 'message' => 'The Auth client was created.'], 201);
+        return response()->json(['data' => $client, 'code' => 'client_created', 'message' => trans('nvl-auth::responsecode.client_created')], 201);
     }
 
     /**
@@ -53,7 +53,7 @@ final class ClientController extends AuthenticatedController
     ): JsonResponse {
         $client = $action->execute($this->subject($request), $client);
 
-        return response()->json(['data' => $client, 'code' => 'client_shown', 'message' => 'The Auth client was shown.']);
+        return response()->json(['data' => $client, 'code' => 'client_shown', 'message' => trans('nvl-auth::responsecode.client_shown')]);
     }
 
     /**
@@ -67,7 +67,7 @@ final class ClientController extends AuthenticatedController
     ): JsonResponse {
         $updated = $action->execute($this->subject($request), $client, $data);
 
-        return response()->json(['data' => $updated, 'code' => 'client_updated', 'message' => 'The Auth client was updated.']);
+        return response()->json(['data' => $updated, 'code' => 'client_updated', 'message' => trans('nvl-auth::responsecode.client_updated')]);
     }
 
     /**
@@ -80,7 +80,7 @@ final class ClientController extends AuthenticatedController
     ): JsonResponse {
         $action->execute($this->subject($request), $client);
 
-        return response()->json(['data' => null, 'code' => 'client_deleted', 'message' => 'The Auth client was deleted.']);
+        return response()->json(['data' => null, 'code' => 'client_deleted', 'message' => trans('nvl-auth::responsecode.client_deleted')]);
     }
 
     /**
@@ -97,7 +97,7 @@ final class ClientController extends AuthenticatedController
         return response()->json([
             'data' => $client,
             'code' => $client->is_active ? 'client_activated' : 'client_deactivated',
-            'message' => $client->is_active ? 'The Auth client was activated.' : 'The Auth client was deactivated.',
+            'message' => $client->is_active ? trans('nvl-auth::responsecode.client_activated') : trans('nvl-auth::responsecode.client_deactivated'),
         ]);
     }
 }

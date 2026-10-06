@@ -20,6 +20,7 @@ use Nvl\Auth\Services\UserLocator;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Restores one soft-deleted package principal.
@@ -36,6 +37,7 @@ final readonly class RestoreUserAction implements RestoreUserContract
         private AuthAuditRecorder $audits,
         private PrincipalAttributeMapper $attributes,
         private PrincipalSessionContainment $sessions,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /** Restore one principal without silently re-enabling it. */
@@ -56,7 +58,7 @@ final readonly class RestoreUserAction implements RestoreUserContract
                 actor: $actor,
                 metadata: $metadata,
             );
-            PrincipalChanged::dispatch($this->attributes->identifier($user), 'restored', $metadata, AuthEventContext::platform());
+            $this->domainEvents->dispatch(new PrincipalChanged($this->attributes->identifier($user), 'restored', $metadata, AuthEventContext::platform()), $user->getConnection());
 
             return $user->refresh();
         }, 3);

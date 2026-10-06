@@ -13,6 +13,7 @@ use Nvl\Auth\Contracts\RevokeInvitationContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\Invitation;
+use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Support\Tenancy\Contracts\TenantBoundary;
@@ -24,15 +25,21 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
  */
 final readonly class RevokeInvitationAction implements RevokeInvitationContract
 {
+    /** Records through the audit recorder supplied to this use case. */
+    private AuthCommittedAudit $committedAudits;
+
     /**
      * Create the invitation revocation use case.
      */
     public function __construct(
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
-        private AuthAuditRecorder $audits,
+        AuthAuditRecorder $audits,
         private TenantBoundary $boundary,
-    ) {}
+        AuthCommittedAudit $committedAudits,
+    ) {
+        $this->committedAudits = $committedAudits->withRecorder($audits);
+    }
 
     /**
      * Revoke an invitation idempotently.
@@ -58,11 +65,11 @@ final readonly class RevokeInvitationAction implements RevokeInvitationContract
                     'active_key' => null,
                     'revoked_at' => CarbonImmutable::now(),
                 ])->save();
-                DB::connection($connection)->afterCommit(fn () => $this->audits->record(
+                $this->committedAudits->record(DB::connection($connection),
                     'invitation.revoked',
                     actor: $actor,
                     metadata: ['invitation_id' => $locked->identifier()],
-                ));
+                );
             }
 
             return $locked;

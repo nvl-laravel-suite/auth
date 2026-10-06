@@ -29,6 +29,7 @@ use Nvl\Auth\Services\UserLocator;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 use Spatie\LaravelData\Optional;
 
 /**
@@ -47,6 +48,7 @@ final readonly class UpdateProfileAction implements UpdateProfileContract
         private AccountConfirmation $confirmation,
         private AuthConfiguration $configuration,
         private AuthOperationBoundary $operations,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /** Persist self-service profile changes. */
@@ -88,9 +90,9 @@ final readonly class UpdateProfileAction implements UpdateProfileContract
             $this->audits->record('profile.updated', subject: $reference, actor: $user, metadata: [
                 'attributes' => array_keys($attributes),
             ]);
-            PrincipalChanged::dispatch($this->attributes->identifier($user), 'profile_updated', [
+            $this->domainEvents->dispatch(new PrincipalChanged($this->attributes->identifier($user), 'profile_updated', [
                 'attributes' => array_keys($attributes),
-            ], AuthEventContext::platform());
+            ], AuthEventContext::platform()), $user->getConnection());
 
             if ($emailChanged) {
                 $this->requestEmailVerification($user, $data);
@@ -107,7 +109,7 @@ final readonly class UpdateProfileAction implements UpdateProfileContract
             $this->configuration->integerBetween('features.email_verification.settings.ttl_minutes', 60, 1, 10_080),
         );
         $reference = SubjectReference::fromAuthenticatable($user);
-        AuthDeliveryRequested::dispatch(new AuthDeliveryRequest(
+        $this->domainEvents->dispatch(new AuthDeliveryRequested(new AuthDeliveryRequest(
             messageId: (string) Str::uuid(),
             feature: AuthFeature::EmailVerification,
             type: AuthMessageType::EmailVerification,
@@ -119,7 +121,7 @@ final readonly class UpdateProfileAction implements UpdateProfileContract
             ],
             expiresAt: $expiresAt,
             locale: $data->locale instanceof Optional ? null : $data->locale,
-        ));
+        )), $user->getConnection());
         $this->audits->record('email_verification.requested', subject: $reference, actor: $user);
     }
 }

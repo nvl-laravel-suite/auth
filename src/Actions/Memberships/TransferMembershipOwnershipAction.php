@@ -15,6 +15,7 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\TenantMembership;
+use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\MembershipLocator;
 use Nvl\Auth\Services\MembershipOwnerGuard;
@@ -30,6 +31,9 @@ use Nvl\Support\Tenancy\Contracts\TenantContext;
  */
 final readonly class TransferMembershipOwnershipAction implements TransferMembershipOwnershipContract
 {
+    /** Records through the audit recorder supplied to this use case. */
+    private AuthCommittedAudit $committedAudits;
+
     public function __construct(
         private FeatureGate $features,
         private MutationAuthorizer $authorization,
@@ -37,8 +41,11 @@ final readonly class TransferMembershipOwnershipAction implements TransferMember
         private MembershipLocator $memberships,
         private MembershipOwnerGuard $owners,
         private TenantContext $context,
-        private AuthAuditRecorder $audits,
-    ) {}
+        AuthAuditRecorder $audits,
+        AuthCommittedAudit $committedAudits,
+    ) {
+        $this->committedAudits = $committedAudits->withRecorder($audits);
+    }
 
     public function execute(Authenticatable|SystemMutationContext $authority, TenantMembership|string $membership, TransferMembershipOwnershipData $data): TenantMembership
     {
@@ -68,12 +75,12 @@ final readonly class TransferMembershipOwnershipAction implements TransferMember
             $recipient->forceFill(['status' => MembershipStatus::Active, 'is_owner' => true, 'revision' => $recipient->revision + 1])->save();
             $source->forceFill(['is_owner' => false, 'revision' => $source->revision + 1])->save();
             $source = $source->refresh();
-            DB::connection($source->getConnectionName())->afterCommit(fn () => $this->audits->record(
+            $this->committedAudits->record(DB::connection($source->getConnectionName()),
                 'membership.ownership_transferred',
                 subject: new SubjectReference($source->subject_type, $source->subject_id),
                 actor: $actor,
                 metadata: ['membership_id' => $source->identifier(), ...$this->authorization->metadata($authority)],
-            ));
+            );
 
             return $source;
         }, 1);

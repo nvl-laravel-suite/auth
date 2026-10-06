@@ -93,4 +93,13 @@ final class Challenge extends AuthModel
             && $this->attempts < $this->max_attempts
             && $this->expires_at->isFuture();
     }
+
+    /** Return the runtime package fixture factory.
+     *
+     * @internal
+     */
+    protected static function newFactory(): ChallengeFactory
+    {
+        return ChallengeFactory::new();
+    }
 }

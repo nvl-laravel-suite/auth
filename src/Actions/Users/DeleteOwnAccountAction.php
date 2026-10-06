@@ -28,6 +28,7 @@ use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\UserLocator;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Confirms and contains credentials before self-service principal deletion.
@@ -48,6 +49,7 @@ final readonly class DeleteOwnAccountAction implements DeleteOwnAccountContract
         private PrincipalAttributeMapper $attributes,
         private AuthOperationBoundary $operations,
         private MembershipOwnerGuard $owners,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /** Delete the authenticated package principal and revoke every active credential. */
@@ -76,11 +78,11 @@ final readonly class DeleteOwnAccountAction implements DeleteOwnAccountContract
             }
             $deleted = (bool) $user->delete();
             $this->audits->record('user.self_deleted', subject: $reference, actor: $user);
-            PrincipalChanged::dispatch(
+            $this->domainEvents->dispatch(new PrincipalChanged(
                 $this->attributes->identifier($user),
                 'self_deleted',
                 context: AuthEventContext::platform(),
-            );
+            ), $user->getConnection());
 
             return $deleted;
         }, 3);

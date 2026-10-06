@@ -13,6 +13,7 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Auth\Models\TenantMembership;
 use Nvl\Auth\Models\TenantMembershipLock;
+use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\MembershipWriter;
@@ -28,6 +29,9 @@ use Nvl\Support\Tenancy\Contracts\TenantContext;
  */
 final readonly class ProvisionTenantOwnerAction implements ProvisionTenantOwnerContract
 {
+    /** Records through the audit recorder supplied to this use case. */
+    private AuthCommittedAudit $committedAudits;
+
     public function __construct(
         private FeatureGate $features,
         private MutationAuthorizer $authorization,
@@ -35,8 +39,11 @@ final readonly class ProvisionTenantOwnerAction implements ProvisionTenantOwnerC
         private MembershipOwnerGuard $owners,
         private MembershipWriter $writer,
         private TenantContext $context,
-        private AuthAuditRecorder $audits,
-    ) {}
+        AuthAuditRecorder $audits,
+        AuthCommittedAudit $committedAudits,
+    ) {
+        $this->committedAudits = $committedAudits->withRecorder($audits);
+    }
 
     public function execute(SystemMutationContext $authority, SubjectReference $subject): TenantMembership
     {
@@ -54,10 +61,10 @@ final readonly class ProvisionTenantOwnerAction implements ProvisionTenantOwnerC
                 $membership->forceFill(['is_owner' => true, 'status' => MembershipStatus::Active, 'revision' => $membership->revision + 1])->save();
             }
             $membership = $membership->refresh();
-            DB::connection($membership->getConnectionName())->afterCommit(fn () => $this->audits->record(
+            $this->committedAudits->record(DB::connection($membership->getConnectionName()),
                 'membership.owner_provisioned', subject: $subject, actor: $actor,
                 metadata: ['membership_id' => $membership->identifier(), ...$this->authorization->metadata($authority)],
-            ));
+            );
 
             return $membership;
         }, 1);

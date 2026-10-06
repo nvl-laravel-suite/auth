@@ -19,6 +19,7 @@ use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Results\IssuedInvitation;
+use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\InvitationDeliveryMetadataPolicy;
@@ -27,6 +28,7 @@ use Nvl\Auth\Services\OpaqueTokenFactory;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
+use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
@@ -37,6 +39,9 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
  */
 final readonly class ResendInvitationAction implements ResendInvitationContract
 {
+    /** Records through the audit recorder supplied to this use case. */
+    private AuthCommittedAudit $committedAudits;
+
     /**
      * Create the invitation resend use case.
      */
@@ -46,10 +51,14 @@ final readonly class ResendInvitationAction implements ResendInvitationContract
         private OpaqueTokenFactory $tokens,
         private SecretHasher $hasher,
         private ManagementAuthorizer $authorization,
-        private AuthAuditRecorder $audits,
+        AuthAuditRecorder $audits,
         private TenantBoundary $boundary,
+        AuthCommittedAudit $committedAudits,
+        private DomainEventDispatcher $domainEvents,
         private ?InvitationDeliveryMetadataPolicy $deliveryMetadata = null,
-    ) {}
+    ) {
+        $this->committedAudits = $committedAudits->withRecorder($audits);
+    }
 
     /**
      * Resend one invitation with a newly rotated token.
@@ -134,14 +143,13 @@ final readonly class ResendInvitationAction implements ResendInvitationContract
                 ))->deliveryData($locked),
                 tenant: $tenant,
             );
-            DB::connection($connection)->afterCommit(function () use ($actor, $delivery, $locked): void {
-                AuthDeliveryRequested::dispatch($delivery);
-                $this->audits->record(
-                    'invitation.resent',
-                    actor: $actor,
-                    metadata: ['invitation_id' => $locked->identifier()],
-                );
-            });
+
+            $this->domainEvents->dispatch(new AuthDeliveryRequested($delivery), $locked->getConnection());
+            $this->committedAudits->record(DB::connection($connection),
+                'invitation.resent',
+                actor: $actor,
+                metadata: ['invitation_id' => $locked->identifier()],
+            );
 
             return new IssuedInvitation($locked, $token);
         }, 3);

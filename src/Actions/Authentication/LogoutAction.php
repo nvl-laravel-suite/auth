@@ -15,12 +15,14 @@ use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\UserLoggedOut;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Logs out through Laravel's configured stateful guard.
@@ -40,6 +42,7 @@ final readonly class LogoutAction implements LogoutContract
         private AuthPipeline $pipeline,
         private AuthAuditRecorder $audits,
         private AuthOperationBoundary $operations,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /**
@@ -74,7 +77,7 @@ final readonly class LogoutAction implements LogoutContract
                     subject: $reference,
                     actor: $subject instanceof Authenticatable ? $subject : null,
                 );
-                UserLoggedOut::dispatch($reference);
+                $this->domainEvents->dispatch(new UserLoggedOut($reference), (new AuthAudit)->getConnection());
             },
         );
     }

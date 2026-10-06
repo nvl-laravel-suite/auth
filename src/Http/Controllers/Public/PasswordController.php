@@ -31,8 +31,7 @@ final class PasswordController
 
         return response()->json([
             'data' => null,
-            'code' => 'password_reset_requested',
-            'message' => 'If the account is eligible, password reset instructions were requested.',
+            'code' => 'password_reset_requested', 'message' => trans('nvl-auth::responsecode.password_reset_requested'),
         ], 202);
     }
 
@@ -45,8 +44,7 @@ final class PasswordController
 
         return response()->json([
             'data' => null,
-            'code' => 'password_reset',
-            'message' => 'The password was reset.',
+            'code' => 'password_reset', 'message' => trans('nvl-auth::responsecode.password_reset'),
         ]);
     }
 }

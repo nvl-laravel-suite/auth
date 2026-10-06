@@ -16,6 +16,7 @@ use Nvl\Auth\Models\Role;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Deletes one non-system package role.
@@ -30,6 +31,7 @@ final readonly class DeleteRoleAction implements DeleteRoleContract
         private ManagementAuthorizer $authorization,
         private RbacEntityLocator $entities,
         private AuthAuditRecorder $audits,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /** Delete one role. */
@@ -47,7 +49,7 @@ final readonly class DeleteRoleAction implements DeleteRoleContract
             $identifier = $role->id;
             $deleted = (bool) $role->delete();
             $this->audits->record('role.deleted', actor: $actor, metadata: ['role_id' => $identifier]);
-            RbacChanged::dispatch('role', $identifier, 'deleted');
+            $this->domainEvents->dispatch(new RbacChanged('role', $identifier, 'deleted'), $role->getConnection());
 
             return $deleted;
         }, 3);

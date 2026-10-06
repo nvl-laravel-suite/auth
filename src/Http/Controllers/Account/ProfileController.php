@@ -20,8 +20,7 @@ final class ProfileController extends AuthenticatedController
     {
         return response()->json([
             'data' => $action->execute($this->subject($request)),
-            'code' => 'profile_shown',
-            'message' => 'The profile was shown.',
+            'code' => 'profile_shown', 'message' => trans('nvl-auth::responsecode.profile_shown'),
         ]);
     }
 
@@ -31,8 +30,7 @@ final class ProfileController extends AuthenticatedController
 
         return response()->json([
             'data' => $user,
-            'code' => 'profile_updated',
-            'message' => 'The profile was updated.',
+            'code' => 'profile_updated', 'message' => trans('nvl-auth::responsecode.profile_updated'),
         ]);
     }
 
@@ -46,8 +44,7 @@ final class ProfileController extends AuthenticatedController
 
         return response()->json([
             'data' => null,
-            'code' => 'account_deleted',
-            'message' => 'The account was deleted.',
+            'code' => 'account_deleted', 'message' => trans('nvl-auth::responsecode.account_deleted'),
         ]);
     }
 }

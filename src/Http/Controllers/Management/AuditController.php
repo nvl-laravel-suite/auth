@@ -23,7 +23,7 @@ final class AuditController extends AuthenticatedController
     {
         $page = $action->execute($this->subject($request), (int) $request->integer('per_page', 50));
 
-        return response()->json(['data' => $page, 'code' => 'auth_audits_listed', 'message' => 'Auth audits were listed.']);
+        return response()->json(['data' => $page, 'code' => 'auth_audits_listed', 'message' => trans('nvl-auth::responsecode.auth_audits_listed')]);
     }
 
     /**
@@ -50,8 +50,7 @@ final class AuditController extends AuthenticatedController
                 'metadata' => $audit->metadata,
                 'created_at' => $audit->created_at?->toIso8601String(),
             ],
-            'code' => 'auth_audit_shown',
-            'message' => 'The Auth audit was shown.',
+            'code' => 'auth_audit_shown', 'message' => trans('nvl-auth::responsecode.auth_audit_shown'),
         ]);
     }
 }

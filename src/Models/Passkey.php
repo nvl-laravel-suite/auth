@@ -79,4 +79,13 @@ final class Passkey extends AuthModel
             'revoked_at' => 'immutable_datetime',
         ];
     }
+
+    /** Return the runtime package fixture factory.
+     *
+     * @internal
+     */
+    protected static function newFactory(): PasskeyFactory
+    {
+        return PasskeyFactory::new();
+    }
 }

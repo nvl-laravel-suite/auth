@@ -15,6 +15,7 @@ use Nvl\Auth\Models\Role;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacAssignmentService;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Adds permissions to a role without replacing existing assignments.
@@ -29,6 +30,7 @@ final readonly class AddRolePermissionsAction implements AddRolePermissionsContr
         private ManagementAuthorizer $authorization,
         private RbacAssignmentService $assignments,
         private AuthAuditRecorder $audits,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /**
@@ -51,10 +53,10 @@ final readonly class AddRolePermissionsAction implements AddRolePermissionsContr
                     'permission_ids' => $result['permissionIds'],
                     'permission_count' => count($result['permissionIds']),
                 ]);
-                RbacChanged::dispatch('role', $result['role']->id, 'permissions_added', [
+                $this->domainEvents->dispatch(new RbacChanged('role', $result['role']->id, 'permissions_added', [
                     'permission_ids' => $result['permissionIds'],
                     'permission_names' => $result['permissionNames'],
-                ]);
+                ]), $result['role']->getConnection());
 
                 return $result;
             },

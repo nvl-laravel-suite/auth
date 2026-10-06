@@ -21,6 +21,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacManager;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Creates one complete package principal.
@@ -37,6 +38,7 @@ final readonly class CreateUserAction implements CreateUserContract
         private RbacManager $rbac,
         private AuthAuditRecorder $audits,
         private PrincipalAttributeMapper $attributes,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /** Persist a principal and optional RBAC assignment atomically. */
@@ -60,9 +62,9 @@ final readonly class CreateUserAction implements CreateUserContract
             $this->rbac->assign($user, $data->roles, $data->permissions);
             $reference = SubjectReference::fromAuthenticatable($user);
             $this->audits->record('user.created', subject: $reference, actor: $actor);
-            PrincipalChanged::dispatch($this->attributes->identifier($user), 'created', [
+            $this->domainEvents->dispatch(new PrincipalChanged($this->attributes->identifier($user), 'created', [
                 'email' => $this->attributes->value($user, PrincipalAttribute::Email),
-            ], AuthEventContext::platform());
+            ], AuthEventContext::platform()), $user->getConnection());
 
             return $user->refresh()->load(['roles', 'permissions']);
         }, 3);

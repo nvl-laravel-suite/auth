@@ -12,6 +12,8 @@ use Nvl\Auth\Models\User;
 /**
  * Builds package-owned principals for consumers and package tests.
  *
+ * @api
+ *
  * @extends Factory<User>
  */
 final class UserFactory extends Factory
@@ -21,6 +23,8 @@ final class UserFactory extends Factory
 
     /**
      * Define a conventional enabled principal.
+     *
+     * @return array<model-property<User>, mixed>
      */
     public function definition(): array
     {
@@ -38,6 +42,8 @@ final class UserFactory extends Factory
 
     /**
      * Mark the principal's email as unverified.
+     *
+     * @api
      */
     public function unverified(): static
     {
@@ -46,6 +52,8 @@ final class UserFactory extends Factory
 
     /**
      * Mark the principal as disabled.
+     *
+     * @api
      */
     public function disabled(): static
     {

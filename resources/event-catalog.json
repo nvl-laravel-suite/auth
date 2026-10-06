@@ -1,0 +1,1386 @@
+{
+  "schema_version": 1,
+  "package": "nvl/auth",
+  "documentation": "docs/events.md",
+  "implementation_status": "implemented; executable acceptance proof pending",
+  "events": [
+    {
+      "class": "Nvl\\Auth\\Events\\AuthAuditRecorded",
+      "source": "packages/nvl/auth/src/Events/AuthAuditRecorded.php",
+      "constructor_fields": [
+        {
+          "name": "auditId",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "1"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "auditId",
+          "type": "string"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int"
+        }
+      ],
+      "kind": "value_object",
+      "schema_version": 1,
+      "trigger": "Audit row persisted.",
+      "aliases": [],
+      "producers": [
+        {
+          "path": "packages/nvl/auth/src/Services/AuthAuditWriter.php",
+          "trigger": "Audit row persisted.",
+          "connection": "$audit->getConnection()",
+          "construction_expression": "new AuthAuditRecorded($audit->identifier())"
+        }
+      ],
+      "security_notes": [
+        "Internal integration metadata, not a public HTTP feed. Authentication attempts/rejections carry the supplied identifier and reason. AuthDeliveryRequested is an explicit sensitive delivery capability: recipient, secret-bearing payload, expiry, invitation and context must stay within trusted delivery listeners. Audit/principal/RBAC facts carry identifiers and producer-shaped JSON metadata, not models. Arbitrary host-supplied mixed arrays are not recursively constrained by every event constructor."
+      ],
+      "no_op_semantics": "Attempt, rejection, session and delivery observations can repeat for separate requests. Mutation events follow their writer branch; there is no generic cross-request deduplication. Native Laravel Verified and PasswordReset are framework events outside this catalog: Eloquent writers use their source commit boundary; non-Eloquent/custom updater paths retain synchronous behavior where no source connection seam exists."
+    },
+    {
+      "class": "Nvl\\Auth\\Events\\AuthDeliveryRequested",
+      "source": "packages/nvl/auth/src/Events/AuthDeliveryRequested.php",
+      "constructor_fields": [
+        {
+          "name": "request",
+          "type": "Nvl\\Auth\\ValueObjects\\AuthDeliveryRequest",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "1"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "request",
+          "type": "Nvl\\Auth\\ValueObjects\\AuthDeliveryRequest"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int"
+        }
+      ],
+      "kind": "value_object",
+      "schema_version": 1,
+      "trigger": "Host delivery capability requested.",
+      "aliases": [],
+      "producers": [
+        {
+          "path": "packages/nvl/auth/src/Actions/Authentication/RequestEmailVerificationAction.php",
+          "trigger": "Host delivery capability requested.",
+          "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit)->getConnection()",
+          "construction_expression": "new AuthDeliveryRequested(new AuthDeliveryRequest( messageId: (string) Str::uuid(), feature: AuthFeature::EmailVerification, type: AuthMessageType::EmailVerification, recipient: $subject->getEmailForVerification(), payload: [ 'subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'email_hash' => sha1($subject->getEmailForVerification()), ], expiresAt: $expiresAt, locale: $locale, ))"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Challenges/IssueChallengeAction.php",
+          "trigger": "Host delivery capability requested.",
+          "connection": "$challenge->getConnection()",
+          "construction_expression": "new AuthDeliveryRequested(new AuthDeliveryRequest( messageId: (string) Str::uuid(), feature: $feature, type: $messageType, recipient: $normalizedRecipient, payload: [ ...$payload, 'challenge_id' => $challenge->identifier(), 'secret' => $secret, 'code' => $fallbackCode, 'purpose' => $purpose, ], expiresAt: $expiresAt, locale: $locale, metadata: ['challenge_id' => $challenge->identifier(), ...$metadata], subject: $subject, ))"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Invitations/CreateInvitationAction.php",
+          "trigger": "Host delivery capability requested.",
+          "connection": "$invitation->getConnection()",
+          "construction_expression": "new AuthDeliveryRequested($delivery)"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Invitations/ResendInvitationAction.php",
+          "trigger": "Host delivery capability requested.",
+          "connection": "$locked->getConnection()",
+          "construction_expression": "new AuthDeliveryRequested($delivery)"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Passwords/RequestPasswordResetAction.php",
+          "trigger": "Host delivery capability requested.",
+          "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit)->getConnection()",
+          "construction_expression": "new AuthDeliveryRequested(new AuthDeliveryRequest( messageId: (string) Str::uuid(), feature: AuthFeature::Password, type: AuthMessageType::PasswordReset, recipient: $subject->getEmailForPasswordReset(), payload: ['token' => $token, 'identifier' => $data->identifier], expiresAt: $expiresAt, locale: $locale, ))"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Users/UpdateProfileAction.php",
+          "trigger": "Host delivery capability requested.",
+          "connection": "$user->getConnection()",
+          "construction_expression": "new AuthDeliveryRequested(new AuthDeliveryRequest( messageId: (string) Str::uuid(), feature: AuthFeature::EmailVerification, type: AuthMessageType::EmailVerification, recipient: $user->getEmailForVerification(), payload: [ 'subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'email_hash' => sha1($user->getEmailForVerification()), ], expiresAt: $expiresAt, locale: $data->locale instanceof Optional ? null : $data->locale, ))"
+        }
+      ],
+      "security_notes": [
+        "Internal integration metadata, not a public HTTP feed. Authentication attempts/rejections carry the supplied identifier and reason. AuthDeliveryRequested is an explicit sensitive delivery capability: recipient, secret-bearing payload, expiry, invitation and context must stay within trusted delivery listeners. Audit/principal/RBAC facts carry identifiers and producer-shaped JSON metadata, not models. Arbitrary host-supplied mixed arrays are not recursively constrained by every event constructor."
+      ],
+      "no_op_semantics": "Attempt, rejection, session and delivery observations can repeat for separate requests. Mutation events follow their writer branch; there is no generic cross-request deduplication. Native Laravel Verified and PasswordReset are framework events outside this catalog: Eloquent writers use their source commit boundary; non-Eloquent/custom updater paths retain synchronous behavior where no source connection seam exists."
+    },
+    {
+      "class": "Nvl\\Auth\\Events\\AuthenticationAttempted",
+      "source": "packages/nvl/auth/src/Events/AuthenticationAttempted.php",
+      "constructor_fields": [
+        {
+          "name": "identifierName",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "identifier",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "1"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "identifierName",
+          "type": "string"
+        },
+        {
+          "name": "identifier",
+          "type": "string"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int"
+        }
+      ],
+      "kind": "value_object",
+      "schema_version": 1,
+      "trigger": "Guard authentication attempted.",
+      "aliases": [],
+      "producers": [
+        {
+          "path": "packages/nvl/auth/src/Actions/Authentication/EstablishAuthenticatedSessionAction.php",
+          "trigger": "Guard authentication attempted.",
+          "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit)->getConnection()",
+          "construction_expression": "new AuthenticationAttempted('subject_reference', $reference->identifier)"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Authentication/LoginAction.php",
+          "trigger": "Guard authentication attempted.",
+          "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit)->getConnection()",
+          "construction_expression": "new AuthenticationAttempted($identifierName, $data->identifier)"
+        }
+      ],
+      "security_notes": [
+        "Internal integration metadata, not a public HTTP feed. Authentication attempts/rejections carry the supplied identifier and reason. AuthDeliveryRequested is an explicit sensitive delivery capability: recipient, secret-bearing payload, expiry, invitation and context must stay within trusted delivery listeners. Audit/principal/RBAC facts carry identifiers and producer-shaped JSON metadata, not models. Arbitrary host-supplied mixed arrays are not recursively constrained by every event constructor."
+      ],
+      "no_op_semantics": "Attempt, rejection, session and delivery observations can repeat for separate requests. Mutation events follow their writer branch; there is no generic cross-request deduplication. Native Laravel Verified and PasswordReset are framework events outside this catalog: Eloquent writers use their source commit boundary; non-Eloquent/custom updater paths retain synchronous behavior where no source connection seam exists."
+    },
+    {
+      "class": "Nvl\\Auth\\Events\\AuthenticationRejected",
+      "source": "packages/nvl/auth/src/Events/AuthenticationRejected.php",
+      "constructor_fields": [
+        {
+          "name": "identifierName",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "identifier",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "subject",
+          "type": "?Nvl\\Auth\\ValueObjects\\SubjectReference",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "1"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "identifierName",
+          "type": "string"
+        },
+        {
+          "name": "identifier",
+          "type": "string"
+        },
+        {
+          "name": "reason",
+          "type": "string"
+        },
+        {
+          "name": "subject",
+          "type": "?Nvl\\Auth\\ValueObjects\\SubjectReference"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int"
+        }
+      ],
+      "kind": "value_object",
+      "schema_version": 1,
+      "trigger": "Guard authentication rejected.",
+      "aliases": [],
+      "producers": [
+        {
+          "path": "packages/nvl/auth/src/Actions/Authentication/EstablishAuthenticatedSessionAction.php",
+          "trigger": "Guard authentication rejected.",
+          "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit)->getConnection()",
+          "construction_expression": "new AuthenticationRejected('subject_reference', $reference->identifier, $reason, $reference)"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Authentication/LoginAction.php",
+          "trigger": "Guard authentication rejected.",
+          "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit)->getConnection()",
+          "construction_expression": "new AuthenticationRejected($identifierName, $data->identifier, 'credentials_invalid')"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Authentication/LoginAction.php",
+          "trigger": "Guard authentication rejected.",
+          "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit)->getConnection()",
+          "construction_expression": "new AuthenticationRejected( $identifierName, $data->identifier, $exception->errorCode, SubjectReference::fromAuthenticatable($subject), )"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Authentication/LoginAction.php",
+          "trigger": "Guard authentication rejected.",
+          "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit)->getConnection()",
+          "construction_expression": "new AuthenticationRejected( $identifierName, $data->identifier, 'pipeline_rejected', $reference, )"
+        }
+      ],
+      "security_notes": [
+        "Internal integration metadata, not a public HTTP feed. Authentication attempts/rejections carry the supplied identifier and reason. AuthDeliveryRequested is an explicit sensitive delivery capability: recipient, secret-bearing payload, expiry, invitation and context must stay within trusted delivery listeners. Audit/principal/RBAC facts carry identifiers and producer-shaped JSON metadata, not models. Arbitrary host-supplied mixed arrays are not recursively constrained by every event constructor."
+      ],
+      "no_op_semantics": "Attempt, rejection, session and delivery observations can repeat for separate requests. Mutation events follow their writer branch; there is no generic cross-request deduplication. Native Laravel Verified and PasswordReset are framework events outside this catalog: Eloquent writers use their source commit boundary; non-Eloquent/custom updater paths retain synchronous behavior where no source connection seam exists."
+    },
+    {
+      "class": "Nvl\\Auth\\Events\\InvitationAccepted",
+      "source": "packages/nvl/auth/src/Events/InvitationAccepted.php",
+      "constructor_fields": [
+        {
+          "name": "invitationId",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "purpose",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "subject",
+          "type": "Nvl\\Auth\\ValueObjects\\SubjectReference",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "acceptedAt",
+          "type": "?Carbon\\CarbonImmutable",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "context",
+          "type": "?Nvl\\Auth\\ValueObjects\\AuthEventContext",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "1"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "invitationId",
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "type": "string"
+        },
+        {
+          "name": "purpose",
+          "type": "string"
+        },
+        {
+          "name": "subject",
+          "type": "Nvl\\Auth\\ValueObjects\\SubjectReference"
+        },
+        {
+          "name": "acceptedAt",
+          "type": "?Carbon\\CarbonImmutable"
+        },
+        {
+          "name": "context",
+          "type": "?Nvl\\Auth\\ValueObjects\\AuthEventContext"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int"
+        }
+      ],
+      "kind": "value_object",
+      "schema_version": 1,
+      "trigger": "Invitation accepted.",
+      "aliases": [],
+      "producers": [
+        {
+          "path": "packages/nvl/auth/src/Actions/Invitations/AcceptInvitationAction.php",
+          "trigger": "Invitation accepted.",
+          "connection": "$invitation->getConnection()",
+          "construction_expression": "new InvitationAccepted( invitationId: $invitation->identifier(), type: $invitation->type, purpose: $invitation->purpose, subject: $reference, acceptedAt: $invitation->accepted_at, )"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Invitations/AcceptInvitationAction.php",
+          "trigger": "Invitation accepted.",
+          "connection": "$invitation->getConnection()",
+          "construction_expression": "new InvitationAccepted( invitationId: $invitation->identifier(), type: $invitation->type, purpose: $invitation->purpose, subject: $reference, acceptedAt: $invitation->accepted_at, context: new AuthEventContext(TenantContextMode::Tenant, $tenant), )"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Invitations/RegisterInvitationAction.php",
+          "trigger": "Invitation accepted.",
+          "connection": "$invitation->getConnection()",
+          "construction_expression": "new InvitationAccepted( invitationId: $invitation->identifier(), type: $invitation->type, purpose: $invitation->purpose, subject: $reference, acceptedAt: $invitation->accepted_at, context: $tenant instanceof TenantId ? new AuthEventContext(TenantContextMode::Tenant, $tenant) : null, )"
+        }
+      ],
+      "security_notes": [
+        "Internal integration metadata, not a public HTTP feed. Authentication attempts/rejections carry the supplied identifier and reason. AuthDeliveryRequested is an explicit sensitive delivery capability: recipient, secret-bearing payload, expiry, invitation and context must stay within trusted delivery listeners. Audit/principal/RBAC facts carry identifiers and producer-shaped JSON metadata, not models. Arbitrary host-supplied mixed arrays are not recursively constrained by every event constructor."
+      ],
+      "no_op_semantics": "Attempt, rejection, session and delivery observations can repeat for separate requests. Mutation events follow their writer branch; there is no generic cross-request deduplication. Native Laravel Verified and PasswordReset are framework events outside this catalog: Eloquent writers use their source commit boundary; non-Eloquent/custom updater paths retain synchronous behavior where no source connection seam exists."
+    },
+    {
+      "class": "Nvl\\Auth\\Events\\PrincipalChanged",
+      "source": "packages/nvl/auth/src/Events/PrincipalChanged.php",
+      "constructor_fields": [
+        {
+          "name": "userId",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "operation",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "payload",
+          "type": "array",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "[]",
+          "phpdoc_type": "array<string, mixed>"
+        },
+        {
+          "name": "context",
+          "type": "?Nvl\\Auth\\ValueObjects\\AuthEventContext",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "1"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "userId",
+          "type": "string"
+        },
+        {
+          "name": "operation",
+          "type": "string"
+        },
+        {
+          "name": "payload",
+          "type": "array",
+          "phpdoc_type": "array<string, mixed>"
+        },
+        {
+          "name": "context",
+          "type": "?Nvl\\Auth\\ValueObjects\\AuthEventContext"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int"
+        }
+      ],
+      "kind": "value_object",
+      "schema_version": 1,
+      "trigger": "Principal mutation persisted.",
+      "aliases": [],
+      "producers": [
+        {
+          "path": "packages/nvl/auth/src/Actions/Invitations/RegisterInvitationAction.php",
+          "trigger": "Principal mutation persisted.",
+          "connection": "$invitation->getConnection()",
+          "construction_expression": "new PrincipalChanged( $reference->identifier, 'invitation_registered', context: $tenant instanceof TenantId ? new AuthEventContext(TenantContextMode::Tenant, $tenant) : null, )"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Users/BulkUpdateUsersAction.php",
+          "trigger": "Principal mutation persisted.",
+          "connection": "$user->getConnection()",
+          "construction_expression": "new PrincipalChanged($this->attributes->identifier($user), $operation->value, $metadata, AuthEventContext::platform())"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Users/CreateUserAction.php",
+          "trigger": "Principal mutation persisted.",
+          "connection": "$user->getConnection()",
+          "construction_expression": "new PrincipalChanged($this->attributes->identifier($user), 'created', [ 'email' => $this->attributes->value($user, PrincipalAttribute::Email), ], AuthEventContext::platform())"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Users/DeleteOwnAccountAction.php",
+          "trigger": "Principal mutation persisted.",
+          "connection": "$user->getConnection()",
+          "construction_expression": "new PrincipalChanged( $this->attributes->identifier($user), 'self_deleted', context: AuthEventContext::platform(), )"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Users/DeleteUserAction.php",
+          "trigger": "Principal mutation persisted.",
+          "connection": "$user->getConnection()",
+          "construction_expression": "new PrincipalChanged($this->attributes->identifier($user), 'deleted', $metadata, AuthEventContext::platform())"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Users/RestoreUserAction.php",
+          "trigger": "Principal mutation persisted.",
+          "connection": "$user->getConnection()",
+          "construction_expression": "new PrincipalChanged($this->attributes->identifier($user), 'restored', $metadata, AuthEventContext::platform())"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Users/SetUserActiveAction.php",
+          "trigger": "Principal mutation persisted.",
+          "connection": "$user->getConnection()",
+          "construction_expression": "new PrincipalChanged($this->attributes->identifier($user), $operation, $metadata, AuthEventContext::platform())"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Users/UpdateProfileAction.php",
+          "trigger": "Principal mutation persisted.",
+          "connection": "$user->getConnection()",
+          "construction_expression": "new PrincipalChanged($this->attributes->identifier($user), 'profile_updated', [ 'attributes' => array_keys($attributes), ], AuthEventContext::platform())"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Users/UpdateUserAction.php",
+          "trigger": "Principal mutation persisted.",
+          "connection": "$user->getConnection()",
+          "construction_expression": "new PrincipalChanged( $this->attributes->identifier($user), 'updated', ['attributes' => array_keys($attributes)], AuthEventContext::platform(), )"
+        }
+      ],
+      "security_notes": [
+        "Internal integration metadata, not a public HTTP feed. Authentication attempts/rejections carry the supplied identifier and reason. AuthDeliveryRequested is an explicit sensitive delivery capability: recipient, secret-bearing payload, expiry, invitation and context must stay within trusted delivery listeners. Audit/principal/RBAC facts carry identifiers and producer-shaped JSON metadata, not models. Arbitrary host-supplied mixed arrays are not recursively constrained by every event constructor."
+      ],
+      "no_op_semantics": "Attempt, rejection, session and delivery observations can repeat for separate requests. Mutation events follow their writer branch; there is no generic cross-request deduplication. Native Laravel Verified and PasswordReset are framework events outside this catalog: Eloquent writers use their source commit boundary; non-Eloquent/custom updater paths retain synchronous behavior where no source connection seam exists."
+    },
+    {
+      "class": "Nvl\\Auth\\Events\\RbacAssignmentChanged",
+      "source": "packages/nvl/auth/src/Events/RbacAssignmentChanged.php",
+      "constructor_fields": [
+        {
+          "name": "principalId",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "operation",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "roles",
+          "type": "array",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "[]",
+          "phpdoc_type": "list<string>"
+        },
+        {
+          "name": "permissions",
+          "type": "array",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "[]",
+          "phpdoc_type": "list<string>"
+        },
+        {
+          "name": "metadata",
+          "type": "array",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "[]",
+          "phpdoc_type": "array<string, mixed>"
+        },
+        {
+          "name": "context",
+          "type": "?Nvl\\Auth\\ValueObjects\\AuthEventContext",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "1"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "principalId",
+          "type": "string"
+        },
+        {
+          "name": "operation",
+          "type": "string"
+        },
+        {
+          "name": "roles",
+          "type": "array",
+          "phpdoc_type": "list<string>"
+        },
+        {
+          "name": "permissions",
+          "type": "array",
+          "phpdoc_type": "list<string>"
+        },
+        {
+          "name": "metadata",
+          "type": "array",
+          "phpdoc_type": "array<string, mixed>"
+        },
+        {
+          "name": "context",
+          "type": "?Nvl\\Auth\\ValueObjects\\AuthEventContext"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int"
+        }
+      ],
+      "kind": "value_object",
+      "schema_version": 1,
+      "trigger": "Principal role/permission assignment persisted.",
+      "aliases": [],
+      "producers": [
+        {
+          "path": "packages/nvl/auth/src/Services/RbacManager.php",
+          "trigger": "Principal role/permission assignment persisted.",
+          "connection": "\\Illuminate\\Support\\Facades\\DB::connection($this->principals->connectionName($subject))",
+          "construction_expression": "new RbacAssignmentChanged( $this->principals->identifier($subject), 'assigned', $roles, $permissions, context: AuthEventContext::capture($this->tenantContext), )"
+        },
+        {
+          "path": "packages/nvl/auth/src/Services/RbacManager.php",
+          "trigger": "Principal role/permission assignment persisted.",
+          "connection": "\\Illuminate\\Support\\Facades\\DB::connection($this->principals->connectionName($subject))",
+          "construction_expression": "new RbacAssignmentChanged( $this->principals->identifier($subject), 'roles_synchronized', $roles, [], $metadata, AuthEventContext::capture($this->tenantContext), )"
+        },
+        {
+          "path": "packages/nvl/auth/src/Services/RbacManager.php",
+          "trigger": "Principal role/permission assignment persisted.",
+          "connection": "\\Illuminate\\Support\\Facades\\DB::connection($this->principals->connectionName($subject))",
+          "construction_expression": "new RbacAssignmentChanged( $this->principals->identifier($subject), 'permissions_synchronized', [], $permissions, $metadata, AuthEventContext::capture($this->tenantContext), )"
+        }
+      ],
+      "security_notes": [
+        "Internal integration metadata, not a public HTTP feed. Authentication attempts/rejections carry the supplied identifier and reason. AuthDeliveryRequested is an explicit sensitive delivery capability: recipient, secret-bearing payload, expiry, invitation and context must stay within trusted delivery listeners. Audit/principal/RBAC facts carry identifiers and producer-shaped JSON metadata, not models. Arbitrary host-supplied mixed arrays are not recursively constrained by every event constructor."
+      ],
+      "no_op_semantics": "Attempt, rejection, session and delivery observations can repeat for separate requests. Mutation events follow their writer branch; there is no generic cross-request deduplication. Native Laravel Verified and PasswordReset are framework events outside this catalog: Eloquent writers use their source commit boundary; non-Eloquent/custom updater paths retain synchronous behavior where no source connection seam exists."
+    },
+    {
+      "class": "Nvl\\Auth\\Events\\RbacChanged",
+      "source": "packages/nvl/auth/src/Events/RbacChanged.php",
+      "constructor_fields": [
+        {
+          "name": "entityType",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "entityId",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "operation",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "payload",
+          "type": "array",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "[]",
+          "phpdoc_type": "array<string, mixed>"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "1"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "entityType",
+          "type": "string"
+        },
+        {
+          "name": "entityId",
+          "type": "string"
+        },
+        {
+          "name": "operation",
+          "type": "string"
+        },
+        {
+          "name": "payload",
+          "type": "array",
+          "phpdoc_type": "array<string, mixed>"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int"
+        }
+      ],
+      "kind": "value_object",
+      "schema_version": 1,
+      "trigger": "Role/permission aggregate mutation persisted.",
+      "aliases": [],
+      "producers": [
+        {
+          "path": "packages/nvl/auth/src/Actions/Rbac/AddRolePermissionsAction.php",
+          "trigger": "Role/permission aggregate mutation persisted.",
+          "connection": "$result['role']->getConnection()",
+          "construction_expression": "new RbacChanged('role', $result['role']->id, 'permissions_added', [ 'permission_ids' => $result['permissionIds'], 'permission_names' => $result['permissionNames'], ])"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Rbac/ApplyRoleTemplateAction.php",
+          "trigger": "Role/permission aggregate mutation persisted.",
+          "connection": "$role->getConnection()",
+          "construction_expression": "new RbacChanged('role', $role->id, 'template_applied', [ 'template' => $templateKey, 'target_role' => $mutation->name, ])"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Rbac/CloneRoleAction.php",
+          "trigger": "Role/permission aggregate mutation persisted.",
+          "connection": "$clone->getConnection()",
+          "construction_expression": "new RbacChanged('role', $clone->id, 'cloned', ['source_role_id' => $source->id])"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Rbac/CreatePermissionAction.php",
+          "trigger": "Role/permission aggregate mutation persisted.",
+          "connection": "$permission->getConnection()",
+          "construction_expression": "new RbacChanged('permission', $permission->id, 'created', ['name' => $permission->name])"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Rbac/CreatePermissionWithRolesAction.php",
+          "trigger": "Role/permission aggregate mutation persisted.",
+          "connection": "$result['permission']->getConnection()",
+          "construction_expression": "new RbacChanged('permission', $result['permission']->id, 'created', [ 'name' => $result['permission']->name, 'role_ids' => $result['roleIds'], 'role_names' => $result['roleNames'], ])"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Rbac/CreateRoleAction.php",
+          "trigger": "Role/permission aggregate mutation persisted.",
+          "connection": "$role->getConnection()",
+          "construction_expression": "new RbacChanged('role', $role->id, 'created', ['name' => $role->name])"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Rbac/DeletePermissionAction.php",
+          "trigger": "Role/permission aggregate mutation persisted.",
+          "connection": "$permission->getConnection()",
+          "construction_expression": "new RbacChanged('permission', $identifier, 'deleted')"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Rbac/DeleteRoleAction.php",
+          "trigger": "Role/permission aggregate mutation persisted.",
+          "connection": "$role->getConnection()",
+          "construction_expression": "new RbacChanged('role', $identifier, 'deleted')"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Rbac/SyncRolePermissionsAction.php",
+          "trigger": "Role/permission aggregate mutation persisted.",
+          "connection": "$result['role']->getConnection()",
+          "construction_expression": "new RbacChanged('role', $result['role']->id, 'permissions_synchronized', [ 'permission_ids' => $result['permissionIds'], 'permission_names' => $result['permissionNames'], ])"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Rbac/UpdatePermissionAction.php",
+          "trigger": "Role/permission aggregate mutation persisted.",
+          "connection": "$permission->getConnection()",
+          "construction_expression": "new RbacChanged('permission', $permission->id, 'updated')"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Rbac/UpdateRoleAction.php",
+          "trigger": "Role/permission aggregate mutation persisted.",
+          "connection": "$role->getConnection()",
+          "construction_expression": "new RbacChanged('role', $role->id, 'updated')"
+        }
+      ],
+      "security_notes": [
+        "Internal integration metadata, not a public HTTP feed. Authentication attempts/rejections carry the supplied identifier and reason. AuthDeliveryRequested is an explicit sensitive delivery capability: recipient, secret-bearing payload, expiry, invitation and context must stay within trusted delivery listeners. Audit/principal/RBAC facts carry identifiers and producer-shaped JSON metadata, not models. Arbitrary host-supplied mixed arrays are not recursively constrained by every event constructor."
+      ],
+      "no_op_semantics": "Attempt, rejection, session and delivery observations can repeat for separate requests. Mutation events follow their writer branch; there is no generic cross-request deduplication. Native Laravel Verified and PasswordReset are framework events outside this catalog: Eloquent writers use their source commit boundary; non-Eloquent/custom updater paths retain synchronous behavior where no source connection seam exists."
+    },
+    {
+      "class": "Nvl\\Auth\\Events\\UserAuthenticated",
+      "source": "packages/nvl/auth/src/Events/UserAuthenticated.php",
+      "constructor_fields": [
+        {
+          "name": "subject",
+          "type": "Nvl\\Auth\\ValueObjects\\SubjectReference",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "1"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "subject",
+          "type": "Nvl\\Auth\\ValueObjects\\SubjectReference"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int"
+        }
+      ],
+      "kind": "value_object",
+      "schema_version": 1,
+      "trigger": "Guard authentication completed.",
+      "aliases": [],
+      "producers": [
+        {
+          "path": "packages/nvl/auth/src/Actions/Authentication/EstablishAuthenticatedSessionAction.php",
+          "trigger": "Guard authentication completed.",
+          "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit)->getConnection()",
+          "construction_expression": "new UserAuthenticated($reference)"
+        },
+        {
+          "path": "packages/nvl/auth/src/Actions/Authentication/LoginAction.php",
+          "trigger": "Guard authentication completed.",
+          "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit)->getConnection()",
+          "construction_expression": "new UserAuthenticated($reference)"
+        }
+      ],
+      "security_notes": [
+        "Internal integration metadata, not a public HTTP feed. Authentication attempts/rejections carry the supplied identifier and reason. AuthDeliveryRequested is an explicit sensitive delivery capability: recipient, secret-bearing payload, expiry, invitation and context must stay within trusted delivery listeners. Audit/principal/RBAC facts carry identifiers and producer-shaped JSON metadata, not models. Arbitrary host-supplied mixed arrays are not recursively constrained by every event constructor."
+      ],
+      "no_op_semantics": "Attempt, rejection, session and delivery observations can repeat for separate requests. Mutation events follow their writer branch; there is no generic cross-request deduplication. Native Laravel Verified and PasswordReset are framework events outside this catalog: Eloquent writers use their source commit boundary; non-Eloquent/custom updater paths retain synchronous behavior where no source connection seam exists."
+    },
+    {
+      "class": "Nvl\\Auth\\Events\\UserLoggedOut",
+      "source": "packages/nvl/auth/src/Events/UserLoggedOut.php",
+      "constructor_fields": [
+        {
+          "name": "subject",
+          "type": "?Nvl\\Auth\\ValueObjects\\SubjectReference",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "1"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "subject",
+          "type": "?Nvl\\Auth\\ValueObjects\\SubjectReference"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int"
+        }
+      ],
+      "kind": "value_object",
+      "schema_version": 1,
+      "trigger": "Guard logout completed.",
+      "aliases": [],
+      "producers": [
+        {
+          "path": "packages/nvl/auth/src/Actions/Authentication/LogoutAction.php",
+          "trigger": "Guard logout completed.",
+          "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit)->getConnection()",
+          "construction_expression": "new UserLoggedOut($reference)"
+        }
+      ],
+      "security_notes": [
+        "Internal integration metadata, not a public HTTP feed. Authentication attempts/rejections carry the supplied identifier and reason. AuthDeliveryRequested is an explicit sensitive delivery capability: recipient, secret-bearing payload, expiry, invitation and context must stay within trusted delivery listeners. Audit/principal/RBAC facts carry identifiers and producer-shaped JSON metadata, not models. Arbitrary host-supplied mixed arrays are not recursively constrained by every event constructor."
+      ],
+      "no_op_semantics": "Attempt, rejection, session and delivery observations can repeat for separate requests. Mutation events follow their writer branch; there is no generic cross-request deduplication. Native Laravel Verified and PasswordReset are framework events outside this catalog: Eloquent writers use their source commit boundary; non-Eloquent/custom updater paths retain synchronous behavior where no source connection seam exists."
+    }
+  ],
+  "value_types": [
+    {
+      "class": "Nvl\\Auth\\Data\\Display\\AuthSubjectReferenceData",
+      "source": "packages/nvl/auth/src/Data/Display/AuthSubjectReferenceData.php",
+      "constructor_fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "id",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "type",
+          "type": "string"
+        },
+        {
+          "name": "id",
+          "type": "string"
+        }
+      ],
+      "kind": "value_object"
+    },
+    {
+      "class": "Nvl\\Auth\\Data\\Display\\InvitationDeliveryData",
+      "source": "packages/nvl/auth/src/Data/Display/InvitationDeliveryData.php",
+      "constructor_fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "purpose",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "recipient",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "inviter",
+          "type": "?Nvl\\Auth\\Data\\Display\\AuthSubjectReferenceData",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "roles",
+          "type": "array",
+          "visibility": "public",
+          "required": true,
+          "phpdoc_type": "list<string>"
+        },
+        {
+          "name": "permissions",
+          "type": "array",
+          "visibility": "public",
+          "required": true,
+          "phpdoc_type": "list<string>"
+        },
+        {
+          "name": "metadata",
+          "type": "array",
+          "visibility": "public",
+          "required": true,
+          "phpdoc_type": "array<string, bool|float|int|string|null>"
+        },
+        {
+          "name": "expiresAt",
+          "type": "Carbon\\CarbonImmutable",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "resendCount",
+          "type": "int",
+          "visibility": "public",
+          "required": true
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "id",
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "type": "string"
+        },
+        {
+          "name": "purpose",
+          "type": "string"
+        },
+        {
+          "name": "recipient",
+          "type": "string"
+        },
+        {
+          "name": "inviter",
+          "type": "?Nvl\\Auth\\Data\\Display\\AuthSubjectReferenceData"
+        },
+        {
+          "name": "roles",
+          "type": "array",
+          "phpdoc_type": "list<string>"
+        },
+        {
+          "name": "permissions",
+          "type": "array",
+          "phpdoc_type": "list<string>"
+        },
+        {
+          "name": "metadata",
+          "type": "array",
+          "phpdoc_type": "array<string, bool|float|int|string|null>"
+        },
+        {
+          "name": "expiresAt",
+          "type": "Carbon\\CarbonImmutable"
+        },
+        {
+          "name": "resendCount",
+          "type": "int"
+        }
+      ],
+      "kind": "value_object"
+    },
+    {
+      "class": "Nvl\\Auth\\Enums\\AuthFeature",
+      "source": "packages/nvl/auth/src/Enums/AuthFeature.php",
+      "constructor_fields": [],
+      "public_fields": [],
+      "kind": "enum",
+      "backing_type": "string",
+      "cases": [
+        {
+          "name": "Authentication",
+          "value": "authentication"
+        },
+        {
+          "name": "PrincipalManagement",
+          "value": "principal_management"
+        },
+        {
+          "name": "Memberships",
+          "value": "memberships"
+        },
+        {
+          "name": "Password",
+          "value": "password"
+        },
+        {
+          "name": "EmailVerification",
+          "value": "email_verification"
+        },
+        {
+          "name": "MagicLinks",
+          "value": "magic_links"
+        },
+        {
+          "name": "SecurityCodes",
+          "value": "security_codes"
+        },
+        {
+          "name": "Invitations",
+          "value": "invitations"
+        },
+        {
+          "name": "Totp",
+          "value": "totp"
+        },
+        {
+          "name": "Passkeys",
+          "value": "passkeys"
+        },
+        {
+          "name": "RecoveryCodes",
+          "value": "recovery_codes"
+        },
+        {
+          "name": "SocialIdentities",
+          "value": "social_identities"
+        },
+        {
+          "name": "Clients",
+          "value": "clients"
+        },
+        {
+          "name": "Sessions",
+          "value": "sessions"
+        },
+        {
+          "name": "ApiTokens",
+          "value": "api_tokens"
+        },
+        {
+          "name": "Rbac",
+          "value": "rbac"
+        },
+        {
+          "name": "Audit",
+          "value": "audit"
+        }
+      ]
+    },
+    {
+      "class": "Nvl\\Auth\\Enums\\AuthMessageType",
+      "source": "packages/nvl/auth/src/Enums/AuthMessageType.php",
+      "constructor_fields": [],
+      "public_fields": [],
+      "kind": "enum",
+      "backing_type": "string",
+      "cases": [
+        {
+          "name": "Invitation",
+          "value": "invitation"
+        },
+        {
+          "name": "MagicLink",
+          "value": "magic_link"
+        },
+        {
+          "name": "SecurityCode",
+          "value": "security_code"
+        },
+        {
+          "name": "PasswordReset",
+          "value": "password_reset"
+        },
+        {
+          "name": "EmailVerification",
+          "value": "email_verification"
+        }
+      ]
+    },
+    {
+      "class": "Nvl\\Auth\\ValueObjects\\AuthDeliveryRequest",
+      "source": "packages/nvl/auth/src/ValueObjects/AuthDeliveryRequest.php",
+      "constructor_fields": [
+        {
+          "name": "messageId",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "feature",
+          "type": "Nvl\\Auth\\Enums\\AuthFeature",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "type",
+          "type": "Nvl\\Auth\\Enums\\AuthMessageType",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "recipient",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "payload",
+          "type": "array",
+          "visibility": "public",
+          "required": true,
+          "phpdoc_type": "array<string, mixed>"
+        },
+        {
+          "name": "expiresAt",
+          "type": "Carbon\\CarbonImmutable",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "locale",
+          "type": "?string",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "metadata",
+          "type": "array",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "[]",
+          "phpdoc_type": "array<string, mixed>"
+        },
+        {
+          "name": "subject",
+          "type": "?Nvl\\Auth\\ValueObjects\\SubjectReference",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "invitation",
+          "type": "?Nvl\\Auth\\Data\\Display\\InvitationDeliveryData",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "tenant",
+          "type": "?Nvl\\Support\\Tenancy\\ValueObjects\\TenantId",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "eventContext",
+          "type": "?Nvl\\Auth\\ValueObjects\\AuthEventContext",
+          "visibility": "parameter",
+          "required": false,
+          "default_expression": "null"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "messageId",
+          "type": "string"
+        },
+        {
+          "name": "feature",
+          "type": "Nvl\\Auth\\Enums\\AuthFeature"
+        },
+        {
+          "name": "type",
+          "type": "Nvl\\Auth\\Enums\\AuthMessageType"
+        },
+        {
+          "name": "recipient",
+          "type": "string"
+        },
+        {
+          "name": "payload",
+          "type": "array",
+          "phpdoc_type": "array<string, mixed>"
+        },
+        {
+          "name": "expiresAt",
+          "type": "Carbon\\CarbonImmutable"
+        },
+        {
+          "name": "locale",
+          "type": "?string"
+        },
+        {
+          "name": "metadata",
+          "type": "array",
+          "phpdoc_type": "array<string, mixed>"
+        },
+        {
+          "name": "subject",
+          "type": "?Nvl\\Auth\\ValueObjects\\SubjectReference"
+        },
+        {
+          "name": "invitation",
+          "type": "?Nvl\\Auth\\Data\\Display\\InvitationDeliveryData"
+        },
+        {
+          "name": "tenant",
+          "type": "?Nvl\\Support\\Tenancy\\ValueObjects\\TenantId"
+        },
+        {
+          "name": "eventContext",
+          "type": "?Nvl\\Auth\\ValueObjects\\AuthEventContext"
+        }
+      ],
+      "kind": "value_object"
+    },
+    {
+      "class": "Nvl\\Auth\\ValueObjects\\AuthEventContext",
+      "source": "packages/nvl/auth/src/ValueObjects/AuthEventContext.php",
+      "constructor_fields": [
+        {
+          "name": "mode",
+          "type": "Nvl\\Support\\Tenancy\\Enums\\TenantContextMode",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "tenantId",
+          "type": "?Nvl\\Support\\Tenancy\\ValueObjects\\TenantId",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "mode",
+          "type": "Nvl\\Support\\Tenancy\\Enums\\TenantContextMode"
+        },
+        {
+          "name": "tenantId",
+          "type": "?Nvl\\Support\\Tenancy\\ValueObjects\\TenantId"
+        }
+      ],
+      "kind": "value_object"
+    },
+    {
+      "class": "Nvl\\Auth\\ValueObjects\\SubjectReference",
+      "source": "packages/nvl/auth/src/ValueObjects/SubjectReference.php",
+      "constructor_fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "identifier",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "type",
+          "type": "string"
+        },
+        {
+          "name": "identifier",
+          "type": "string"
+        }
+      ],
+      "kind": "value_object"
+    },
+    {
+      "class": "Nvl\\Support\\Tenancy\\Enums\\TenantContextMode",
+      "source": "packages/nvl/core/support/src/Tenancy/Enums/TenantContextMode.php",
+      "constructor_fields": [],
+      "public_fields": [],
+      "kind": "enum",
+      "backing_type": "string",
+      "cases": [
+        {
+          "name": "Disabled",
+          "value": "disabled"
+        },
+        {
+          "name": "Unresolved",
+          "value": "unresolved"
+        },
+        {
+          "name": "Tenant",
+          "value": "tenant"
+        },
+        {
+          "name": "Platform",
+          "value": "platform"
+        }
+      ]
+    },
+    {
+      "class": "Nvl\\Support\\Tenancy\\ValueObjects\\TenantId",
+      "source": "packages/nvl/core/support/src/Tenancy/ValueObjects/TenantId.php",
+      "constructor_fields": [
+        {
+          "name": "value",
+          "type": "string",
+          "visibility": "parameter",
+          "required": true
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "value",
+          "type": "string"
+        }
+      ],
+      "kind": "value_object"
+    }
+  ],
+  "aliases": [],
+  "publication": {
+    "publication": "The native host dispatcher receives the captured event after the supplied source connection outer commit, or immediately when that connection has no active transaction.",
+    "rollback": "Callbacks attach to the matching native connection and current nesting record; native outer/savepoint rollback discards the corresponding callbacks.",
+    "registration_failure": "Missing source transaction records fail before commit; Mail Notifications reports and drops unusable observations.",
+    "host_policy": "Host after-commit listeners and queue after_commit policies can add their own deferral after publication. Host transaction infrastructure and dispatcher bindings are preserved.",
+    "delivery_limit": "Local callbacks are not an outbox. Process exit between commit and callback can lose delivery; no crash durability or exactly-once delivery is promised.",
+    "cardinality": "One canonical object is dispatched per qualifying producer call. This is local publication, not cross-process deduplication or a guarantee that repeated observations are unique.",
+    "manual_producers": "Use Nvl\\Support\\Events\\DomainEventDispatcher::dispatch($event, $writerConnection). Native Event::dispatch() is immediate and has no package interception."
+  },
+  "security_notes": [
+    "Internal integration metadata, not a public HTTP feed. Authentication attempts/rejections carry the supplied identifier and reason. AuthDeliveryRequested is an explicit sensitive delivery capability: recipient, secret-bearing payload, expiry, invitation and context must stay within trusted delivery listeners. Audit/principal/RBAC facts carry identifiers and producer-shaped JSON metadata, not models. Arbitrary host-supplied mixed arrays are not recursively constrained by every event constructor."
+  ],
+  "no_op_semantics": "Attempt, rejection, session and delivery observations can repeat for separate requests. Mutation events follow their writer branch; there is no generic cross-request deduplication. Native Laravel Verified and PasswordReset are framework events outside this catalog: Eloquent writers use their source commit boundary; non-Eloquent/custom updater paths retain synchronous behavior where no source connection seam exists.",
+  "notes": [
+    "InvitationAccepted custom serialization includes schemaVersion and restores old scalar acceptance payloads without it as version 1.",
+    "AuthDeliveryRequest preserves its own debug redaction and serialized delivery capability, including recipient and payload; redaction during inspection is not removal from the listener payload.",
+    "SubjectReference uses getMorphClass() for an Eloquent subject and class identity for a non-Eloquent authenticatable. AuthEventContext captures TenantContextMode and optional TenantId; it can derive a TenantJobEnvelope."
+  ]
+}

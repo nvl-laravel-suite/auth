@@ -339,6 +339,7 @@ use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
 use Nvl\Support\Config\PackageOptions;
 use Nvl\Support\Doctor\PackageDoctorContributor;
+use Nvl\Support\Globals\GlobalNames;
 use Nvl\Support\Providers\TenantServiceProvider;
 use Nvl\Support\Tenancy\Contracts\TenantHttpResolver;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
@@ -557,6 +558,10 @@ final class AuthServiceProvider extends ServiceProvider
         AuthConfiguration $configuration,
         TypeScriptSourceRegistry $typeScriptSources,
     ): void {
+        $this->app->make(GlobalNames::class)->translations('auth', __DIR__.'/../../lang', $this->app->make('translation.loader'));
+        $this->publishes([
+            __DIR__.'/../../lang' => lang_path('vendor/nvl-auth'),
+        ], 'nvl-auth-translations');
         if (config('nvl-tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Memberships)) {
             $this->registerMembershipAccess();
             $kernel = $this->app->make(HttpKernelContract::class);

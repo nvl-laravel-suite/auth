@@ -1,14 +1,26 @@
 # Upgrading NVL Auth
 
+## Consumer contracts, committed events and runtime policy (5.x)
+
+Prefer focused public interfaces in constructor injection; native implementations remain container defaults and host prebindings win. Returned models are documented identity/data handles: use package contracts for reads/writes and capability-specific batch readers instead of direct package queries. Enable the shipped Core PHPStan include in your host; do not invoke the suite workbench static audit command in a consumer.
+
+Events now carry immutable schemaVersion=1 and scalar/DTO snapshots. Replace model-bearing event fields with the IDs listed in [events](docs/events.md); load only through an authorized public reader when needed. Only six declared legacy `*Event` names are retained as PHP aliases for major 5, removal no earlier than major 6. Migrate exact imports/listeners/fakes to canonical names, replace suffix wildcard patterns explicitly, drain old queued payloads, rebuild event caches and restart workers. Framework Verified/PasswordReset remain native classes. Source-connection callbacks are process-local after-commit publication, not a durable outbox or exactly-once delivery.
+
+Package failures have a marker and optional response metadata. Opt into Core's JSON renderer deliberately; preserve existing host handlers and request-locale selection. Missing required host adapters produce `binding_required`/500; genuine configured authorization denial retains native handling. See the README error table and required-bindings section where applicable.
+
+Factories ship in runtime package mappings for host tests. Ordinary make may persist parents; withoutParents()->make creates detached fixtures. Supply persisted native owners/parents and active tenants explicitly, retain source revisions, and never treat a factory row as a real storage/provider/workflow effect. Core's optional installer publishes common config without enabling features; strict Doctor and explicit deployment cache/worker steps belong in the host release process. C3/C4/E executable acceptance is pending until recorded by integration.
+
+
 ## Major 5 consumer workflow contracts
 
 Supported feature Actions now implement focused interfaces under
 `Nvl\Auth\Contracts`, named `<Action basename without Action>Contract`.
 Change host constructor type hints such as `ListApiTokensAction` to
 `ListApiTokensContract` when the host needs to substitute that workflow in its
-own tests. Concrete Action resolution, constructors, final/readonly qualifiers,
-execute signatures, generic result types, and feature/security behavior remain
-available unchanged. Follow the [host injection example](README.md#injecting-workflows-into-host-services).
+own tests. The C3 binding-only change preserves concrete Action resolution,
+constructors, final/readonly qualifiers, execute signatures, generic result
+types, and feature/security behavior. The separate C4 committed-event change
+adds the required constructor dependencies listed below. Follow the [host injection example](README.md#injecting-workflows-into-host-services).
 
 New workflow defaults use `bindIf`. Existing public extension defaults now
 preserve host instances and interface bindings through provider registration,
@@ -38,6 +50,48 @@ The five internal exclusions do not gain consumer contracts:
 `AdoptPrincipalsAction`, `PruneAuthStateAction`, `IssueChallengeAction`,
 `ConsumeChallengeAction`, and `ConsumeChallengeByIdAction`. Use the existing
 adoption/pruning commands or the complete magic-link/security-code Actions.
+
+## Major 5 committed-event constructor migration (C4)
+
+Container-resolved Actions receive the new dependencies automatically. Hosts
+that construct concrete Actions or services with `new`, or supply their own
+container factories, must supply these required collaborators. This migration
+belongs to C4 source-connection event publication, separately from C3's
+binding-only interface additions. Original constructor parameters retain their
+relative order, names and types.
+
+| Existing concrete class (under `Nvl\Auth`) | New required constructor parameters, in order |
+| --- | --- |
+| `Actions\Invitations\CreateInvitationAction`, `ResendInvitationAction` | `AuthCommittedAudit $committedAudits`, `DomainEventDispatcher $domainEvents`, immediately before the existing optional `?InvitationDeliveryMetadataPolicy $deliveryMetadata = null` tail |
+| `Actions\Invitations\AcceptInvitationAction`, `RegisterInvitationAction` | Append `AuthCommittedAudit $committedAudits`, `DomainEventDispatcher $domainEvents` |
+| `Actions\Invitations\RevokeInvitationAction` | Append `AuthCommittedAudit $committedAudits` |
+| `Actions\Memberships\EnrollMembershipAction`, `ProvisionTenantOwnerAction`, `RevokeMembershipAction`, `SetMembershipStatusAction`, `TransferMembershipOwnershipAction` | Append `AuthCommittedAudit $committedAudits` |
+| `Actions\Authentication\EstablishAuthenticatedSessionAction`, `LoginAction`, `LogoutAction`, `RequestEmailVerificationAction` | Append `DomainEventDispatcher $domainEvents` |
+| `Actions\Passwords\RequestPasswordResetAction` | Append `DomainEventDispatcher $domainEvents` |
+| `Actions\Authentication\VerifyEmailAction`, `Actions\Passwords\ResetPasswordAction` | Append `ConnectionCommitCallbacks $eventCommits` for the retained native framework events |
+| `Actions\Rbac\AddRolePermissionsAction`, `ApplyRoleTemplateAction`, `CloneRoleAction`, `CreatePermissionAction`, `CreatePermissionWithRolesAction`, `CreateRoleAction`, `DeletePermissionAction`, `DeleteRoleAction`, `SyncRolePermissionsAction`, `UpdatePermissionAction`, `UpdateRoleAction` | Append `DomainEventDispatcher $domainEvents` |
+| `Actions\Users\BulkUpdateUsersAction`, `CreateUserAction`, `DeleteOwnAccountAction`, `DeleteUserAction`, `RestoreUserAction`, `SetUserActiveAction`, `UpdateProfileAction`, `UpdateUserAction` | Append `DomainEventDispatcher $domainEvents` |
+| `Services\AuthAuditWriter`, `Services\RbacManager` | Append `DomainEventDispatcher $domainEvents` |
+| Internal `Actions\Challenges\IssueChallengeAction` | Append `DomainEventDispatcher $domainEvents`; continue integrating through the complete public challenge workflows |
+
+The types above are `Nvl\Auth\Services\AuthCommittedAudit`,
+`Nvl\Support\Events\DomainEventDispatcher`,
+`Nvl\Support\Events\ConnectionCommitCallbacks` and
+`Nvl\Auth\Services\InvitationDeliveryMetadataPolicy`. Resolve the required
+collaborators from the same host container as the Action. Keep the existing
+`AuthAuditRecorder $audits` argument: invitation issuance, registration, resend
+and revocation, and the five membership mutations select that supplied recorder
+inside the committed-audit adapter. An independently constructed adapter's
+recorder does not override the Action's original recorder argument. The adapter
+retains the host's native source-connection callbacks.
+
+For positional construction of `CreateInvitationAction` and
+`ResendInvitationAction`, insert the two new required arguments before the
+previous delivery-metadata argument. Named construction keeps every original
+parameter name and adds `committedAudits:` and `domainEvents:`. Omitting
+`deliveryMetadata` or passing `null` remains supported. Other rows append their
+listed required arguments. Rebuild custom factories and long-lived resolved
+services after upgrading; existing instances retain their dependencies.
 
 ## 1.0.3 from 1.0.1 or 1.0.2
 
@@ -264,7 +318,7 @@ DDL transactions are driver dependent and per connection. Inspect dry-run warnin
 
 ## Tagged consumer PHP boundary
 
-Use source `@api` workflows, extension contracts, and value types for application integration. Direct use of untagged implementations or `@internal` members is unsupported. This classification keeps existing concrete Action signatures and runtime behavior; it does not authorize package model persistence, ad hoc queries, relation traversal, or generic model serialization. Returned models are identity/result handles with only the explicitly declared in-memory read fields described in the README.
+Use source `@api` workflows, extension contracts, and value types for application integration. Direct use of untagged implementations or `@internal` members is unsupported. This classification preserves the supported execute signatures and runtime behavior; the C4 constructor migration above still applies; it does not authorize package model persistence, ad hoc queries, relation traversal, or generic model serialization. Returned models are identity/result handles with only the explicitly declared in-memory read fields described in the README.
 
 The implementation Actions `AdoptPrincipalsAction`, `ConsumeChallengeAction`, `ConsumeChallengeByIdAction`, `IssueChallengeAction`, `PruneAuthStateAction` are explicitly internal. Use `RequestMagicLinkAction`/`ConsumeMagicLinkAction` and `RequestSecurityCodeAction`/`VerifySecurityCodeAction` for complete challenge workflows. Run `nvl:auth:adopt-principals` for reviewed adoption and `nvl:auth:prune` for retention maintenance.
 

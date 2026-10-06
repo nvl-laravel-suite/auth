@@ -20,6 +20,7 @@ use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacAssignmentService;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
  * Creates a permission together with its initial role assignments.
@@ -37,6 +38,7 @@ final readonly class CreatePermissionWithRolesAction implements CreatePermission
         private RbacAssignmentService $assignments,
         private AuthAuditRecorder $audits,
         private AuthOperationBoundary $operations,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /**
@@ -76,11 +78,11 @@ final readonly class CreatePermissionWithRolesAction implements CreatePermission
                 'role_ids' => $result['roleIds'],
                 'role_count' => count($result['roleIds']),
             ]);
-            RbacChanged::dispatch('permission', $result['permission']->id, 'created', [
+            $this->domainEvents->dispatch(new RbacChanged('permission', $result['permission']->id, 'created', [
                 'name' => $result['permission']->name,
                 'role_ids' => $result['roleIds'],
                 'role_names' => $result['roleNames'],
-            ]);
+            ]), $result['permission']->getConnection());
 
             return $result;
         }, 3);

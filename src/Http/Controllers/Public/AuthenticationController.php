@@ -33,8 +33,7 @@ final class AuthenticationController
 
         return response()->json([
             'data' => ['subject' => ['type' => $reference->type, 'id' => $reference->identifier]],
-            'code' => 'authenticated',
-            'message' => 'Authentication succeeded.',
+            'code' => 'authenticated', 'message' => trans('nvl-auth::responsecode.authenticated'),
         ]);
     }
 }

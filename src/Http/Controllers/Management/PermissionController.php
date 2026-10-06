@@ -31,8 +31,7 @@ final class PermissionController extends AuthenticatedController
                 $query->group,
                 $query->perPage ?? 25,
             ),
-            'code' => 'permissions_listed',
-            'message' => 'Permissions were listed.',
+            'code' => 'permissions_listed', 'message' => trans('nvl-auth::responsecode.permissions_listed'),
         ]);
     }
 
@@ -41,15 +40,14 @@ final class PermissionController extends AuthenticatedController
     {
         return response()->json([
             'data' => $action->execute($this->subject($request), $data),
-            'code' => 'permission_created',
-            'message' => 'The permission was created.',
+            'code' => 'permission_created', 'message' => trans('nvl-auth::responsecode.permission_created'),
         ], 201);
     }
 
     /** Show one permission. */
     public function show(Request $request, string $permission, ShowPermissionAction $action): JsonResponse
     {
-        return response()->json(['data' => $action->execute($this->subject($request), $permission), 'code' => 'permission_shown', 'message' => 'The permission was shown.']);
+        return response()->json(['data' => $action->execute($this->subject($request), $permission), 'code' => 'permission_shown', 'message' => trans('nvl-auth::responsecode.permission_shown')]);
     }
 
     /** Update one permission. */
@@ -57,7 +55,7 @@ final class PermissionController extends AuthenticatedController
     {
         $data = UpdatePermissionData::validateForUpdate($this->requestPayload($request), $permission);
 
-        return response()->json(['data' => $action->execute($this->subject($request), $permission, $data), 'code' => 'permission_updated', 'message' => 'The permission was updated.']);
+        return response()->json(['data' => $action->execute($this->subject($request), $permission, $data), 'code' => 'permission_updated', 'message' => trans('nvl-auth::responsecode.permission_updated')]);
     }
 
     /** Delete one permission. */
@@ -65,6 +63,6 @@ final class PermissionController extends AuthenticatedController
     {
         $action->execute($this->subject($request), $permission);
 
-        return response()->json(['data' => null, 'code' => 'permission_deleted', 'message' => 'The permission was deleted.']);
+        return response()->json(['data' => null, 'code' => 'permission_deleted', 'message' => trans('nvl-auth::responsecode.permission_deleted')]);
     }
 }

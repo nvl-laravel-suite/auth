@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Nvl\Auth\Actions\Authentication\CompletePendingTenantAuthenticationIntentAction;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Support\Http\PackageExceptionPayload;
 use Nvl\Support\Tenancy\Contracts\TenantHttpResolver;
 use Nvl\Support\Tenancy\Exceptions\TenantBoundaryViolation;
 use Nvl\Support\Tenancy\Exceptions\TenantNotFound;
@@ -16,8 +17,10 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
 /**
  * Completes server-owned post-authentication tenant selection.
  */
-final class TenantAuthenticationIntentController
+final readonly class TenantAuthenticationIntentController
 {
+    public function __construct(private PackageExceptionPayload $payload) {}
+
     /** Complete the current authenticated session's pending tenant intent. */
     public function complete(
         Request $request,
@@ -34,17 +37,18 @@ final class TenantAuthenticationIntentController
             }
             $tenant = $action->execute($this->requestedTenant($request, $tenants));
         } catch (AuthException $exception) {
+            $payload = $this->payload->for($exception);
+
             return response()->json([
                 'data' => null,
-                'code' => $exception->errorCode,
-                'message' => $exception->getMessage(),
-            ], $exception->status);
+                'code' => $payload['code'],
+                'message' => $payload['message'],
+            ], $exception->status, $this->payload->headers($exception));
         }
 
         return response()->json([
             'data' => ['tenant_id' => $tenant->value],
-            'code' => 'tenant_authentication_intent_completed',
-            'message' => 'Tenant selection succeeded.',
+            'code' => 'tenant_authentication_intent_completed', 'message' => trans('nvl-auth::responsecode.tenant_authentication_intent_completed'),
         ]);
     }
 

@@ -8,12 +8,17 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Config;
 use Nvl\Auth\Models\Permission;
 
-/** @extends Factory<Permission> */
+/** @api
+ * @extends Factory<Permission> */
 final class PermissionFactory extends Factory
 {
     /** @var class-string<Permission> */
     protected $model = Permission::class;
 
+    /** Define native package fixture attributes.
+     *
+     * @return array<model-property<Permission>, mixed>
+     */
     public function definition(): array
     {
         return [

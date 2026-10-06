@@ -27,6 +27,7 @@ use Nvl\Auth\Tests\Fixtures\TestSubjectResolver;
 use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
+use Nvl\Support\Providers\LocaleServiceProvider;
 use Nvl\Tenancy\Contracts\PlatformAccess;
 use Nvl\Tenancy\Contracts\TenantDirectory;
 use Nvl\Tenancy\Contracts\TenantHttpResolver;
@@ -50,6 +51,7 @@ abstract class TenancyTestCase extends Orchestra
     protected function getPackageProviders($app): array
     {
         return [
+            LocaleServiceProvider::class,
             PermissionServiceProvider::class,
             SanctumServiceProvider::class,
             LaravelDataServiceProvider::class,

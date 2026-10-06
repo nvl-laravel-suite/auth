@@ -10,6 +10,8 @@ use Nvl\Auth\Models\AuthAudit;
 /**
  * Builds bounded Auth audit records.
  *
+ * @api
+ *
  * @extends Factory<AuthAudit>
  */
 final class AuthAuditFactory extends Factory
@@ -19,6 +21,8 @@ final class AuthAuditFactory extends Factory
 
     /**
      * Define a valid audit fact.
+     *
+     * @return array<model-property<AuthAudit>, mixed>
      */
     public function definition(): array
     {
