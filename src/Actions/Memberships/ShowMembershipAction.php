@@ -30,7 +30,7 @@ final readonly class ShowMembershipAction
     {
         $this->features->assertAllowed(AuthFeature::Memberships, FeatureOperation::Read);
         $membership = $this->memberships->find($membership);
-        $this->authorization->authorize($actor, 'nvl-auth.memberships.view', $membership);
+        $this->authorization->authorize($actor, 'nvl.auth.memberships.view', $membership);
         $principal = $this->principals->resolve(new SubjectReference($membership->subject_type, $membership->subject_id));
 
         return self::data($membership, $principal instanceof Model ? $principal : null);

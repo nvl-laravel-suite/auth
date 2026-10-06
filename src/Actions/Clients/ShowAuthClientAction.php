@@ -30,7 +30,7 @@ final readonly class ShowAuthClientAction
     public function execute(Authenticatable $actor, AuthClient $client): AuthClient
     {
         $this->features->assertAllowed(AuthFeature::Clients, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.clients.view', $client);
+        $this->authorization->authorize($actor, 'nvl.auth.clients.view', $client);
 
         return $client;
     }

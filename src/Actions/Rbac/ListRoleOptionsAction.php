@@ -37,7 +37,7 @@ final readonly class ListRoleOptionsAction
         ?int $limit = null,
     ): Collection {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
         $search = $this->normalizedSearch($search);
 
         return $this->options->roles($search, $this->limits->roleOptionLimit($limit));

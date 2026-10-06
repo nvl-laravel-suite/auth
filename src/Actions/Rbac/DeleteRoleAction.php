@@ -31,7 +31,7 @@ final readonly class DeleteRoleAction
     public function execute(Authenticatable $actor, Role|string $role): bool
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Revoke);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.manageRoles');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.manageRoles');
         $role = $this->entities->role($role);
 
         if ($role->is_system) {

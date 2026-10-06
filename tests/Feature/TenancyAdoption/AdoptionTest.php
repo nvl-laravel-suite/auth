@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Models\Role;
+use Nvl\Auth\Services\PermissionStorageReadiness;
 use Nvl\Auth\Tests\Fixtures\AuthTenancyScenario;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Tenancy\Contracts\TenantMembershipAccess;
@@ -47,6 +48,7 @@ it('maps a shared legacy role into reviewed tenant memberships', function (): vo
 
     expect($coordinator->verify($plan)->errors)->toBe([]);
     $coordinator->activate($plan, $operation);
+    app()->forgetInstance(PermissionStorageReadiness::class);
     app(TenantMembershipAccess::class)->assertMember($one, $scenario->a());
     app(TenantMembershipAccess::class)->assertMember($two, $scenario->b());
     expect($scenario->run($scenario->a(), fn () => $one->fresh()->hasRole('manager')))->toBeTrue()
@@ -87,7 +89,7 @@ it('resumes an immutable run without duplicating adopted rows', function (): voi
         ->and(app('db')->table(AuthTables::Roles)->where('tenant_id', $scenario->a()->value)->count())->toBe(1)
         ->and(app('db')->table(AuthTables::ModelHasRoles)->where('tenant_id', $scenario->a()->value)->count())->toBe(1);
 
-    config(['tenancy.profile' => 'changed-after-review']);
+    config(['nvl-tenancy.profile' => 'changed-after-review']);
     expect(fn () => $coordinator->resume($plan->id))->toThrow(TenantConfigurationInvalid::class);
 });
 

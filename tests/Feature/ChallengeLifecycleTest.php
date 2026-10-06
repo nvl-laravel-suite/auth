@@ -15,6 +15,7 @@ use Nvl\Auth\Data\Mutations\RequestSecurityCodeData;
 use Nvl\Auth\Data\Mutations\VerifySecurityCodeData;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Http\Middleware\EnsureAuthFeatureAvailable;
 use Nvl\Auth\Http\Middleware\RenderAuthExceptions;
 use Nvl\Auth\Models\Challenge;
 
@@ -83,18 +84,19 @@ it('scopes numeric codes to their recipient and purpose', function (): void {
 it('keeps generic security-code HTTP proof host-managed and unauthenticated when tenancy is disabled', function (): void {
     config()->set('nvl-auth.features.security_codes.enabled', true);
     Event::fake([AuthDeliveryRequested::class]);
-    Route::prefix('api/v1/auth')->name('nvl.auth.public.')
+    app('router')->aliasMiddleware('nvl.auth.feature', EnsureAuthFeatureAvailable::class);
+    Route::prefix('nvl/api/v1/auth')->name('nvl.auth.public.')
         ->middleware(RenderAuthExceptions::class)
         ->group(dirname(__DIR__, 2).'/routes/public/security_codes.php');
 
-    $this->postJson('/api/v1/auth/security-codes', [
+    $this->postJson('/nvl/api/v1/auth/security-codes', [
         'recipient' => 'host-managed@example.test',
         'purpose' => 'email_change',
     ])->assertAccepted();
     /** @var AuthDeliveryRequested $delivery */
     $delivery = Event::dispatched(AuthDeliveryRequested::class)->sole()[0];
 
-    $this->postJson('/api/v1/auth/security-codes/verify', [
+    $this->postJson('/nvl/api/v1/auth/security-codes/verify', [
         'recipient' => 'host-managed@example.test',
         'purpose' => 'email_change',
         'code' => $delivery->request->payload['secret'],

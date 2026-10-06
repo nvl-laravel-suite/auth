@@ -5,7 +5,7 @@ Submit reports through [this package's private vulnerability reporting form](htt
 Report vulnerabilities privately to the package maintainers. Do not open a
 public issue containing secrets, exploit details, or affected production data.
 
-Security fixes are provided for the current `2.x` release line on PHP 8.3+
+Security fixes are provided for the prepared `5.x` release line on PHP 8.3+
 and Laravel 13.
 
 Security-sensitive design rules:

@@ -42,7 +42,7 @@ final readonly class SetMembershipStatusAction
         $this->features->assertAllowed(AuthFeature::Memberships, FeatureOperation::Update);
 
         $candidate = $this->memberships->find($membership);
-        $actor = $this->authorization->authorize($authority, 'nvl-auth.memberships.update', $candidate);
+        $actor = $this->authorization->authorize($authority, 'nvl.auth.memberships.update', $candidate);
 
         return DB::connection($candidate->getConnectionName())->transaction(function () use ($actor, $authority, $candidate, $data): TenantMembership {
             $this->owners->lock($this->context->requireTenant());

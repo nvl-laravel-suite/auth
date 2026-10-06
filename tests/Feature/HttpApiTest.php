@@ -30,7 +30,7 @@ it('serves the authorized client and audit management lifecycle', function (): v
     $actor = $this->user('manager@example.test');
     $this->actingAs($actor, 'web');
 
-    $created = $this->postJson('/api/v1/auth/clients', [
+    $created = $this->postJson('/nvl/api/v1/auth/clients', [
         'name' => 'Admin Portal',
         'surface' => 'web',
         'baseUrl' => 'https://admin.example.test',
@@ -43,16 +43,16 @@ it('serves the authorized client and audit management lifecycle', function (): v
 
     expect($clientId)->toBeString();
 
-    $this->getJson("/api/v1/auth/clients/{$clientId}")
+    $this->getJson("/nvl/api/v1/auth/clients/{$clientId}")
         ->assertOk()
         ->assertJsonPath('data.metadata.owner', 'platform');
-    $this->patchJson("/api/v1/auth/clients/{$clientId}/status", ['active' => false])
+    $this->patchJson("/nvl/api/v1/auth/clients/{$clientId}/status", ['active' => false])
         ->assertOk()
         ->assertJsonPath('code', 'client_deactivated')
         ->assertHeader('Cache-Control', 'no-store, private');
 
     $audit = AuthAudit::query()->where('action', 'client.created')->sole();
-    $this->getJson("/api/v1/auth/audits/{$audit->identifier()}")
+    $this->getJson("/nvl/api/v1/auth/audits/{$audit->identifier()}")
         ->assertOk()
         ->assertJsonPath('data.metadata.surface', 'web');
 });
@@ -72,10 +72,10 @@ it('keeps public magic-link account discovery neutral while binding known subjec
     );
     $user = $this->user();
 
-    $this->postJson('/api/v1/auth/magic-links', ['recipient' => 'unknown@example.test'])
+    $this->postJson('/nvl/api/v1/auth/magic-links', ['recipient' => 'unknown@example.test'])
         ->assertAccepted()
         ->assertJsonPath('code', 'magic_link_requested');
-    $this->postJson('/api/v1/auth/magic-links', ['recipient' => $user->email])
+    $this->postJson('/nvl/api/v1/auth/magic-links', ['recipient' => $user->email])
         ->assertAccepted()
         ->assertJsonPath('code', 'magic_link_requested');
 

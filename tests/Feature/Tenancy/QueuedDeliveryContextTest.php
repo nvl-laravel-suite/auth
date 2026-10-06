@@ -52,8 +52,8 @@ return Illuminate\Foundation\Application::configure(basePath: dirname(__DIR__))
     ->withProviders([
         Nvl\Support\Providers\SupportServiceProvider::class,
         Nvl\Data\Providers\DataServiceProvider::class,
-        Nvl\Tenancy\Providers\TenancyServiceProvider::class,
         Nvl\Auth\Tests\Fixtures\AuthDeliveryWorkerProvider::class,
+        Nvl\Tenancy\Providers\TenancyServiceProvider::class,
     ])->withExceptions()->withMiddleware()->create();
 PHP;
         file_put_contents($consumer.'/bootstrap/app.php', $bootstrap);

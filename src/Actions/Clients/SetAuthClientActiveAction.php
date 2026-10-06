@@ -36,7 +36,7 @@ final readonly class SetAuthClientActiveAction
         bool $active,
     ): AuthClient {
         $this->features->assertAllowed(AuthFeature::Clients, FeatureOperation::Update);
-        $this->authorization->authorize($actor, 'nvl-auth.clients.update', $client);
+        $this->authorization->authorize($actor, 'nvl.auth.clients.update', $client);
 
         return DB::connection($client->getConnectionName())->transaction(function () use ($active, $actor, $client): AuthClient {
             /** @var AuthClient $locked */

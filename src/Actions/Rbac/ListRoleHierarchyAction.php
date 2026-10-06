@@ -29,9 +29,9 @@ final readonly class ListRoleHierarchyAction
     public function execute(Authenticatable $actor): array
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
         $class = $this->models->roleClass();
-        $roles = (config('tenancy.enabled') === true ? $this->tenancy->roles() : $class::query())
+        $roles = (config('nvl-tenancy.enabled') === true ? $this->tenancy->roles() : $class::query())
             ->withCount('users')->orderByDesc('priority')->orderBy('name')->get();
 
         return $this->hierarchy->tree($roles);

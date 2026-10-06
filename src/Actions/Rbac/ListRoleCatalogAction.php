@@ -39,11 +39,11 @@ final readonly class ListRoleCatalogAction
         RoleIndexQueryData $data,
     ): LengthAwarePaginator {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
         $this->assertMaximumLength($data->search, 160, 'Role search');
         $this->assertMaximumLength($data->guard, 120, 'Role guard');
         $class = $this->models->roleClass();
-        $query = (config('tenancy.enabled') === true ? $this->tenancy->roles() : $class::query())
+        $query = (config('nvl-tenancy.enabled') === true ? $this->tenancy->roles() : $class::query())
             ->select([
                 'id',
                 'name',

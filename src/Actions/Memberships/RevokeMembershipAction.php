@@ -44,7 +44,7 @@ final readonly class RevokeMembershipAction
         $this->features->assertAllowed(AuthFeature::Memberships, FeatureOperation::Revoke);
 
         $candidate = $this->memberships->find($membership);
-        $actor = $this->authorization->authorize($authority, 'nvl-auth.memberships.revoke', $candidate);
+        $actor = $this->authorization->authorize($authority, 'nvl.auth.memberships.revoke', $candidate);
 
         return DB::connection($candidate->getConnectionName())->transaction(function () use ($actor, $authority, $candidate, $expectedRevision): TenantMembership {
             $tenant = $this->context->requireTenant();

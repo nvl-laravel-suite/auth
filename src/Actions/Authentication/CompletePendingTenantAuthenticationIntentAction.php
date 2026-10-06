@@ -40,7 +40,7 @@ final readonly class CompletePendingTenantAuthenticationIntentAction
     {
         $this->features->assertAllowed(AuthFeature::Authentication, FeatureOperation::Use);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Use);
-        if (config('tenancy.enabled') !== true) {
+        if (config('nvl-tenancy.enabled') !== true) {
             throw new AuthException('tenant_authentication_intent_unavailable', 'No tenant authentication intent is pending.', 410);
         }
 

@@ -209,7 +209,7 @@ it('serves the complete built-in registration and authentication HTTP flow', fun
     $user = $this->user();
     $authenticator = new TestWebauthnAuthenticator;
     $this->actingAs($user, 'web');
-    $registration = $this->postJson('/api/v1/auth/passkeys/registration/options')
+    $registration = $this->postJson('/nvl/api/v1/auth/passkeys/registration/options')
         ->assertOk()
         ->assertJsonPath('code', 'passkey_registration_started');
     $registrationOptions = $registration->json('data.options');
@@ -218,13 +218,13 @@ it('serves the complete built-in registration and authentication HTTP flow', fun
     expect($registrationOptions)->toBeArray()
         ->and($registrationId)->toBeString();
 
-    $this->postJson('/api/v1/auth/passkeys/registration', [
+    $this->postJson('/nvl/api/v1/auth/passkeys/registration', [
         'ceremonyId' => $registrationId,
         'response' => $authenticator->registrationResponse($registrationOptions),
         'name' => 'HTTP passkey',
     ])->assertCreated()->assertJsonPath('code', 'passkey_registered');
 
-    $authentication = $this->postJson('/api/v1/auth/passkeys/authentication/options')
+    $authentication = $this->postJson('/nvl/api/v1/auth/passkeys/authentication/options')
         ->assertOk()
         ->assertJsonPath('code', 'passkey_authentication_started');
     $authenticationOptions = $authentication->json('data.options');
@@ -233,7 +233,7 @@ it('serves the complete built-in registration and authentication HTTP flow', fun
     expect($authenticationOptions)->toBeArray()
         ->and($authenticationId)->toBeString();
 
-    $this->postJson('/api/v1/auth/passkeys/authentication', [
+    $this->postJson('/nvl/api/v1/auth/passkeys/authentication', [
         'ceremonyId' => $authenticationId,
         'response' => $authenticator->authenticationResponse(
             $authenticationOptions,

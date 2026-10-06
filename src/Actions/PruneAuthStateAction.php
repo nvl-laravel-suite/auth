@@ -59,7 +59,7 @@ final readonly class PruneAuthStateAction
             $this->configuration->integerBetween('cleanup.retention_days', 30, 1, 3_650),
         );
         $snapshot = $this->tenantContext->snapshot();
-        if (config('tenancy.enabled') === true && $snapshot->mode === TenantContextMode::Unresolved) {
+        if (config('nvl-tenancy.enabled') === true && $snapshot->mode === TenantContextMode::Unresolved) {
             throw new TenantContextMissing('Tenant-aware Auth pruning requires an explicit tenant or platform context.');
         }
         $ownedQueries = [
@@ -74,7 +74,7 @@ final readonly class PruneAuthStateAction
                     ->orWhere('revoked_at', '<', $cutoff);
             }),
         ];
-        if (config('tenancy.enabled') === true) {
+        if (config('nvl-tenancy.enabled') === true) {
             foreach ($ownedQueries as $query) {
                 if ($snapshot->mode === TenantContextMode::Tenant) {
                     $query->where('tenant_id', $snapshot->tenantId?->value)
@@ -85,7 +85,7 @@ final readonly class PruneAuthStateAction
             }
         }
         $queries = $ownedQueries;
-        if (config('tenancy.enabled') !== true || $snapshot->mode === TenantContextMode::Platform) {
+        if (config('nvl-tenancy.enabled') !== true || $snapshot->mode === TenantContextMode::Platform) {
             $queries += [
                 'totp_credentials' => TotpCredential::query()->where('revoked_at', '<', $cutoff),
                 'passkeys' => Passkey::query()->where('revoked_at', '<', $cutoff),
@@ -96,7 +96,7 @@ final readonly class PruneAuthStateAction
                 'client_sessions' => AuthClientSession::query()->where('ended_at', '<', $cutoff),
             ];
         }
-        if (config('tenancy.enabled') === true
+        if (config('nvl-tenancy.enabled') === true
             && Schema::connection((new TenantAuthenticationIntent)->getConnectionName())
                 ->hasTable(TenantAuthenticationIntent::TABLE)) {
             $queries['tenant_authentication_intents'] = TenantAuthenticationIntent::query()

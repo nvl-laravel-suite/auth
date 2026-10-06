@@ -20,6 +20,7 @@ use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\FeatureManifest;
 use Nvl\Auth\ValueObjects\FeatureDefinition;
+use Nvl\Support\Globals\GlobalNames;
 
 /**
  * Registers only effective, explicitly enabled package route families.
@@ -35,34 +36,75 @@ final class RouteServiceProvider extends ServiceProvider
         FeatureManifest $manifest,
         FeatureGate $features,
     ): void {
-        $router->aliasMiddleware('nvl-auth.feature', EnsureAuthFeatureAvailable::class);
-        $router->aliasMiddleware('nvl-auth.guard', AuthenticateAuthGuard::class);
-        $this->registerRateLimiters();
-
-        if ($this->app->routesAreCached()
-            || ! $configuration->enabled()
+        if (! $configuration->enabled()
             || ! $configuration->boolean('routes.enabled', false)) {
             return;
         }
 
-        $prefix = trim($configuration->string('routes.prefix', 'api/v1/auth'), '/');
-        Route::prefix($prefix)
-            ->name('nvl.auth.')
-            ->group(function () use ($configuration, $features, $manifest): void {
-                foreach (['public', 'account', 'management'] as $surface) {
-                    $this->mapSurface($surface, $configuration, $manifest, $features);
+        $surfaces = [];
+        foreach (['public', 'account', 'management'] as $surface) {
+            if (! $configuration->boolean("routes.{$surface}.enabled", false)) {
+                continue;
+            }
+            foreach ($manifest->definitions() as $definition) {
+                if (is_string($definition->routeFamilies[$surface] ?? null)
+                    && $configuration->featureRoutesEnabled($definition->feature, $surface)
+                    && $features->allows($definition->feature, FeatureOperation::Read)
+                    && $this->dependenciesAvailable($definition, $surface, $features)) {
+                    $surfaces[] = $surface;
+                    break;
                 }
-            });
+            }
+        }
+        if ($surfaces === []) {
+            return;
+        }
+
+        $names = $this->app->make(GlobalNames::class);
+        foreach (['nvl-auth.feature' => ['nvl.auth.feature', EnsureAuthFeatureAvailable::class],
+            'nvl-auth.guard' => ['nvl.auth.guard', AuthenticateAuthGuard::class]] as $legacy => [$canonical, $middleware]) {
+            $exists = static fn (string $name): bool => array_key_exists($name, $router->getMiddleware());
+            $install = static function (string $name) use ($router, $middleware): void {
+                $router->aliasMiddleware($name, $middleware);
+            };
+            $names->reserve('auth', 'middleware', $canonical, $exists, $install);
+            $names->register('auth', 'middleware', $legacy, $canonical, $exists, $install);
+        }
+        $this->registerRateLimiters($surfaces);
+        if ($this->app->routesAreCached()) {
+            return;
+        }
+
+        $prefix = trim($configuration->string('routes.prefix', 'nvl/api/v1/auth'), '/');
+        $this->app->make(GlobalNames::class)->loadRoutes('auth', $router, function () use ($prefix, $configuration, $features, $manifest): void {
+            Route::prefix($prefix)
+                ->name('nvl.auth.')
+                ->group(function () use ($configuration, $features, $manifest): void {
+                    foreach (['public', 'account', 'management'] as $surface) {
+                        $this->mapSurface($surface, $configuration, $manifest, $features);
+                    }
+                });
+        });
     }
 
     /**
      * Register package rate-limit policies.
+     *
+     * @param  list<string>  $surfaces
      */
-    private function registerRateLimiters(): void
+    private function registerRateLimiters(array $surfaces): void
     {
-        RateLimiter::for('nvl-auth-public', static fn (Request $request): Limit => Limit::perMinute(10)->by(self::requestKey($request)));
-        RateLimiter::for('nvl-auth-account', static fn (Request $request): Limit => Limit::perMinute(30)->by(self::requestKey($request)));
-        RateLimiter::for('nvl-auth-management', static fn (Request $request): Limit => Limit::perMinute(60)->by(self::requestKey($request)));
+        $names = $this->app->make(GlobalNames::class);
+        foreach ($surfaces as $surface) {
+            $maximum = ['public' => 10, 'account' => 30, 'management' => 60][$surface];
+            $limiter = static fn (Request $request): Limit => Limit::perMinute($maximum)->by(self::requestKey($request));
+            $exists = static fn (string $name): bool => RateLimiter::limiter($name) !== null;
+            $install = static function (string $name) use ($limiter): void {
+                RateLimiter::for($name, $limiter);
+            };
+            $names->reserve('auth', 'limiter', 'nvl.auth.'.$surface, $exists, $install);
+            $names->register('auth', 'limiter', 'nvl-auth-'.$surface, 'nvl.auth.'.$surface, $exists, $install);
+        }
     }
 
     /**
@@ -122,9 +164,9 @@ final class RouteServiceProvider extends ServiceProvider
         }
 
         $featureMiddleware = [
-            "nvl-auth.feature:{$definition->feature->value},read",
+            "nvl.auth.feature:{$definition->feature->value},read",
             ...array_map(
-                static fn ($dependency): string => "nvl-auth.feature:{$dependency->value},read",
+                static fn ($dependency): string => "nvl.auth.feature:{$dependency->value},read",
                 $definition->dependenciesForSurface($surface),
             ),
         ];

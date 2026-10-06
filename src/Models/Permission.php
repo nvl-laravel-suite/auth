@@ -82,7 +82,7 @@ class Permission extends SpatiePermission
     /** @return BelongsToMany<Model, $this> */
     public function users(): BelongsToMany
     {
-        if (config('tenancy.enabled') !== true) {
+        if (config('nvl-tenancy.enabled') !== true) {
             return parent::users();
         }
         $tenant = getPermissionsTeamId();

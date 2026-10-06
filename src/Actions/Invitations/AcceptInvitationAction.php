@@ -69,7 +69,7 @@ final readonly class AcceptInvitationAction
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Use);
         $reference = SubjectReference::fromAuthenticatable($subject);
 
-        if (config('tenancy.enabled') === true) {
+        if (config('nvl-tenancy.enabled') === true) {
             $tenant = $this->bootstrap->tenantForToken($token);
             if (! $tenant instanceof TenantId) {
                 throw new AuthException('invitation_invalid', 'The invitation is invalid or expired.', 410);
@@ -167,7 +167,7 @@ final readonly class AcceptInvitationAction
                             $invitation->inviter_id,
                         ), true);
                         $this->membershipAccess->assertMember($inviter, $tenant);
-                        $this->authorization->authorize($inviter, 'nvl-auth.invitations.create');
+                        $this->authorization->authorize($inviter, 'nvl.auth.invitations.create');
 
                         $roles = is_array($invitation->roles) ? $invitation->roles : [];
                         $permissions = is_array($invitation->permissions) ? $invitation->permissions : [];

@@ -37,7 +37,7 @@ final readonly class CreatePermissionAction
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Issue);
         $this->operations->requirePlatformAdministration();
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.managePermissions');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.managePermissions');
         $class = $this->models->permissionClass();
         $connection = (new $class)->getConnectionName();
 

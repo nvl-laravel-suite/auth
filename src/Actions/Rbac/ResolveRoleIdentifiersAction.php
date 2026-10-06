@@ -33,7 +33,7 @@ final readonly class ResolveRoleIdentifiersAction
     public function execute(Authenticatable $actor, array $identifiers): Collection
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
 
         return $this->entities
             ->rolesByIdentifiers($identifiers)

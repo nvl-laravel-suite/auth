@@ -154,7 +154,7 @@ final readonly class LoginAction
         SubjectReference $reference,
         ?AuthenticationRequestContext $context,
     ): void {
-        if (config('tenancy.enabled') !== true
+        if (config('nvl-tenancy.enabled') !== true
             || ! is_string($context?->tenantIntentNonce)
             || ! is_string($context->tenantSessionBinding)
             || $context->tenantPurpose === null) {

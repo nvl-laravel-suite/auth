@@ -25,6 +25,7 @@ use Nvl\Auth\Actions\Users\SyncUserPermissionsAction;
 use Nvl\Auth\Actions\Users\SyncUserRolesAction;
 use Nvl\Auth\Actions\Users\UpdateProfileAction;
 use Nvl\Auth\Contracts\AuthManagementAccess;
+use Nvl\Auth\Contracts\PrincipalSessionContainment;
 use Nvl\Auth\Data\Mutations\DeleteOwnAccountData;
 use Nvl\Auth\Data\Mutations\LoginData;
 use Nvl\Auth\Data\Mutations\StorePermissionData;
@@ -43,6 +44,19 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
+
+it('rejects a malformed host token relationship before credential containment', function (): void {
+    $principal = new class extends Illuminate\Foundation\Auth\User
+    {
+        public function tokens(): string
+        {
+            return 'invalid-token-relationship';
+        }
+    };
+
+    expect(fn () => app(PrincipalSessionContainment::class)->contain($principal, 'deactivate'))
+        ->toThrow(AuthException::class, 'token relationship');
+});
 
 it('owns a complete principal lifecycle and fails disabled login closed', function (): void {
     $actor = $this->user('owner@example.test');

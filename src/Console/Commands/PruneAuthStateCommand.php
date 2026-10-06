@@ -33,7 +33,7 @@ final class PruneAuthStateCommand extends Command
     public function handle(PruneAuthStateAction $action, TenantRunner $tenants): int
     {
         $execute = fn (): array => $action->execute((bool) $this->option('dry-run'));
-        if (config('tenancy.enabled') === true) {
+        if (config('nvl-tenancy.enabled') === true) {
             $tenant = $this->option('tenant');
             $platform = (bool) $this->option('platform');
             $tenantProvided = is_string($tenant) && $tenant !== '';

@@ -42,7 +42,7 @@ final readonly class DeleteUserAction
     public function execute(Authenticatable|SystemMutationContext $authority, User|string $user): bool
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Revoke);
-        $actor = $this->authorization->authorize($authority, 'nvl-auth.users.delete', $user);
+        $actor = $this->authorization->authorize($authority, 'nvl.auth.users.delete', $user);
         $metadata = $this->authorization->metadata($authority);
         $context = $authority instanceof SystemMutationContext ? $authority : null;
         $user = $this->users->find($user);
@@ -53,7 +53,7 @@ final readonly class DeleteUserAction
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $context, $metadata, $user): bool {
             $reference = SubjectReference::fromAuthenticatable($user);
-            if (config('tenancy.enabled') === true) {
+            if (config('nvl-tenancy.enabled') === true) {
                 $this->owners->assertPrincipalCanBeDisabled($reference);
             }
             $this->sessions->contain($user, 'deleted', $context);

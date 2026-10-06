@@ -33,7 +33,7 @@ final readonly class ListAuthClientsAction
     public function execute(Authenticatable $actor, int $perPage = 25): LengthAwarePaginator
     {
         $this->features->assertAllowed(AuthFeature::Clients, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.clients.viewAny');
+        $this->authorization->authorize($actor, 'nvl.auth.clients.viewAny');
 
         return AuthClient::query()->latest()->paginate(max(1, min($perPage, 100)));
     }

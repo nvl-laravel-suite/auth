@@ -81,7 +81,7 @@ it('carries a subject-bound tenant intent through the real magic-link HTTP trans
     $scenario->member($scenario->a(), SubjectReference::fromAuthenticatable($user));
 
     $this->withSession([])->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->postJson('/api/v1/auth/magic-links', ['recipient' => $user->email])
+        ->postJson('/nvl/api/v1/auth/magic-links', ['recipient' => $user->email])
         ->assertAccepted();
     /** @var AuthDeliveryRequested $delivery */
     $delivery = Event::dispatched(AuthDeliveryRequested::class)->sole()[0];
@@ -89,7 +89,7 @@ it('carries a subject-bound tenant intent through the real magic-link HTTP trans
     $token = $delivery->request->payload['secret'];
 
     $this->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->postJson('/api/v1/auth/magic-links/consume', ['challengeId' => $challengeId, 'token' => $token])
+        ->postJson('/nvl/api/v1/auth/magic-links/consume', ['challengeId' => $challengeId, 'token' => $token])
         ->assertOk()
         ->assertJsonPath('code', 'magic_link_consumed');
 
@@ -106,13 +106,13 @@ it('does not consume a tenant intent for a mismatched HTTP tenant and consumes i
     $scenario->member($scenario->a(), SubjectReference::fromAuthenticatable($user));
 
     $this->withSession([])->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->postJson('/api/v1/auth/magic-links', ['recipient' => $user->email])
+        ->postJson('/nvl/api/v1/auth/magic-links', ['recipient' => $user->email])
         ->assertAccepted();
     /** @var AuthDeliveryRequested $delivery */
     $delivery = Event::dispatched(AuthDeliveryRequested::class)->sole()[0];
     $challengeId = $delivery->request->payload['challenge_id'];
 
-    $this->withHeader('X-Test-Tenant', $scenario->b()->value)->postJson('/api/v1/auth/magic-links/consume', [
+    $this->withHeader('X-Test-Tenant', $scenario->b()->value)->postJson('/nvl/api/v1/auth/magic-links/consume', [
         'challengeId' => $challengeId,
         'token' => $delivery->request->payload['secret'],
     ])->assertOk();
@@ -123,7 +123,7 @@ it('does not consume a tenant intent for a mismatched HTTP tenant and consumes i
         ->and(AuthAudit::query()->where('action', 'authentication.tenant_selection_denied')->count())->toBe(1);
 
     $this->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->postJson('/api/v1/auth/tenant-intents/complete')
+        ->postJson('/nvl/api/v1/auth/tenant-intents/complete')
         ->assertOk()
         ->assertJsonPath('data.tenant_id', $scenario->a()->value);
 
@@ -131,7 +131,7 @@ it('does not consume a tenant intent for a mismatched HTTP tenant and consumes i
         ->and(AuthAudit::query()->where('action', 'authentication.tenant_selected')->count())->toBe(1);
 
     $this->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->postJson('/api/v1/auth/tenant-intents/complete')
+        ->postJson('/nvl/api/v1/auth/tenant-intents/complete')
         ->assertGone()
         ->assertJsonPath('code', 'tenant_authentication_intent_unavailable');
 });
@@ -145,21 +145,21 @@ it('keeps concurrent same-browser tenant flows independently retryable without c
     $scenario->member($scenario->b(), $reference);
 
     $this->withSession([])->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->postJson('/api/v1/auth/magic-links', ['recipient' => $user->email])
+        ->postJson('/nvl/api/v1/auth/magic-links', ['recipient' => $user->email])
         ->assertAccepted();
     $this->withHeader('X-Test-Tenant', $scenario->b()->value)
-        ->postJson('/api/v1/auth/security-codes/authentication', [
+        ->postJson('/nvl/api/v1/auth/security-codes/authentication', [
             'recipient' => $user->email,
             'purpose' => 'passwordless_login',
         ])
         ->assertAccepted();
     $deliveries = Event::dispatched(AuthDeliveryRequested::class);
 
-    $this->withHeader('X-Test-Tenant', $scenario->b()->value)->postJson('/api/v1/auth/magic-links/consume', [
+    $this->withHeader('X-Test-Tenant', $scenario->b()->value)->postJson('/nvl/api/v1/auth/magic-links/consume', [
         'challengeId' => $deliveries[0][0]->request->payload['challenge_id'],
         'token' => $deliveries[0][0]->request->payload['secret'],
     ])->assertOk();
-    $this->withHeader('X-Test-Tenant', $scenario->a()->value)->postJson('/api/v1/auth/security-codes/authentication/verify', [
+    $this->withHeader('X-Test-Tenant', $scenario->a()->value)->postJson('/nvl/api/v1/auth/security-codes/authentication/verify', [
         'recipient' => $user->email,
         'purpose' => 'passwordless_login',
         'code' => $deliveries[1][0]->request->payload['secret'],
@@ -167,20 +167,20 @@ it('keeps concurrent same-browser tenant flows independently retryable without c
 
     expect(TenantAuthenticationIntent::query()->whereNotNull('consumed_at')->count())->toBe(0);
     $this->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->postJson('/api/v1/auth/tenant-intents/complete', ['nonce' => 'client-controlled'])
+        ->postJson('/nvl/api/v1/auth/tenant-intents/complete', ['nonce' => 'client-controlled'])
         ->assertUnprocessable()
         ->assertJsonPath('code', 'tenant_authentication_intent_input_invalid');
     $this->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->postJson('/api/v1/auth/tenant-intents/complete')
+        ->postJson('/nvl/api/v1/auth/tenant-intents/complete')
         ->assertOk();
     $this->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->postJson('/api/v1/auth/tenant-intents/complete')
+        ->postJson('/nvl/api/v1/auth/tenant-intents/complete')
         ->assertGone();
     $this->withHeader('X-Test-Tenant', $scenario->b()->value)
-        ->postJson('/api/v1/auth/tenant-intents/complete')
+        ->postJson('/nvl/api/v1/auth/tenant-intents/complete')
         ->assertOk();
     $this->withHeader('X-Test-Tenant', $scenario->b()->value)
-        ->postJson('/api/v1/auth/tenant-intents/complete')
+        ->postJson('/nvl/api/v1/auth/tenant-intents/complete')
         ->assertGone();
 
     expect(TenantAuthenticationIntent::query()->whereNotNull('consumed_at')->count())->toBe(2)
@@ -196,11 +196,11 @@ it('authenticates tenant retry through the configured non-default guard', functi
     $scenario->member($scenario->a(), SubjectReference::fromAuthenticatable($user));
 
     $this->withSession([])->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->postJson('/api/v1/auth/magic-links', ['recipient' => $user->email])
+        ->postJson('/nvl/api/v1/auth/magic-links', ['recipient' => $user->email])
         ->assertAccepted();
     /** @var AuthDeliveryRequested $delivery */
     $delivery = Event::dispatched(AuthDeliveryRequested::class)->sole()[0];
-    $this->withHeader('X-Test-Tenant', $scenario->b()->value)->postJson('/api/v1/auth/magic-links/consume', [
+    $this->withHeader('X-Test-Tenant', $scenario->b()->value)->postJson('/nvl/api/v1/auth/magic-links/consume', [
         'challengeId' => $delivery->request->payload['challenge_id'],
         'token' => $delivery->request->payload['secret'],
     ])->assertOk();
@@ -208,7 +208,7 @@ it('authenticates tenant retry through the configured non-default guard', functi
     expect(auth('admin')->check())->toBeTrue()
         ->and(auth('web')->check())->toBeFalse();
     $this->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->postJson('/api/v1/auth/tenant-intents/complete')
+        ->postJson('/nvl/api/v1/auth/tenant-intents/complete')
         ->assertOk();
     expect(TenantAuthenticationIntent::query()->sole()->consumed_at)->not->toBeNull();
 });
@@ -220,7 +220,7 @@ it('denies expired and suspended magic-link tenant intents without failing globa
     $scenario->member($scenario->a(), SubjectReference::fromAuthenticatable($user));
 
     $this->withSession([])->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->postJson('/api/v1/auth/magic-links', ['recipient' => $user->email])
+        ->postJson('/nvl/api/v1/auth/magic-links', ['recipient' => $user->email])
         ->assertAccepted();
     /** @var AuthDeliveryRequested $delivery */
     $delivery = Event::dispatched(AuthDeliveryRequested::class)->sole()[0];
@@ -233,7 +233,7 @@ it('denies expired and suspended magic-link tenant intents without failing globa
         expect($directory)->toBeInstanceOf(AuthTestTenantDirectory::class);
         $directory->setStatus($scenario->a(), TenantStatus::Suspended);
     }
-    $this->withHeader('X-Test-Tenant', $scenario->a()->value)->postJson('/api/v1/auth/magic-links/consume', [
+    $this->withHeader('X-Test-Tenant', $scenario->a()->value)->postJson('/nvl/api/v1/auth/magic-links/consume', [
         'challengeId' => $delivery->request->payload['challenge_id'],
         'token' => $delivery->request->payload['secret'],
     ])->assertOk();
@@ -248,20 +248,20 @@ it('carries tenant intent through real security-code and passkey HTTP transports
     $user = $this->user('passwordless-http@example.test');
     $scenario->member($scenario->a(), SubjectReference::fromAuthenticatable($user));
 
-    $this->withSession([])->withHeader('X-Test-Tenant', $scenario->a()->value)->postJson('/api/v1/auth/security-codes/authentication', [
+    $this->withSession([])->withHeader('X-Test-Tenant', $scenario->a()->value)->postJson('/nvl/api/v1/auth/security-codes/authentication', [
         'recipient' => $user->email,
         'purpose' => 'passwordless_login',
     ])->assertAccepted();
     /** @var AuthDeliveryRequested $codeDelivery */
     $codeDelivery = Event::dispatched(AuthDeliveryRequested::class)->sole()[0];
-    $this->withHeader('X-Test-Tenant', $scenario->b()->value)->postJson('/api/v1/auth/security-codes/authentication/verify', [
+    $this->withHeader('X-Test-Tenant', $scenario->b()->value)->postJson('/nvl/api/v1/auth/security-codes/authentication/verify', [
         'recipient' => $user->email,
         'purpose' => 'passwordless_login',
         'code' => $codeDelivery->request->payload['secret'],
     ])->assertOk()->assertJsonPath('code', 'security_code_authenticated');
     expect(TenantAuthenticationIntent::query()->whereNotNull('consumed_at')->count())->toBe(0);
     $this->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->postJson('/api/v1/auth/tenant-intents/complete')
+        ->postJson('/nvl/api/v1/auth/tenant-intents/complete')
         ->assertOk();
 
     auth('web')->logout();
@@ -272,9 +272,9 @@ it('carries tenant intent through real security-code and passkey HTTP transports
         new FinishPasskeyRegistrationData($registration->ceremonyId, ['valid' => true]),
     );
     $authentication = $this->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->postJson('/api/v1/auth/passkeys/authentication/options')
+        ->postJson('/nvl/api/v1/auth/passkeys/authentication/options')
         ->assertOk();
-    $this->withHeader('X-Test-Tenant', $scenario->b()->value)->postJson('/api/v1/auth/passkeys/authentication', [
+    $this->withHeader('X-Test-Tenant', $scenario->b()->value)->postJson('/nvl/api/v1/auth/passkeys/authentication', [
         'ceremonyId' => $authentication->json('data.ceremony_id'),
         'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2],
     ])->assertOk()->assertJsonPath('data.subject.id', (string) $user->getKey());
@@ -282,7 +282,7 @@ it('carries tenant intent through real security-code and passkey HTTP transports
     $this->assertAuthenticatedAs($user);
     expect(TenantAuthenticationIntent::query()->whereNotNull('consumed_at')->count())->toBe(1);
     $this->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->postJson('/api/v1/auth/tenant-intents/complete')
+        ->postJson('/nvl/api/v1/auth/tenant-intents/complete')
         ->assertOk();
     expect(TenantAuthenticationIntent::query()->whereNotNull('consumed_at')->count())->toBe(2)
         ->and(AuthAudit::query()->where('action', 'authentication.tenant_selected')->count())->toBe(2);

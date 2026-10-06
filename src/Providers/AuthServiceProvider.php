@@ -67,6 +67,7 @@ use Nvl\Auth\Models\TenantMembership;
 use Nvl\Auth\Models\TenantMembershipLock;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthAuditRecorder;
+use Nvl\Auth\Services\AuthAuditWriter;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthDoctor;
 use Nvl\Auth\Services\AuthManagementAbilityCatalog;
@@ -75,6 +76,7 @@ use Nvl\Auth\Services\AuthSchemaManager;
 use Nvl\Auth\Services\AuthTenantContextParticipant;
 use Nvl\Auth\Services\AuthTenantMembershipAccess;
 use Nvl\Auth\Services\AuthTenantRbacQueries;
+use Nvl\Auth\Services\CentralIdentityAuditRecorder;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
 use Nvl\Auth\Services\ConfiguredPrincipalAttributeMapper;
 use Nvl\Auth\Services\DenySystemMutationAccess;
@@ -91,6 +93,8 @@ use Nvl\Auth\Services\PackageInvitationRegistrationMapper;
 use Nvl\Auth\Services\PackageInvitationSubjectResolver;
 use Nvl\Auth\Services\PasswordAccountConfirmation;
 use Nvl\Auth\Services\PermissionCatalogRegistry;
+use Nvl\Auth\Services\PermissionRegistrarReference;
+use Nvl\Auth\Services\PermissionStorageReadiness;
 use Nvl\Auth\Services\PrincipalEligibility;
 use Nvl\Auth\Services\RbacPrincipalTracker;
 use Nvl\Auth\Services\RoleTemplateRegistry;
@@ -99,6 +103,7 @@ use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
 use Nvl\Auth\Tenancy\AuthTenancyAdoption;
 use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
+use Nvl\Support\Config\PackageOptions;
 use Nvl\Support\Doctor\PackageDoctorContributor;
 use Nvl\Support\Providers\TenantServiceProvider;
 use Nvl\Support\Tenancy\Contracts\TenantHttpResolver;
@@ -108,10 +113,9 @@ use Nvl\Support\Tenancy\Services\TenantContextParticipants;
 use Nvl\Support\Tenancy\Services\TenantResourceRegistry;
 use Nvl\Support\Tenancy\ValueObjects\TenantResourceDefinition;
 use Nvl\Support\Traits\MergesPackageConfiguration;
-use Nvl\Tenancy\Definitions\Tables\TenancyTables;
+use Nvl\Support\Traits\RegistersNamespacedResources;
 use Nvl\Tenancy\Services\TenantAdoptionRegistry;
 use Spatie\Permission\PermissionRegistrar;
-use Throwable;
 
 /**
  * Registers the passive package layer and lazy feature integrations.
@@ -119,6 +123,7 @@ use Throwable;
 final class AuthServiceProvider extends ServiceProvider
 {
     use MergesPackageConfiguration;
+    use RegistersNamespacedResources;
 
     /**
      * Merge canonical configuration and bind package contracts.
@@ -138,7 +143,7 @@ final class AuthServiceProvider extends ServiceProvider
             if ($container->bound(TenantHttpResolver::class)) {
                 return;
             }
-            if ($container->make(ConfigRepository::class)->get('tenancy.enabled') === true) {
+            if ($container->make(ConfigRepository::class)->get('nvl-tenancy.enabled') === true) {
                 throw AuthException::invalidConfiguration('A tenant HTTP resolver is required when tenancy is enabled.');
             }
 
@@ -199,10 +204,14 @@ final class AuthServiceProvider extends ServiceProvider
             return $resolved;
         });
         $this->app->scoped(AuthAuditContextProvider::class, LaravelRequestAuditContextProvider::class);
+        $this->app->scoped(AuthAuditRecorder::class);
+        $this->app->scoped(AuthAuditWriter::class);
+        $this->app->scoped(CentralIdentityAuditRecorder::class);
         $this->bindConfiguredContract(
             AuthAuditRecorderContract::class,
             'features.audit.services.recorder',
             AuthAuditRecorder::class,
+            scoped: true,
         );
         $this->bindConfiguredContract(
             AuthManagementAccess::class,
@@ -310,12 +319,12 @@ final class AuthServiceProvider extends ServiceProvider
         AuthConfiguration $configuration,
         TypeScriptSourceRegistry $typeScriptSources,
     ): void {
-        if (config('tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Memberships)) {
+        if (config('nvl-tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Memberships)) {
             $this->app->scoped(TenantMembershipAccess::class, AuthTenantMembershipAccess::class);
             $kernel = $this->app->make(HttpKernelContract::class);
             $kernel->addToMiddlewarePriorityAfter(AuthenticatesRequests::class, EnsureAuthTenantAccess::class);
         }
-        if (config('tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Rbac)) {
+        if (config('nvl-tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Rbac)) {
             $principal = $this->app->make(AuthModelRegistry::class)->rbacPrincipalClass();
             $principal::retrieved(fn (Model $model) => $this->app->make(RbacPrincipalTracker::class)->track($model));
             $principal::created(fn (Model $model) => $this->app->make(RbacPrincipalTracker::class)->track($model));
@@ -364,41 +373,40 @@ final class AuthServiceProvider extends ServiceProvider
             return;
         }
 
-        if ((bool) $configuration->get('nvl-auth.features.principal_management.enabled', true)
-            && (bool) $configuration->get('nvl-auth.features.principal_management.settings.use_as_auth_model', true)) {
-            $guard = $configuration->get('nvl-auth.guard', 'web');
-            $provider = is_string($guard)
-                ? $configuration->get("auth.guards.{$guard}.provider")
-                : null;
+        if ($configuration->get('nvl-auth.adoption.principal_model.enabled') === true) {
+            $guard = $configuration->get('nvl-auth.adoption.principal_model.guard');
+            $provider = $configuration->get('nvl-auth.adoption.principal_model.provider');
+            if (! is_string($guard) || trim($guard) === ''
+                || ! is_string($provider) || trim($provider) === ''
+                || $configuration->get("auth.guards.{$guard}.provider") !== $provider
+                || ! is_array($configuration->get("auth.providers.{$provider}"))) {
+                throw AuthException::invalidConfiguration('Principal model adoption requires an explicit guard and provider that match the host configuration.');
+            }
             $userModel = $configuration->get(
                 'nvl-auth.features.principal_management.models.user',
                 User::class,
             );
 
-            if (is_string($provider) && trim($provider) !== '' && is_string($userModel)) {
-                $configuration->set("auth.providers.{$provider}.model", $userModel);
+            if (! is_string($userModel) || ! is_a($userModel, Model::class, true)) {
+                throw AuthException::invalidConfiguration('Principal adoption requires an Eloquent user model.');
             }
-
-            $broker = (bool) $configuration->get('nvl-auth.features.password.enabled', true)
-                ? $configuration->get('nvl-auth.password_broker')
-                    ?? $configuration->get('auth.defaults.passwords')
-                : null;
-
-            if (is_string($broker) && trim($broker) !== '') {
-                $configuration->set(
-                    "auth.passwords.{$broker}.table",
-                    $configuration->get('nvl-auth.tables.password_reset_tokens', AuthTables::get(AuthTables::PasswordResetTokens)),
-                );
-                $connection = $configuration->get('nvl-auth.connection');
-
-                if (is_string($connection) && trim($connection) !== '') {
-                    $configuration->set("auth.passwords.{$broker}.connection", trim($connection));
-                }
-            }
+            $configuration->set("auth.providers.{$provider}.model", $userModel);
         }
 
-        if (! (bool) $configuration->get('nvl-auth.features.rbac.enabled', true)
-            || ! (bool) $configuration->get('nvl-auth.features.rbac.settings.use_package_storage', true)) {
+        if ($configuration->get('nvl-auth.adoption.password_broker.enabled') === true) {
+            $broker = $configuration->get('nvl-auth.adoption.password_broker.broker');
+            if (! is_string($broker) || trim($broker) === ''
+                || ! is_array($configuration->get("auth.passwords.{$broker}"))) {
+                throw AuthException::invalidConfiguration('Password storage adoption requires an explicit configured broker.');
+            }
+            $configuration->set(
+                "auth.passwords.{$broker}.table",
+                AuthTables::get(AuthTables::PasswordResetTokens),
+            );
+            $configuration->set("auth.passwords.{$broker}.connection", PackageOptions::connection('auth'));
+        }
+
+        if ($configuration->get('nvl-auth.adoption.spatie_storage.enabled') !== true) {
             return;
         }
 
@@ -425,27 +433,30 @@ final class AuthServiceProvider extends ServiceProvider
             'model_morph_key' => 'model_id',
             'team_foreign_key' => 'tenant_id',
         ]));
-        $configuration->set('permission.teams', false);
-        $this->app->beforeResolving(PermissionRegistrar::class, function () use ($configuration): void {
-            $configuration->set('permission.teams', $this->persistedTenantRbacIsActive($configuration));
-        });
+        $this->registerPermissionReadiness();
     }
 
-    /** Enable Spatie teams lazily only after Auth's persisted role marker is active. */
-    private function persistedTenantRbacIsActive(ConfigRepository $configuration): bool
+    /** Register one lazy hook without retaining scoped readiness in a singleton. */
+    private function registerPermissionReadiness(): void
     {
-        if ((bool) $configuration->get('tenancy.enabled', false) !== true) {
-            return false;
+        if ($this->app->bound('nvl.auth.permission-readiness-hook')) {
+            return;
         }
-        try {
-            $connection = (new Role)->getConnection();
-
-            return $connection->getSchemaBuilder()->hasTable(TenancyTables::get(TenancyTables::InstallationState))
-                && $connection->table(TenancyTables::get(TenancyTables::InstallationState))
-                    ->where('resource', 'auth.roles')->where('state', 'active')->exists();
-        } catch (Throwable) {
-            return false;
-        }
+        $this->app->instance('nvl.auth.permission-readiness-hook', true);
+        $this->app->scoped(PermissionStorageReadiness::class);
+        $this->app->forgetInstance(PermissionRegistrar::class);
+        $registrarReference = new PermissionRegistrarReference;
+        $this->app->beforeResolving(PermissionRegistrar::class, function () use ($registrarReference): void {
+            $teams = $this->app->make(PermissionStorageReadiness::class)->initialize();
+            $registrar = $registrarReference->current();
+            if ($registrar instanceof PermissionRegistrar) {
+                $registrar->teams = $teams;
+                $registrar->teamsKey = 'tenant_id';
+            }
+        });
+        $this->app->afterResolving(PermissionRegistrar::class, static function (PermissionRegistrar $registrar) use ($registrarReference): void {
+            $registrarReference->remember($registrar);
+        });
     }
 
     /** Register Auth's immutable tenant resource inventory without touching storage. */
@@ -483,8 +494,9 @@ final class AuthServiceProvider extends ServiceProvider
         string $contract,
         string $configurationPath,
         ?string $fallback,
+        bool $scoped = false,
     ): void {
-        $this->app->singleton($contract, static function (Container $container) use (
+        $factory = static function (Container $container) use (
             $configurationPath,
             $contract,
             $fallback,
@@ -509,7 +521,13 @@ final class AuthServiceProvider extends ServiceProvider
             }
 
             return $resolved;
-        });
+        };
+
+        if ($scoped) {
+            $this->app->scoped($contract, $factory);
+        } else {
+            $this->app->singleton($contract, $factory);
+        }
     }
 
     /**

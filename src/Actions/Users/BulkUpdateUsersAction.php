@@ -59,9 +59,9 @@ final readonly class BulkUpdateUsersAction
                 : FeatureOperation::Update,
         );
         $ability = match ($operation) {
-            UserBulkOperation::Delete => 'nvl-auth.users.delete',
-            UserBulkOperation::Restore => 'nvl-auth.users.restore',
-            default => 'nvl-auth.users.update',
+            UserBulkOperation::Delete => 'nvl.auth.users.delete',
+            UserBulkOperation::Restore => 'nvl.auth.users.restore',
+            default => 'nvl.auth.users.update',
         };
         if ($userIds === []
             || count($userIds) > 100
@@ -121,7 +121,7 @@ final readonly class BulkUpdateUsersAction
         ?SystemMutationContext $context = null,
     ): bool {
         if (! $data->active) {
-            if (config('tenancy.enabled') === true) {
+            if (config('nvl-tenancy.enabled') === true) {
                 $this->owners->assertPrincipalCanBeDisabled(SubjectReference::fromAuthenticatable($user));
             }
             $this->sessions->contain($user, 'disabled', $context);
@@ -133,7 +133,7 @@ final readonly class BulkUpdateUsersAction
     /** Soft-delete one principal and revoke its tokens. */
     private function delete(User $user, ?SystemMutationContext $context): bool
     {
-        if (config('tenancy.enabled') === true) {
+        if (config('nvl-tenancy.enabled') === true) {
             $this->owners->assertPrincipalCanBeDisabled(SubjectReference::fromAuthenticatable($user));
         }
         $this->sessions->contain($user, 'deleted', $context);

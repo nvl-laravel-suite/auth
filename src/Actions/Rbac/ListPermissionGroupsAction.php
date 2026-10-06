@@ -37,7 +37,7 @@ final readonly class ListPermissionGroupsAction
     public function execute(Authenticatable $actor): Collection
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
         $class = $this->models->permissionClass();
         $query = $class::query();
         $rows = $query

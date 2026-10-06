@@ -10,13 +10,16 @@ use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\SystemMutationAccess;
 use Nvl\Auth\Providers\AuthServiceProvider;
+use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Tests\Fixtures\AllowAllManagementAccess;
 use Nvl\Auth\Tests\Fixtures\AllowAllSystemMutationAccess;
 use Nvl\Auth\Tests\Fixtures\TestSubjectResolver;
 use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Data\Providers\DataServiceProvider;
+use Nvl\Data\Services\TypeScriptSourceRegistry;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Spatie\LaravelData\LaravelDataServiceProvider;
+use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\PermissionServiceProvider;
 
 /**
@@ -72,6 +75,13 @@ abstract class TestCase extends Orchestra
     protected function setUp(): void
     {
         parent::setUp();
+        config([
+            'nvl-auth.adoption.principal_model' => ['enabled' => true, 'guard' => 'web', 'provider' => 'users'],
+            'nvl-auth.adoption.password_broker' => ['enabled' => true, 'broker' => 'users'],
+            'nvl-auth.adoption.spatie_storage.enabled' => true,
+        ]);
+        (new AuthServiceProvider($this->app))->boot($this->app->make(AuthConfiguration::class), $this->app->make(TypeScriptSourceRegistry::class));
+        $this->app->make(PermissionRegistrar::class);
 
         $this->app->singleton(AuthManagementAccess::class, AllowAllManagementAccess::class);
         $this->app->singleton(AuthSubjectResolver::class, TestSubjectResolver::class);

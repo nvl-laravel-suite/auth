@@ -164,11 +164,11 @@ it('registers timestamp-aware migration publishing and warns about duplicate own
 
     expect(AuthServiceProvider::pathsToPublish(
         AuthServiceProvider::class,
-        'auth-migrations',
+        'nvl-auth-migrations',
     ))->not->toBeEmpty()
         ->and(AuthServiceProvider::pathsToPublish(
             AuthServiceProvider::class,
-            'auth-adoption',
+            'nvl-auth-adoption',
         ))->toHaveCount(1)
         ->and($publishableMigrationPaths)->toContain($migrationPath);
 
@@ -263,7 +263,7 @@ it('fails readiness for invalid pipelines and management abilities without packa
     $this->app->singleton(AuthManagementAccess::class, LaravelGateAuthManagementAccess::class);
 
     $this->artisan('nvl:auth:doctor')
-        ->expectsOutputToContain('Management routes require package RBAC or Laravel Gate authorization for [nvl-auth.clients.viewAny].')
+        ->expectsOutputToContain('Management routes require package RBAC or Laravel Gate authorization for [nvl.auth.clients.viewAny].')
         ->assertFailed();
 });
 
@@ -279,7 +279,7 @@ it('fails readiness for incomplete configured management policy coverage', funct
 
     $this->artisan('nvl:auth:doctor')
         ->expectsOutputToContain('Management policy mappings contain unknown aliases')
-        ->expectsOutputToContain('Management authorization has no resolvable policy decision for [nvl-auth.users.viewAny].')
+        ->expectsOutputToContain('Management authorization has no resolvable policy decision for [nvl.auth.users.viewAny].')
         ->assertFailed();
 });
 
@@ -293,7 +293,7 @@ it('rejects a configured policy model from the wrong management group', function
 
     $this->artisan('nvl:auth:doctor')
         ->expectsOutputToContain('Management policy mappings contain unknown aliases, invalid operations, or invalid model classes.')
-        ->expectsOutputToContain('Management authorization has no resolvable policy decision for [nvl-auth.users.viewAny].')
+        ->expectsOutputToContain('Management authorization has no resolvable policy decision for [nvl.auth.users.viewAny].')
         ->assertFailed();
 });
 

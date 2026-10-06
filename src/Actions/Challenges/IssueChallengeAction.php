@@ -98,9 +98,9 @@ final readonly class IssueChallengeAction
             : $this->hasher->hash("challenge-{$messageType->value}-secondary-{$recipientHash}", $fallbackCode);
         $activeKey = $this->hasher->hash(
             'active-challenge',
-            (config('tenancy.enabled') === true ? "platform\0" : '').$messageType->value."\0".$purpose."\0".$recipientHash,
+            (config('nvl-tenancy.enabled') === true ? "platform\0" : '').$messageType->value."\0".$purpose."\0".$recipientHash,
         );
-        $ownership = config('tenancy.enabled') === true
+        $ownership = config('nvl-tenancy.enabled') === true
             ? ['tenant_id' => null, 'ownership_key' => 'platform']
             : [];
         $connection = (new Challenge)->getConnectionName();
@@ -126,7 +126,7 @@ final readonly class IssueChallengeAction
                 $ownership,
             ): IssuedChallenge {
                 Challenge::query()
-                    ->when(config('tenancy.enabled') === true, fn ($query) => $query->where('ownership_key', 'platform'))
+                    ->when(config('nvl-tenancy.enabled') === true, fn ($query) => $query->where('ownership_key', 'platform'))
                     ->where('active_key', $activeKey)
                     ->update(['active_key' => null, 'revoked_at' => CarbonImmutable::now()]);
                 $challenge = Challenge::query()->create([

@@ -15,6 +15,7 @@ use Nvl\Auth\Contracts\SystemMutationAccess;
 use Nvl\Auth\Http\Middleware\ApplyAuthSecurityHeaders;
 use Nvl\Auth\Http\Middleware\RenderAuthExceptions;
 use Nvl\Auth\Providers\AuthServiceProvider;
+use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Tests\Fixtures\AllowAllManagementAccess;
 use Nvl\Auth\Tests\Fixtures\AllowAllSystemMutationAccess;
 use Nvl\Auth\Tests\Fixtures\AuthTestMaintenanceMode;
@@ -25,6 +26,7 @@ use Nvl\Auth\Tests\Fixtures\RecordingTenantAwareAuthActivityBridge;
 use Nvl\Auth\Tests\Fixtures\TestSubjectResolver;
 use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Data\Providers\DataServiceProvider;
+use Nvl\Data\Services\TypeScriptSourceRegistry;
 use Nvl\Tenancy\Contracts\PlatformAccess;
 use Nvl\Tenancy\Contracts\TenantDirectory;
 use Nvl\Tenancy\Contracts\TenantHttpResolver;
@@ -36,6 +38,7 @@ use Orchestra\Testbench\TestCase as Orchestra;
 use ReflectionClass;
 use RuntimeException;
 use Spatie\LaravelData\LaravelDataServiceProvider;
+use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\PermissionServiceProvider;
 
 /** Boots the complete Auth tenant integration without an outer transaction. */
@@ -80,11 +83,11 @@ abstract class TenancyTestCase extends Orchestra
         $app['config']->set('nvl-auth.features.sessions.routes.public.enabled', true);
         $app['config']->set('nvl-auth.features.memberships.routes.account.enabled', true);
         $app['config']->set('nvl-auth.features.memberships.routes.management.enabled', true);
-        $app['config']->set('tenancy.enabled', true);
-        $app['config']->set('tenancy.access.membership', DenyTenantMembershipAccess::class);
-        $app['config']->set('tenancy.access.platform', AuthTestPlatformAccess::class);
-        $app['config']->set('tenancy.directory', ['driver' => 'host', 'adapter' => AuthTestTenantDirectory::class]);
-        $app['config']->set('tenancy.resolvers.http', AuthTestTenantHttpResolver::class);
+        $app['config']->set('nvl-tenancy.enabled', true);
+        $app['config']->set('nvl-tenancy.access.membership', DenyTenantMembershipAccess::class);
+        $app['config']->set('nvl-tenancy.access.platform', AuthTestPlatformAccess::class);
+        $app['config']->set('nvl-tenancy.directory', ['driver' => 'host', 'adapter' => AuthTestTenantDirectory::class]);
+        $app['config']->set('nvl-tenancy.resolvers.http', AuthTestTenantHttpResolver::class);
         $app['config']->set('nvl-auth.tenancy.migrations.enabled', true);
         $app['config']->set('nvl-auth.tenancy.activity_bridge', RecordingTenantAwareAuthActivityBridge::class);
         $app->singleton(TenantDirectory::class, AuthTestTenantDirectory::class);
@@ -101,6 +104,13 @@ abstract class TenancyTestCase extends Orchestra
         $this->app->singleton(AuthSubjectResolver::class, TestSubjectResolver::class);
         $this->app->singleton(SystemMutationAccess::class, AllowAllSystemMutationAccess::class);
         $this->activateEmptyAuthTenancy();
+        config([
+            'nvl-auth.adoption.principal_model' => ['enabled' => true, 'guard' => 'web', 'provider' => 'users'],
+            'nvl-auth.adoption.password_broker' => ['enabled' => true, 'broker' => 'users'],
+            'nvl-auth.adoption.spatie_storage.enabled' => true,
+        ]);
+        (new AuthServiceProvider($this->app))->boot($this->app->make(AuthConfiguration::class), $this->app->make(TypeScriptSourceRegistry::class));
+        $this->app->make(PermissionRegistrar::class);
         if ($this->deactivateMaintenanceAfterSetup()) {
             $this->app->make(MaintenanceMode::class)->deactivate();
         }
@@ -109,7 +119,7 @@ abstract class TenancyTestCase extends Orchestra
     /** Register only the tenancy route surfaces exercised by this fixture. */
     protected function defineRoutes($router): void
     {
-        Route::prefix('api/v1/auth')->name('nvl.auth.')->group(function (): void {
+        Route::prefix('nvl/api/v1/auth')->name('nvl.auth.')->group(function (): void {
             Route::name('account.')->middleware(['api', 'auth', ApplyAuthSecurityHeaders::class, RenderAuthExceptions::class])
                 ->group(function (): void {
                     require dirname(__DIR__).'/routes/account/memberships.php';

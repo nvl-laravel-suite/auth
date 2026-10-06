@@ -42,7 +42,7 @@ final readonly class SuggestUsersAction
     public function execute(Authenticatable $actor, string $search, ?int $limit = null): Collection
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.users.viewAny');
+        $this->authorization->authorize($actor, 'nvl.auth.users.viewAny');
         $search = trim($search);
 
         if ($search === '' || mb_strlen($search) > 160) {

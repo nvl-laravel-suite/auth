@@ -28,7 +28,7 @@ final readonly class ListPermissionsAction
     public function execute(Authenticatable $actor, ?string $search = null, ?string $group = null, int $perPage = 25): LengthAwarePaginator
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
         $class = $this->models->permissionClass();
         $query = $class::query()->withCount(['roles', 'users']);
 

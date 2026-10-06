@@ -26,7 +26,7 @@ final readonly class ShowRoleAction
     public function execute(Authenticatable $actor, Role|string $role): Role
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
 
         return $this->entities->role($role)->load(['parent', 'children', 'permissions'])->loadCount('users');
     }

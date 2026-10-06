@@ -34,7 +34,7 @@ final readonly class CreateAuthClientAction
     public function execute(Authenticatable $actor, StoreClientData $data): AuthClient
     {
         $this->features->assertAllowed(AuthFeature::Clients, FeatureOperation::Issue);
-        $this->authorization->authorize($actor, 'nvl-auth.clients.create');
+        $this->authorization->authorize($actor, 'nvl.auth.clients.create');
         $connection = (new AuthClient)->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($actor, $data): AuthClient {

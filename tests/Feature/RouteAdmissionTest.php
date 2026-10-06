@@ -43,7 +43,7 @@ it('fails stale registered routes closed after a feature is disabled', function 
     );
     config()->set('nvl-auth.features.authentication.enabled', false);
 
-    $response = $this->postJson('/api/v1/auth/login', [
+    $response = $this->postJson('/nvl/api/v1/auth/login', [
         'identifier' => 'user@example.test',
         'password' => 'secret',
     ])->assertNotFound()->assertJson([
@@ -92,7 +92,7 @@ it('rejects stale model-bound routes before authentication or database binding',
     DB::flushQueryLog();
     DB::enableQueryLog();
 
-    $this->deleteJson('/api/v1/auth/clients/00000000-0000-0000-0000-000000000000')
+    $this->deleteJson('/nvl/api/v1/auth/clients/00000000-0000-0000-0000-000000000000')
         ->assertNotFound()
         ->assertJson(['data' => null, 'code' => 'feature_unavailable']);
 

@@ -30,7 +30,7 @@ final readonly class ListMembershipsAction
     public function execute(Authenticatable $actor, ?string $search = null, int $perPage = 25): LengthAwarePaginator
     {
         $this->features->assertAllowed(AuthFeature::Memberships, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.memberships.viewAny');
+        $this->authorization->authorize($actor, 'nvl.auth.memberships.viewAny');
         if ($search !== null && mb_strlen($search) > 191) {
             throw new AuthException('invalid_membership_filter', 'Membership search is too long.', 422);
         }

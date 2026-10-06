@@ -51,7 +51,7 @@ final readonly class FindActiveInvitationAction
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Read);
 
         if ($actor instanceof Authenticatable) {
-            $this->authorization->authorize($actor, 'nvl-auth.invitations.viewAny');
+            $this->authorization->authorize($actor, 'nvl.auth.invitations.viewAny');
         } elseif ($issuance?->actorlessAuthorized !== true) {
             throw new AuthException(
                 'forbidden',

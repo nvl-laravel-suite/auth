@@ -40,11 +40,11 @@ final readonly class CreateUserAction
     public function execute(Authenticatable $actor, StoreUserData $data): User
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Issue);
-        $this->authorization->authorize($actor, 'nvl-auth.users.create');
+        $this->authorization->authorize($actor, 'nvl.auth.users.create');
 
         if ($data->roles !== [] || $data->permissions !== []) {
             $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
-            $this->authorization->authorize($actor, 'nvl-auth.users.manageAccess');
+            $this->authorization->authorize($actor, 'nvl.auth.users.manageAccess');
         }
 
         $class = $this->models->userClass();

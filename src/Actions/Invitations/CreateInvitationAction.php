@@ -69,7 +69,7 @@ final readonly class CreateInvitationAction
         $context ??= new InvitationIssuanceContext;
 
         if ($actor instanceof Authenticatable) {
-            $this->authorization->authorize($actor, 'nvl-auth.invitations.create');
+            $this->authorization->authorize($actor, 'nvl.auth.invitations.create');
         } elseif (! $context->actorlessAuthorized) {
             throw new AuthException('forbidden', 'Actorless invitation issuance was not explicitly authorized.', 403);
         }
@@ -86,7 +86,7 @@ final readonly class CreateInvitationAction
                 throw new AuthException('forbidden', 'Tenant invitation issuance requires an authenticated member.', 403);
             }
             $this->membershipAccess->assertMember($actor, $tenant);
-        } elseif (config('tenancy.enabled') === true && ($data->roles !== [] || $data->permissions !== [])) {
+        } elseif (config('nvl-tenancy.enabled') === true && ($data->roles !== [] || $data->permissions !== [])) {
             throw new AuthException('invitation_assignment_invalid', 'Platform invitations cannot carry tenant access assignments.', 422);
         }
 

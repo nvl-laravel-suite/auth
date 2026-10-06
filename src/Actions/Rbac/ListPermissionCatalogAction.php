@@ -40,7 +40,7 @@ final readonly class ListPermissionCatalogAction
         PermissionIndexQueryData $data,
     ): LengthAwarePaginator {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
         $this->assertMaximumLength($data->search, 160, 'Permission search');
         $this->assertMaximumLength($data->group, 120, 'Permission group');
         $this->assertMaximumLength($data->guard, 120, 'Permission guard');

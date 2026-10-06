@@ -71,7 +71,7 @@ final readonly class AuthSchemaManager
         $missingIndexes = $this->missingIndexes($schema, $required);
         $requiresRepair = $missing !== [] || $outdated !== [] || $missingIndexes !== [];
 
-        if ($apply && config('tenancy.enabled') === true && $this->tenancySchemaMissing($schema, $required)) {
+        if ($apply && config('nvl-tenancy.enabled') === true && $this->tenancySchemaMissing($schema, $required)) {
             throw new RuntimeException(
                 'Auth tenancy schema is adopted only through the reviewed nvl:tenancy:adopt workflow.',
             );
@@ -132,7 +132,7 @@ final readonly class AuthSchemaManager
         $outdated = [];
 
         $requirements = self::REQUIRED_COLUMNS;
-        if (config('tenancy.enabled') === true) {
+        if (config('nvl-tenancy.enabled') === true) {
             foreach (self::TENANCY_COLUMNS as $table => $columns) {
                 $requirements[$table] = array_values(array_unique(array_merge(
                     $requirements[$table] ?? [],
@@ -235,7 +235,7 @@ final readonly class AuthSchemaManager
             $tables[] = $this->table('users', AuthTables::get(AuthTables::Users));
         }
 
-        if ($this->enabled(AuthFeature::Memberships) && config('tenancy.enabled') === true) {
+        if ($this->enabled(AuthFeature::Memberships) && config('nvl-tenancy.enabled') === true) {
             $tables[] = AuthTables::get(AuthTables::TenantMemberships);
             $tables[] = AuthTables::get(AuthTables::TenantMembershipLocks);
             $tables[] = AuthTables::get(AuthTables::TenantAuthenticationIntents);

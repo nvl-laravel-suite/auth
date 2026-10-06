@@ -46,10 +46,10 @@ final readonly class CreatePermissionWithRolesAction
     ): Permission {
         $this->operations->rejectMixedRbacOperation();
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Issue);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.managePermissions');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.managePermissions');
 
         if ($roleIdentifiers !== []) {
-            $this->authorization->authorize($actor, 'nvl-auth.rbac.manageRoles');
+            $this->authorization->authorize($actor, 'nvl.auth.rbac.manageRoles');
         }
 
         $class = $this->models->permissionClass();

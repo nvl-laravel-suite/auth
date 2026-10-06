@@ -51,7 +51,7 @@ final readonly class ApiTokenPolicy
     /** Require a fresh eligible principal in the active tenant or explicit platform boundary. */
     public function authorizeSubject(Authenticatable $subject): void
     {
-        if (config('tenancy.enabled') === true) {
+        if (config('nvl-tenancy.enabled') === true) {
             $this->principals->assertEligible($subject);
             $snapshot = $this->context->snapshot();
             if ($snapshot->mode === TenantContextMode::Tenant && $snapshot->tenantId !== null) {

@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
 use Nvl\Auth\Exceptions\AuthException;
@@ -39,7 +40,11 @@ final readonly class LaravelPrincipalSessionContainment implements PrincipalSess
         }
 
         if (method_exists($principal, 'tokens')) {
-            $principal->tokens()->delete();
+            $tokens = $principal->tokens();
+            if (! $tokens instanceof MorphMany) {
+                throw AuthException::invalidConfiguration('Session containment requires a Sanctum token relationship.');
+            }
+            $tokens->delete();
         }
 
         $rememberTokenName = $principal->getRememberTokenName();

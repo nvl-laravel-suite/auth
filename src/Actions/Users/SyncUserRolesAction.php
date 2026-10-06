@@ -38,7 +38,7 @@ final readonly class SyncUserRolesAction
         SyncUserRolesData $data,
     ): Authenticatable {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
-        $ability = config('tenancy.enabled') === true ? 'nvl-auth.memberships.manageAccess' : 'nvl-auth.users.manageAccess';
+        $ability = config('nvl-tenancy.enabled') === true ? 'nvl.auth.memberships.manageAccess' : 'nvl.auth.users.manageAccess';
         $actor = $this->authorization->authorize($authority, $ability, $user);
         $metadata = $this->authorization->metadata($authority);
         $user = $this->principals->find($user);

@@ -63,7 +63,7 @@ final readonly class DeleteOwnAccountAction
 
         $deleted = DB::connection($user->getConnectionName())->transaction(function () use ($user): bool {
             $reference = SubjectReference::fromAuthenticatable($user);
-            if (config('tenancy.enabled') === true) {
+            if (config('nvl-tenancy.enabled') === true) {
                 $this->owners->assertPrincipalCanBeDisabled($reference);
             }
             $tokens = $user->tokens();

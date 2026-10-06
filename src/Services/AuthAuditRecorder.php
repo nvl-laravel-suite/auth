@@ -42,7 +42,7 @@ final readonly class AuthAuditRecorder implements AuthAuditRecorderContract
         array $metadata = [],
     ): ?AuthAudit {
         $snapshot = $this->tenantContext->snapshot();
-        if (config('tenancy.enabled') !== true
+        if (config('nvl-tenancy.enabled') !== true
             || in_array($snapshot->mode, [TenantContextMode::Tenant, TenantContextMode::Platform], true)) {
             return $this->writer->write(
                 new AuthEventContext($snapshot->mode, $snapshot->tenantId),

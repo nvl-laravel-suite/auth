@@ -42,7 +42,7 @@ final readonly class SynchronizePermissionCatalogAction
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
         $this->operations->requirePlatformAdministration();
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.synchronize');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.synchronize');
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
         $connection = (new Permission)->getConnectionName();
         $created = DB::connection($connection)->transaction(

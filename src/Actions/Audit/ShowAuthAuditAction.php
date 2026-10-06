@@ -35,7 +35,7 @@ final readonly class ShowAuthAuditAction
         /** @var AuthAudit $record */
         $record = $this->boundary->query(AuthAudit::query(), 'auth.audits')
             ->whereKey($audit->getKey())->firstOrFail();
-        $this->authorization->authorize($actor, 'nvl-auth.audits.view', $record);
+        $this->authorization->authorize($actor, 'nvl.auth.audits.view', $record);
 
         return $record;
     }

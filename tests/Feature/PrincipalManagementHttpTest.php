@@ -27,18 +27,18 @@ it('serves configurable principal profile and RBAC APIs without Inertia', functi
     $actor = $this->user('api.owner@example.test');
     $this->actingAs($actor, 'web');
 
-    $permission = $this->postJson('/api/v1/auth/permissions', [
+    $permission = $this->postJson('/nvl/api/v1/auth/permissions', [
         'name' => 'articles.publish',
         'displayName' => 'Publish articles',
         'group' => 'articles',
         'system' => true,
     ])->assertCreated()->assertJsonPath('code', 'permission_created');
-    $role = $this->postJson('/api/v1/auth/roles', [
+    $role = $this->postJson('/nvl/api/v1/auth/roles', [
         'name' => 'publisher',
         'permissions' => ['articles.publish'],
         'system' => true,
     ])->assertCreated()->assertJsonPath('code', 'role_created');
-    $user = $this->postJson('/api/v1/auth/users', [
+    $user = $this->postJson('/nvl/api/v1/auth/users', [
         'name' => 'API User',
         'email' => 'api.user@example.test',
         'password' => 'SecurePassword123',
@@ -57,65 +57,65 @@ it('serves configurable principal profile and RBAC APIs without Inertia', functi
         ->and(Route::has('nvl.auth.management.users.bulk'))->toBeTrue()
         ->and(Route::has('nvl.auth.management.roles.analytics'))->toBeTrue();
 
-    $this->getJson('/api/v1/auth/users?search=API%20User')
+    $this->getJson('/nvl/api/v1/auth/users?search=API%20User')
         ->assertOk()
         ->assertJsonPath('data.total', 1);
-    $this->getJson('/api/v1/auth/users?perPage=1')
+    $this->getJson('/nvl/api/v1/auth/users?perPage=1')
         ->assertOk()
         ->assertJsonPath('data.per_page', 1);
-    $this->getJson('/api/v1/auth/roles?perPage=1')
+    $this->getJson('/nvl/api/v1/auth/roles?perPage=1')
         ->assertOk()
         ->assertJsonPath('data.per_page', 1);
-    $this->putJson("/api/v1/auth/permissions/{$permissionId}", [
+    $this->putJson("/nvl/api/v1/auth/permissions/{$permissionId}", [
         'name' => 'articles.publish',
         'displayName' => 'Publish articles',
         'group' => 'articles',
         'system' => true,
     ])->assertOk()
         ->assertJsonPath('code', 'permission_updated');
-    $this->putJson("/api/v1/auth/roles/{$roleId}", [
+    $this->putJson("/nvl/api/v1/auth/roles/{$roleId}", [
         'name' => 'publisher',
         'permissions' => ['articles.publish'],
         'system' => true,
     ])->assertOk()
         ->assertJsonPath('code', 'role_updated');
-    $this->putJson("/api/v1/auth/users/{$userId}", [
+    $this->putJson("/nvl/api/v1/auth/users/{$userId}", [
         'email' => 'api.user@example.test',
     ])->assertOk()
         ->assertJsonPath('code', 'user_updated');
-    $this->patchJson('/api/v1/auth/profile', [
+    $this->patchJson('/nvl/api/v1/auth/profile', [
         'name' => 'API Owner Updated',
         'locale' => 'en',
         'timezone' => 'UTC',
         'profile' => ['department' => 'security'],
     ])->assertOk()
         ->assertJsonPath('data.profile.department', 'security');
-    $this->patchJson("/api/v1/auth/users/{$userId}/status", ['active' => false])
+    $this->patchJson("/nvl/api/v1/auth/users/{$userId}/status", ['active' => false])
         ->assertOk()
         ->assertJsonPath('code', 'user_disabled');
-    $this->getJson('/api/v1/auth/roles/analytics')
+    $this->getJson('/nvl/api/v1/auth/roles/analytics')
         ->assertOk()
         ->assertJsonPath('data.roles', 1);
 
-    $this->getJson('/api/v1/auth/users?perPage=0')
+    $this->getJson('/nvl/api/v1/auth/users?perPage=0')
         ->assertUnprocessable()
         ->assertJsonValidationErrors('perPage');
 
-    $this->postJson("/api/v1/auth/roles/{$roleId}/clone", ['name' => 'publisher-copy', 'display_name' => 'Publisher copy'])
+    $this->postJson("/nvl/api/v1/auth/roles/{$roleId}/clone", ['name' => 'publisher-copy', 'display_name' => 'Publisher copy'])
         ->assertCreated()
         ->assertJsonPath('data.name', 'publisher-copy')
         ->assertJsonPath('data.display_name', 'Publisher copy');
-    $this->postJson("/api/v1/auth/roles/{$roleId}/clone", ['name' => 'publisher-copy'])
+    $this->postJson("/nvl/api/v1/auth/roles/{$roleId}/clone", ['name' => 'publisher-copy'])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('name');
-    $this->postJson("/api/v1/auth/roles/{$roleId}/clone", ['name' => 'publisher-camel', 'displayName' => 'Publisher camel'])
+    $this->postJson("/nvl/api/v1/auth/roles/{$roleId}/clone", ['name' => 'publisher-camel', 'displayName' => 'Publisher camel'])
         ->assertCreated()
         ->assertJsonPath('data.display_name', 'Publisher camel');
 
-    $this->postJson('/api/v1/auth/users/bulk', ['operation' => 'disable', 'user_ids' => ['invalid-id']])
+    $this->postJson('/nvl/api/v1/auth/users/bulk', ['operation' => 'disable', 'user_ids' => ['invalid-id']])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('user_ids.0');
-    $this->postJson('/api/v1/auth/users/bulk', ['operation' => 'disable', 'userIds' => [$userId]])
+    $this->postJson('/nvl/api/v1/auth/users/bulk', ['operation' => 'disable', 'userIds' => [$userId]])
         ->assertOk()
         ->assertJsonPath('code', 'users_bulk_updated');
 });

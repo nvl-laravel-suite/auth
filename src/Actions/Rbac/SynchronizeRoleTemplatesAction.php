@@ -39,7 +39,7 @@ final readonly class SynchronizeRoleTemplatesAction
     public function execute(Authenticatable $actor): int
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.synchronize');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.synchronize');
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
         $connection = (new Role)->getConnectionName();
         $roleCount = DB::connection($connection)->transaction(

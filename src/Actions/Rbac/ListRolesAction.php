@@ -30,9 +30,9 @@ final readonly class ListRolesAction
     public function execute(Authenticatable $actor, ?string $search = null, int $perPage = 25): LengthAwarePaginator
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
         $class = $this->models->roleClass();
-        $query = (config('tenancy.enabled') === true ? $this->tenancy->roles() : $class::query())
+        $query = (config('nvl-tenancy.enabled') === true ? $this->tenancy->roles() : $class::query())
             ->with('parent')->withCount(['users', 'permissions']);
 
         if ($search !== null && trim($search) !== '') {

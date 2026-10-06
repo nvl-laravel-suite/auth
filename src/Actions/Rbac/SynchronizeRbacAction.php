@@ -44,7 +44,7 @@ final readonly class SynchronizeRbacAction
     {
         $this->operations->rejectMixedRbacOperation();
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.synchronize');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.synchronize');
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
         $permissionClass = $this->models->permissionClass();
         $connection = (new $permissionClass)->getConnectionName();

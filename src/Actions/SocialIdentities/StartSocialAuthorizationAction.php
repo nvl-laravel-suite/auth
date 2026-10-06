@@ -78,7 +78,7 @@ final readonly class StartSocialAuthorizationAction
             throw AuthException::invalidConfiguration('The social identity provider returned an invalid redirect URL.');
         }
 
-        if (config('tenancy.enabled') === true && $tenant instanceof TenantId) {
+        if (config('nvl-tenancy.enabled') === true && $tenant instanceof TenantId) {
             parse_str((string) ($parts['query'] ?? ''), $query);
             $state = $query['state'] ?? null;
             if (! is_string($state) || trim($state) === '') {

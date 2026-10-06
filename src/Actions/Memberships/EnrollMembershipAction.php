@@ -38,7 +38,7 @@ final readonly class EnrollMembershipAction
     {
         $this->features->assertAllowed(AuthFeature::Memberships, FeatureOperation::Enroll);
 
-        $actor = $this->authorization->authorize($authority, 'nvl-auth.memberships.enroll');
+        $actor = $this->authorization->authorize($authority, 'nvl.auth.memberships.enroll');
 
         return DB::connection((new TenantMembership)->getConnectionName())->transaction(function () use ($actor, $authority, $data): TenantMembership {
             $this->owners->lock($this->context->requireTenant());

@@ -45,22 +45,22 @@ final readonly class CreateRoleAction
     public function execute(Authenticatable $actor, StoreRoleData $data): Role
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Issue);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.manageRoles');
-        if (config('tenancy.enabled') === true) {
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.manageRoles');
+        if (config('nvl-tenancy.enabled') === true) {
             $this->memberships->assertMember($actor, $this->context->requireTenant());
         }
         $class = $this->models->roleClass();
         $connection = (new $class)->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($actor, $class, $data): Role {
-            if (config('tenancy.enabled') === true) {
+            if (config('nvl-tenancy.enabled') === true) {
                 $this->owners->lock($this->context->requireTenant());
             }
             $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
             $parent = $data->parentId !== null ? $this->entities->role($data->parentId) : null;
             /** @var array{tenant_id?: string|null, name: string, guard_name: string, display_name: string|null, description: string|null, parent_id: null, priority: int, is_system: bool, metadata: array<string, mixed>|null} $attributes */
             $attributes = [
-                ...(config('tenancy.enabled') === true ? $this->tenancy->attributes('auth.roles') : []),
+                ...(config('nvl-tenancy.enabled') === true ? $this->tenancy->attributes('auth.roles') : []),
                 'name' => trim($data->name),
                 'guard_name' => $guard,
                 'display_name' => $data->displayName,

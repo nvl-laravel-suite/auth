@@ -41,7 +41,7 @@ final readonly class ListInvitationsAction
         int $perPage = 25,
     ): LengthAwarePaginator {
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.invitations.viewAny');
+        $this->authorization->authorize($actor, 'nvl.auth.invitations.viewAny');
 
         $filters ??= new InvitationIndexQueryData;
         $query = $this->boundary->query(Invitation::query(), 'auth.invitations')

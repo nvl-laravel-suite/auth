@@ -8,6 +8,7 @@ use Nvl\Auth\Contracts\TenantAwareAuthActivityBridge;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Services\DisabledInvitationRecipientProof;
 use Nvl\Auth\Services\DisabledTenantAwareAuthActivityBridge;
+use Nvl\Auth\Services\PermissionStorageReadiness;
 use Nvl\Auth\Tests\Fixtures\RecordingTenantAwareAuthActivityBridge;
 use Nvl\Tenancy\Services\TenantAdoptionCoordinator;
 use Nvl\Tenancy\ValueObjects\PlatformOperation;
@@ -20,6 +21,7 @@ it('reports the activated Auth tenancy boundary through named read-only checks',
         // Empty adoption may still advance through bounded package phases.
     }
     $coordinator->activate($plan, $operation);
+    app()->forgetInstance(PermissionStorageReadiness::class);
 
     Artisan::call('nvl:auth:doctor', ['--format' => 'json']);
     $report = json_decode(Artisan::output(), true, 64, JSON_THROW_ON_ERROR);

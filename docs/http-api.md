@@ -1,6 +1,6 @@
 # HTTP API
 
-All HTTP routes are optional. Default prefix: `/api/v1/auth`. Route names start
+All HTTP routes are optional. Default prefix: `/nvl/api/v1/auth`. Route names start
 with `nvl.auth.` and response envelopes use `data`, `code`, and `message`.
 
 ## Public surface
@@ -52,14 +52,14 @@ with `nvl.auth.` and response envelopes use `data`, `code`, and `message`.
 
 | Family | Routes | Package abilities |
 |---|---|---|
-| users | list, suggestions, create, show, update, enable/disable, restore, delete, bulk operations | `nvl-auth.users.viewAny`, `.view`, `.create`, `.update`, `.delete`, `.restore` |
-| user access | replace direct roles or permissions | `nvl-auth.users.manageAccess` |
-| invitations | list, create, resend, revoke | `nvl-auth.invitations.*` |
-| clients | list, show, create, update, activate/deactivate, delete | `nvl-auth.clients.*` |
-| roles | list, show, create, update, delete, clone, hierarchy, templates, apply template, analytics | `nvl-auth.rbac.view`, `.manageRoles` |
-| permissions | list, show, create, update, delete | `nvl-auth.rbac.view`, `.managePermissions` |
-| RBAC synchronization | synchronize catalogs and templates | `nvl-auth.rbac.synchronize` |
-| audits | list, authorized detail with metadata/context | `nvl-auth.audits.viewAny`, `nvl-auth.audits.view` |
+| users | list, suggestions, create, show, update, enable/disable, restore, delete, bulk operations | `nvl.auth.users.viewAny`, `.view`, `.create`, `.update`, `.delete`, `.restore` |
+| user access | replace direct roles or permissions | `nvl.auth.users.manageAccess` |
+| invitations | list, create, resend, revoke | `nvl.auth.invitations.*` |
+| clients | list, show, create, update, activate/deactivate, delete | `nvl.auth.clients.*` |
+| roles | list, show, create, update, delete, clone, hierarchy, templates, apply template, analytics | `nvl.auth.rbac.view`, `.manageRoles` |
+| permissions | list, show, create, update, delete | `nvl.auth.rbac.view`, `.managePermissions` |
+| RBAC synchronization | synchronize catalogs and templates | `nvl.auth.rbac.synchronize` |
+| audits | list, authorized detail with metadata/context | `nvl.auth.audits.viewAny`, `nvl.auth.audits.view` |
 
 ## Errors
 

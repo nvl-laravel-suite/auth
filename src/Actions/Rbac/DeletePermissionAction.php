@@ -34,7 +34,7 @@ final readonly class DeletePermissionAction
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Revoke);
         $this->operations->requirePlatformAdministration();
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.managePermissions');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.managePermissions');
         $permission = $this->entities->permission($permission);
 
         if ($permission->is_system) {

@@ -39,6 +39,7 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\ValueObjects\FeatureDefinition;
+use Nvl\Support\Config\PackageOptions;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Support\Tenancy\Services\EffectiveTenantConnection;
@@ -159,7 +160,7 @@ final class AuthDoctor
         $principalAttributes = $this->principalAttributes;
         $deliveryMetadata = $this->deliveryMetadata;
 
-        $checks = [];
+        $checks = $this->adoptionChecks($configuration);
         $migrationDuplicates = config('nvl-auth.migrations.enabled') === true
             ? $this->publishedMigrationDuplicates(dirname(__DIR__, 2).'/database/migrations')
             : [];
@@ -172,8 +173,7 @@ final class AuthDoctor
             ),
             'warning',
         );
-        $connection = $configuration->get('connection');
-        $schema = Schema::connection(is_string($connection) && $connection !== '' ? $connection : null);
+        $schema = Schema::connection(PackageOptions::connection('auth'));
 
         $requiredTables = $schemaManager->requiredTables();
 
@@ -230,7 +230,7 @@ final class AuthDoctor
             ...$checks,
             ...$this->ownershipChecks($configuration, $manifest, $router),
         ];
-        if (config('tenancy.enabled') === true) {
+        if (config('nvl-tenancy.enabled') === true) {
             $checks = [
                 ...$checks,
                 ...$this->tenancyChecks($configuration, $container, $schema),
@@ -250,7 +250,7 @@ final class AuthDoctor
             ),
         );
 
-        if ($configuration->boolean('features.principal_management.settings.use_as_auth_model', true)) {
+        if ($configuration->boolean('adoption.principal_model.enabled', false)) {
             $checks[] = $this->check(
                 'configuration.auth_provider',
                 $this->authProviderReady($configuration, $container),
@@ -371,7 +371,7 @@ final class AuthDoctor
             $apiTokens = $this->integration($container, ApiTokenManager::class);
             $abilityProvider = $this->integration($container, ApiTokenAbilityProvider::class);
             $checks[] = $this->check('adapter.api_tokens', $apiTokens !== null && ! $apiTokens instanceof UnavailableApiTokenManager, 'API tokens require a configured provider adapter.');
-            if (config('tenancy.enabled') === true) {
+            if (config('nvl-tenancy.enabled') === true) {
                 $checks[] = $this->check(
                     'contract.tenant_bound_api_tokens',
                     $apiTokens instanceof TenantBoundApiTokenManager,
@@ -502,7 +502,7 @@ final class AuthDoctor
             $checks[] = $this->check('contract.invitation_subject_resolver', $invitationSubjects !== null && ! $invitationSubjects instanceof UnavailableInvitationSubjectResolver, 'Public invitations require a configured principal resolver.');
         }
 
-        if ($configuration->featureEnabled(AuthFeature::Rbac)) {
+        if ($configuration->featureEnabled(AuthFeature::Rbac) && $configuration->boolean('adoption.spatie_storage.enabled', false)) {
             $spatieTables = $this->spatieTables();
             $checks[] = $this->check(
                 'configuration.spatie_tables',
@@ -554,6 +554,41 @@ final class AuthDoctor
             $expectedRoutes === $actualRoutes,
             'Auth route inventory differs from configuration; rebuild route and configuration caches.',
         );
+
+        return $checks;
+    }
+
+    /**
+     * Describe explicit global adoption without exposing credentials.
+     *
+     * @return list<array{name: string, severity: string, passed: bool, message: string}>
+     */
+    private function adoptionChecks(AuthConfiguration $configuration): array
+    {
+        $checks = [];
+        foreach (['principal_model', 'password_broker', 'spatie_storage'] as $adoption) {
+            $enabled = $configuration->boolean("adoption.{$adoption}.enabled", false);
+            $target = ! $enabled ? [] : match ($adoption) {
+                'principal_model' => [
+                    'guard' => $configuration->get('adoption.principal_model.guard'),
+                    'provider' => $configuration->get('adoption.principal_model.provider'),
+                    'model' => config('auth.providers.'.$configuration->string('adoption.principal_model.provider').'.model'),
+                ],
+                'password_broker' => [
+                    'broker' => $configuration->get('adoption.password_broker.broker'),
+                    'storage' => config('auth.passwords.'.$configuration->string('adoption.password_broker.broker').'.table'),
+                ],
+                default => ['models' => config('permission.models'), 'tables' => config('permission.table_names')],
+            };
+            $checks[] = [
+                'name' => "adoption.{$adoption}",
+                'severity' => 'info',
+                'passed' => true,
+                'message' => $enabled
+                    ? 'Explicit global adoption is active: '.json_encode($target, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)
+                    : 'Global adoption is disabled; host configuration is preserved.',
+            ];
+        }
 
         return $checks;
     }
@@ -613,7 +648,7 @@ final class AuthDoctor
         try {
             $principalConnection = $principals instanceof MembershipPrincipalResolver ? $principals->connectionName() : '__missing__';
             $container->make(EffectiveTenantConnection::class)->assertCompatible([
-                is_string(config('tenancy.connection')) ? config('tenancy.connection') : null,
+                is_string(config('nvl-tenancy.connection')) ? config('nvl-tenancy.connection') : null,
                 is_string($configuration->get('connection')) ? $configuration->get('connection') : null,
                 $principalConnection,
             ]);
@@ -651,9 +686,9 @@ final class AuthDoctor
                 && $schema->hasColumns($roleTable, ['tenant_id'])
                 && $schema->hasColumns(AuthTables::Invitations, ['tenant_id', 'ownership_key']), 'Auth optional tenancy schema is incomplete.'),
             $this->check('tenancy.marker', $markerReady, 'Auth tenancy installation markers are not active and consistent.'),
-            $this->check('tenancy.spatie_teams', config('permission.teams') === true
+            $this->check('tenancy.spatie_teams', ! $configuration->boolean('adoption.spatie_storage.enabled', false) || (config('permission.teams') === true
                 && config('permission.column_names.team_foreign_key') === 'tenant_id'
-                && $registrar instanceof PermissionRegistrar && $registrar->teams && $registrar->teamsKey === 'tenant_id', 'Spatie Permission is not configured for tenant teams.'),
+                && $registrar instanceof PermissionRegistrar && $registrar->teams && $registrar->teamsKey === 'tenant_id'), 'Spatie Permission is not configured for tenant teams.'),
             $this->check('tenancy.no_null_roles', $schema->hasTable($roleTable)
                 && $schema->hasColumns($roleTable, ['tenant_id'])
                 && ! Schema::connection(is_string($configuration->get('connection')) ? $configuration->get('connection') : null)
@@ -758,8 +793,11 @@ final class AuthDoctor
     {
         try {
             $models = $container->make(AuthModelRegistry::class);
-            $guard = $configuration->get('guard', 'web');
-            $provider = is_string($guard) ? config("auth.guards.{$guard}.provider") : null;
+            $guard = $configuration->get('adoption.principal_model.guard');
+            $provider = $configuration->get('adoption.principal_model.provider');
+            if (! is_string($guard) || config("auth.guards.{$guard}.provider") !== $provider) {
+                return false;
+            }
             $configured = is_string($provider) ? config("auth.providers.{$provider}.model") : null;
 
             return is_string($configured)

@@ -76,7 +76,7 @@ final class PasskeyController
 
     private function requestedTenant(Request $request, TenantHttpResolver $tenants): ?TenantId
     {
-        if (config('tenancy.enabled') !== true) {
+        if (config('nvl-tenancy.enabled') !== true) {
             return null;
         }
 

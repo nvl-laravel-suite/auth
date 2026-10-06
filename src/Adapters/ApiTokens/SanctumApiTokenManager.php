@@ -275,7 +275,7 @@ final class SanctumApiTokenManager implements ApiTokenManager, TenantBoundApiTok
             lastUsedAt: $this->date($token->getAttribute('last_used_at')),
             expiresAt: $this->date($token->getAttribute('expires_at')),
             createdAt: $createdAt,
-            tenantId: config('tenancy.enabled') === true
+            tenantId: config('nvl-tenancy.enabled') === true
                 ? (is_string($token->getAttribute('tenant_id')) ? $token->getAttribute('tenant_id') : null)
                 : null,
         );

@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Nvl\Auth\Contracts\RbacPrincipalAccess;
 use Nvl\Auth\Exceptions\AuthException;
+use ReflectionMethod;
 
 /**
  * Applies RBAC to a configured Eloquent principal without requiring package principal management.
@@ -25,7 +26,7 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
         if ($principal instanceof Authenticatable) {
             $principal = $this->assertCompatible($principal);
 
-            return config('tenancy.enabled') === true
+            return config('nvl-tenancy.enabled') === true
                 ? $this->queries()->assertAssignmentPrincipal($principal)
                 : $principal;
         }
@@ -39,7 +40,7 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
 
         $resolved = $this->assertCompatible($resolved);
 
-        return config('tenancy.enabled') === true
+        return config('nvl-tenancy.enabled') === true
             ? $this->queries()->assertAssignmentPrincipal($resolved)
             : $resolved;
     }
@@ -79,11 +80,11 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
         $principal = $this->assignmentPrincipal($principal);
 
         if ($roles !== []) {
-            $principal->assignRole($roles);
+            $this->invokeAssignment($principal, 'assignRole', $roles);
         }
 
         if ($permissions !== []) {
-            $principal->givePermissionTo($permissions);
+            $this->invokeAssignment($principal, 'givePermissionTo', $permissions);
         }
     }
 
@@ -94,7 +95,7 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
      */
     public function syncRoles(Authenticatable $principal, array $roles): void
     {
-        $this->assignmentPrincipal($principal)->syncRoles($roles);
+        $this->invokeAssignment($this->assignmentPrincipal($principal), 'syncRoles', $roles);
     }
 
     /**
@@ -104,7 +105,7 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
      */
     public function syncPermissions(Authenticatable $principal, array $permissions): void
     {
-        $this->assignmentPrincipal($principal)->syncPermissions($permissions);
+        $this->invokeAssignment($this->assignmentPrincipal($principal), 'syncPermissions', $permissions);
     }
 
     /**
@@ -148,11 +149,25 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
     private function assignmentPrincipal(Authenticatable $principal): Model
     {
         $principal = $this->assertCompatible($principal);
-        if (config('tenancy.enabled') === true) {
+        if (config('nvl-tenancy.enabled') === true) {
             $principal = $this->queries()->assertAssignmentPrincipal($principal);
         }
 
         return $this->assertCompatible($principal);
+    }
+
+    /**
+     * Invoke the selected public Spatie capability after validating the host model boundary.
+     *
+     * @param  list<string>  $values
+     */
+    private function invokeAssignment(Model&Authenticatable $principal, string $method, array $values): void
+    {
+        $operation = [$principal, $method];
+        if (! (new ReflectionMethod($principal, $method))->isPublic() || ! is_callable($operation)) {
+            throw AuthException::invalidConfiguration('RBAC principal assignment capabilities must be public callable methods.');
+        }
+        $operation($values);
     }
 
     /**

@@ -16,7 +16,7 @@ only with `--apply`.
 - Publish and edit the sample:
 
 ```bash
-php artisan vendor:publish --tag=auth-adoption
+php artisan vendor:publish --tag=nvl-auth-adoption
 ```
 
 The manifest is installed as `nvl-auth.principals.json`. Version 1 requires an

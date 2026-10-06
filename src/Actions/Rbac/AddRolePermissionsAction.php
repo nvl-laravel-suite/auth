@@ -37,7 +37,7 @@ final readonly class AddRolePermissionsAction
         array $permissionIdentifiers,
     ): Role {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.manageRoles');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.manageRoles');
         $result = DB::connection($this->assignments->roleConnectionName($role))->transaction(
             function () use ($actor, $permissionIdentifiers, $role): array {
                 $result = $this->assignments->add($role, $permissionIdentifiers);

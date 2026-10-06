@@ -36,7 +36,7 @@ final readonly class UpdatePermissionAction
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
         $this->operations->requirePlatformAdministration();
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.managePermissions');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.managePermissions');
         $permission = $this->entities->permission($permission);
 
         if ($permission->is_system && $permission->name !== trim($data->name)) {

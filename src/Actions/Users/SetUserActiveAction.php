@@ -46,7 +46,7 @@ final readonly class SetUserActiveAction
         UpdateUserStatusData $data,
     ): User {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Update);
-        $actor = $this->authorization->authorize($authority, 'nvl-auth.users.update', $user);
+        $actor = $this->authorization->authorize($authority, 'nvl.auth.users.update', $user);
         $metadata = $this->authorization->metadata($authority);
         $context = $authority instanceof SystemMutationContext ? $authority : null;
         $user = $this->users->find($user);
@@ -58,7 +58,7 @@ final readonly class SetUserActiveAction
         }
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $context, $data, $metadata, $user): User {
-            if (! $data->active && config('tenancy.enabled') === true) {
+            if (! $data->active && config('nvl-tenancy.enabled') === true) {
                 $this->owners->assertPrincipalCanBeDisabled(SubjectReference::fromAuthenticatable($user));
             }
             $user->update($this->attributes->map($data->toArray()));

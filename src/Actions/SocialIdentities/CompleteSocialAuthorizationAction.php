@@ -83,7 +83,7 @@ final readonly class CompleteSocialAuthorizationAction
 
         $resolvedSubject = $subject ?? $this->subjects->resolve($identity);
         $record = $this->links->execute($resolvedSubject, $identity);
-        if (config('tenancy.enabled') === true && is_string($flowReference) && trim($flowReference) !== '') {
+        if (config('nvl-tenancy.enabled') === true && is_string($flowReference) && trim($flowReference) !== '') {
             $flow = "social:{$provider}:{$flowReference}";
             $nonce = $this->session->pullAuthenticationIntent($flow);
             if (is_string($nonce)) {

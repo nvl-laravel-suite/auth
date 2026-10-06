@@ -43,7 +43,7 @@ final readonly class ApplyRoleTemplateAction
     public function execute(Authenticatable $actor, ApplyRoleTemplateData $data): Role
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.manageRoles');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.manageRoles');
         $templates = $this->templates->roles();
         $templateKey = trim($data->template);
 
@@ -67,7 +67,7 @@ final readonly class ApplyRoleTemplateAction
             } catch (ModelNotFoundException) {
                 /** @var array{tenant_id?: string|null, name: string, guard_name: string} $attributes */
                 $attributes = [
-                    ...(config('tenancy.enabled') === true ? $this->tenancy->attributes('auth.roles') : []),
+                    ...(config('nvl-tenancy.enabled') === true ? $this->tenancy->attributes('auth.roles') : []),
                     'name' => $mutation->name,
                     'guard_name' => $guard,
                 ];
@@ -75,7 +75,7 @@ final readonly class ApplyRoleTemplateAction
             }
 
             $this->hierarchy->assertParentAllowed($role, $parent);
-            $permissions = config('tenancy.enabled') === true
+            $permissions = config('nvl-tenancy.enabled') === true
                 ? $this->entities->permissionsByIdentifiers($mutation->permissions)->all()
                 : array_map(static fn (string $name) => $permissionClass::findOrCreate($name, $guard), $mutation->permissions);
 

@@ -59,7 +59,7 @@ published migrations, then rerun the plan and Doctor.
 Publish and edit the versioned sample manifest, then follow the staged workflow:
 
 ```bash
-php artisan vendor:publish --tag=auth-adoption
+php artisan vendor:publish --tag=nvl-auth-adoption
 php artisan nvl:auth:adopt-principals nvl-auth.principals.json --stage
 php artisan nvl:auth:adopt-principals nvl-auth.principals.json --stage --apply
 php artisan nvl:auth:schema --apply

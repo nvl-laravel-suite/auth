@@ -38,7 +38,7 @@ final readonly class UpdateUserAction
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Update);
         $user = $this->users->find($user, true);
-        $this->authorization->authorize($actor, 'nvl-auth.users.update', $user);
+        $this->authorization->authorize($actor, 'nvl.auth.users.update', $user);
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $data, $user): User {
             $attributes = $data->toArray();

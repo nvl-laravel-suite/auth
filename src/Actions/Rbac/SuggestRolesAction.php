@@ -37,7 +37,7 @@ final readonly class SuggestRolesAction
         ?int $limit = null,
     ): Collection {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
         $search = trim((string) $search);
 
         if (mb_strlen($search) > 160) {

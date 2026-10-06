@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Auth\GenericUser;
+use Illuminate\Foundation\Auth\User;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
@@ -52,4 +53,20 @@ it('fails closed for invalid RBAC principal models and identifiers', function ()
     $invalidIdentifier = new GenericUser(['id' => []]);
     expect(static fn (): string => $access->identifier($invalidIdentifier))
         ->toThrow(AuthException::class, 'string-compatible identifier');
+});
+
+it('rejects inaccessible assignment methods despite Eloquent magic dispatch', function (): void {
+    $principal = new class extends User
+    {
+        protected function assignRole(array $roles): void {}
+
+        public function givePermissionTo(array $permissions): void {}
+
+        public function syncRoles(array $roles): void {}
+
+        public function syncPermissions(array $permissions): void {}
+    };
+
+    expect(fn () => (new EloquentRbacPrincipalAccess)->assign($principal, ['host-role'], []))
+        ->toThrow(AuthException::class, 'public callable');
 });

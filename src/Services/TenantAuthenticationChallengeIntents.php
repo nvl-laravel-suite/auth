@@ -30,7 +30,7 @@ final readonly class TenantAuthenticationChallengeIntents
         string $provider,
         ?SubjectReference $subject = null,
     ): void {
-        if (config('tenancy.enabled') !== true || ! $tenant instanceof TenantId) {
+        if (config('nvl-tenancy.enabled') !== true || ! $tenant instanceof TenantId) {
             return;
         }
 
@@ -56,7 +56,7 @@ final readonly class TenantAuthenticationChallengeIntents
 
     public function context(Challenge $challenge, ?TenantId $requestedTenant = null): ?AuthenticationRequestContext
     {
-        if (config('tenancy.enabled') !== true) {
+        if (config('nvl-tenancy.enabled') !== true) {
             return null;
         }
 

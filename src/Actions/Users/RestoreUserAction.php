@@ -39,7 +39,7 @@ final readonly class RestoreUserAction
     public function execute(Authenticatable|SystemMutationContext $authority, User|string $user): User
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Revoke);
-        $actor = $this->authorization->authorize($authority, 'nvl-auth.users.restore', $user);
+        $actor = $this->authorization->authorize($authority, 'nvl.auth.users.restore', $user);
         $metadata = $this->authorization->metadata($authority);
         $context = $authority instanceof SystemMutationContext ? $authority : null;
         $user = $this->users->find($user, true);

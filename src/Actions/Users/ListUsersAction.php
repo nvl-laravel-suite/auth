@@ -48,7 +48,7 @@ final readonly class ListUsersAction
         int $perPage = 25,
     ): LengthAwarePaginator {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.users.viewAny');
+        $this->authorization->authorize($actor, 'nvl.auth.users.viewAny');
 
         if (! in_array($trashed, ['without', 'with', 'only'], true)) {
             throw new AuthException('invalid_user_filter', 'The trashed user filter is invalid.', 422);

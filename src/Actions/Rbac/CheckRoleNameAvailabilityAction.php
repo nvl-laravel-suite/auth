@@ -35,7 +35,7 @@ final readonly class CheckRoleNameAvailabilityAction
         ?string $exceptId = null,
     ): RoleNameAvailabilityData {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
         $name = trim($name);
 
         if ($name === '' || mb_strlen($name) > 160) {
@@ -58,7 +58,7 @@ final readonly class CheckRoleNameAvailabilityAction
 
         $class = $this->models->roleClass();
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
-        $conflictingRoleId = (config('tenancy.enabled') === true ? $this->tenancy->roles() : $class::query())
+        $conflictingRoleId = (config('nvl-tenancy.enabled') === true ? $this->tenancy->roles() : $class::query())
             ->where('guard_name', $guard)
             ->where('name', $name)
             ->when($exceptId !== null, static fn ($query) => $query->whereKeyNot($exceptId))

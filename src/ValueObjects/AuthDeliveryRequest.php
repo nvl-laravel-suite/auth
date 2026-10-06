@@ -59,7 +59,7 @@ final readonly class AuthDeliveryRequest
 
         $this->eventContext = $eventContext ?? ($this->tenant instanceof TenantId
             ? new AuthEventContext(TenantContextMode::Tenant, $this->tenant)
-            : new AuthEventContext(config('tenancy.enabled') === true
+            : new AuthEventContext(config('nvl-tenancy.enabled') === true
                 ? TenantContextMode::Unresolved
                 : TenantContextMode::Disabled));
 

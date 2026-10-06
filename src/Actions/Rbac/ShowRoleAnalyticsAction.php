@@ -37,7 +37,7 @@ final readonly class ShowRoleAnalyticsAction
     public function execute(Authenticatable $actor, Role|string $role): RoleAnalyticsData
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
         $role = $this->entities->roleForConfiguredGuard($role);
         [$users, $activeUsers] = $this->userCounts($role);
         [$permissions, $permissionGroups] = $this->permissionCounts($role);

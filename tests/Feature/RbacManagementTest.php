@@ -88,7 +88,7 @@ it('owns role and permission CRUD foundations, cloning, hierarchy, templates, an
         ->and($clone->is_system)->toBeFalse()
         ->and(collect($templates)->pluck('key')->all())->toBe(['auth-auditor', 'auth-user-manager', 'super-admin'])
         ->and($template->is_system)->toBeTrue()
-        ->and($template->hasPermissionTo('nvl-auth.audits.view'))->toBeTrue()
+        ->and($template->hasPermissionTo('nvl.auth.audits.view'))->toBeTrue()
         ->and($parentNode)->toBeArray()
         ->and($childNode)->toBeArray()
         ->and($analytics->roles)->toBe(4)

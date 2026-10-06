@@ -34,14 +34,14 @@ final readonly class CloneRoleAction
     public function execute(Authenticatable $actor, Role|string $role, string $name, ?string $displayName = null): Role
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Issue);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.manageRoles');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.manageRoles');
         $source = $this->entities->role($role)->load('permissions');
         $class = $this->models->roleClass();
 
         return DB::connection($source->getConnectionName())->transaction(function () use ($actor, $class, $displayName, $name, $source): Role {
             /** @var array{tenant_id?: string|null, name: string, guard_name: string, display_name: string|null, description: string|null, parent_id: string|null, priority: int, is_system: bool, metadata: array<string, mixed>|null} $attributes */
             $attributes = [
-                ...(config('tenancy.enabled') === true ? $this->tenancy->attributes('auth.roles') : []),
+                ...(config('nvl-tenancy.enabled') === true ? $this->tenancy->attributes('auth.roles') : []),
                 'name' => trim($name),
                 'guard_name' => $source->guard_name,
                 'display_name' => $displayName,

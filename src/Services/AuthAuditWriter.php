@@ -76,7 +76,7 @@ final readonly class AuthAuditWriter
     /** @return array{tenant_id?: string|null, ownership_key?: string} */
     private function ownership(AuthEventContext $context): array
     {
-        if (config('tenancy.enabled') !== true) {
+        if (config('nvl-tenancy.enabled') !== true) {
             return [];
         }
 

@@ -44,7 +44,7 @@ final readonly class BootstrapRbacAction
     {
         $this->operations->rejectMixedRbacOperation();
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
-        $actor = $this->authorization->authorize($context, 'nvl-auth.rbac.bootstrap');
+        $actor = $this->authorization->authorize($context, 'nvl.auth.rbac.bootstrap');
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
         $permissionClass = $this->models->permissionClass();
         $connection = (new $permissionClass)->getConnectionName();

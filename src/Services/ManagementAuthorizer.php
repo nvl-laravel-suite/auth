@@ -26,7 +26,7 @@ final readonly class ManagementAuthorizer
         string $ability,
         mixed $target = null,
     ): void {
-        if (str_starts_with($ability, 'nvl-auth.users.')) {
+        if (str_starts_with($ability, 'nvl.auth.users.')) {
             $this->operations->requirePlatformAdministration();
         }
         if (! $this->access->allows($actor, $ability, $target)) {

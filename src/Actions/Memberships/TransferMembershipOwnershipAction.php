@@ -41,7 +41,7 @@ final readonly class TransferMembershipOwnershipAction
 
         $candidate = $this->memberships->find($membership);
         $recipientCandidate = $this->memberships->find($data->recipientMembershipId);
-        $actor = $this->authorization->authorize($authority, 'nvl-auth.memberships.transferOwnership', $candidate);
+        $actor = $this->authorization->authorize($authority, 'nvl.auth.memberships.transferOwnership', $candidate);
 
         return DB::connection($candidate->getConnectionName())->transaction(function () use ($actor, $authority, $candidate, $data, $recipientCandidate): TenantMembership {
             $this->owners->lock($this->context->requireTenant());

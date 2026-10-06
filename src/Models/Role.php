@@ -92,14 +92,14 @@ class Role extends SpatieRole
     {
         $relation = $this->belongsTo(static::class, 'parent_id');
 
-        return config('tenancy.enabled') === true ? $relation->where('tenant_id', $this->tenant_id) : $relation;
+        return config('nvl-tenancy.enabled') === true ? $relation->where('tenant_id', $this->tenant_id) : $relation;
     }
 
     /** @return HasMany<static, $this> */
     public function children(): HasMany
     {
         $relation = $this->hasMany(static::class, 'parent_id');
-        if (config('tenancy.enabled') === true) {
+        if (config('nvl-tenancy.enabled') === true) {
             $relation->where('tenant_id', $this->tenant_id);
         }
 
@@ -110,7 +110,7 @@ class Role extends SpatieRole
     /** @return BelongsToMany<Model, $this> */
     public function users(): BelongsToMany
     {
-        if (config('tenancy.enabled') !== true) {
+        if (config('nvl-tenancy.enabled') !== true) {
             return parent::users();
         }
         $tenant = getPermissionsTeamId();

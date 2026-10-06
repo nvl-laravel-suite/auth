@@ -76,7 +76,7 @@ final readonly class ResendInvitationAction
                 ->lockForUpdate()->findOrFail($identifier);
 
             if ($actor instanceof Authenticatable) {
-                $this->authorization->authorize($actor, 'nvl-auth.invitations.resend', $locked);
+                $this->authorization->authorize($actor, 'nvl.auth.invitations.resend', $locked);
             }
 
             if (! $locked->isUsable()) {

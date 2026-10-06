@@ -7,11 +7,13 @@ For support, [open an issue](https://github.com/nvl-laravel-suite/auth/issues). 
 
 See the [installation and publishing guide](https://github.com/nvl-laravel-suite/laravel-suite/blob/main/docs/installation.md) for Composer setup, configuration, migration ownership, and agent skills.
 
+Principal adoption (`nvl-auth.adoption.principal_model.enabled` with explicit `guard` and `provider`), password-broker storage (`adoption.password_broker.enabled` with explicit `broker`), and Spatie storage (`adoption.spatie_storage.enabled`) are independent and default to `false`. Installation preserves the complete host `auth` and `permission` configuration, including team scoping. Auth HTTP routes remain disabled until explicitly enabled. Adopted permission storage initializes lazily, fails closed when unavailable, and memoizes readiness per request/job; restart workers after changing adoption or tenancy configuration. Doctor reports each adopted target and effective storage.
+
 ## Quick reference
 
 | Item | Value |
 |---|---|
-| Installed through | `composer require nvl/auth:^2.0` |
+| Installed through | `composer require nvl/auth:^5.0` |
 | Module identifier | `nvl/auth` |
 | PHP namespace | `Nvl\Auth` |
 | Service provider | `Nvl\Auth\Providers\AuthServiceProvider` |
@@ -35,8 +37,8 @@ push, or another transport without coupling Auth to delivery infrastructure.
 For a clean application, review the Auth configuration before running migrations:
 
 ```bash
-composer require nvl/auth:^2.0
-php artisan vendor:publish --tag=auth-config
+composer require nvl/auth:^5.0
+php artisan vendor:publish --tag=nvl-auth-config
 php artisan migrate
 php artisan nvl:auth:schema
 php artisan nvl:auth:doctor
@@ -45,12 +47,12 @@ php artisan nvl:auth:doctor
 Publish the bundled guidance only if the application's agents need it:
 
 ```bash
-php artisan vendor:publish --tag=auth-skills
+php artisan vendor:publish --tag=nvl-auth-skills
 ```
 
 For an existing identity schema, follow the
 [principal adoption guide](docs/principal-adoption.md) before publishing its
-principal-adoption manifest with `php artisan vendor:publish --tag=auth-adoption`.
+principal-adoption manifest with `php artisan vendor:publish --tag=nvl-auth-adoption`.
 This tag is not part of a clean installation.
 
 Laravel package discovery registers `AuthServiceProvider` directly. With the
@@ -64,11 +66,11 @@ replace host Auth, Permission, Sanctum, or migration state.
 
 Choose exactly one migration owner:
 
-1. **Automatic vendor loading (default):** leave `nvl-auth.migrations.enabled=true`, do not publish `auth-migrations`, and run `php artisan migrate`.
-2. **Host-owned published migrations:** publish `auth-migrations`, set `nvl-auth.migrations.enabled=false` before migrating, and maintain the published files as application migrations.
+1. **Automatic vendor loading (default):** leave `nvl-auth.migrations.enabled=true`, do not publish `nvl-auth-migrations`, and run `php artisan migrate`.
+2. **Host-owned published migrations:** publish `nvl-auth-migrations`, set `nvl-auth.migrations.enabled=false` before migrating, and maintain the published files as application migrations.
 
    ```bash
-   php artisan vendor:publish --tag=auth-migrations
+   php artisan vendor:publish --tag=nvl-auth-migrations
    ```
 
 Never run both sources. Laravel retimestamps files published through the migration tag. `php artisan nvl:auth:doctor` reports a warning when automatic loading remains enabled and `database/migrations` contains a timestamp-independent name matching a package migration; `--strict` promotes that warning to failure.
@@ -192,15 +194,15 @@ user/RBAC management routes:
 ```php
 'routes' => [
     'enabled' => true,
-    'prefix' => 'api/v1/auth',
+    'prefix' => 'nvl/api/v1/auth',
     'middleware' => ['api'],
     'account' => [
         'enabled' => true,
-        'middleware' => ['auth:sanctum', 'throttle:nvl-auth-account'],
+        'middleware' => ['auth:sanctum', 'throttle:nvl.auth.account'],
     ],
     'management' => [
         'enabled' => true,
-        'middleware' => ['auth:sanctum', 'throttle:nvl-auth-management'],
+        'middleware' => ['auth:sanctum', 'throttle:nvl.auth.management'],
     ],
 ],
 
@@ -461,7 +463,7 @@ php artisan nvl:auth:prune --dry-run
 php artisan nvl:auth:prune
 ```
 
-Tenant ownership is opt-in through `tenancy.enabled`. Existing installations
+Tenant ownership is opt-in through `nvl-tenancy.enabled`. Existing installations
 must use the reviewed `nvl:tenancy:adopt` workflow; `nvl:auth:schema --apply`
 never guesses owners or activates tenant storage. Adoption creates explicit
 memberships, clones reviewed roles per tenant, revokes package-managed unbound
@@ -528,4 +530,8 @@ Use `nvl-auth.tables.<logical-key>` for every table and `nvl-auth.connection` fo
 | `tenant_membership_locks` | `nvl_auth_tenant_membership_locks` | `nvl_auth_tenant_membership_locks` |
 | `tenant_authentication_intents` | `nvl_auth_tenant_authentication_intents` | `nvl_auth_tenant_authentication_intents` |
 
-Migration filenames contain `nvl_auth_`. Existing installations must complete the upgrade in `UPGRADING.md` before running new migrations. A pending creator rejects an existing target before any migration in the batch runs; legacy storage with old history needs an ownership decision.
+Migration filenames contain `nvl_auth_`. Existing installations must complete the upgrade in `UPGRADING.md` before running new migrations. A pending creator rejects an existing target before that owned migration runs; use `nvl:schema:preflight` for an explicit whole-batch check; legacy storage with old history needs an ownership decision.
+
+## Canonical configuration ownership
+
+Use `nvl-auth` settings in `config/nvl-auth.php` and canonical package environment names. Old generic roots are foreign unless an upgrading NVL host explicitly selects them in Core's default-off compatibility. Canonical false/null/empty values win; no old roots are populated or written back. Keep logical package/resource IDs unchanged. Review [Core's rename inventory and cache/worker cutover](https://github.com/nvl-laravel-suite/core/blob/main/UPGRADING.md#major-5-canonical-configuration-and-environment).

@@ -16,7 +16,7 @@ final readonly class InvitationTenantBootstrap
 
     public function tenantForToken(string $token): ?TenantId
     {
-        if (config('tenancy.enabled') !== true) {
+        if (config('nvl-tenancy.enabled') !== true) {
             return null;
         }
 

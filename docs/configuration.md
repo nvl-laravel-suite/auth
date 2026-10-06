@@ -3,7 +3,7 @@
 Publish the canonical configuration with:
 
 ```bash
-php artisan vendor:publish --tag=auth-config
+php artisan vendor:publish --tag=nvl-auth-config
 ```
 
 ## Package, identity, and storage
@@ -131,19 +131,19 @@ elsewhere. `nvl:auth:doctor` detects these physical collisions.
 ```php
 'routes' => [
     'enabled' => true,
-    'prefix' => 'api/v1/auth',
+    'prefix' => 'nvl/api/v1/auth',
     'middleware' => ['api'],
     'public' => [
         'enabled' => true,
-        'middleware' => ['throttle:nvl-auth-public'],
+        'middleware' => ['throttle:nvl.auth.public'],
     ],
     'account' => [
         'enabled' => true,
-        'middleware' => ['auth:sanctum', 'throttle:nvl-auth-account'],
+        'middleware' => ['auth:sanctum', 'throttle:nvl.auth.account'],
     ],
     'management' => [
         'enabled' => true,
-        'middleware' => ['auth:sanctum', 'throttle:nvl-auth-management'],
+        'middleware' => ['auth:sanctum', 'throttle:nvl.auth.management'],
     ],
 ],
 ```
@@ -276,7 +276,7 @@ RBAC state, or `nvl_auth_audits`.
 
 ## Tenancy
 
-Tenancy remains disabled by default. Enabling `tenancy.enabled` requires the
+Tenancy remains disabled by default. Enabling `nvl-tenancy.enabled` requires the
 independently selected Auth tenant migration and an active foundation adoption
 marker. Memberships, invitations, roles, package Sanctum tokens, authentication
 intents, and audit projections become tenant-aware; principals, credentials,

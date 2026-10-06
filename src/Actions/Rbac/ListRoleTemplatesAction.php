@@ -29,7 +29,7 @@ final readonly class ListRoleTemplatesAction
     public function execute(Authenticatable $actor): array
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
 
         return array_values(array_map(
             static fn ($template): array => $template->toArray(),

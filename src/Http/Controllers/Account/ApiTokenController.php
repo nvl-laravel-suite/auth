@@ -115,7 +115,7 @@ final class ApiTokenController extends AuthenticatedController
             'created_at' => $token->createdAt->toIso8601String(),
         ];
 
-        if (config('tenancy.enabled') === true) {
+        if (config('nvl-tenancy.enabled') === true) {
             $data['tenant_id'] = $token->tenantId;
         }
 

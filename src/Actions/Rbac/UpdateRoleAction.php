@@ -34,7 +34,7 @@ final readonly class UpdateRoleAction
     public function execute(Authenticatable $actor, Role|string $role, UpdateRoleData $data): Role
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.manageRoles');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.manageRoles');
         $role = $this->entities->role($role);
 
         if ($role->is_system && $role->name !== trim($data->name)) {

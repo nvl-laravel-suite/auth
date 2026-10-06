@@ -50,7 +50,7 @@ final readonly class AuthOperationBoundary
 
     public function requirePlatformAdministration(): void
     {
-        if (config('tenancy.enabled') !== true) {
+        if (config('nvl-tenancy.enabled') !== true) {
             return;
         }
         if ($this->context->snapshot()->mode !== TenantContextMode::Platform) {
@@ -61,7 +61,7 @@ final readonly class AuthOperationBoundary
     /** Reject legacy RBAC entry points that mix platform and tenant-owned writes. */
     public function rejectMixedRbacOperation(): void
     {
-        if (config('tenancy.enabled') === true) {
+        if (config('nvl-tenancy.enabled') === true) {
             throw new AuthException(
                 'rbac_mixed_context_operation',
                 'This RBAC operation mixes platform and tenant-owned state.',

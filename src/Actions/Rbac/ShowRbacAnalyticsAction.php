@@ -28,7 +28,7 @@ final readonly class ShowRbacAnalyticsAction
     public function execute(Authenticatable $actor): RbacAnalytics
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
         $roleClass = $this->models->roleClass();
         $permissionClass = $this->models->permissionClass();
         $roles = $roleClass::query()->withCount(['users', 'permissions'])->get();

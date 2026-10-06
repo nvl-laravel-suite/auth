@@ -33,7 +33,7 @@ final readonly class DeleteAuthClientAction
     public function execute(Authenticatable $actor, AuthClient $client): void
     {
         $this->features->assertAllowed(AuthFeature::Clients, FeatureOperation::Revoke);
-        $this->authorization->authorize($actor, 'nvl-auth.clients.delete', $client);
+        $this->authorization->authorize($actor, 'nvl.auth.clients.delete', $client);
 
         DB::connection($client->getConnectionName())->transaction(function () use ($actor, $client): void {
             $clientId = $client->identifier();

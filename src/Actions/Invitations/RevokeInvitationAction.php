@@ -48,7 +48,7 @@ final readonly class RevokeInvitationAction
             /** @var Invitation $locked */
             $locked = $this->boundary->query(Invitation::query(), 'auth.invitations')
                 ->lockForUpdate()->findOrFail($identifier);
-            $this->authorization->authorize($actor, 'nvl-auth.invitations.revoke', $locked);
+            $this->authorization->authorize($actor, 'nvl.auth.invitations.revoke', $locked);
 
             if ($locked->revoked_at === null && $locked->accepted_at === null) {
                 $locked->forceFill([

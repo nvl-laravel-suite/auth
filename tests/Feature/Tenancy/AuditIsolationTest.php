@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Request;
 use Nvl\Auth\Actions\Audit\ListAuthAuditsAction;
 use Nvl\Auth\Actions\Audit\ShowAuthAuditAction;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
@@ -24,6 +25,23 @@ it('persists audit ownership when the event is recorded', function (): void {
     $rows = AuthAudit::query()->where('action', 'membership.test')->orderBy('tenant_id')->get();
 
     expect($rows->pluck('tenant_id')->all())->toBe([$scenario->a()->value, $scenario->b()->value]);
+});
+
+it('refreshes audit ownership and request context between application scopes', function (): void {
+    $scenario = new AuthTenancyScenario;
+    foreach ([$scenario->a(), $scenario->b()] as $index => $tenant) {
+        app()->forgetScopedInstances();
+        $request = Request::create('/audit-scope', server: ['HTTP_X_REQUEST_ID' => 'scope-'.$index]);
+        app()->instance('request', $request);
+        $scenario->run($tenant, fn () => app(AuthAuditRecorder::class)->record('membership.lifecycle'));
+    }
+    app()->forgetScopedInstances();
+    app()->instance('request', Request::create('/audit-scope', server: ['HTTP_X_REQUEST_ID' => 'scope-platform']));
+    app(AuthAuditRecorder::class)->record('authentication.lifecycle');
+
+    $rows = AuthAudit::query()->whereIn('action', ['membership.lifecycle', 'authentication.lifecycle'])->orderBy('request_id')->get();
+    expect($rows->pluck('tenant_id')->all())->toBe([$scenario->a()->value, $scenario->b()->value, null])
+        ->and($rows->pluck('request_id')->all())->toBe(['scope-0', 'scope-1', 'scope-platform']);
 });
 
 it('isolates tenant audit reads and keeps central identity facts platform-owned', function (): void {

@@ -31,7 +31,7 @@ final readonly class MutationAuthorizer
         string $ability,
         mixed $target = null,
     ): ?Authenticatable {
-        if (str_starts_with($ability, 'nvl-auth.users.')) {
+        if (str_starts_with($ability, 'nvl.auth.users.')) {
             $this->operations->requirePlatformAdministration();
         }
         if ($authority instanceof Authenticatable) {

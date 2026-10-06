@@ -36,7 +36,7 @@ final readonly class PreviewInvitationAction
     public function execute(string $token): Invitation
     {
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Read);
-        if (config('tenancy.enabled') === true) {
+        if (config('nvl-tenancy.enabled') === true) {
             $tenant = $this->bootstrap->tenantForToken($token);
             if ($tenant === null) {
                 throw new AuthException('invitation_invalid', 'The invitation is invalid or expired.', 410);

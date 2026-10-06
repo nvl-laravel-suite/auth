@@ -368,7 +368,7 @@ final readonly class RbacEntityLocator
     /** @return Builder<Role> */
     private function roleQuery(): Builder
     {
-        if (config('tenancy.enabled') === true) {
+        if (config('nvl-tenancy.enabled') === true) {
             return $this->tenantQueries()->roles();
         }
         $class = $this->models->roleClass();
@@ -379,7 +379,7 @@ final readonly class RbacEntityLocator
     /** @return Builder<Permission> */
     private function permissionQuery(): Builder
     {
-        if (config('tenancy.enabled') === true) {
+        if (config('nvl-tenancy.enabled') === true) {
             return $this->tenantQueries()->permissions();
         }
         $class = $this->models->permissionClass();

@@ -29,10 +29,10 @@ final readonly class ShowPermissionAction
     public function execute(Authenticatable $actor, Permission|string $permission): Permission
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
-        $this->authorization->authorize($actor, 'nvl-auth.rbac.view');
+        $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
 
         $permission = $this->entities->permission($permission);
-        if (config('tenancy.enabled') !== true) {
+        if (config('nvl-tenancy.enabled') !== true) {
             return $permission->load('roles')->loadCount('users');
         }
         $roles = $this->tenancy->roles()

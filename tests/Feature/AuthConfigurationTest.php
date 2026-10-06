@@ -66,7 +66,7 @@ it('catalogs every package management ability with policy mapping metadata', fun
         ->and($catalogAbilities)->toBe($manifestAbilities)
         ->and($catalog->definitions())->toHaveCount(29)
         ->and($catalog->definition('users.update'))->toMatchArray([
-            'ability' => 'nvl-auth.users.update',
+            'ability' => 'nvl.auth.users.update',
             'feature' => AuthFeature::PrincipalManagement,
             'operation' => 'update',
             'subject' => 'target',
@@ -106,27 +106,27 @@ it('delegates configured package aliases to host policies and denies unknown or 
     $managed = $this->user('managed@example.test');
     $other = $this->user('other@example.test');
 
-    expect(Gate::has('nvl-auth.users.viewAny'))->toBeFalse()
-        ->and($access->allows($manager, 'nvl-auth.users.viewAny'))->toBeTrue()
-        ->and($access->allows($manager, 'nvl-auth.users.update', $managed))->toBeTrue()
-        ->and($access->allows($manager, 'nvl-auth.users.update', $other))->toBeFalse()
-        ->and($access->allows($manager, 'nvl-auth.users.update', new stdClass))->toBeFalse()
-        ->and($access->allows($manager, 'nvl-auth.rbac.manageRoles'))->toBeTrue()
-        ->and($access->allows($manager, 'nvl-auth.rbac.managePermissions'))->toBeTrue()
-        ->and($access->allows($manager, 'nvl-auth.users.delete', $managed))->toBeFalse()
+    expect(Gate::has('nvl.auth.users.viewAny'))->toBeFalse()
+        ->and($access->allows($manager, 'nvl.auth.users.viewAny'))->toBeTrue()
+        ->and($access->allows($manager, 'nvl.auth.users.update', $managed))->toBeTrue()
+        ->and($access->allows($manager, 'nvl.auth.users.update', $other))->toBeFalse()
+        ->and($access->allows($manager, 'nvl.auth.users.update', new stdClass))->toBeFalse()
+        ->and($access->allows($manager, 'nvl.auth.rbac.manageRoles'))->toBeTrue()
+        ->and($access->allows($manager, 'nvl.auth.rbac.managePermissions'))->toBeTrue()
+        ->and($access->allows($manager, 'nvl.auth.users.delete', $managed))->toBeFalse()
         ->and($access->allows($manager, 'nvl-auth.unknown'))->toBeFalse();
 
     config()->set('nvl-auth.management.abilities.users.viewAny', 'manage');
     config()->set('nvl-auth.management.policy_models.users', Role::class);
 
-    expect($access->configurationReady('nvl-auth.users.viewAny'))->toBeFalse()
-        ->and($access->allows($manager, 'nvl-auth.users.viewAny'))->toBeFalse();
+    expect($access->configurationReady('nvl.auth.users.viewAny'))->toBeFalse()
+        ->and($access->allows($manager, 'nvl.auth.users.viewAny'))->toBeFalse();
 
     config()->set('nvl-auth.management.policy_models.users', TestUser::class);
 
     config()->set('nvl-auth.features.principal_management.enabled', false);
 
-    expect($access->allows($manager, 'nvl-auth.users.update', $managed))->toBeFalse();
+    expect($access->allows($manager, 'nvl.auth.users.update', $managed))->toBeFalse();
 });
 
 it('resolves the configured management access implementation through the provider', function (): void {
