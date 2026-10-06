@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Definitions\Tables;
 
+use Nvl\Support\Config\PackageStorage;
+
 /**
  * Defines the canonical table names owned by the Auth package.
  */
@@ -48,6 +50,12 @@ final class AuthTables
     public const string TenantMembershipLocks = 'nvl_auth_tenant_membership_locks';
 
     public const string TenantAuthenticationIntents = 'nvl_auth_tenant_authentication_intents';
+
+    /** Return one configured logical or historical package table. */
+    public static function get(string $key): string
+    {
+        return PackageStorage::resolveTable('auth', $key);
+    }
 
     private function __construct() {}
 }

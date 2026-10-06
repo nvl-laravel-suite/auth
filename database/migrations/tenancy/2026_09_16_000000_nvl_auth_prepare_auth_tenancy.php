@@ -7,16 +7,23 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Support\Config\PackageStorage;
 
 return new class extends Migration
 {
+    /** Use the effective package connection for Laravel's migration transaction. */
+    public function getConnection(): ?string
+    {
+        return PackageStorage::connection('auth');
+    }
+
     /** Prepare independently selected Auth ownership storage. */
     public function up(): void
     {
         $schema = Schema::connection($this->connectionName());
 
-        if (! $schema->hasTable(AuthTables::TenantMemberships)) {
-            $schema->create(AuthTables::TenantMemberships, static function (Blueprint $table): void {
+        if (! $schema->hasTable(AuthTables::get(AuthTables::TenantMemberships))) {
+            $schema->create(AuthTables::get(AuthTables::TenantMemberships), static function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->uuid('tenant_id');
                 $table->string('subject_type', 160);
@@ -31,15 +38,15 @@ return new class extends Migration
             });
         }
 
-        if (! $schema->hasTable(AuthTables::TenantMembershipLocks)) {
-            $schema->create(AuthTables::TenantMembershipLocks, static function (Blueprint $table): void {
+        if (! $schema->hasTable(AuthTables::get(AuthTables::TenantMembershipLocks))) {
+            $schema->create(AuthTables::get(AuthTables::TenantMembershipLocks), static function (Blueprint $table): void {
                 $table->uuid('tenant_id')->primary();
                 $table->timestampsTz();
             });
         }
 
-        if (! $schema->hasTable(AuthTables::TenantAuthenticationIntents)) {
-            $schema->create(AuthTables::TenantAuthenticationIntents, static function (Blueprint $table): void {
+        if (! $schema->hasTable(AuthTables::get(AuthTables::TenantAuthenticationIntents))) {
+            $schema->create(AuthTables::get(AuthTables::TenantAuthenticationIntents), static function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->uuid('tenant_id');
                 $table->string('purpose', 32);
@@ -56,11 +63,11 @@ return new class extends Migration
             });
         }
 
-        $this->addTenantColumn($schema, AuthTables::Roles);
-        $this->addTenantColumn($schema, AuthTables::ModelHasRoles);
-        $this->addTenantColumn($schema, AuthTables::ModelHasPermissions);
+        $this->addTenantColumn($schema, AuthTables::get(AuthTables::Roles));
+        $this->addTenantColumn($schema, AuthTables::get(AuthTables::ModelHasRoles));
+        $this->addTenantColumn($schema, AuthTables::get(AuthTables::ModelHasPermissions));
 
-        foreach ([AuthTables::Invitations, AuthTables::PersonalAccessTokens, AuthTables::Challenges, AuthTables::Audits] as $table) {
+        foreach ([AuthTables::get(AuthTables::Invitations), AuthTables::get(AuthTables::PersonalAccessTokens), AuthTables::get(AuthTables::Challenges), AuthTables::get(AuthTables::Audits)] as $table) {
             $this->addMixedOwnershipColumns($schema, $table);
         }
     }
@@ -69,9 +76,9 @@ return new class extends Migration
     public function down(): void
     {
         $schema = Schema::connection($this->connectionName());
-        $schema->dropIfExists(AuthTables::TenantAuthenticationIntents);
-        $schema->dropIfExists(AuthTables::TenantMembershipLocks);
-        $schema->dropIfExists(AuthTables::TenantMemberships);
+        $schema->dropIfExists(AuthTables::get(AuthTables::TenantAuthenticationIntents));
+        $schema->dropIfExists(AuthTables::get(AuthTables::TenantMembershipLocks));
+        $schema->dropIfExists(AuthTables::get(AuthTables::TenantMemberships));
     }
 
     /** Add the nullable preparation discriminator to one existing tenant table. */

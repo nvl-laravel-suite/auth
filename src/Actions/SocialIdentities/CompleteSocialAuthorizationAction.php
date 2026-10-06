@@ -20,10 +20,10 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\SocialProviderConfiguration;
 use Nvl\Auth\Services\TenantAuthenticationIntents;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\Contracts\TenantMembershipAccess;
-use Nvl\Tenancy\Exceptions\TenantInactive;
-use Nvl\Tenancy\Exceptions\TenantNotFound;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Support\Tenancy\Exceptions\TenantInactive;
+use Nvl\Support\Tenancy\Exceptions\TenantNotFound;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 use Throwable;
 
 /**

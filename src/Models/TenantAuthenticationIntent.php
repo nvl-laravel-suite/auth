@@ -7,6 +7,7 @@ namespace Nvl\Auth\Models;
 use Carbon\CarbonImmutable;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\TenantAuthenticationPurpose;
+use Nvl\Support\Config\PackageStorage;
 
 /**
  * Stores one short-lived, one-use tenant authentication binding.
@@ -46,5 +47,17 @@ final class TenantAuthenticationIntent extends AuthModel
             'expires_at' => 'immutable_datetime',
             'consumed_at' => 'immutable_datetime',
         ];
+    }
+
+    /** Resolve the configured package storage table. */
+    public function getTable(): string
+    {
+        return AuthTables::get(AuthTables::TenantAuthenticationIntents);
+    }
+
+    /** Resolve the package connection through shared infrastructure defaults. */
+    public function getConnectionName(): ?string
+    {
+        return PackageStorage::connectionName($this->connection ?? PackageStorage::connection('auth') ?? parent::getConnectionName());
     }
 }

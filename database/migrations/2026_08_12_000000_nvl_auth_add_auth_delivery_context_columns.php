@@ -8,9 +8,16 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Contracts\AuthSchemaMigration;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Support\Config\PackageStorage;
 
 return new class extends Migration implements AuthSchemaMigration
 {
+    /** Use the effective package connection for Laravel's migration transaction. */
+    public function getConnection(): ?string
+    {
+        return PackageStorage::connection('auth');
+    }
+
     /**
      * Add the Auth delivery correlation columns introduced after v1.0.1.
      */
@@ -18,18 +25,18 @@ return new class extends Migration implements AuthSchemaMigration
     {
         $schema = Schema::connection($this->connectionName());
 
-        if ($schema->hasTable(AuthTables::Invitations)) {
-            if (! $schema->hasColumn(AuthTables::Invitations, 'context_hash')) {
-                $schema->table(AuthTables::Invitations, function (Blueprint $table): void {
+        if ($schema->hasTable(AuthTables::get(AuthTables::Invitations))) {
+            if (! $schema->hasColumn(AuthTables::get(AuthTables::Invitations), 'context_hash')) {
+                $schema->table(AuthTables::get(AuthTables::Invitations), function (Blueprint $table): void {
                     $table->char('context_hash', 64)->nullable();
                 });
             }
 
             if (! $schema->hasIndex(
-                AuthTables::Invitations,
+                AuthTables::get(AuthTables::Invitations),
                 'nvl_auth_invitations_context_hash_index',
             )) {
-                $schema->table(AuthTables::Invitations, function (Blueprint $table): void {
+                $schema->table(AuthTables::get(AuthTables::Invitations), function (Blueprint $table): void {
                     $table->index(
                         'context_hash',
                         'nvl_auth_invitations_context_hash_index',
@@ -38,18 +45,18 @@ return new class extends Migration implements AuthSchemaMigration
             }
         }
 
-        if ($schema->hasTable(AuthTables::Challenges)) {
-            if (! $schema->hasColumn(AuthTables::Challenges, 'secondary_secret_hash')) {
-                $schema->table(AuthTables::Challenges, function (Blueprint $table): void {
+        if ($schema->hasTable(AuthTables::get(AuthTables::Challenges))) {
+            if (! $schema->hasColumn(AuthTables::get(AuthTables::Challenges), 'secondary_secret_hash')) {
+                $schema->table(AuthTables::get(AuthTables::Challenges), function (Blueprint $table): void {
                     $table->char('secondary_secret_hash', 64)->nullable();
                 });
             }
 
             if (! $schema->hasIndex(
-                AuthTables::Challenges,
+                AuthTables::get(AuthTables::Challenges),
                 'nvl_auth_challenges_secondary_secret_hash_unique',
             )) {
-                $schema->table(AuthTables::Challenges, function (Blueprint $table): void {
+                $schema->table(AuthTables::get(AuthTables::Challenges), function (Blueprint $table): void {
                     $table->unique(
                         'secondary_secret_hash',
                         'nvl_auth_challenges_secondary_secret_hash_unique',

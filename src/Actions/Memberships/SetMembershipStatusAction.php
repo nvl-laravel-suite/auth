@@ -21,7 +21,7 @@ use Nvl\Auth\Services\MembershipWriter;
 use Nvl\Auth\Services\MutationAuthorizer;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
-use Nvl\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
 
 /** Applies one optimistic membership status transition. */
 final readonly class SetMembershipStatusAction

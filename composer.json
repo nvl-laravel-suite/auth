@@ -22,7 +22,6 @@
         "laravel/sanctum": "^4.3",
         "nesbot/carbon": "^2.72 || ^3.0",
         "nvl/core": "^2.0",
-        "nvl/tenancy": "^2.0",
         "paragonie/constant_time_encoding": "^2.6 || ^3.0",
         "pragmarx/google2fa": "^9.0",
         "spatie/laravel-data": "^4.23",
@@ -40,6 +39,7 @@
         "laravel/pint": "^1.27",
         "laravel/socialite": "^5.29",
         "mockery/mockery": "^1.6",
+        "nvl/tenancy": "^2.0",
         "orchestra/testbench": "^11.0",
         "pestphp/pest": "^4.0",
         "pestphp/pest-plugin-laravel": "^4.0",
@@ -50,7 +50,8 @@
         "bacon/bacon-qr-code": "Renders server-side QR codes for TOTP provisioning when a headless URI is not sufficient.",
         "laravel/socialite": "Enables the optional OAuth identity adapter.",
         "nvl/activity": "Can consume the package's after-commit audit and authentication events.",
-        "nvl/mail-notifications": "Can consume AuthDeliveryRequested events and deliver the typed payloads."
+        "nvl/mail-notifications": "Can consume AuthDeliveryRequested events and deliver the typed payloads.",
+        "nvl/tenancy": "Enables enforcing tenant ownership, scoped execution, adoption, and captured tenant queue contexts."
     },
     "autoload": {
         "psr-4": {

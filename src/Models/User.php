@@ -23,6 +23,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Nvl\Auth\Database\Factories\UserFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\PrincipalAttribute;
+use Nvl\Support\Config\PackageStorage;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
@@ -168,11 +169,7 @@ class User extends Authenticatable implements CanResetPasswordContract, HasApiTo
      */
     public function getConnectionName(): ?string
     {
-        $configured = config('nvl-auth.connection');
-
-        return is_string($configured) && trim($configured) !== ''
-            ? trim($configured)
-            : parent::getConnectionName();
+        return PackageStorage::connectionName($this->connection ?? PackageStorage::connection('auth') ?? parent::getConnectionName());
     }
 
     public function getKeyName(): string

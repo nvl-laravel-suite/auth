@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\TenantMembershipFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\MembershipStatus;
+use Nvl\Support\Config\PackageStorage;
 
 /**
  * Stores one principal's lifecycle inside one tenant.
@@ -45,5 +46,17 @@ final class TenantMembership extends AuthModel
             'is_owner' => 'boolean',
             'revision' => 'integer',
         ];
+    }
+
+    /** Resolve the configured package storage table. */
+    public function getTable(): string
+    {
+        return AuthTables::get(AuthTables::TenantMemberships);
+    }
+
+    /** Resolve the package connection through shared infrastructure defaults. */
+    public function getConnectionName(): ?string
+    {
+        return PackageStorage::connectionName($this->connection ?? PackageStorage::connection('auth') ?? parent::getConnectionName());
     }
 }

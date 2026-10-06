@@ -20,7 +20,7 @@ use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\MutationAuthorizer;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
-use Nvl\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
 
 /** Transfers tenant ownership inside one locked transaction. */
 final readonly class TransferMembershipOwnershipAction

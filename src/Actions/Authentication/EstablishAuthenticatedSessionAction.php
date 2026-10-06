@@ -30,8 +30,8 @@ use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\PendingTenantAuthenticationIntent;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\Contracts\TenantMembershipAccess;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 use Throwable;
 
 /**

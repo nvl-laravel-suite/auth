@@ -180,7 +180,7 @@ final readonly class AdoptPrincipalsAction
         $target = (new $class)->getTable();
         $passwordTarget = $this->configuration->string(
             'tables.password_reset_tokens',
-            AuthTables::PasswordResetTokens,
+            AuthTables::get(AuthTables::PasswordResetTokens),
         );
         $schema = Schema::connection($plan->connection);
 

@@ -86,7 +86,7 @@ final class UpdatePermissionData extends Data
         $permissionId = isset($payload['_currentPermissionId']) && is_string($payload['_currentPermissionId'])
             ? $payload['_currentPermissionId']
             : null;
-        $permissions = Config::string('nvl-auth.tables.permissions', AuthTables::Permissions);
+        $permissions = Config::string('nvl-auth.tables.permissions', AuthTables::get(AuthTables::Permissions));
         $guard = Config::string('nvl-auth.features.rbac.settings.guard', 'web');
 
         return [

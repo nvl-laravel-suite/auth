@@ -6,9 +6,9 @@ namespace Nvl\Auth\Console\Commands;
 
 use Illuminate\Console\Command;
 use Nvl\Auth\Actions\PruneAuthStateAction;
-use Nvl\Tenancy\Services\TenantRunner;
-use Nvl\Tenancy\ValueObjects\PlatformOperation;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantRunner;
+use Nvl\Support\Tenancy\ValueObjects\PlatformOperation;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Prunes terminal Auth state on an operator-controlled schedule.

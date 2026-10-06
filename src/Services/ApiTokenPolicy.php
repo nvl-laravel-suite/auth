@@ -9,9 +9,9 @@ use Nvl\Auth\Contracts\ApiTokenAbilityProvider;
 use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Data\Mutations\ApiTokenData;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Tenancy\Contracts\TenantContext;
-use Nvl\Tenancy\Contracts\TenantMembershipAccess;
-use Nvl\Tenancy\Enums\TenantContextMode;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Support\Tenancy\Enums\TenantContextMode;
 
 /**
  * Enforces the host's API-token ability catalog.

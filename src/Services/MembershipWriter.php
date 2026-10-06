@@ -8,8 +8,8 @@ use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\TenantMembership;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\Contracts\TenantContext;
-use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
 
 /** Performs transaction-owned membership persistence without public Action chaining. */
 final readonly class MembershipWriter

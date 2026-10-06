@@ -12,10 +12,10 @@ use Nvl\Auth\Actions\Passkeys\FinishPasskeyAuthenticationAction;
 use Nvl\Auth\Data\Mutations\FinishPasskeyAuthenticationData;
 use Nvl\Auth\Http\Controllers\Concerns\InteractsWithValidatedInput;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
-use Nvl\Tenancy\Contracts\TenantHttpResolver;
-use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
-use Nvl\Tenancy\Exceptions\TenantNotFound;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantHttpResolver;
+use Nvl\Support\Tenancy\Exceptions\TenantBoundaryViolation;
+use Nvl\Support\Tenancy\Exceptions\TenantNotFound;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Handles public passkey authentication ceremonies.

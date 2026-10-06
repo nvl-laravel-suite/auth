@@ -17,7 +17,7 @@ use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\TenantAuthenticationChallengeIntents;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Resolves and issues a subject-bound security code for public authentication.

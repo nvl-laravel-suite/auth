@@ -17,7 +17,7 @@ use Nvl\Auth\Services\InvitationDeliveryMetadataPolicy;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
-use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
  * Finds one active invitation through an explicitly trusted read boundary.

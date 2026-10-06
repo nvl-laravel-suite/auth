@@ -31,9 +31,9 @@ use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\Contracts\TenantMembershipAccess;
-use Nvl\Tenancy\Services\TenantBoundary;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Issues one simple invitation and publishes its delivery payload after commit.

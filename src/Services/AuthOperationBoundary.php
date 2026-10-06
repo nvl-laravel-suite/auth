@@ -11,9 +11,9 @@ use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\Contracts\TenantContext;
-use Nvl\Tenancy\Enums\TenantContextMode;
-use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Tenancy\Enums\TenantContextMode;
+use Nvl\Support\Tenancy\Exceptions\TenantBoundaryViolation;
 
 /** Separates narrow central identity work from privileged platform administration. */
 final readonly class AuthOperationBoundary

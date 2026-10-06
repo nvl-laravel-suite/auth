@@ -8,9 +8,9 @@ use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Foundation\Events\Dispatchable;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthEventContext;
-use Nvl\Tenancy\Contracts\TenantQueuedJob;
-use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
-use Nvl\Tenancy\ValueObjects\TenantJobEnvelope;
+use Nvl\Support\Tenancy\Contracts\TenantQueuedJob;
+use Nvl\Support\Tenancy\Exceptions\TenantBoundaryViolation;
+use Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope;
 
 /**
  * Requests host-owned delivery after Auth state has committed.

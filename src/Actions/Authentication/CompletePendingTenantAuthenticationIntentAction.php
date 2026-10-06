@@ -15,8 +15,8 @@ use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\TenantAuthenticationIntents;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\Contracts\TenantMembershipAccess;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 use Throwable;
 
 /**

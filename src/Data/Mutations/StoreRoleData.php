@@ -89,8 +89,8 @@ final class StoreRoleData extends Data
     /** @return array<string, list<mixed>> */
     public static function rules(): array
     {
-        $roles = Config::string('nvl-auth.tables.roles', AuthTables::Roles);
-        $permissions = Config::string('nvl-auth.tables.permissions', AuthTables::Permissions);
+        $roles = Config::string('nvl-auth.tables.roles', AuthTables::get(AuthTables::Roles));
+        $permissions = Config::string('nvl-auth.tables.permissions', AuthTables::get(AuthTables::Permissions));
         $guard = Config::string('nvl-auth.features.rbac.settings.guard', 'web');
         $tenant = config('tenancy.enabled') === true ? getPermissionsTeamId() : null;
         $unique = Rule::unique($roles, 'name')->where('guard_name', $guard);

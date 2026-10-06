@@ -11,8 +11,8 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\Contracts\TenantContext;
-use Nvl\Tenancy\Enums\TenantContextMode;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Tenancy\Enums\TenantContextMode;
 
 /**
  * Records package audit facts when the audit feature is enabled.

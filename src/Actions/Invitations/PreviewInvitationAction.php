@@ -11,8 +11,8 @@ use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\InvitationTenantBootstrap;
 use Nvl\Auth\Services\SecretHasher;
-use Nvl\Tenancy\Services\TenantBoundary;
-use Nvl\Tenancy\Services\TenantRunner;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantRunner;
 
 /**
  * Resolves public, non-secret invitation context before host provisioning.

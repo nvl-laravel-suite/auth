@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Tenancy;
 
 use Illuminate\Support\Str;
-use Nvl\Tenancy\Exceptions\TenantConfigurationInvalid;
+use Nvl\Support\Tenancy\Exceptions\TenantConfigurationInvalid;
 use Nvl\Tenancy\ValueObjects\TenantAssignment;
 
 /** Validates Auth's closed reviewed-adoption metadata schemas. */

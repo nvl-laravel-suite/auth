@@ -8,9 +8,16 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Contracts\AuthSchemaMigration;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Support\Config\PackageStorage;
 
 return new class extends Migration implements AuthSchemaMigration
 {
+    /** Use the effective package connection for Laravel's migration transaction. */
+    public function getConnection(): ?string
+    {
+        return PackageStorage::connection('auth');
+    }
+
     private const COLUMNS = [
         'current_delivery_message_id',
         'delivery_status',
@@ -29,16 +36,16 @@ return new class extends Migration implements AuthSchemaMigration
     {
         $schema = Schema::connection($this->connectionName());
 
-        if (! $schema->hasTable(AuthTables::Invitations)) {
+        if (! $schema->hasTable(AuthTables::get(AuthTables::Invitations))) {
             return;
         }
 
         foreach (self::COLUMNS as $column) {
-            if ($schema->hasColumn(AuthTables::Invitations, $column)) {
+            if ($schema->hasColumn(AuthTables::get(AuthTables::Invitations), $column)) {
                 continue;
             }
 
-            $schema->table(AuthTables::Invitations, function (Blueprint $table) use ($column): void {
+            $schema->table(AuthTables::get(AuthTables::Invitations), function (Blueprint $table) use ($column): void {
                 match ($column) {
                     'current_delivery_message_id' => $table->string($column, 191)->nullable(),
                     'delivery_status' => $table->string($column, 32)->nullable(),
@@ -48,8 +55,8 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if (! $schema->hasIndex(AuthTables::Invitations, self::STATUS_INDEX)) {
-            $schema->table(AuthTables::Invitations, function (Blueprint $table): void {
+        if (! $schema->hasIndex(AuthTables::get(AuthTables::Invitations), self::STATUS_INDEX)) {
+            $schema->table(AuthTables::get(AuthTables::Invitations), function (Blueprint $table): void {
                 $table->index(
                     ['delivery_status', 'delivery_attempted_at'],
                     self::STATUS_INDEX,
@@ -65,22 +72,22 @@ return new class extends Migration implements AuthSchemaMigration
     {
         $schema = Schema::connection($this->connectionName());
 
-        if (! $schema->hasTable(AuthTables::Invitations)) {
+        if (! $schema->hasTable(AuthTables::get(AuthTables::Invitations))) {
             return;
         }
 
-        if ($schema->hasIndex(AuthTables::Invitations, self::STATUS_INDEX)) {
-            $schema->table(AuthTables::Invitations, function (Blueprint $table): void {
+        if ($schema->hasIndex(AuthTables::get(AuthTables::Invitations), self::STATUS_INDEX)) {
+            $schema->table(AuthTables::get(AuthTables::Invitations), function (Blueprint $table): void {
                 $table->dropIndex(self::STATUS_INDEX);
             });
         }
 
         foreach (array_reverse(self::COLUMNS) as $column) {
-            if (! $schema->hasColumn(AuthTables::Invitations, $column)) {
+            if (! $schema->hasColumn(AuthTables::get(AuthTables::Invitations), $column)) {
                 continue;
             }
 
-            $schema->table(AuthTables::Invitations, function (Blueprint $table) use ($column): void {
+            $schema->table(AuthTables::get(AuthTables::Invitations), function (Blueprint $table) use ($column): void {
                 $table->dropColumn($column);
             });
         }

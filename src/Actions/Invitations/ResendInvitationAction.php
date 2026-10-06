@@ -26,8 +26,8 @@ use Nvl\Auth\Services\OpaqueTokenFactory;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
-use Nvl\Tenancy\Services\TenantBoundary;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Rotates and republishes one still-active invitation token.

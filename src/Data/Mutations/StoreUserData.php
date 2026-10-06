@@ -116,10 +116,10 @@ final class StoreUserData extends Data
     /** @return array<string, list<mixed>> */
     public static function rules(): array
     {
-        $users = Config::string('nvl-auth.tables.users', AuthTables::Users);
+        $users = Config::string('nvl-auth.tables.users', AuthTables::get(AuthTables::Users));
         $email = Config::string('nvl-auth.features.principal_management.settings.attributes.email', 'email');
-        $roles = Config::string('nvl-auth.tables.roles', AuthTables::Roles);
-        $permissions = Config::string('nvl-auth.tables.permissions', AuthTables::Permissions);
+        $roles = Config::string('nvl-auth.tables.roles', AuthTables::get(AuthTables::Roles));
+        $permissions = Config::string('nvl-auth.tables.permissions', AuthTables::get(AuthTables::Permissions));
 
         return [
             'name' => ['required', 'string', 'max:160'],

@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Nvl\Auth\ValueObjects;
 
 use InvalidArgumentException;
-use Nvl\Tenancy\Contracts\TenantContext;
-use Nvl\Tenancy\Enums\TenantContextMode;
-use Nvl\Tenancy\ValueObjects\TenantContextSnapshot;
-use Nvl\Tenancy\ValueObjects\TenantId;
-use Nvl\Tenancy\ValueObjects\TenantJobEnvelope;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Tenancy\Enums\TenantContextMode;
+use Nvl\Support\Tenancy\ValueObjects\TenantContextSnapshot;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope;
 
 /** Captures immutable Auth event ownership before context can change. */
 final readonly class AuthEventContext

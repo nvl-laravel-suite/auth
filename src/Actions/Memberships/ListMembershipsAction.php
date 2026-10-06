@@ -14,7 +14,7 @@ use Nvl\Auth\Models\TenantMembership;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
-use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /** Lists only membership rows inside the active tenant. */
 final readonly class ListMembershipsAction

@@ -514,9 +514,9 @@ it('publishes invitation delivery only after pending state and its audit are com
     DB::purge($connectionName);
 
     foreach ([
-        '2026_08_02_000000_create_nvl_auth_tables.php',
-        '2026_08_12_000000_add_auth_delivery_context_columns.php',
-        '2026_08_28_000000_add_invitation_delivery_outcomes.php',
+        '2026_08_02_000000_nvl_auth_create_nvl_auth_tables.php',
+        '2026_08_12_000000_nvl_auth_add_auth_delivery_context_columns.php',
+        '2026_08_28_000000_nvl_auth_add_invitation_delivery_outcomes.php',
     ] as $migrationFile) {
         $migration = require dirname(__DIR__, 2)."/database/migrations/{$migrationFile}";
         $migration->up();

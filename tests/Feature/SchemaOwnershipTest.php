@@ -55,8 +55,8 @@ it('installs exactly the seventeen namespaced auth-owned tables', function (): v
 });
 
 it('installs only enabled feature schema and safely installs later capabilities', function (): void {
-    $features = require dirname(__DIR__, 2).'/database/migrations/2026_08_02_000000_create_nvl_auth_tables.php';
-    $identity = require dirname(__DIR__, 2).'/database/migrations/2026_08_01_000000_create_nvl_auth_identity_tables.php';
+    $features = require dirname(__DIR__, 2).'/database/migrations/2026_08_02_000000_nvl_auth_create_nvl_auth_tables.php';
+    $identity = require dirname(__DIR__, 2).'/database/migrations/2026_08_01_000000_nvl_auth_create_nvl_auth_identity_tables.php';
     $features->down();
     $identity->down();
     config()->set('nvl-auth.enabled', false);
@@ -98,7 +98,7 @@ it('registers the feature-aware schema installation command', function (): void 
 });
 
 it('does not bypass host-owned migration mode during schema apply', function (): void {
-    $features = require dirname(__DIR__, 2).'/database/migrations/2026_08_02_000000_create_nvl_auth_tables.php';
+    $features = require dirname(__DIR__, 2).'/database/migrations/2026_08_02_000000_nvl_auth_create_nvl_auth_tables.php';
     $features->down();
     config()->set('nvl-auth.migrations.enabled', false);
 
@@ -113,10 +113,10 @@ it('does not bypass host-owned migration mode during schema apply', function ():
 });
 
 it('rolls the complete package schema down and back up cleanly', function (): void {
-    $features = require dirname(__DIR__, 2).'/database/migrations/2026_08_02_000000_create_nvl_auth_tables.php';
-    $identity = require dirname(__DIR__, 2).'/database/migrations/2026_08_01_000000_create_nvl_auth_identity_tables.php';
-    $deliveryContext = require dirname(__DIR__, 2).'/database/migrations/2026_08_12_000000_add_auth_delivery_context_columns.php';
-    $deliveryOutcomes = require dirname(__DIR__, 2).'/database/migrations/2026_08_28_000000_add_invitation_delivery_outcomes.php';
+    $features = require dirname(__DIR__, 2).'/database/migrations/2026_08_02_000000_nvl_auth_create_nvl_auth_tables.php';
+    $identity = require dirname(__DIR__, 2).'/database/migrations/2026_08_01_000000_nvl_auth_create_nvl_auth_identity_tables.php';
+    $deliveryContext = require dirname(__DIR__, 2).'/database/migrations/2026_08_12_000000_nvl_auth_add_auth_delivery_context_columns.php';
+    $deliveryOutcomes = require dirname(__DIR__, 2).'/database/migrations/2026_08_28_000000_nvl_auth_add_invitation_delivery_outcomes.php';
 
     $deliveryOutcomes->down();
     $features->down();
@@ -142,7 +142,7 @@ it('rolls the complete package schema down and back up cleanly', function (): vo
 });
 
 it('uses configured identity provider table names consistently during installation', function (): void {
-    $identity = require dirname(__DIR__, 2).'/database/migrations/2026_08_01_000000_create_nvl_auth_identity_tables.php';
+    $identity = require dirname(__DIR__, 2).'/database/migrations/2026_08_01_000000_nvl_auth_create_nvl_auth_identity_tables.php';
     $identity->down();
     $configured = [
         'users' => 'custom_auth_users',

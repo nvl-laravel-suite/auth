@@ -11,7 +11,7 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\RbacAssignmentChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\ValueObjects\AuthEventContext;
-use Nvl\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
 use Spatie\Permission\PermissionRegistrar;
 
 /**

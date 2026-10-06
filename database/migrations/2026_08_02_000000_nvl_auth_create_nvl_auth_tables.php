@@ -8,9 +8,16 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Contracts\AuthSchemaMigration;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Support\Config\PackageStorage;
 
 return new class extends Migration implements AuthSchemaMigration
 {
+    /** Use the effective package connection for Laravel's migration transaction. */
+    public function getConnection(): ?string
+    {
+        return PackageStorage::connection('auth');
+    }
+
     /**
      * Create the complete package-owned Auth schema.
      */
@@ -19,8 +26,8 @@ return new class extends Migration implements AuthSchemaMigration
         $schema = Schema::connection($this->connectionName());
 
         if (($this->featureEnabled('clients') || $this->featureEnabled('audit'))
-            && ! $schema->hasTable(AuthTables::Clients)) {
-            $schema->create(AuthTables::Clients, function (Blueprint $table): void {
+            && ! $schema->hasTable(AuthTables::get(AuthTables::Clients))) {
+            $schema->create(AuthTables::get(AuthTables::Clients), function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->string('name', 120);
                 $table->string('surface', 40)->default('web');
@@ -37,10 +44,10 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if ($this->featureEnabled('clients') && ! $schema->hasTable(AuthTables::ClientSessions)) {
-            $schema->create(AuthTables::ClientSessions, function (Blueprint $table): void {
+        if ($this->featureEnabled('clients') && ! $schema->hasTable(AuthTables::get(AuthTables::ClientSessions))) {
+            $schema->create(AuthTables::get(AuthTables::ClientSessions), function (Blueprint $table): void {
                 $table->uuid('id')->primary();
-                $table->foreignUuid('client_id')->constrained(AuthTables::Clients)->cascadeOnDelete();
+                $table->foreignUuid('client_id')->constrained(AuthTables::get(AuthTables::Clients))->cascadeOnDelete();
                 $table->string('subject_type', 160)->nullable();
                 $table->string('subject_id', 191)->nullable();
                 $table->char('session_id_hash', 64);
@@ -59,8 +66,8 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if ($this->featureEnabled('invitations') && ! $schema->hasTable(AuthTables::Invitations)) {
-            $schema->create(AuthTables::Invitations, function (Blueprint $table): void {
+        if ($this->featureEnabled('invitations') && ! $schema->hasTable(AuthTables::get(AuthTables::Invitations))) {
+            $schema->create(AuthTables::get(AuthTables::Invitations), function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->char('token_hash', 64)->unique();
                 $table->char('active_key', 64)->nullable()->unique();
@@ -89,8 +96,8 @@ return new class extends Migration implements AuthSchemaMigration
         }
 
         if (($this->featureEnabled('magic_links') || $this->featureEnabled('security_codes'))
-            && ! $schema->hasTable(AuthTables::Challenges)) {
-            $schema->create(AuthTables::Challenges, function (Blueprint $table): void {
+            && ! $schema->hasTable(AuthTables::get(AuthTables::Challenges))) {
+            $schema->create(AuthTables::get(AuthTables::Challenges), function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->string('type', 80);
                 $table->string('purpose', 120);
@@ -113,8 +120,8 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if ($this->featureEnabled('totp') && ! $schema->hasTable(AuthTables::TotpCredentials)) {
-            $schema->create(AuthTables::TotpCredentials, function (Blueprint $table): void {
+        if ($this->featureEnabled('totp') && ! $schema->hasTable(AuthTables::get(AuthTables::TotpCredentials))) {
+            $schema->create(AuthTables::get(AuthTables::TotpCredentials), function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->string('subject_type', 160);
                 $table->string('subject_id', 191);
@@ -134,8 +141,8 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if ($this->featureEnabled('passkeys') && ! $schema->hasTable(AuthTables::Passkeys)) {
-            $schema->create(AuthTables::Passkeys, function (Blueprint $table): void {
+        if ($this->featureEnabled('passkeys') && ! $schema->hasTable(AuthTables::get(AuthTables::Passkeys))) {
+            $schema->create(AuthTables::get(AuthTables::Passkeys), function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->string('subject_type', 160);
                 $table->string('subject_id', 191);
@@ -156,8 +163,8 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if ($this->featureEnabled('recovery_codes') && ! $schema->hasTable(AuthTables::RecoveryCodes)) {
-            $schema->create(AuthTables::RecoveryCodes, function (Blueprint $table): void {
+        if ($this->featureEnabled('recovery_codes') && ! $schema->hasTable(AuthTables::get(AuthTables::RecoveryCodes))) {
+            $schema->create(AuthTables::get(AuthTables::RecoveryCodes), function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->uuid('batch_id');
                 $table->string('subject_type', 160);
@@ -172,8 +179,8 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if ($this->featureEnabled('social_identities') && ! $schema->hasTable(AuthTables::SocialIdentities)) {
-            $schema->create(AuthTables::SocialIdentities, function (Blueprint $table): void {
+        if ($this->featureEnabled('social_identities') && ! $schema->hasTable(AuthTables::get(AuthTables::SocialIdentities))) {
+            $schema->create(AuthTables::get(AuthTables::SocialIdentities), function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->string('subject_type', 160);
                 $table->string('subject_id', 191);
@@ -191,8 +198,8 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if ($this->featureEnabled('audit') && ! $schema->hasTable(AuthTables::Audits)) {
-            $schema->create(AuthTables::Audits, function (Blueprint $table): void {
+        if ($this->featureEnabled('audit') && ! $schema->hasTable(AuthTables::get(AuthTables::Audits))) {
+            $schema->create(AuthTables::get(AuthTables::Audits), function (Blueprint $table): void {
                 $table->uuid('id')->primary();
                 $table->string('action', 120);
                 $table->string('outcome', 40)->default('success');
@@ -200,7 +207,7 @@ return new class extends Migration implements AuthSchemaMigration
                 $table->string('subject_id', 191)->nullable();
                 $table->string('actor_type', 160)->nullable();
                 $table->string('actor_id', 191)->nullable();
-                $table->foreignUuid('client_id')->nullable()->constrained(AuthTables::Clients)->nullOnDelete();
+                $table->foreignUuid('client_id')->nullable()->constrained(AuthTables::get(AuthTables::Clients))->nullOnDelete();
                 $table->text('ip_address')->nullable();
                 $table->text('user_agent')->nullable();
                 $table->string('request_id', 128)->nullable();
@@ -222,15 +229,15 @@ return new class extends Migration implements AuthSchemaMigration
         $schema = Schema::connection($this->connectionName());
 
         foreach ([
-            AuthTables::Audits,
-            AuthTables::SocialIdentities,
-            AuthTables::RecoveryCodes,
-            AuthTables::Passkeys,
-            AuthTables::TotpCredentials,
-            AuthTables::Challenges,
-            AuthTables::Invitations,
-            AuthTables::ClientSessions,
-            AuthTables::Clients,
+            AuthTables::get(AuthTables::Audits),
+            AuthTables::get(AuthTables::SocialIdentities),
+            AuthTables::get(AuthTables::RecoveryCodes),
+            AuthTables::get(AuthTables::Passkeys),
+            AuthTables::get(AuthTables::TotpCredentials),
+            AuthTables::get(AuthTables::Challenges),
+            AuthTables::get(AuthTables::Invitations),
+            AuthTables::get(AuthTables::ClientSessions),
+            AuthTables::get(AuthTables::Clients),
         ] as $table) {
             $schema->dropIfExists($table);
         }

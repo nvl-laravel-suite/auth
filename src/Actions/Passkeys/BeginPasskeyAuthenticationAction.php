@@ -20,7 +20,7 @@ use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\Services\TenantAuthenticationChallengeIntents;
 use Nvl\Auth\ValueObjects\PasskeyCeremonyOptions;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 use Throwable;
 
 /**

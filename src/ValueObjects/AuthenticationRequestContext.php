@@ -6,7 +6,7 @@ namespace Nvl\Auth\ValueObjects;
 
 use Carbon\CarbonImmutable;
 use Nvl\Auth\Enums\TenantAuthenticationPurpose;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Carries optional transport context into authentication use cases.

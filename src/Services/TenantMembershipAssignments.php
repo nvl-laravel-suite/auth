@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\Model;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
-use Nvl\Tenancy\Contracts\TenantContext;
-use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
 
 /** Validates canonical tenant roles and fixed vocabulary permissions before assignment. */
 final readonly class TenantMembershipAssignments

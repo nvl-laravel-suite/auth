@@ -6,7 +6,7 @@ namespace Nvl\Auth\ValueObjects;
 
 use Carbon\CarbonImmutable;
 use InvalidArgumentException;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Carries trusted host issuance policy that must never be hydrated from public input.

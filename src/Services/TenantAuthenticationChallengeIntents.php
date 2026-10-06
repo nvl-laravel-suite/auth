@@ -11,7 +11,7 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /** Stores tenant intent references only in encrypted, server-owned challenge state. */
 final readonly class TenantAuthenticationChallengeIntents

@@ -13,8 +13,8 @@ use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Contracts\TenantBoundApiTokenManager;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\Contracts\TenantMembershipAccess;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /** Admits a fresh member and, when present, its immutable tenant-bound Sanctum token. */
 final readonly class AuthTenantAdmission

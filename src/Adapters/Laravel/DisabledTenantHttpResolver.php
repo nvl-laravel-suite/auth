@@ -6,8 +6,8 @@ namespace Nvl\Auth\Adapters\Laravel;
 
 use Illuminate\Http\Request;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Tenancy\Contracts\TenantHttpResolver;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantHttpResolver;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Keeps disabled Auth HTTP routes injectable without selecting a tenant.

@@ -132,7 +132,7 @@ it('fails readiness when Auth delivery correlation indexes are missing', functio
             ->expectsOutputToContain('nvl_auth_invitations_context_hash_index')
             ->assertFailed();
     } finally {
-        $migration = require dirname(__DIR__, 2).'/database/migrations/2026_08_12_000000_add_auth_delivery_context_columns.php';
+        $migration = require dirname(__DIR__, 2).'/database/migrations/2026_08_12_000000_nvl_auth_add_auth_delivery_context_columns.php';
         $migration->up();
     }
 
@@ -145,7 +145,7 @@ it('fails readiness when Auth delivery correlation indexes are missing', functio
             ->expectsOutputToContain('nvl_auth_challenges_secondary_secret_hash_unique')
             ->assertFailed();
     } finally {
-        $migration = require dirname(__DIR__, 2).'/database/migrations/2026_08_12_000000_add_auth_delivery_context_columns.php';
+        $migration = require dirname(__DIR__, 2).'/database/migrations/2026_08_12_000000_nvl_auth_add_auth_delivery_context_columns.php';
         $migration->up();
     }
 
@@ -173,7 +173,7 @@ it('registers timestamp-aware migration publishing and warns about duplicate own
         ->and($publishableMigrationPaths)->toContain($migrationPath);
 
     $published = database_path(
-        'migrations/2099_01_01_000000_create_nvl_auth_identity_tables.php',
+        'migrations/2099_01_01_000000_nvl_auth_create_nvl_auth_identity_tables.php',
     );
     file_put_contents($published, "<?php\n");
 

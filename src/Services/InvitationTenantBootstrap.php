@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Nvl\Auth\Services;
 
 use Nvl\Auth\Models\Invitation;
-use Nvl\Tenancy\Contracts\TenantDirectory;
-use Nvl\Tenancy\Enums\TenantStatus;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantDirectory;
+use Nvl\Support\Tenancy\Enums\TenantStatus;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /** Performs the one bounded secret lookup allowed before entering invitation tenancy. */
 final readonly class InvitationTenantBootstrap

@@ -45,7 +45,7 @@ final class SyncUserRolesData extends Data
      */
     public static function rules(): array
     {
-        $roles = Config::string('nvl-auth.tables.roles', AuthTables::Roles);
+        $roles = Config::string('nvl-auth.tables.roles', AuthTables::get(AuthTables::Roles));
 
         return [
             'roles' => ['required', 'array', 'max:100'],

@@ -6,7 +6,7 @@ namespace Nvl\Auth\ValueObjects;
 
 use Carbon\CarbonImmutable;
 use Nvl\Auth\Enums\TenantAuthenticationPurpose;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Carries one server-owned post-authentication tenant-selection retry.

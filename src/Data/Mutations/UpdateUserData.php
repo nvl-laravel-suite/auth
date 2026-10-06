@@ -95,7 +95,7 @@ final class UpdateUserData extends Data
         $userId = isset($payload['_currentUserId']) && is_string($payload['_currentUserId'])
             ? $payload['_currentUserId']
             : null;
-        $table = Config::string('nvl-auth.tables.users', AuthTables::Users);
+        $table = Config::string('nvl-auth.tables.users', AuthTables::get(AuthTables::Users));
         $id = Config::string('nvl-auth.features.principal_management.settings.attributes.id', 'id');
         $email = Config::string('nvl-auth.features.principal_management.settings.attributes.email', 'email');
 

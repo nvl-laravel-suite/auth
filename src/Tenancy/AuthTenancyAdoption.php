@@ -14,11 +14,11 @@ use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Tenancy\Exceptions\TenantBoundaryViolation;
+use Nvl\Support\Tenancy\Exceptions\TenantConfigurationInvalid;
+use Nvl\Support\Tenancy\Services\EffectiveTenantConnection;
 use Nvl\Tenancy\Contracts\TenantAdoptionAdapter;
 use Nvl\Tenancy\Contracts\TenantAdoptionMetadataValidator;
-use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
-use Nvl\Tenancy\Exceptions\TenantConfigurationInvalid;
-use Nvl\Tenancy\Services\EffectiveTenantConnection;
 use Nvl\Tenancy\Services\TenantAdoptionMappings;
 use Nvl\Tenancy\ValueObjects\TenantAdoptionPlan;
 use Nvl\Tenancy\ValueObjects\TenantAssignment;
@@ -72,28 +72,28 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
         $this->migrator->usingConnection($plan->connection, fn () => $this->migrator->run([$path], ['force' => true]));
         $schema = $this->connection($plan)->getSchemaBuilder();
 
-        if ($schema->hasIndex(AuthTables::Roles, 'nvl_auth_roles_name_guard_unique')) {
-            $schema->table(AuthTables::Roles, static function (Blueprint $table): void {
+        if ($schema->hasIndex(AuthTables::get(AuthTables::Roles), 'nvl_auth_roles_name_guard_unique')) {
+            $schema->table(AuthTables::get(AuthTables::Roles), static function (Blueprint $table): void {
                 $table->dropUnique('nvl_auth_roles_name_guard_unique');
             });
         }
-        if (! $schema->hasIndex(AuthTables::Roles, 'nvl_auth_roles_tenant_name_guard_unique')) {
-            $schema->table(AuthTables::Roles, static function (Blueprint $table): void {
+        if (! $schema->hasIndex(AuthTables::get(AuthTables::Roles), 'nvl_auth_roles_tenant_name_guard_unique')) {
+            $schema->table(AuthTables::get(AuthTables::Roles), static function (Blueprint $table): void {
                 $table->unique(['tenant_id', 'name', 'guard_name'], 'nvl_auth_roles_tenant_name_guard_unique');
             });
         }
-        if (! $schema->hasIndex(AuthTables::ModelHasRoles, 'nvl_auth_model_roles_role_id_index')) {
-            $schema->table(AuthTables::ModelHasRoles, static function (Blueprint $table): void {
+        if (! $schema->hasIndex(AuthTables::get(AuthTables::ModelHasRoles), 'nvl_auth_model_roles_role_id_index')) {
+            $schema->table(AuthTables::get(AuthTables::ModelHasRoles), static function (Blueprint $table): void {
                 $table->index('role_id', 'nvl_auth_model_roles_role_id_index');
             });
         }
-        if (! $schema->hasIndex(AuthTables::ModelHasPermissions, 'nvl_auth_model_permissions_permission_id_index')) {
-            $schema->table(AuthTables::ModelHasPermissions, static function (Blueprint $table): void {
+        if (! $schema->hasIndex(AuthTables::get(AuthTables::ModelHasPermissions), 'nvl_auth_model_permissions_permission_id_index')) {
+            $schema->table(AuthTables::get(AuthTables::ModelHasPermissions), static function (Blueprint $table): void {
                 $table->index('permission_id', 'nvl_auth_model_permissions_permission_id_index');
             });
         }
-        if ($this->primaryColumns($schema, AuthTables::ModelHasPermissions) !== null) {
-            $schema->table(AuthTables::ModelHasPermissions, static function (Blueprint $table): void {
+        if ($this->primaryColumns($schema, AuthTables::get(AuthTables::ModelHasPermissions)) !== null) {
+            $schema->table(AuthTables::get(AuthTables::ModelHasPermissions), static function (Blueprint $table): void {
                 $table->dropPrimary('nvl_auth_model_permissions_primary');
                 $table->unique(
                     ['tenant_id', 'permission_id', 'model_id', 'model_type'],
@@ -151,58 +151,58 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
         $connection = $this->connection($plan);
         $schema = $connection->getSchemaBuilder();
         $errors = [];
-        foreach ([AuthTables::TenantMemberships, AuthTables::TenantMembershipLocks, AuthTables::TenantAuthenticationIntents] as $table) {
+        foreach ([AuthTables::get(AuthTables::TenantMemberships), AuthTables::get(AuthTables::TenantMembershipLocks), AuthTables::get(AuthTables::TenantAuthenticationIntents)] as $table) {
             if (! $schema->hasTable($table)) {
                 $errors[] = $table.'.missing';
             }
         }
-        foreach ([AuthTables::Roles, AuthTables::ModelHasRoles, AuthTables::ModelHasPermissions] as $table) {
+        foreach ([AuthTables::get(AuthTables::Roles), AuthTables::get(AuthTables::ModelHasRoles), AuthTables::get(AuthTables::ModelHasPermissions)] as $table) {
             if (! $schema->hasColumn($table, 'tenant_id')) {
                 $errors[] = $table.'.tenant_id';
             }
         }
-        foreach ([AuthTables::Invitations, AuthTables::PersonalAccessTokens, AuthTables::Challenges, AuthTables::Audits] as $table) {
+        foreach ([AuthTables::get(AuthTables::Invitations), AuthTables::get(AuthTables::PersonalAccessTokens), AuthTables::get(AuthTables::Challenges), AuthTables::get(AuthTables::Audits)] as $table) {
             if ($schema->hasTable($table) && ! $schema->hasColumns($table, ['tenant_id', 'ownership_key'])) {
                 $errors[] = $table.'.ownership';
             }
         }
-        if ($schema->hasTable(AuthTables::TenantMemberships)
-            && ! $schema->hasIndex(AuthTables::TenantMemberships, ['tenant_id', 'subject_type', 'subject_id'], 'unique')) {
-            $errors[] = AuthTables::TenantMemberships.'.identity';
+        if ($schema->hasTable(AuthTables::get(AuthTables::TenantMemberships))
+            && ! $schema->hasIndex(AuthTables::get(AuthTables::TenantMemberships), ['tenant_id', 'subject_type', 'subject_id'], 'unique')) {
+            $errors[] = AuthTables::get(AuthTables::TenantMemberships).'.identity';
         }
-        foreach ([AuthTables::Roles, AuthTables::ModelHasRoles, AuthTables::ModelHasPermissions] as $table) {
+        foreach ([AuthTables::get(AuthTables::Roles), AuthTables::get(AuthTables::ModelHasRoles), AuthTables::get(AuthTables::ModelHasPermissions)] as $table) {
             if ($schema->hasTable($table) && $connection->table($table)->whereNull('tenant_id')->exists()) {
                 $errors[] = $table.'.unmapped';
             }
         }
-        if ($schema->hasTable(AuthTables::Invitations)
-            && $connection->table(AuthTables::Invitations)->whereNull('tenant_id')->whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '>', now())->exists()) {
-            $errors[] = AuthTables::Invitations.'.live_unmapped';
+        if ($schema->hasTable(AuthTables::get(AuthTables::Invitations))
+            && $connection->table(AuthTables::get(AuthTables::Invitations))->whereNull('tenant_id')->whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '>', now())->exists()) {
+            $errors[] = AuthTables::get(AuthTables::Invitations).'.live_unmapped';
         }
-        if ($schema->hasTable(AuthTables::PersonalAccessTokens)
-            && $connection->table(AuthTables::PersonalAccessTokens)->whereNull('tenant_id')->exists()) {
-            $errors[] = AuthTables::PersonalAccessTokens.'.unbound';
+        if ($schema->hasTable(AuthTables::get(AuthTables::PersonalAccessTokens))
+            && $connection->table(AuthTables::get(AuthTables::PersonalAccessTokens))->whereNull('tenant_id')->exists()) {
+            $errors[] = AuthTables::get(AuthTables::PersonalAccessTokens).'.unbound';
         }
-        if ($schema->hasTable(AuthTables::TenantMemberships)) {
-            foreach ($connection->table(AuthTables::TenantMemberships)->where('status', 'active')->distinct()->pluck('tenant_id') as $tenantId) {
-                if (! is_string($tenantId) || ! $connection->table(AuthTables::TenantMemberships)
+        if ($schema->hasTable(AuthTables::get(AuthTables::TenantMemberships))) {
+            foreach ($connection->table(AuthTables::get(AuthTables::TenantMemberships))->where('status', 'active')->distinct()->pluck('tenant_id') as $tenantId) {
+                if (! is_string($tenantId) || ! $connection->table(AuthTables::get(AuthTables::TenantMemberships))
                     ->where('tenant_id', $tenantId)->where('status', 'active')->where('is_owner', true)->exists()) {
-                    $errors[] = AuthTables::TenantMemberships.'.owner_missing';
+                    $errors[] = AuthTables::get(AuthTables::TenantMemberships).'.owner_missing';
                     break;
                 }
             }
         }
-        if ($schema->hasTable(AuthTables::Roles) && $connection->table(AuthTables::Roles.' as child')
-            ->join(AuthTables::Roles.' as parent', 'parent.id', '=', 'child.parent_id')
+        if ($schema->hasTable(AuthTables::get(AuthTables::Roles)) && $connection->table(AuthTables::get(AuthTables::Roles).' as child')
+            ->join(AuthTables::get(AuthTables::Roles).' as parent', 'parent.id', '=', 'child.parent_id')
             ->whereColumn('parent.tenant_id', '!=', 'child.tenant_id')->exists()) {
-            $errors[] = AuthTables::Roles.'.parent_tenant';
+            $errors[] = AuthTables::get(AuthTables::Roles).'.parent_tenant';
         }
-        if ($schema->hasTable(AuthTables::ModelHasRoles) && $connection->table(AuthTables::ModelHasRoles.' as pivot')
-            ->join(AuthTables::Roles.' as role', 'role.id', '=', 'pivot.role_id')
+        if ($schema->hasTable(AuthTables::get(AuthTables::ModelHasRoles)) && $connection->table(AuthTables::get(AuthTables::ModelHasRoles).' as pivot')
+            ->join(AuthTables::get(AuthTables::Roles).' as role', 'role.id', '=', 'pivot.role_id')
             ->whereColumn('role.tenant_id', '!=', 'pivot.tenant_id')->exists()) {
-            $errors[] = AuthTables::ModelHasRoles.'.role_tenant';
+            $errors[] = AuthTables::get(AuthTables::ModelHasRoles).'.role_tenant';
         }
-        foreach ([AuthTables::Invitations, AuthTables::PersonalAccessTokens, AuthTables::Challenges, AuthTables::Audits] as $table) {
+        foreach ([AuthTables::get(AuthTables::Invitations), AuthTables::get(AuthTables::PersonalAccessTokens), AuthTables::get(AuthTables::Challenges), AuthTables::get(AuthTables::Audits)] as $table) {
             if ($schema->hasTable($table) && $this->hasInvalidOwnership($connection, $table)) {
                 $errors[] = $table.'.ownership_invalid';
             }
@@ -220,23 +220,23 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
             throw new TenantBoundaryViolation('Auth tenant schema did not verify before activation.');
         }
 
-        if (! $schema->hasIndex(AuthTables::Roles, 'nvl_auth_roles_tenant_id_unique')) {
-            $schema->table(AuthTables::Roles, static function (Blueprint $table): void {
+        if (! $schema->hasIndex(AuthTables::get(AuthTables::Roles), 'nvl_auth_roles_tenant_id_unique')) {
+            $schema->table(AuthTables::get(AuthTables::Roles), static function (Blueprint $table): void {
                 $table->unique(['tenant_id', 'id'], 'nvl_auth_roles_tenant_id_unique');
             });
         }
-        foreach ([AuthTables::Roles, AuthTables::ModelHasRoles, AuthTables::ModelHasPermissions] as $table) {
+        foreach ([AuthTables::get(AuthTables::Roles), AuthTables::get(AuthTables::ModelHasRoles), AuthTables::get(AuthTables::ModelHasPermissions)] as $table) {
             $schema->table($table, static function (Blueprint $blueprint): void {
                 $blueprint->uuid('tenant_id')->nullable(false)->change();
             });
         }
-        $this->replacePivotPrimary($schema, AuthTables::ModelHasRoles, ['tenant_id', 'role_id', 'model_id', 'model_type'], 'nvl_auth_model_roles_primary');
-        if ($schema->hasIndex(AuthTables::ModelHasPermissions, 'nvl_auth_model_permissions_tenant_unique')) {
-            $schema->table(AuthTables::ModelHasPermissions, static function (Blueprint $table): void {
+        $this->replacePivotPrimary($schema, AuthTables::get(AuthTables::ModelHasRoles), ['tenant_id', 'role_id', 'model_id', 'model_type'], 'nvl_auth_model_roles_primary');
+        if ($schema->hasIndex(AuthTables::get(AuthTables::ModelHasPermissions), 'nvl_auth_model_permissions_tenant_unique')) {
+            $schema->table(AuthTables::get(AuthTables::ModelHasPermissions), static function (Blueprint $table): void {
                 $table->dropUnique('nvl_auth_model_permissions_tenant_unique');
             });
         }
-        $this->replacePivotPrimary($schema, AuthTables::ModelHasPermissions, ['tenant_id', 'permission_id', 'model_id', 'model_type'], 'nvl_auth_model_permissions_primary');
+        $this->replacePivotPrimary($schema, AuthTables::get(AuthTables::ModelHasPermissions), ['tenant_id', 'permission_id', 'model_id', 'model_type'], 'nvl_auth_model_permissions_primary');
 
         $this->configuration->set('permission.teams', true);
         $this->configuration->set('permission.column_names.team_foreign_key', 'tenant_id');
@@ -271,11 +271,11 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
         }
         $connection = $this->connectionForModels();
         $timestamp = now();
-        $connection->table(AuthTables::TenantMembershipLocks)->updateOrInsert(
+        $connection->table(AuthTables::get(AuthTables::TenantMembershipLocks))->updateOrInsert(
             ['tenant_id' => $assignment->tenantId->value],
             ['created_at' => $timestamp, 'updated_at' => $timestamp],
         );
-        $connection->table(AuthTables::TenantMemberships)->updateOrInsert(
+        $connection->table(AuthTables::get(AuthTables::TenantMemberships))->updateOrInsert(
             ['id' => $assignment->recordId],
             [
                 'tenant_id' => $assignment->tenantId->value,
@@ -295,11 +295,11 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
     {
         $connection = $this->connection($plan);
         $sourceId = $this->roleSourceId($assignment);
-        $source = $connection->table(AuthTables::Roles)->where('id', $sourceId)->first();
+        $source = $connection->table(AuthTables::get(AuthTables::Roles))->where('id', $sourceId)->first();
         if ($source === null) {
             throw new TenantBoundaryViolation('A reviewed Auth role source is unavailable.');
         }
-        $connection->table(AuthTables::Roles)->updateOrInsert(
+        $connection->table(AuthTables::get(AuthTables::Roles))->updateOrInsert(
             ['id' => $assignment->recordId],
             [
                 'tenant_id' => $assignment->tenantId->value,
@@ -315,8 +315,8 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
                 'updated_at' => now(),
             ],
         );
-        foreach ($connection->table(AuthTables::RoleHasPermissions)->where('role_id', $sourceId)->pluck('permission_id') as $permissionId) {
-            $connection->table(AuthTables::RoleHasPermissions)->insertOrIgnore([
+        foreach ($connection->table(AuthTables::get(AuthTables::RoleHasPermissions))->where('role_id', $sourceId)->pluck('permission_id') as $permissionId) {
+            $connection->table(AuthTables::get(AuthTables::RoleHasPermissions))->insertOrIgnore([
                 'permission_id' => $permissionId,
                 'role_id' => $assignment->recordId,
             ]);
@@ -331,11 +331,11 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
         if ($parentId !== null && ! is_string($parentId)) {
             throw new TenantBoundaryViolation('A reviewed Auth role parent is invalid.');
         }
-        if ($parentId !== null && ! $connection->table(AuthTables::Roles)
+        if ($parentId !== null && ! $connection->table(AuthTables::get(AuthTables::Roles))
             ->where('id', $parentId)->where('tenant_id', $assignment->tenantId->value)->exists()) {
             throw new TenantBoundaryViolation('A reviewed Auth role parent is outside the destination tenant.');
         }
-        $connection->table(AuthTables::Roles)->where('id', $assignment->recordId)->update([
+        $connection->table(AuthTables::get(AuthTables::Roles))->where('id', $assignment->recordId)->update([
             'parent_id' => $parentId,
             'updated_at' => now(),
         ]);
@@ -347,10 +347,10 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
         $metadata = $this->membershipMetadata($assignment);
         $connection = $this->connectionForModels();
         foreach ($metadata['role_ids'] as $roleId) {
-            if (! $connection->table(AuthTables::Roles)->where('id', $roleId)->where('tenant_id', $assignment->tenantId->value)->exists()) {
+            if (! $connection->table(AuthTables::get(AuthTables::Roles))->where('id', $roleId)->where('tenant_id', $assignment->tenantId->value)->exists()) {
                 throw new TenantBoundaryViolation('A reviewed membership role is outside the destination tenant.');
             }
-            $connection->table(AuthTables::ModelHasRoles)->insertOrIgnore([
+            $connection->table(AuthTables::get(AuthTables::ModelHasRoles))->insertOrIgnore([
                 'tenant_id' => $assignment->tenantId->value,
                 'role_id' => $roleId,
                 'model_type' => $metadata['subject_type'],
@@ -358,10 +358,10 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
             ]);
         }
         foreach ($metadata['permission_ids'] as $permissionId) {
-            if (! $connection->table(AuthTables::Permissions)->where('id', $permissionId)->exists()) {
+            if (! $connection->table(AuthTables::get(AuthTables::Permissions))->where('id', $permissionId)->exists()) {
                 throw new TenantBoundaryViolation('A reviewed membership permission is unavailable.');
             }
-            $connection->table(AuthTables::ModelHasPermissions)->insertOrIgnore([
+            $connection->table(AuthTables::get(AuthTables::ModelHasPermissions))->insertOrIgnore([
                 'tenant_id' => $assignment->tenantId->value,
                 'permission_id' => $permissionId,
                 'model_type' => $metadata['subject_type'],
@@ -375,7 +375,7 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
     {
         $roleIds = $this->identifierList($assignment->metadata['role_ids'] ?? null);
         $permissionIds = $this->identifierList($assignment->metadata['permission_ids'] ?? null);
-        $query = $this->connectionForModels()->table(AuthTables::Invitations)->where('id', $assignment->recordId)
+        $query = $this->connectionForModels()->table(AuthTables::get(AuthTables::Invitations))->where('id', $assignment->recordId)
             ->whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '>', now());
         if (! (clone $query)->exists()) {
             throw new TenantBoundaryViolation('Only a live unconsumed invitation may receive reviewed tenant ownership.');
@@ -392,7 +392,7 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
     /** Assign one historical audit only when the operator supplied bounded evidence. */
     private function backfillAudit(TenantAssignment $assignment): void
     {
-        $updated = $this->connectionForModels()->table(AuthTables::Audits)->where('id', $assignment->recordId)->update([
+        $updated = $this->connectionForModels()->table(AuthTables::get(AuthTables::Audits))->where('id', $assignment->recordId)->update([
             'tenant_id' => $assignment->tenantId->value,
             'ownership_key' => 'tenant:'.$assignment->tenantId->value,
             'updated_at' => now(),
@@ -412,7 +412,7 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
             $metadata = $this->membershipMetadata($assignment);
             $reviewed[$metadata['subject_type']."\0".$metadata['subject_id']] = true;
         }
-        foreach ([AuthTables::ModelHasRoles, AuthTables::ModelHasPermissions] as $table) {
+        foreach ([AuthTables::get(AuthTables::ModelHasRoles), AuthTables::get(AuthTables::ModelHasPermissions)] as $table) {
             foreach ($connection->table($table)->whereNull('tenant_id')->get(['model_type', 'model_id']) as $pivot) {
                 $modelType = $pivot->model_type;
                 $modelId = $pivot->model_id;
@@ -429,27 +429,27 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
             $this->allAssignments($plan, 'auth.roles'),
         )));
         if ($sourceIds !== []) {
-            $connection->table(AuthTables::Roles)->whereNull('tenant_id')->whereIn('id', $sourceIds)
-                ->whereNotIn('id', $connection->table(AuthTables::ModelHasRoles)->whereNull('tenant_id')->select('role_id'))->delete();
+            $connection->table(AuthTables::get(AuthTables::Roles))->whereNull('tenant_id')->whereIn('id', $sourceIds)
+                ->whereNotIn('id', $connection->table(AuthTables::get(AuthTables::ModelHasRoles))->whereNull('tenant_id')->select('role_id'))->delete();
         }
-        if ($schema->hasTable(AuthTables::PersonalAccessTokens)) {
-            $connection->table(AuthTables::PersonalAccessTokens)->whereNull('tenant_id')->delete();
+        if ($schema->hasTable(AuthTables::get(AuthTables::PersonalAccessTokens))) {
+            $connection->table(AuthTables::get(AuthTables::PersonalAccessTokens))->whereNull('tenant_id')->delete();
         }
-        if ($schema->hasTable(AuthTables::Challenges)) {
-            $connection->table(AuthTables::Challenges)->whereNull('tenant_id')->update([
+        if ($schema->hasTable(AuthTables::get(AuthTables::Challenges))) {
+            $connection->table(AuthTables::get(AuthTables::Challenges))->whereNull('tenant_id')->update([
                 'ownership_key' => 'platform',
                 'revoked_at' => now(),
                 'updated_at' => now(),
             ]);
         }
-        if ($schema->hasTable(AuthTables::Invitations)) {
-            $connection->table(AuthTables::Invitations)->whereNull('tenant_id')
+        if ($schema->hasTable(AuthTables::get(AuthTables::Invitations))) {
+            $connection->table(AuthTables::get(AuthTables::Invitations))->whereNull('tenant_id')
                 ->where(static function (QueryBuilder $query): void {
                     $query->whereNotNull('accepted_at')->orWhereNotNull('revoked_at')->orWhere('expires_at', '<=', now());
                 })->update(['ownership_key' => 'platform', 'updated_at' => now()]);
         }
-        if ($schema->hasTable(AuthTables::Audits)) {
-            $connection->table(AuthTables::Audits)->whereNull('tenant_id')->update([
+        if ($schema->hasTable(AuthTables::get(AuthTables::Audits))) {
+            $connection->table(AuthTables::get(AuthTables::Audits))->whereNull('tenant_id')->update([
                 'ownership_key' => 'platform',
                 'updated_at' => now(),
             ]);

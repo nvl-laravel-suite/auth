@@ -12,7 +12,7 @@ use Nvl\Auth\Enums\TenantAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\ValueObjects\PendingTenantAuthenticationIntent;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 use Throwable;
 
 /**

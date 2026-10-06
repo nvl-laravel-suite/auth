@@ -45,7 +45,7 @@ final class SyncUserPermissionsData extends Data
      */
     public static function rules(): array
     {
-        $permissions = Config::string('nvl-auth.tables.permissions', AuthTables::Permissions);
+        $permissions = Config::string('nvl-auth.tables.permissions', AuthTables::get(AuthTables::Permissions));
 
         return [
             'permissions' => ['required', 'array', 'max:250'],

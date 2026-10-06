@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 use Nvl\Auth\Database\Factories\PersonalAccessTokenFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Support\Config\PackageStorage;
 
 /**
  * Stores Sanctum tokens in the package-owned namespaced token table.
@@ -58,10 +59,6 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
      */
     public function getConnectionName(): ?string
     {
-        $configured = config('nvl-auth.connection');
-
-        return is_string($configured) && trim($configured) !== ''
-            ? trim($configured)
-            : parent::getConnectionName();
+        return PackageStorage::connectionName($this->connection ?? PackageStorage::connection('auth') ?? parent::getConnectionName());
     }
 }

@@ -12,9 +12,9 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\TenantAuthenticationIntent;
 use Nvl\Auth\ValueObjects\IssuedTenantAuthenticationIntent;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\Contracts\TenantDirectory;
-use Nvl\Tenancy\Enums\TenantStatus;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantDirectory;
+use Nvl\Support\Tenancy\Enums\TenantStatus;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /** Issues and atomically consumes short-lived tenant-selection authentication intents. */
 final readonly class TenantAuthenticationIntents

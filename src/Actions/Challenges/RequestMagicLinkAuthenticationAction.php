@@ -16,7 +16,7 @@ use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\TenantAuthenticationChallengeIntents;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Requests an account-bound magic link without disclosing account existence.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Models;
 
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Support\Config\PackageStorage;
 
 /**
  * Stable serialization row retained for the complete lifetime of a tenant.
@@ -29,5 +30,17 @@ final class TenantMembershipLock extends AuthModel
     public function uniqueIds(): array
     {
         return [];
+    }
+
+    /** Resolve the configured package storage table. */
+    public function getTable(): string
+    {
+        return AuthTables::get(AuthTables::TenantMembershipLocks);
+    }
+
+    /** Resolve the package connection through shared infrastructure defaults. */
+    public function getConnectionName(): ?string
+    {
+        return PackageStorage::connectionName($this->connection ?? PackageStorage::connection('auth') ?? parent::getConnectionName());
     }
 }

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Nvl\Auth\Services;
 
 use Closure;
-use Nvl\Tenancy\Contracts\TenantContextParticipant;
-use Nvl\Tenancy\Enums\TenantContextMode;
-use Nvl\Tenancy\ValueObjects\TenantContextSnapshot;
+use Nvl\Support\Tenancy\Contracts\TenantContextParticipant;
+use Nvl\Support\Tenancy\Enums\TenantContextMode;
+use Nvl\Support\Tenancy\ValueObjects\TenantContextSnapshot;
 use Spatie\Permission\PermissionRegistrar;
 use Throwable;
 

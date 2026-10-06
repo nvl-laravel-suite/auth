@@ -10,8 +10,8 @@ use JsonException;
 use Nvl\Auth\Data\Display\InvitationDeliveryData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
-use Nvl\Tenancy\Enums\TenantContextMode;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Enums\TenantContextMode;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Carries a transport-neutral message request to host delivery listeners.

@@ -316,7 +316,7 @@ it('fails closed when an enabled schema remains incomplete after repair', functi
  */
 function authDeliveryBaselineMigration(): AuthSchemaMigration
 {
-    $migration = require dirname(__DIR__, 2).'/database/migrations/2026_08_02_000000_create_nvl_auth_tables.php';
+    $migration = require dirname(__DIR__, 2).'/database/migrations/2026_08_02_000000_nvl_auth_create_nvl_auth_tables.php';
 
     expect($migration)->toBeInstanceOf(Migration::class)
         ->and($migration)->toBeInstanceOf(AuthSchemaMigration::class);
@@ -329,7 +329,7 @@ function authDeliveryBaselineMigration(): AuthSchemaMigration
  */
 function authDeliveryCorrectiveMigration(): AuthSchemaMigration
 {
-    $migration = require dirname(__DIR__, 2).'/database/migrations/2026_08_12_000000_add_auth_delivery_context_columns.php';
+    $migration = require dirname(__DIR__, 2).'/database/migrations/2026_08_12_000000_nvl_auth_add_auth_delivery_context_columns.php';
 
     expect($migration)->toBeInstanceOf(Migration::class)
         ->and($migration)->toBeInstanceOf(AuthSchemaMigration::class);
@@ -342,7 +342,7 @@ function authDeliveryCorrectiveMigration(): AuthSchemaMigration
  */
 function authDeliveryOutcomeMigration(): AuthSchemaMigration
 {
-    $migration = require dirname(__DIR__, 2).'/database/migrations/2026_08_28_000000_add_invitation_delivery_outcomes.php';
+    $migration = require dirname(__DIR__, 2).'/database/migrations/2026_08_28_000000_nvl_auth_add_invitation_delivery_outcomes.php';
 
     expect($migration)->toBeInstanceOf(Migration::class)
         ->and($migration)->toBeInstanceOf(AuthSchemaMigration::class);

@@ -8,10 +8,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Nvl\Auth\Actions\Authentication\CompletePendingTenantAuthenticationIntentAction;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Tenancy\Contracts\TenantHttpResolver;
-use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
-use Nvl\Tenancy\Exceptions\TenantNotFound;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantHttpResolver;
+use Nvl\Support\Tenancy\Exceptions\TenantBoundaryViolation;
+use Nvl\Support\Tenancy\Exceptions\TenantNotFound;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Completes server-owned post-authentication tenant selection.

@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
+use Nvl\Support\Config\PackageStorage;
 
 /**
  * Provides shared connection and UUID behavior for package-owned records.
@@ -32,11 +33,7 @@ abstract class AuthModel extends Model
      */
     public function getConnectionName(): ?string
     {
-        $configured = config('nvl-auth.connection');
-
-        return is_string($configured) && trim($configured) !== ''
-            ? trim($configured)
-            : parent::getConnectionName();
+        return PackageStorage::connectionName($this->connection ?? PackageStorage::connection('auth') ?? parent::getConnectionName());
     }
 
     /**

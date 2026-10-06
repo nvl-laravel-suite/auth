@@ -10,10 +10,10 @@ use Illuminate\Contracts\Auth\Factory;
 use Illuminate\Http\Request;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Services\AuthTenantAdmission;
-use Nvl\Tenancy\Contracts\TenantHttpResolver;
-use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
-use Nvl\Tenancy\Exceptions\TenantInactive;
-use Nvl\Tenancy\Exceptions\TenantNotFound;
+use Nvl\Support\Tenancy\Contracts\TenantHttpResolver;
+use Nvl\Support\Tenancy\Exceptions\TenantBoundaryViolation;
+use Nvl\Support\Tenancy\Exceptions\TenantInactive;
+use Nvl\Support\Tenancy\Exceptions\TenantNotFound;
 use Symfony\Component\HttpFoundation\Response;
 
 /** Verifies Auth membership and token ownership before foundation context entry. */

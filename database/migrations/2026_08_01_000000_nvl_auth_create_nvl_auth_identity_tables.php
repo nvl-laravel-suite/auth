@@ -8,9 +8,16 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Contracts\AuthSchemaMigration;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Support\Config\PackageStorage;
 
 return new class extends Migration implements AuthSchemaMigration
 {
+    /** Use the effective package connection for Laravel's migration transaction. */
+    public function getConnection(): ?string
+    {
+        return PackageStorage::connection('auth');
+    }
+
     /**
      * Create the package-owned principal, RBAC, and Sanctum schema.
      */
@@ -184,14 +191,14 @@ return new class extends Migration implements AuthSchemaMigration
     private function tables(): array
     {
         $defaults = [
-            'users' => AuthTables::Users,
-            'permissions' => AuthTables::Permissions,
-            'roles' => AuthTables::Roles,
-            'model_has_permissions' => AuthTables::ModelHasPermissions,
-            'model_has_roles' => AuthTables::ModelHasRoles,
-            'role_has_permissions' => AuthTables::RoleHasPermissions,
-            'personal_access_tokens' => AuthTables::PersonalAccessTokens,
-            'password_reset_tokens' => AuthTables::PasswordResetTokens,
+            'users' => AuthTables::get(AuthTables::Users),
+            'permissions' => AuthTables::get(AuthTables::Permissions),
+            'roles' => AuthTables::get(AuthTables::Roles),
+            'model_has_permissions' => AuthTables::get(AuthTables::ModelHasPermissions),
+            'model_has_roles' => AuthTables::get(AuthTables::ModelHasRoles),
+            'role_has_permissions' => AuthTables::get(AuthTables::RoleHasPermissions),
+            'personal_access_tokens' => AuthTables::get(AuthTables::PersonalAccessTokens),
+            'password_reset_tokens' => AuthTables::get(AuthTables::PasswordResetTokens),
         ];
         $tables = [];
 

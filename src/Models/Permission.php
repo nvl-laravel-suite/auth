@@ -14,6 +14,7 @@ use Illuminate\Database\Query\Grammars\PostgresGrammar;
 use Nvl\Auth\Database\Factories\PermissionFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Relations\TextCastColumnComparison;
+use Nvl\Support\Config\PackageStorage;
 use Spatie\Permission\Models\Permission as SpatiePermission;
 
 /**
@@ -74,11 +75,7 @@ class Permission extends SpatiePermission
      */
     public function getConnectionName(): ?string
     {
-        $configured = config('nvl-auth.connection');
-
-        return is_string($configured) && trim($configured) !== ''
-            ? trim($configured)
-            : parent::getConnectionName();
+        return PackageStorage::connectionName($this->connection ?? PackageStorage::connection('auth') ?? parent::getConnectionName());
     }
 
     /** Constrain direct inverse assignments to the active team and membership. */
@@ -94,19 +91,19 @@ class Permission extends SpatiePermission
 
         return $relation->whereExists(static function (QueryBuilder $query) use ($principal, $tenant): void {
             $principalKey = $principal->qualifyColumn($principal->getKeyName());
-            $query->selectRaw('1')->from(AuthTables::TenantMemberships);
+            $query->selectRaw('1')->from(AuthTables::get(AuthTables::TenantMemberships));
             if ($query->getGrammar() instanceof PostgresGrammar) {
                 $query->whereRaw(new TextCastColumnComparison(
-                    $query->getGrammar()->wrap(AuthTables::TenantMemberships.'.subject_id'),
+                    $query->getGrammar()->wrap(AuthTables::get(AuthTables::TenantMemberships).'.subject_id'),
                     $query->getGrammar()->wrap($principalKey),
                 ));
             } else {
-                $query->whereColumn(AuthTables::TenantMemberships.'.subject_id', $principalKey);
+                $query->whereColumn(AuthTables::get(AuthTables::TenantMemberships).'.subject_id', $principalKey);
             }
             $query
-                ->where(AuthTables::TenantMemberships.'.subject_type', $principal->getMorphClass())
-                ->where(AuthTables::TenantMemberships.'.tenant_id', $tenant)
-                ->where(AuthTables::TenantMemberships.'.status', 'active');
+                ->where(AuthTables::get(AuthTables::TenantMemberships).'.subject_type', $principal->getMorphClass())
+                ->where(AuthTables::get(AuthTables::TenantMemberships).'.tenant_id', $tenant)
+                ->where(AuthTables::get(AuthTables::TenantMemberships).'.status', 'active');
         });
     }
 

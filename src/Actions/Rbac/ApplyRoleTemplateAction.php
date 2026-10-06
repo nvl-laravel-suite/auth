@@ -21,7 +21,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
 use Nvl\Auth\Services\RoleHierarchy;
 use Nvl\Auth\Services\RoleTemplateRegistry;
-use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /** Creates or updates one role from the canonical template registry. */
 final readonly class ApplyRoleTemplateAction

@@ -19,9 +19,9 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\RbacEntityLocator;
 use Nvl\Auth\Services\RoleHierarchy;
-use Nvl\Tenancy\Contracts\TenantContext;
-use Nvl\Tenancy\Contracts\TenantMembershipAccess;
-use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 
 /** Creates one package role and permission assignment. */
 final readonly class CreateRoleAction

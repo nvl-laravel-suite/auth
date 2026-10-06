@@ -29,11 +29,11 @@ use Nvl\Auth\Services\TenantMembershipAssignments;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\Contracts\TenantMembershipAccess;
-use Nvl\Tenancy\Enums\TenantContextMode;
-use Nvl\Tenancy\Services\TenantBoundary;
-use Nvl\Tenancy\Services\TenantRunner;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Support\Tenancy\Contracts\TenantRunner;
+use Nvl\Support\Tenancy\Enums\TenantContextMode;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Consumes one invitation and optionally applies its Spatie Permission payload.

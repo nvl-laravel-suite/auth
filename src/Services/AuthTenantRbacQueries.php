@@ -12,9 +12,9 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\Contracts\TenantContext;
-use Nvl\Tenancy\Contracts\TenantMembershipAccess;
-use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 
 /** Supplies canonical tenant role queries and assignment principal reloads. */
 final readonly class AuthTenantRbacQueries

@@ -14,7 +14,7 @@ use Nvl\Auth\Enums\InvitationDeliveryStatus;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Services\FeatureGate;
-use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
  * Records one bounded host delivery result against the current invitation message.

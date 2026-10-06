@@ -12,10 +12,10 @@ use Nvl\Auth\Actions\SocialIdentities\StartSocialAuthorizationAction;
 use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\Contracts\TenantHttpResolver;
-use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
-use Nvl\Tenancy\Exceptions\TenantNotFound;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantHttpResolver;
+use Nvl\Support\Tenancy\Exceptions\TenantBoundaryViolation;
+use Nvl\Support\Tenancy\Exceptions\TenantNotFound;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Handles public Socialite authorization and callback transport.

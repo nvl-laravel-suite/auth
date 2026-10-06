@@ -68,6 +68,7 @@ use Nvl\Auth\Models\TenantMembershipLock;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\AuthDoctor;
 use Nvl\Auth\Services\AuthManagementAbilityCatalog;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\AuthSchemaManager;
@@ -98,16 +99,17 @@ use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
 use Nvl\Auth\Tenancy\AuthTenancyAdoption;
 use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
+use Nvl\Support\Doctor\PackageDoctorContributor;
+use Nvl\Support\Providers\TenantServiceProvider;
+use Nvl\Support\Tenancy\Contracts\TenantHttpResolver;
+use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Support\Tenancy\Enums\TenantResourceKind;
+use Nvl\Support\Tenancy\Services\TenantContextParticipants;
+use Nvl\Support\Tenancy\Services\TenantResourceRegistry;
+use Nvl\Support\Tenancy\ValueObjects\TenantResourceDefinition;
 use Nvl\Support\Traits\MergesPackageConfiguration;
-use Nvl\Tenancy\Contracts\TenantHttpResolver;
-use Nvl\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Tenancy\Definitions\Tables\TenancyTables;
-use Nvl\Tenancy\Enums\TenantResourceKind;
-use Nvl\Tenancy\Providers\TenancyServiceProvider;
 use Nvl\Tenancy\Services\TenantAdoptionRegistry;
-use Nvl\Tenancy\Services\TenantContextParticipants;
-use Nvl\Tenancy\Services\TenantResourceRegistry;
-use Nvl\Tenancy\ValueObjects\TenantResourceDefinition;
 use Spatie\Permission\PermissionRegistrar;
 use Throwable;
 
@@ -123,9 +125,11 @@ final class AuthServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        PackageDoctorContributor::register($this->app, 'nvl/auth', fn (): array => array_map(static fn (array $check): array => ['key' => $check['name'], ...$check], $this->app->make(AuthDoctor::class)->inspect()));
+
         $this->mergePackageConfiguration(dirname(__DIR__, 2).'/config/nvl-auth.php', 'nvl-auth');
         $this->app->register(DataServiceProvider::class);
-        $this->app->register(TenancyServiceProvider::class);
+        $this->app->register(TenantServiceProvider::class);
         $this->app->beforeResolving(TenantHttpResolver::class, static function (
             string $abstract,
             array $parameters,
@@ -383,7 +387,7 @@ final class AuthServiceProvider extends ServiceProvider
             if (is_string($broker) && trim($broker) !== '') {
                 $configuration->set(
                     "auth.passwords.{$broker}.table",
-                    $configuration->get('nvl-auth.tables.password_reset_tokens', AuthTables::PasswordResetTokens),
+                    $configuration->get('nvl-auth.tables.password_reset_tokens', AuthTables::get(AuthTables::PasswordResetTokens)),
                 );
                 $connection = $configuration->get('nvl-auth.connection');
 
@@ -407,11 +411,11 @@ final class AuthServiceProvider extends ServiceProvider
             $configuration->get('nvl-auth.features.rbac.models.permission', Permission::class),
         );
         $configuration->set('permission.table_names', [
-            'roles' => $configuration->get('nvl-auth.tables.roles', AuthTables::Roles),
-            'permissions' => $configuration->get('nvl-auth.tables.permissions', AuthTables::Permissions),
-            'model_has_permissions' => $configuration->get('nvl-auth.tables.model_has_permissions', AuthTables::ModelHasPermissions),
-            'model_has_roles' => $configuration->get('nvl-auth.tables.model_has_roles', AuthTables::ModelHasRoles),
-            'role_has_permissions' => $configuration->get('nvl-auth.tables.role_has_permissions', AuthTables::RoleHasPermissions),
+            'roles' => $configuration->get('nvl-auth.tables.roles', AuthTables::get(AuthTables::Roles)),
+            'permissions' => $configuration->get('nvl-auth.tables.permissions', AuthTables::get(AuthTables::Permissions)),
+            'model_has_permissions' => $configuration->get('nvl-auth.tables.model_has_permissions', AuthTables::get(AuthTables::ModelHasPermissions)),
+            'model_has_roles' => $configuration->get('nvl-auth.tables.model_has_roles', AuthTables::get(AuthTables::ModelHasRoles)),
+            'role_has_permissions' => $configuration->get('nvl-auth.tables.role_has_permissions', AuthTables::get(AuthTables::RoleHasPermissions)),
         ]);
         $columnNames = $configuration->get('permission.column_names', []);
         $columnNames = is_array($columnNames) ? $columnNames : [];
@@ -436,8 +440,8 @@ final class AuthServiceProvider extends ServiceProvider
         try {
             $connection = (new Role)->getConnection();
 
-            return $connection->getSchemaBuilder()->hasTable(TenancyTables::InstallationState)
-                && $connection->table(TenancyTables::InstallationState)
+            return $connection->getSchemaBuilder()->hasTable(TenancyTables::get(TenancyTables::InstallationState))
+                && $connection->table(TenancyTables::get(TenancyTables::InstallationState))
                     ->where('resource', 'auth.roles')->where('state', 'active')->exists();
         } catch (Throwable) {
             return false;
@@ -462,7 +466,11 @@ final class AuthServiceProvider extends ServiceProvider
         ] as $resource) {
             $resources->register($resource);
         }
-        $this->app->make(TenantAdoptionRegistry::class)->register('auth', AuthTenancyAdoption::class);
+        $this->app->booted(function (): void {
+            if ($this->app->bound(TenantAdoptionRegistry::class)) {
+                $this->app->make(TenantAdoptionRegistry::class)->register('auth', AuthTenancyAdoption::class);
+            }
+        });
     }
 
     /**

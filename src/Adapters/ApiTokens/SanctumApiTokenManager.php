@@ -22,8 +22,8 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Results\IssuedApiToken;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
-use Nvl\Tenancy\Services\TenantBoundary;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Manages personal access tokens directly in Sanctum's authoritative table.

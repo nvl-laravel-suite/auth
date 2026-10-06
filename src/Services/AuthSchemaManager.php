@@ -86,12 +86,12 @@ final readonly class AuthSchemaManager
 
         if ($apply && $this->configuration->boolean('migrations.enabled', true)) {
             if ($missing !== []) {
-                $this->migration('2026_08_01_000000_create_nvl_auth_identity_tables.php')->up();
-                $this->migration('2026_08_02_000000_create_nvl_auth_tables.php')->up();
+                $this->migration('2026_08_01_000000_nvl_auth_create_nvl_auth_identity_tables.php')->up();
+                $this->migration('2026_08_02_000000_nvl_auth_create_nvl_auth_tables.php')->up();
             }
 
-            $this->migration('2026_08_12_000000_add_auth_delivery_context_columns.php')->up();
-            $this->migration('2026_08_28_000000_add_invitation_delivery_outcomes.php')->up();
+            $this->migration('2026_08_12_000000_nvl_auth_add_auth_delivery_context_columns.php')->up();
+            $this->migration('2026_08_28_000000_nvl_auth_add_invitation_delivery_outcomes.php')->up();
         }
 
         $remaining = array_values(array_filter(
@@ -232,69 +232,69 @@ final readonly class AuthSchemaManager
         $tables = [];
 
         if ($this->enabled(AuthFeature::PrincipalManagement)) {
-            $tables[] = $this->table('users', AuthTables::Users);
+            $tables[] = $this->table('users', AuthTables::get(AuthTables::Users));
         }
 
         if ($this->enabled(AuthFeature::Memberships) && config('tenancy.enabled') === true) {
-            $tables[] = AuthTables::TenantMemberships;
-            $tables[] = AuthTables::TenantMembershipLocks;
-            $tables[] = AuthTables::TenantAuthenticationIntents;
+            $tables[] = AuthTables::get(AuthTables::TenantMemberships);
+            $tables[] = AuthTables::get(AuthTables::TenantMembershipLocks);
+            $tables[] = AuthTables::get(AuthTables::TenantAuthenticationIntents);
         }
 
         if ($this->enabled(AuthFeature::Password)) {
-            $tables[] = $this->table('password_reset_tokens', AuthTables::PasswordResetTokens);
+            $tables[] = $this->table('password_reset_tokens', AuthTables::get(AuthTables::PasswordResetTokens));
         }
 
         if ($this->enabled(AuthFeature::Rbac)) {
             foreach ([
-                'permissions' => AuthTables::Permissions,
-                'roles' => AuthTables::Roles,
-                'model_has_permissions' => AuthTables::ModelHasPermissions,
-                'model_has_roles' => AuthTables::ModelHasRoles,
-                'role_has_permissions' => AuthTables::RoleHasPermissions,
+                'permissions' => AuthTables::get(AuthTables::Permissions),
+                'roles' => AuthTables::get(AuthTables::Roles),
+                'model_has_permissions' => AuthTables::get(AuthTables::ModelHasPermissions),
+                'model_has_roles' => AuthTables::get(AuthTables::ModelHasRoles),
+                'role_has_permissions' => AuthTables::get(AuthTables::RoleHasPermissions),
             ] as $key => $default) {
                 $tables[] = $this->table($key, $default);
             }
         }
 
         if ($this->enabled(AuthFeature::ApiTokens)) {
-            $tables[] = $this->table('personal_access_tokens', AuthTables::PersonalAccessTokens);
+            $tables[] = $this->table('personal_access_tokens', AuthTables::get(AuthTables::PersonalAccessTokens));
         }
 
         if ($this->enabled(AuthFeature::Clients) || $this->enabled(AuthFeature::Audit)) {
-            $tables[] = AuthTables::Clients;
+            $tables[] = AuthTables::get(AuthTables::Clients);
         }
 
         if ($this->enabled(AuthFeature::Clients)) {
-            $tables[] = AuthTables::ClientSessions;
+            $tables[] = AuthTables::get(AuthTables::ClientSessions);
         }
 
         if ($this->enabled(AuthFeature::Invitations)) {
-            $tables[] = AuthTables::Invitations;
+            $tables[] = AuthTables::get(AuthTables::Invitations);
         }
 
         if ($this->enabled(AuthFeature::MagicLinks) || $this->enabled(AuthFeature::SecurityCodes)) {
-            $tables[] = AuthTables::Challenges;
+            $tables[] = AuthTables::get(AuthTables::Challenges);
         }
 
         if ($this->enabled(AuthFeature::Totp)) {
-            $tables[] = AuthTables::TotpCredentials;
+            $tables[] = AuthTables::get(AuthTables::TotpCredentials);
         }
 
         if ($this->enabled(AuthFeature::Passkeys)) {
-            $tables[] = AuthTables::Passkeys;
+            $tables[] = AuthTables::get(AuthTables::Passkeys);
         }
 
         if ($this->enabled(AuthFeature::RecoveryCodes)) {
-            $tables[] = AuthTables::RecoveryCodes;
+            $tables[] = AuthTables::get(AuthTables::RecoveryCodes);
         }
 
         if ($this->enabled(AuthFeature::SocialIdentities)) {
-            $tables[] = AuthTables::SocialIdentities;
+            $tables[] = AuthTables::get(AuthTables::SocialIdentities);
         }
 
         if ($this->enabled(AuthFeature::Audit)) {
-            $tables[] = AuthTables::Audits;
+            $tables[] = AuthTables::get(AuthTables::Audits);
         }
 
         return array_values(array_unique($tables));

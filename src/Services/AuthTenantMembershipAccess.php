@@ -10,10 +10,10 @@ use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\TenantMembership;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\Contracts\TenantDirectory;
-use Nvl\Tenancy\Contracts\TenantMembershipAccess;
-use Nvl\Tenancy\Enums\TenantStatus;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantDirectory;
+use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Support\Tenancy\Enums\TenantStatus;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /** Revalidates persisted active membership without trusting a cache or Gate. */
 final readonly class AuthTenantMembershipAccess implements TenantMembershipAccess

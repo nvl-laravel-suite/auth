@@ -22,7 +22,7 @@ use Nvl\Auth\Services\MutationAuthorizer;
 use Nvl\Auth\Services\TenantMembershipAssignments;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
-use Nvl\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
 
 /** Revokes one tenant membership without mutating the global principal. */
 final readonly class RevokeMembershipAction

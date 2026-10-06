@@ -496,3 +496,36 @@ composer quality
 ## License
 
 NVL Auth is released under the MIT License. See [LICENSE](LICENSE).
+
+## Shared consumer diagnostics
+
+Run `php artisan nvl:doctor --strict --format=json` to combine the read-only checks from loaded NVL package providers. Errors fail the gate, and strict mode also fails warnings. This package's existing Doctor command remains available and uses the same package-owned inspection service.
+
+## Next major: isolated schema identities
+
+Use `nvl-auth.tables.<logical-key>` for every table and `nvl-auth.connection` for its database connection. Null connection inherits `nvl-core.connection`, then Laravel's default. Tables are resolved at runtime by the package table definition helper.
+
+| Logical key | New default | Previous name |
+| --- | --- | --- |
+| `users` | `nvl_auth_users` | `nvl_auth_users` |
+| `roles` | `nvl_auth_roles` | `nvl_auth_roles` |
+| `permissions` | `nvl_auth_permissions` | `nvl_auth_permissions` |
+| `model_has_permissions` | `nvl_auth_model_has_permissions` | `nvl_auth_model_has_permissions` |
+| `model_has_roles` | `nvl_auth_model_has_roles` | `nvl_auth_model_has_roles` |
+| `role_has_permissions` | `nvl_auth_role_has_permissions` | `nvl_auth_role_has_permissions` |
+| `personal_access_tokens` | `nvl_auth_personal_access_tokens` | `nvl_auth_personal_access_tokens` |
+| `password_reset_tokens` | `nvl_auth_password_reset_tokens` | `nvl_auth_password_reset_tokens` |
+| `clients` | `nvl_auth_clients` | `nvl_auth_clients` |
+| `client_sessions` | `nvl_auth_client_sessions` | `nvl_auth_client_sessions` |
+| `invitations` | `nvl_auth_invitations` | `nvl_auth_invitations` |
+| `challenges` | `nvl_auth_challenges` | `nvl_auth_challenges` |
+| `totp_credentials` | `nvl_auth_totp_credentials` | `nvl_auth_totp_credentials` |
+| `passkeys` | `nvl_auth_passkeys` | `nvl_auth_passkeys` |
+| `recovery_codes` | `nvl_auth_recovery_codes` | `nvl_auth_recovery_codes` |
+| `social_identities` | `nvl_auth_social_identities` | `nvl_auth_social_identities` |
+| `audits` | `nvl_auth_audits` | `nvl_auth_audits` |
+| `tenant_memberships` | `nvl_auth_tenant_memberships` | `nvl_auth_tenant_memberships` |
+| `tenant_membership_locks` | `nvl_auth_tenant_membership_locks` | `nvl_auth_tenant_membership_locks` |
+| `tenant_authentication_intents` | `nvl_auth_tenant_authentication_intents` | `nvl_auth_tenant_authentication_intents` |
+
+Migration filenames contain `nvl_auth_`. Existing installations must complete the upgrade in `UPGRADING.md` before running new migrations. A pending creator rejects an existing target before any migration in the batch runs; legacy storage with old history needs an ownership decision.

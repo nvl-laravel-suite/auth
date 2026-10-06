@@ -18,7 +18,7 @@ use Nvl\Auth\Services\MembershipWriter;
 use Nvl\Auth\Services\MutationAuthorizer;
 use Nvl\Auth\Services\TenantMembershipAssignments;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
-use Nvl\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
 
 /** Enrolls or safely reactivates one tenant membership. */
 final readonly class EnrollMembershipAction

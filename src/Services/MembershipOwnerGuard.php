@@ -10,8 +10,8 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\TenantMembership;
 use Nvl\Auth\Models\TenantMembershipLock;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\Services\TenantBoundary;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /** Serializes and protects tenant owner lifecycle transitions. */
 final readonly class MembershipOwnerGuard

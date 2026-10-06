@@ -18,7 +18,7 @@ use Nvl\Auth\Services\MembershipWriter;
 use Nvl\Auth\Services\MutationAuthorizer;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
-use Nvl\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
 
 /** Provisions the first explicitly authorized owner for one tenant. */
 final readonly class ProvisionTenantOwnerAction

@@ -15,7 +15,7 @@ use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\SocialProviderConfiguration;
 use Nvl\Auth\Services\TenantAuthenticationIntents;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 use Throwable;
 
 /**

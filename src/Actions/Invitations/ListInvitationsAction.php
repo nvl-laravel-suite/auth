@@ -13,7 +13,7 @@ use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\SecretHasher;
-use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
  * Lists invitation records after host business authorization.

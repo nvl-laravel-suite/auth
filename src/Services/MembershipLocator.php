@@ -6,7 +6,7 @@ namespace Nvl\Auth\Services;
 
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\TenantMembership;
-use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /** Reloads membership targets through the canonical tenant predicate. */
 final readonly class MembershipLocator

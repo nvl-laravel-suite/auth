@@ -21,9 +21,9 @@ use Nvl\Auth\Models\TenantAuthenticationIntent;
 use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
-use Nvl\Tenancy\Contracts\TenantContext;
-use Nvl\Tenancy\Enums\TenantContextMode;
-use Nvl\Tenancy\Exceptions\TenantContextMissing;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Tenancy\Enums\TenantContextMode;
+use Nvl\Support\Tenancy\Exceptions\TenantContextMissing;
 
 /**
  * Prunes terminal, retention-expired Auth state without deleting audits.

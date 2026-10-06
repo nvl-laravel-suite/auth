@@ -31,7 +31,7 @@ final class CloneRoleData extends Data
     /** @return array<string, mixed> */
     public static function rules(): array
     {
-        $roles = Config::string('nvl-auth.tables.roles', AuthTables::Roles);
+        $roles = Config::string('nvl-auth.tables.roles', AuthTables::get(AuthTables::Roles));
         $guard = Config::string('nvl-auth.features.rbac.settings.guard', 'web');
 
         return [

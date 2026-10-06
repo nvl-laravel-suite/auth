@@ -13,7 +13,7 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\Enums\TenantContextMode;
+use Nvl\Support\Tenancy\Enums\TenantContextMode;
 
 /** Persists an Auth audit against an already-captured ownership context. */
 final readonly class AuthAuditWriter

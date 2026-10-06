@@ -6,7 +6,7 @@ namespace Nvl\Auth\Contracts;
 
 use Nvl\Auth\ValueObjects\PendingTenantAuthenticationIntent;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /** Stores server-only tenant intent state alongside Socialite's authoritative OAuth state. */
 interface TenantAuthenticationSession

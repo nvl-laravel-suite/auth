@@ -69,7 +69,7 @@ final class StorePermissionData extends Data
     /** @return array<string, list<mixed>> */
     public static function rules(): array
     {
-        $permissions = Config::string('nvl-auth.tables.permissions', AuthTables::Permissions);
+        $permissions = Config::string('nvl-auth.tables.permissions', AuthTables::get(AuthTables::Permissions));
         $guard = Config::string('nvl-auth.features.rbac.settings.guard', 'web');
 
         return [

@@ -14,7 +14,7 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
-use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
  * Revokes one invitation as a containment operation.
