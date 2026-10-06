@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\ResendInvitationContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -34,7 +35,7 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
  *
  * @api
  */
-final readonly class ResendInvitationAction
+final readonly class ResendInvitationAction implements ResendInvitationContract
 {
     /**
      * Create the invitation resend use case.

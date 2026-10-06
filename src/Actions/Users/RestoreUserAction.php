@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
+use Nvl\Auth\Contracts\RestoreUserContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\PrincipalChanged;
@@ -25,7 +26,7 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
  *
  * @api
  */
-final readonly class RestoreUserAction
+final readonly class RestoreUserAction implements RestoreUserContract
 {
     /** Create the restoration use case. */
     public function __construct(

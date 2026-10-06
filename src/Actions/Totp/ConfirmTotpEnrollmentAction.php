@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\ConfirmTotpEnrollmentContract;
 use Nvl\Auth\Data\Mutations\ConfirmTotpEnrollmentData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -23,7 +24,7 @@ use SensitiveParameter;
  *
  * @api
  */
-final readonly class ConfirmTotpEnrollmentAction
+final readonly class ConfirmTotpEnrollmentAction implements ConfirmTotpEnrollmentContract
 {
     /**
      * Create the TOTP confirmation use case.

@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Users;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Nvl\Auth\Contracts\ListUsersContract;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -23,7 +24,7 @@ use Nvl\Auth\Services\UserLocator;
  *
  * @api
  */
-final readonly class ListUsersAction
+final readonly class ListUsersAction implements ListUsersContract
 {
     /**
      * Create the principal listing use case.

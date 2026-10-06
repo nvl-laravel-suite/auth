@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\SynchronizeRoleTemplatesContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Services\AuthConfiguration;
@@ -21,7 +22,7 @@ use Spatie\Permission\PermissionRegistrar;
  *
  * @api
  */
-final readonly class SynchronizeRoleTemplatesAction
+final readonly class SynchronizeRoleTemplatesAction implements SynchronizeRoleTemplatesContract
 {
     /**
      * Create the role-template synchronization use case.

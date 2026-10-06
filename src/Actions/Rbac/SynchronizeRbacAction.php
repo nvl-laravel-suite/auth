@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\SynchronizeRbacContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Results\RbacSynchronizationResult;
@@ -23,7 +24,7 @@ use Spatie\Permission\PermissionRegistrar;
  *
  * @api
  */
-final readonly class SynchronizeRbacAction
+final readonly class SynchronizeRbacAction implements SynchronizeRbacContract
 {
     /**
      * Create the complete RBAC synchronization use case.

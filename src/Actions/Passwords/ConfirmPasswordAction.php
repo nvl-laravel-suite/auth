@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Hashing\Hasher;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\BrowserSession;
+use Nvl\Auth\Contracts\ConfirmPasswordContract;
 use Nvl\Auth\Data\Mutations\ConfirmPasswordData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -21,7 +22,7 @@ use SensitiveParameter;
  *
  * @api
  */
-final readonly class ConfirmPasswordAction
+final readonly class ConfirmPasswordAction implements ConfirmPasswordContract
 {
     /**
      * Create the password-confirmation use case.

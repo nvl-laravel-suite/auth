@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Users;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\CreateUserContract;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\StoreUserData;
 use Nvl\Auth\Enums\AuthFeature;
@@ -26,7 +27,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class CreateUserAction
+final readonly class CreateUserAction implements CreateUserContract
 {
     /** Create the principal creation use case. */
     public function __construct(

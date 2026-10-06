@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Nvl\Auth\Contracts;
+
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Collection;
+use Nvl\Auth\Data\Display\RoleOptionData;
+
+/**
+ * Defines the suggest roles use-case boundary.
+ *
+ * @api
+ */
+interface SuggestRolesContract
+{
+    /**
+     * Return defaults for an empty search and no results for a one-character search.
+     *
+     * @return Collection<int, RoleOptionData>
+     */
+    public function execute(
+        Authenticatable $actor,
+        ?string $search = null,
+        ?int $limit = null,
+    ): Collection;
+}

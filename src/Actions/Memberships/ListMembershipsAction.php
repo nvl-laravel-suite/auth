@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Memberships;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Nvl\Auth\Contracts\ListMembershipsContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
@@ -21,7 +22,7 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
  *
  * @api
  */
-final readonly class ListMembershipsAction
+final readonly class ListMembershipsAction implements ListMembershipsContract
 {
     public function __construct(
         private FeatureGate $features,

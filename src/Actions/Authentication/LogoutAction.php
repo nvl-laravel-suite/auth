@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\StatefulGuard;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\BrowserSession;
+use Nvl\Auth\Contracts\LogoutContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -26,7 +27,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class LogoutAction
+final readonly class LogoutAction implements LogoutContract
 {
     /**
      * Create the logout use case.

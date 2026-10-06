@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use LogicException;
+use Nvl\Auth\Contracts\ListPermissionGroupsContract;
 use Nvl\Auth\Data\Display\PermissionGroupData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -22,7 +23,7 @@ use Nvl\Auth\Services\RbacPermissionGroupExpressions;
  *
  * @api
  */
-final readonly class ListPermissionGroupsAction
+final readonly class ListPermissionGroupsAction implements ListPermissionGroupsContract
 {
     /** Create the permission group listing use case. */
     public function __construct(

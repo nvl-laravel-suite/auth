@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\UpdatePermissionContract;
 use Nvl\Auth\Data\Display\PermissionOptionData;
 use Nvl\Auth\Data\Mutations\UpdatePermissionData;
 use Nvl\Auth\Enums\AuthFeature;
@@ -24,7 +25,7 @@ use Nvl\Auth\Services\RbacEntityLocator;
  *
  * @api
  */
-final readonly class UpdatePermissionAction
+final readonly class UpdatePermissionAction implements UpdatePermissionContract
 {
     /** Create the permission update use case. */
     public function __construct(

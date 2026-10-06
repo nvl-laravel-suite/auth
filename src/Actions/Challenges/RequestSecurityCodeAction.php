@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Challenges;
 
 use Carbon\CarbonImmutable;
+use Nvl\Auth\Contracts\RequestSecurityCodeContract;
 use Nvl\Auth\Data\Mutations\RequestSecurityCodeData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
@@ -19,7 +20,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class RequestSecurityCodeAction
+final readonly class RequestSecurityCodeAction implements RequestSecurityCodeContract
 {
     /**
      * Create the security-code request use case.

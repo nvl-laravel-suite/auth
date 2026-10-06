@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\CreateRoleContract;
 use Nvl\Auth\Data\Mutations\StoreRoleData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -28,7 +29,7 @@ use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
  *
  * @api
  */
-final readonly class CreateRoleAction
+final readonly class CreateRoleAction implements CreateRoleContract
 {
     /** Create the role creation use case. */
     public function __construct(

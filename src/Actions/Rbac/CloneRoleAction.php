@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\CloneRoleContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\RbacChanged;
@@ -22,7 +23,7 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
  *
  * @api
  */
-final readonly class CloneRoleAction
+final readonly class CloneRoleAction implements CloneRoleContract
 {
     /** Create the role cloning use case. */
     public function __construct(

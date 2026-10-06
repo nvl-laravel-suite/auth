@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\DeletePermissionContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\RbacChanged;
@@ -22,7 +23,7 @@ use Nvl\Auth\Services\RbacEntityLocator;
  *
  * @api
  */
-final readonly class DeletePermissionAction
+final readonly class DeletePermissionAction implements DeletePermissionContract
 {
     /** Create the permission deletion use case. */
     public function __construct(

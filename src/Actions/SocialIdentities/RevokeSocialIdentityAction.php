@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\RevokeSocialIdentityContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
@@ -20,7 +21,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class RevokeSocialIdentityAction
+final readonly class RevokeSocialIdentityAction implements RevokeSocialIdentityContract
 {
     /**
      * Create the social identity revocation use case.

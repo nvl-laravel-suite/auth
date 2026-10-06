@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\RbacPrincipalAccess;
+use Nvl\Auth\Contracts\SyncUserPermissionsContract;
 use Nvl\Auth\Data\Mutations\SyncUserPermissionsData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -22,7 +23,7 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
  *
  * @api
  */
-final readonly class SyncUserPermissionsAction
+final readonly class SyncUserPermissionsAction implements SyncUserPermissionsContract
 {
     /** Create the permission assignment use case. */
     public function __construct(

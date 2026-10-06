@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\VerifyTotpContract;
 use Nvl\Auth\Data\Mutations\VerifyTotpData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -23,7 +24,7 @@ use SensitiveParameter;
  *
  * @api
  */
-final readonly class VerifyTotpAction
+final readonly class VerifyTotpAction implements VerifyTotpContract
 {
     /**
      * Create the TOTP verification use case.

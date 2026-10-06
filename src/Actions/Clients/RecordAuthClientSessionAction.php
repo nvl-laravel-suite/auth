@@ -10,6 +10,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use JsonException;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\RecordAuthClientSessionContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
@@ -24,7 +25,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class RecordAuthClientSessionAction
+final readonly class RecordAuthClientSessionAction implements RecordAuthClientSessionContract
 {
     /**
      * Create the session-correlation use case.

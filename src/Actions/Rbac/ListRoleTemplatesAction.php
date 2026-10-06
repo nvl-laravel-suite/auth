@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Nvl\Auth\Contracts\ListRoleTemplatesContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Services\FeatureGate;
@@ -16,7 +17,7 @@ use Nvl\Auth\Services\RoleTemplateRegistry;
  *
  * @api
  */
-final readonly class ListRoleTemplatesAction
+final readonly class ListRoleTemplatesAction implements ListRoleTemplatesContract
 {
     /** Create the template listing use case. */
     public function __construct(

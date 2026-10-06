@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Nvl\Auth\Contracts\ShowRoleContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\Role;
@@ -17,7 +18,7 @@ use Nvl\Auth\Services\RbacEntityLocator;
  *
  * @api
  */
-final readonly class ShowRoleAction
+final readonly class ShowRoleAction implements ShowRoleContract
 {
     /** Create the role read use case. */
     public function __construct(

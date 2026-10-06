@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Users;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\DeleteUserContract;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
 use Nvl\Auth\Enums\AuthFeature;
@@ -27,7 +28,7 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
  *
  * @api
  */
-final readonly class DeleteUserAction
+final readonly class DeleteUserAction implements DeleteUserContract
 {
     /** Create the deletion use case. */
     public function __construct(

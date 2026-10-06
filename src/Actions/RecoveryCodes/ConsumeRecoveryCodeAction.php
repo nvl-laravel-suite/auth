@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\ConsumeRecoveryCodeContract;
 use Nvl\Auth\Data\Mutations\ConsumeRecoveryCodeData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -24,7 +25,7 @@ use SensitiveParameter;
  *
  * @api
  */
-final readonly class ConsumeRecoveryCodeAction
+final readonly class ConsumeRecoveryCodeAction implements ConsumeRecoveryCodeContract
 {
     /**
      * Create the recovery-code consumption use case.

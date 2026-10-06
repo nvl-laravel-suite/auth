@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\SynchronizePermissionCatalogContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Services\AuthConfiguration;
@@ -22,7 +23,7 @@ use Spatie\Permission\PermissionRegistrar;
  *
  * @api
  */
-final readonly class SynchronizePermissionCatalogAction
+final readonly class SynchronizePermissionCatalogAction implements SynchronizePermissionCatalogContract
 {
     /**
      * Create the catalog synchronization use case.

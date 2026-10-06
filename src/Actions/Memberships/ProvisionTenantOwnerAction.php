@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Memberships;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\MembershipPrincipalResolver;
+use Nvl\Auth\Contracts\ProvisionTenantOwnerContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\MembershipStatus;
@@ -25,7 +26,7 @@ use Nvl\Support\Tenancy\Contracts\TenantContext;
  *
  * @api
  */
-final readonly class ProvisionTenantOwnerAction
+final readonly class ProvisionTenantOwnerAction implements ProvisionTenantOwnerContract
 {
     public function __construct(
         private FeatureGate $features,

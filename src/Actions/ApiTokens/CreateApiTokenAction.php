@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\ApiTokens;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\CreateApiTokenContract;
 use Nvl\Auth\Data\Mutations\ApiTokenData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -22,7 +23,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class CreateApiTokenAction
+final readonly class CreateApiTokenAction implements CreateApiTokenContract
 {
     /**
      * Create the API-token issuance use case.

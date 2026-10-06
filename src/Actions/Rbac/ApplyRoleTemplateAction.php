@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Contracts\ApplyRoleTemplateContract;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Data\Mutations\ApplyRoleTemplateData;
 use Nvl\Auth\Enums\AuthFeature;
@@ -28,7 +29,7 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
  *
  * @api
  */
-final readonly class ApplyRoleTemplateAction
+final readonly class ApplyRoleTemplateAction implements ApplyRoleTemplateContract
 {
     /** Create the template application use case. */
     public function __construct(

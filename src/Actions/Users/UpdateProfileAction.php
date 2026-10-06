@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use Nvl\Auth\Contracts\AccountConfirmation;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Contracts\UpdateProfileContract;
 use Nvl\Auth\Data\Mutations\UpdateProfileData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
@@ -35,7 +36,7 @@ use Spatie\LaravelData\Optional;
  *
  * @api
  */
-final readonly class UpdateProfileAction
+final readonly class UpdateProfileAction implements UpdateProfileContract
 {
     /** Create the profile mutation use case. */
     public function __construct(

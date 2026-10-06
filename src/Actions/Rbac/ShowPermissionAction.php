@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
+use Nvl\Auth\Contracts\ShowPermissionContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\Permission;
@@ -19,7 +20,7 @@ use Nvl\Auth\Services\RbacEntityLocator;
  *
  * @api
  */
-final readonly class ShowPermissionAction
+final readonly class ShowPermissionAction implements ShowPermissionContract
 {
     /** Create the permission read use case. */
     public function __construct(

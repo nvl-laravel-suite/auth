@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Contracts\AccountConfirmation;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\BrowserSession;
+use Nvl\Auth\Contracts\DeleteOwnAccountContract;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Data\Mutations\DeleteOwnAccountData;
 use Nvl\Auth\Enums\AuthFeature;
@@ -33,7 +34,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class DeleteOwnAccountAction
+final readonly class DeleteOwnAccountAction implements DeleteOwnAccountContract
 {
     /** Create the self-service deletion use case. */
     public function __construct(

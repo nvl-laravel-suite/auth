@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Clients;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Nvl\Auth\Contracts\ShowAuthClientContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\AuthClient;
@@ -16,7 +17,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
  *
  * @api
  */
-final readonly class ShowAuthClientAction
+final readonly class ShowAuthClientAction implements ShowAuthClientContract
 {
     /**
      * Create the client detail use case.

@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\UpdateRoleContract;
 use Nvl\Auth\Data\Mutations\UpdateRoleData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -23,7 +24,7 @@ use Nvl\Auth\Services\RoleHierarchy;
  *
  * @api
  */
-final readonly class UpdateRoleAction
+final readonly class UpdateRoleAction implements UpdateRoleContract
 {
     /** Create the role update use case. */
     public function __construct(

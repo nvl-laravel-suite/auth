@@ -24,13 +24,95 @@ Principal adoption (`nvl-auth.adoption.principal_model.enabled` with explicit `g
 NVL Auth is a reusable Laravel authentication platform with an optional,
 versioned JSON API. It works out of the box with a concrete UUID User model,
 password authentication, profiles, user administration, Spatie Permission,
-Sanctum tokens, invitations, passkeys, and security audit facts. Every model,
-Action, Service, route family, and adapter remains replaceable or extensible.
+Sanctum tokens, invitations, passkeys, and security audit facts. Each
+supported workflow retains its concrete Action and exposes a focused contract
+for host substitution; models and adapters keep their documented extension seams.
 
 It contains no Inertia pages and sends no mail. Message-producing use cases
 dispatch a typed, after-commit `AuthDeliveryRequested` event. Applications may
 consume that event with `nvl/mail-notifications`, Laravel Notifications, SMS,
 push, or another transport without coupling Auth to delivery infrastructure.
+
+## Injecting workflows into host services
+
+Inject `Nvl\Auth\Contracts\<Action name without Action>Contract` for supported
+feature workflows. For example, `ListApiTokensContract`,
+`ListInvitationProjectionsContract`, and `LogoutContract` expose the existing
+Actions' exact `execute()` parameters, defaults, sensitive-parameter attributes,
+and result/PHPDoc types. The invitation contract retains its DTO paginator;
+token listing retains `list<ApiTokenSnapshot>` and logout retains `void`.
+
+```php
+use Illuminate\Contracts\Auth\Authenticatable;
+use Nvl\Auth\Contracts\ListApiTokensContract;
+use Nvl\Auth\Contracts\LogoutContract;
+use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
+
+final readonly class HostAccountScreen
+{
+    public function __construct(
+        private ListApiTokensContract $tokens,
+        private LogoutContract $logout,
+    ) {}
+
+    /** @return list<string> */
+    public function tokenNames(Authenticatable $subject): array
+    {
+        return array_map(
+            static fn (ApiTokenSnapshot $token): string => $token->name,
+            $this->tokens->execute($subject),
+        );
+    }
+
+    public function signOut(): string
+    {
+        $this->logout->execute();
+
+        return '/signed-out';
+    }
+}
+```
+
+In a host test, substitute the interface with a native Mockery mock or an
+anonymous implementation, then resolve and invoke the real host service:
+
+```php
+use Carbon\CarbonImmutable;
+use Nvl\Auth\Contracts\ListApiTokensContract;
+use Nvl\Auth\Contracts\LogoutContract;
+use Nvl\Auth\Models\User;
+use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
+
+$subject = User::factory()->make();
+$tokens = Mockery::mock(ListApiTokensContract::class);
+$tokens->shouldReceive('execute')->once()->with($subject)->andReturn([
+    new ApiTokenSnapshot('token-42', 'Host dashboard', ['profile:read'], null, null, CarbonImmutable::now()),
+]);
+$logout = Mockery::mock(LogoutContract::class);
+$logout->shouldReceive('execute')->once()->withNoArgs()->andReturnNull();
+$this->app->instance(ListApiTokensContract::class, $tokens);
+$this->app->instance(LogoutContract::class, $logout);
+$screen = $this->app->make(HostAccountScreen::class);
+
+expect($screen->tokenNames($subject))->toBe(['Host dashboard']);
+expect($screen->signOut())->toBe('/signed-out');
+```
+
+Focused defaults use transient `bindIf` registrations. Host prebindings remain
+authoritative through provider registration; a later `instance()` replacement
+reaches newly resolved host services. Existing final/readonly Actions remain
+directly resolvable with their original constructors. Existing feature extension
+contracts keep their native singleton/scoped lifetimes and lazy configuration
+validation, with conditional defaults. Internal Action chains retain their
+own concrete dependencies. Host substitution tests isolate application
+orchestration; retain package integration tests for authorization, storage,
+session security, and delivery behavior.
+
+`AdoptPrincipalsAction`, `PruneAuthStateAction`, and
+`Challenges\{IssueChallenge,ConsumeChallenge,ConsumeChallengeById}Action` are
+internal command/helper implementations. Use the documented operational commands
+or complete magic-link/security-code workflows. See [UPGRADING.md](UPGRADING.md)
+for binding precedence and the bounded Core membership fallback exception.
 
 ## Installation
 

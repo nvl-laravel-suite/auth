@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Contracts\AcceptInvitationContract;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\InvitationRecipientProof;
 use Nvl\Auth\Contracts\MembershipPrincipalResolver;
@@ -40,7 +41,7 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
  *
  * @api
  */
-final readonly class AcceptInvitationAction
+final readonly class AcceptInvitationAction implements AcceptInvitationContract
 {
     /**
      * Create the invitation acceptance use case.

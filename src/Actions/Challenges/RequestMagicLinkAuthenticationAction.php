@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Challenges;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthIdentifierResolver;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Contracts\RequestMagicLinkAuthenticationContract;
 use Nvl\Auth\Data\Mutations\RequestMagicLinkData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -27,7 +28,7 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
  *
  * @api
  */
-final readonly class RequestMagicLinkAuthenticationAction
+final readonly class RequestMagicLinkAuthenticationAction implements RequestMagicLinkAuthenticationContract
 {
     /**
      * Create the account-bound magic-link use case.

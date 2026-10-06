@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Contracts\AddRolePermissionsContract;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -20,7 +21,7 @@ use Nvl\Auth\Services\RbacAssignmentService;
  *
  * @api
  */
-final readonly class AddRolePermissionsAction
+final readonly class AddRolePermissionsAction implements AddRolePermissionsContract
 {
     /** Create the additive role permission use case. */
     public function __construct(

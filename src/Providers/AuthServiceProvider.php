@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Providers;
 
+use Closure;
+use Illuminate\Container\Container as LaravelContainer;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Container\Container;
@@ -11,6 +13,122 @@ use Illuminate\Contracts\Http\Kernel as HttpKernelContract;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
+use Nvl\Auth\Actions\ApiTokens\CreateApiTokenAction;
+use Nvl\Auth\Actions\ApiTokens\ListApiTokensAction;
+use Nvl\Auth\Actions\ApiTokens\RevokeAllApiTokensAction;
+use Nvl\Auth\Actions\ApiTokens\RevokeApiTokenAction;
+use Nvl\Auth\Actions\ApiTokens\RotateApiTokenAction;
+use Nvl\Auth\Actions\ApiTokens\UpdateApiTokenAction;
+use Nvl\Auth\Actions\Audit\ListAuthAuditsAction;
+use Nvl\Auth\Actions\Audit\ShowAuthAuditAction;
+use Nvl\Auth\Actions\Authentication\CompletePendingTenantAuthenticationIntentAction;
+use Nvl\Auth\Actions\Authentication\EstablishAuthenticatedSessionAction;
+use Nvl\Auth\Actions\Authentication\LoginAction;
+use Nvl\Auth\Actions\Authentication\LogoutAction;
+use Nvl\Auth\Actions\Authentication\RequestEmailVerificationAction;
+use Nvl\Auth\Actions\Authentication\VerifyEmailAction;
+use Nvl\Auth\Actions\Challenges\ConsumeMagicLinkAction;
+use Nvl\Auth\Actions\Challenges\RequestMagicLinkAction;
+use Nvl\Auth\Actions\Challenges\RequestMagicLinkAuthenticationAction;
+use Nvl\Auth\Actions\Challenges\RequestSecurityCodeAction;
+use Nvl\Auth\Actions\Challenges\RequestSecurityCodeAuthenticationAction;
+use Nvl\Auth\Actions\Challenges\VerifySecurityCodeAction;
+use Nvl\Auth\Actions\Challenges\VerifySecurityCodeAuthenticationAction;
+use Nvl\Auth\Actions\Clients\CreateAuthClientAction;
+use Nvl\Auth\Actions\Clients\DeleteAuthClientAction;
+use Nvl\Auth\Actions\Clients\EndAuthClientSessionAction;
+use Nvl\Auth\Actions\Clients\ListAuthClientsAction;
+use Nvl\Auth\Actions\Clients\RecordAuthClientSessionAction;
+use Nvl\Auth\Actions\Clients\SetAuthClientActiveAction;
+use Nvl\Auth\Actions\Clients\ShowAuthClientAction;
+use Nvl\Auth\Actions\Clients\StartAuthClientAction;
+use Nvl\Auth\Actions\Clients\TouchAuthClientSessionAction;
+use Nvl\Auth\Actions\Clients\UpdateAuthClientAction;
+use Nvl\Auth\Actions\Invitations\AcceptInvitationAction;
+use Nvl\Auth\Actions\Invitations\CreateInvitationAction;
+use Nvl\Auth\Actions\Invitations\FindActiveInvitationAction;
+use Nvl\Auth\Actions\Invitations\ListInvitationProjectionsAction;
+use Nvl\Auth\Actions\Invitations\ListInvitationsAction;
+use Nvl\Auth\Actions\Invitations\PreviewInvitationAction;
+use Nvl\Auth\Actions\Invitations\RecordInvitationDeliveryOutcomeAction;
+use Nvl\Auth\Actions\Invitations\RegisterInvitationAction;
+use Nvl\Auth\Actions\Invitations\ResendInvitationAction;
+use Nvl\Auth\Actions\Invitations\RevokeInvitationAction;
+use Nvl\Auth\Actions\Memberships\EnrollMembershipAction;
+use Nvl\Auth\Actions\Memberships\ListMembershipsAction;
+use Nvl\Auth\Actions\Memberships\ListOwnMembershipsAction;
+use Nvl\Auth\Actions\Memberships\ProvisionTenantOwnerAction;
+use Nvl\Auth\Actions\Memberships\RevokeMembershipAction;
+use Nvl\Auth\Actions\Memberships\SetMembershipStatusAction;
+use Nvl\Auth\Actions\Memberships\ShowMembershipAction;
+use Nvl\Auth\Actions\Memberships\TransferMembershipOwnershipAction;
+use Nvl\Auth\Actions\Passkeys\BeginPasskeyAuthenticationAction;
+use Nvl\Auth\Actions\Passkeys\BeginPasskeyRegistrationAction;
+use Nvl\Auth\Actions\Passkeys\FinishPasskeyAuthenticationAction;
+use Nvl\Auth\Actions\Passkeys\FinishPasskeyRegistrationAction;
+use Nvl\Auth\Actions\Passkeys\RevokePasskeyAction;
+use Nvl\Auth\Actions\Passwords\ConfirmPasswordAction;
+use Nvl\Auth\Actions\Passwords\RequestPasswordResetAction;
+use Nvl\Auth\Actions\Passwords\ResetPasswordAction;
+use Nvl\Auth\Actions\Passwords\UpdatePasswordAction;
+use Nvl\Auth\Actions\Rbac\AddRolePermissionsAction;
+use Nvl\Auth\Actions\Rbac\ApplyRoleTemplateAction;
+use Nvl\Auth\Actions\Rbac\BootstrapRbacAction;
+use Nvl\Auth\Actions\Rbac\CheckRoleNameAvailabilityAction;
+use Nvl\Auth\Actions\Rbac\CloneRoleAction;
+use Nvl\Auth\Actions\Rbac\CreatePermissionAction;
+use Nvl\Auth\Actions\Rbac\CreatePermissionWithRolesAction;
+use Nvl\Auth\Actions\Rbac\CreateRoleAction;
+use Nvl\Auth\Actions\Rbac\DeletePermissionAction;
+use Nvl\Auth\Actions\Rbac\DeleteRoleAction;
+use Nvl\Auth\Actions\Rbac\ListPermissionCatalogAction;
+use Nvl\Auth\Actions\Rbac\ListPermissionGroupsAction;
+use Nvl\Auth\Actions\Rbac\ListPermissionOptionsAction;
+use Nvl\Auth\Actions\Rbac\ListPermissionsAction;
+use Nvl\Auth\Actions\Rbac\ListRoleCatalogAction;
+use Nvl\Auth\Actions\Rbac\ListRoleHierarchyAction;
+use Nvl\Auth\Actions\Rbac\ListRoleOptionsAction;
+use Nvl\Auth\Actions\Rbac\ListRolesAction;
+use Nvl\Auth\Actions\Rbac\ListRoleTemplatesAction;
+use Nvl\Auth\Actions\Rbac\ResolvePermissionIdentifiersAction;
+use Nvl\Auth\Actions\Rbac\ResolveRoleIdentifiersAction;
+use Nvl\Auth\Actions\Rbac\ShowPermissionAction;
+use Nvl\Auth\Actions\Rbac\ShowRbacAnalyticsAction;
+use Nvl\Auth\Actions\Rbac\ShowRoleAction;
+use Nvl\Auth\Actions\Rbac\ShowRoleAnalyticsAction;
+use Nvl\Auth\Actions\Rbac\SuggestPermissionsAction;
+use Nvl\Auth\Actions\Rbac\SuggestRolesAction;
+use Nvl\Auth\Actions\Rbac\SynchronizePermissionCatalogAction;
+use Nvl\Auth\Actions\Rbac\SynchronizeRbacAction;
+use Nvl\Auth\Actions\Rbac\SynchronizeRoleTemplatesAction;
+use Nvl\Auth\Actions\Rbac\SyncRolePermissionsAction;
+use Nvl\Auth\Actions\Rbac\UpdatePermissionAction;
+use Nvl\Auth\Actions\Rbac\UpdateRoleAction;
+use Nvl\Auth\Actions\RecoveryCodes\ConsumeRecoveryCodeAction;
+use Nvl\Auth\Actions\RecoveryCodes\RegenerateRecoveryCodesAction;
+use Nvl\Auth\Actions\RecoveryCodes\RevokeRecoveryCodesAction;
+use Nvl\Auth\Actions\SocialIdentities\CompleteSocialAuthorizationAction;
+use Nvl\Auth\Actions\SocialIdentities\LinkSocialIdentityAction;
+use Nvl\Auth\Actions\SocialIdentities\RevokeSocialIdentityAction;
+use Nvl\Auth\Actions\SocialIdentities\StartSocialAuthorizationAction;
+use Nvl\Auth\Actions\Totp\ConfirmTotpEnrollmentAction;
+use Nvl\Auth\Actions\Totp\RevokeTotpCredentialAction;
+use Nvl\Auth\Actions\Totp\StartTotpEnrollmentAction;
+use Nvl\Auth\Actions\Totp\VerifyTotpAction;
+use Nvl\Auth\Actions\Users\BulkUpdateUsersAction;
+use Nvl\Auth\Actions\Users\CreateUserAction;
+use Nvl\Auth\Actions\Users\DeleteOwnAccountAction;
+use Nvl\Auth\Actions\Users\DeleteUserAction;
+use Nvl\Auth\Actions\Users\ListUsersAction;
+use Nvl\Auth\Actions\Users\RestoreUserAction;
+use Nvl\Auth\Actions\Users\SetUserActiveAction;
+use Nvl\Auth\Actions\Users\ShowProfileAction;
+use Nvl\Auth\Actions\Users\ShowUserAction;
+use Nvl\Auth\Actions\Users\SuggestUsersAction;
+use Nvl\Auth\Actions\Users\SyncUserPermissionsAction;
+use Nvl\Auth\Actions\Users\SyncUserRolesAction;
+use Nvl\Auth\Actions\Users\UpdateProfileAction;
+use Nvl\Auth\Actions\Users\UpdateUserAction;
 use Nvl\Auth\Adapters\ApiTokens\SanctumApiTokenManager;
 use Nvl\Auth\Adapters\Laravel\DisabledTenantHttpResolver;
 use Nvl\Auth\Adapters\Laravel\EloquentAuthSubjectResolver;
@@ -26,33 +144,149 @@ use Nvl\Auth\Console\Commands\AuthDoctorCommand;
 use Nvl\Auth\Console\Commands\InstallAuthSchemaCommand;
 use Nvl\Auth\Console\Commands\ListAuthFeaturesCommand;
 use Nvl\Auth\Console\Commands\PruneAuthStateCommand;
+use Nvl\Auth\Contracts\AcceptInvitationContract;
 use Nvl\Auth\Contracts\AccountConfirmation;
+use Nvl\Auth\Contracts\AddRolePermissionsContract;
 use Nvl\Auth\Contracts\ApiTokenAbilityProvider;
 use Nvl\Auth\Contracts\ApiTokenManager;
+use Nvl\Auth\Contracts\ApplyRoleTemplateContract;
 use Nvl\Auth\Contracts\AuthAuditContextProvider;
 use Nvl\Auth\Contracts\AuthAuditRecorder as AuthAuditRecorderContract;
 use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\AuthIdentifierResolver;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
+use Nvl\Auth\Contracts\BeginPasskeyAuthenticationContract;
+use Nvl\Auth\Contracts\BeginPasskeyRegistrationContract;
+use Nvl\Auth\Contracts\BootstrapRbacContract;
 use Nvl\Auth\Contracts\BrowserSession;
+use Nvl\Auth\Contracts\BulkUpdateUsersContract;
+use Nvl\Auth\Contracts\CheckRoleNameAvailabilityContract;
+use Nvl\Auth\Contracts\CloneRoleContract;
+use Nvl\Auth\Contracts\CompletePendingTenantAuthenticationIntentContract;
+use Nvl\Auth\Contracts\CompleteSocialAuthorizationContract;
+use Nvl\Auth\Contracts\ConfirmPasswordContract;
+use Nvl\Auth\Contracts\ConfirmTotpEnrollmentContract;
+use Nvl\Auth\Contracts\ConsumeMagicLinkContract;
+use Nvl\Auth\Contracts\ConsumeRecoveryCodeContract;
+use Nvl\Auth\Contracts\CreateApiTokenContract;
+use Nvl\Auth\Contracts\CreateAuthClientContract;
+use Nvl\Auth\Contracts\CreateInvitationContract;
+use Nvl\Auth\Contracts\CreatePermissionContract;
+use Nvl\Auth\Contracts\CreatePermissionWithRolesContract;
+use Nvl\Auth\Contracts\CreateRoleContract;
+use Nvl\Auth\Contracts\CreateUserContract;
+use Nvl\Auth\Contracts\DeleteAuthClientContract;
+use Nvl\Auth\Contracts\DeleteOwnAccountContract;
+use Nvl\Auth\Contracts\DeletePermissionContract;
+use Nvl\Auth\Contracts\DeleteRoleContract;
+use Nvl\Auth\Contracts\DeleteUserContract;
+use Nvl\Auth\Contracts\EndAuthClientSessionContract;
+use Nvl\Auth\Contracts\EnrollMembershipContract;
+use Nvl\Auth\Contracts\EstablishAuthenticatedSessionContract;
+use Nvl\Auth\Contracts\FindActiveInvitationContract;
+use Nvl\Auth\Contracts\FinishPasskeyAuthenticationContract;
+use Nvl\Auth\Contracts\FinishPasskeyRegistrationContract;
 use Nvl\Auth\Contracts\InvitationRecipientProof;
 use Nvl\Auth\Contracts\InvitationRegistrationMapper;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
+use Nvl\Auth\Contracts\LinkSocialIdentityContract;
+use Nvl\Auth\Contracts\ListApiTokensContract;
+use Nvl\Auth\Contracts\ListAuthAuditsContract;
+use Nvl\Auth\Contracts\ListAuthClientsContract;
+use Nvl\Auth\Contracts\ListInvitationProjectionsContract;
+use Nvl\Auth\Contracts\ListInvitationsContract;
+use Nvl\Auth\Contracts\ListMembershipsContract;
+use Nvl\Auth\Contracts\ListOwnMembershipsContract;
+use Nvl\Auth\Contracts\ListPermissionCatalogContract;
+use Nvl\Auth\Contracts\ListPermissionGroupsContract;
+use Nvl\Auth\Contracts\ListPermissionOptionsContract;
+use Nvl\Auth\Contracts\ListPermissionsContract;
+use Nvl\Auth\Contracts\ListRoleCatalogContract;
+use Nvl\Auth\Contracts\ListRoleHierarchyContract;
+use Nvl\Auth\Contracts\ListRoleOptionsContract;
+use Nvl\Auth\Contracts\ListRolesContract;
+use Nvl\Auth\Contracts\ListRoleTemplatesContract;
+use Nvl\Auth\Contracts\ListUsersContract;
+use Nvl\Auth\Contracts\LoginContract;
+use Nvl\Auth\Contracts\LogoutContract;
 use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PermissionCatalogProvider;
+use Nvl\Auth\Contracts\PreviewInvitationContract;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
+use Nvl\Auth\Contracts\ProvisionTenantOwnerContract;
 use Nvl\Auth\Contracts\RbacPrincipalAccess;
+use Nvl\Auth\Contracts\RecordAuthClientSessionContract;
+use Nvl\Auth\Contracts\RecordInvitationDeliveryOutcomeContract;
+use Nvl\Auth\Contracts\RegenerateRecoveryCodesContract;
+use Nvl\Auth\Contracts\RegisterInvitationContract;
+use Nvl\Auth\Contracts\RequestEmailVerificationContract;
+use Nvl\Auth\Contracts\RequestMagicLinkAuthenticationContract;
+use Nvl\Auth\Contracts\RequestMagicLinkContract;
+use Nvl\Auth\Contracts\RequestPasswordResetContract;
+use Nvl\Auth\Contracts\RequestSecurityCodeAuthenticationContract;
+use Nvl\Auth\Contracts\RequestSecurityCodeContract;
+use Nvl\Auth\Contracts\ResendInvitationContract;
+use Nvl\Auth\Contracts\ResetPasswordContract;
+use Nvl\Auth\Contracts\ResolvePermissionIdentifiersContract;
+use Nvl\Auth\Contracts\ResolveRoleIdentifiersContract;
+use Nvl\Auth\Contracts\RestoreUserContract;
+use Nvl\Auth\Contracts\RevokeAllApiTokensContract;
+use Nvl\Auth\Contracts\RevokeApiTokenContract;
+use Nvl\Auth\Contracts\RevokeInvitationContract;
+use Nvl\Auth\Contracts\RevokeMembershipContract;
+use Nvl\Auth\Contracts\RevokePasskeyContract;
+use Nvl\Auth\Contracts\RevokeRecoveryCodesContract;
+use Nvl\Auth\Contracts\RevokeSocialIdentityContract;
+use Nvl\Auth\Contracts\RevokeTotpCredentialContract;
 use Nvl\Auth\Contracts\RoleTemplateProvider;
+use Nvl\Auth\Contracts\RotateApiTokenContract;
+use Nvl\Auth\Contracts\SetAuthClientActiveContract;
+use Nvl\Auth\Contracts\SetMembershipStatusContract;
+use Nvl\Auth\Contracts\SetUserActiveContract;
+use Nvl\Auth\Contracts\ShowAuthAuditContract;
+use Nvl\Auth\Contracts\ShowAuthClientContract;
+use Nvl\Auth\Contracts\ShowMembershipContract;
+use Nvl\Auth\Contracts\ShowPermissionContract;
+use Nvl\Auth\Contracts\ShowProfileContract;
+use Nvl\Auth\Contracts\ShowRbacAnalyticsContract;
+use Nvl\Auth\Contracts\ShowRoleAnalyticsContract;
+use Nvl\Auth\Contracts\ShowRoleContract;
+use Nvl\Auth\Contracts\ShowUserContract;
 use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
+use Nvl\Auth\Contracts\StartAuthClientContract;
+use Nvl\Auth\Contracts\StartSocialAuthorizationContract;
+use Nvl\Auth\Contracts\StartTotpEnrollmentContract;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
+use Nvl\Auth\Contracts\SuggestPermissionsContract;
+use Nvl\Auth\Contracts\SuggestRolesContract;
+use Nvl\Auth\Contracts\SuggestUsersContract;
+use Nvl\Auth\Contracts\SynchronizePermissionCatalogContract;
+use Nvl\Auth\Contracts\SynchronizeRbacContract;
+use Nvl\Auth\Contracts\SynchronizeRoleTemplatesContract;
+use Nvl\Auth\Contracts\SyncRolePermissionsContract;
+use Nvl\Auth\Contracts\SyncUserPermissionsContract;
+use Nvl\Auth\Contracts\SyncUserRolesContract;
 use Nvl\Auth\Contracts\SystemMutationAccess;
 use Nvl\Auth\Contracts\TenantAuthenticationSession;
 use Nvl\Auth\Contracts\TenantAwareAuthActivityBridge;
+use Nvl\Auth\Contracts\TouchAuthClientSessionContract;
+use Nvl\Auth\Contracts\TransferMembershipOwnershipContract;
+use Nvl\Auth\Contracts\UpdateApiTokenContract;
+use Nvl\Auth\Contracts\UpdateAuthClientContract;
+use Nvl\Auth\Contracts\UpdatePasswordContract;
+use Nvl\Auth\Contracts\UpdatePermissionContract;
+use Nvl\Auth\Contracts\UpdateProfileContract;
+use Nvl\Auth\Contracts\UpdateRoleContract;
+use Nvl\Auth\Contracts\UpdateUserContract;
+use Nvl\Auth\Contracts\VerifyEmailContract;
+use Nvl\Auth\Contracts\VerifySecurityCodeAuthenticationContract;
+use Nvl\Auth\Contracts\VerifySecurityCodeContract;
+use Nvl\Auth\Contracts\VerifyTotpContract;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Exceptions\AuthException;
@@ -109,12 +343,15 @@ use Nvl\Support\Providers\TenantServiceProvider;
 use Nvl\Support\Tenancy\Contracts\TenantHttpResolver;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Support\Tenancy\Enums\TenantResourceKind;
+use Nvl\Support\Tenancy\Services\DisabledTenantMembershipAccess;
 use Nvl\Support\Tenancy\Services\TenantContextParticipants;
 use Nvl\Support\Tenancy\Services\TenantResourceRegistry;
 use Nvl\Support\Tenancy\ValueObjects\TenantResourceDefinition;
 use Nvl\Support\Traits\MergesPackageConfiguration;
 use Nvl\Support\Traits\RegistersNamespacedResources;
 use Nvl\Tenancy\Services\TenantAdoptionRegistry;
+use ReflectionFunction;
+use ReflectionMethod;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
@@ -161,9 +398,9 @@ final class AuthServiceProvider extends ServiceProvider
         $this->app->scoped(AuthTenantRbacQueries::class);
         $this->app->make(TenantContextParticipants::class)->register(AuthTenantContextParticipant::class);
         $this->registerTenancyResources();
-        $this->app->scoped(BrowserSession::class, LaravelBrowserSession::class);
-        $this->app->scoped(TenantAuthenticationSession::class, LaravelBrowserSession::class);
-        $this->app->singleton(TenantAwareAuthActivityBridge::class, function (Container $container): TenantAwareAuthActivityBridge {
+        $this->app->scopedIf(BrowserSession::class, LaravelBrowserSession::class);
+        $this->app->scopedIf(TenantAuthenticationSession::class, LaravelBrowserSession::class);
+        $this->app->singletonIf(TenantAwareAuthActivityBridge::class, function (Container $container): TenantAwareAuthActivityBridge {
             $bridge = config('nvl-auth.tenancy.activity_bridge', 'disabled');
             if ($bridge === 'disabled') {
                 return new DisabledTenantAwareAuthActivityBridge;
@@ -183,7 +420,7 @@ final class AuthServiceProvider extends ServiceProvider
 
             return $resolved;
         });
-        $this->app->singleton(InvitationRecipientProof::class, function (Container $container): InvitationRecipientProof {
+        $this->app->singletonIf(InvitationRecipientProof::class, function (Container $container): InvitationRecipientProof {
             $proof = config('nvl-auth.tenancy.recipient_proof', 'disabled');
             if ($proof === 'disabled') {
                 return new DisabledInvitationRecipientProof;
@@ -203,7 +440,7 @@ final class AuthServiceProvider extends ServiceProvider
 
             return $resolved;
         });
-        $this->app->scoped(AuthAuditContextProvider::class, LaravelRequestAuditContextProvider::class);
+        $this->app->scopedIf(AuthAuditContextProvider::class, LaravelRequestAuditContextProvider::class);
         $this->app->scoped(AuthAuditRecorder::class);
         $this->app->scoped(AuthAuditWriter::class);
         $this->app->scoped(CentralIdentityAuditRecorder::class);
@@ -308,6 +545,7 @@ final class AuthServiceProvider extends ServiceProvider
             'features.memberships.services.principal_resolver',
             EloquentMembershipPrincipalResolver::class,
         );
+        $this->registerConsumerContracts();
         $this->registerExtensionRegistries();
         $this->app->register(RouteServiceProvider::class);
     }
@@ -320,7 +558,7 @@ final class AuthServiceProvider extends ServiceProvider
         TypeScriptSourceRegistry $typeScriptSources,
     ): void {
         if (config('nvl-tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Memberships)) {
-            $this->app->scoped(TenantMembershipAccess::class, AuthTenantMembershipAccess::class);
+            $this->registerMembershipAccess();
             $kernel = $this->app->make(HttpKernelContract::class);
             $kernel->addToMiddlewarePriorityAfter(AuthenticatesRequests::class, EnsureAuthTenantAccess::class);
         }
@@ -524,10 +762,169 @@ final class AuthServiceProvider extends ServiceProvider
         };
 
         if ($scoped) {
-            $this->app->scoped($contract, $factory);
+            $this->app->scopedIf($contract, $factory);
         } else {
-            $this->app->singleton($contract, $factory);
+            $this->app->singletonIf($contract, $factory);
         }
+    }
+
+    /** Register transient application-facing workflows without replacing host bindings. */
+    private function registerConsumerContracts(): void
+    {
+        foreach ([
+            CreateApiTokenContract::class => CreateApiTokenAction::class,
+            ListApiTokensContract::class => ListApiTokensAction::class,
+            RevokeAllApiTokensContract::class => RevokeAllApiTokensAction::class,
+            RevokeApiTokenContract::class => RevokeApiTokenAction::class,
+            RotateApiTokenContract::class => RotateApiTokenAction::class,
+            UpdateApiTokenContract::class => UpdateApiTokenAction::class,
+            ListAuthAuditsContract::class => ListAuthAuditsAction::class,
+            ShowAuthAuditContract::class => ShowAuthAuditAction::class,
+            CompletePendingTenantAuthenticationIntentContract::class => CompletePendingTenantAuthenticationIntentAction::class,
+            EstablishAuthenticatedSessionContract::class => EstablishAuthenticatedSessionAction::class,
+            LoginContract::class => LoginAction::class,
+            LogoutContract::class => LogoutAction::class,
+            RequestEmailVerificationContract::class => RequestEmailVerificationAction::class,
+            VerifyEmailContract::class => VerifyEmailAction::class,
+            ConsumeMagicLinkContract::class => ConsumeMagicLinkAction::class,
+            RequestMagicLinkContract::class => RequestMagicLinkAction::class,
+            RequestMagicLinkAuthenticationContract::class => RequestMagicLinkAuthenticationAction::class,
+            RequestSecurityCodeContract::class => RequestSecurityCodeAction::class,
+            RequestSecurityCodeAuthenticationContract::class => RequestSecurityCodeAuthenticationAction::class,
+            VerifySecurityCodeContract::class => VerifySecurityCodeAction::class,
+            VerifySecurityCodeAuthenticationContract::class => VerifySecurityCodeAuthenticationAction::class,
+            CreateAuthClientContract::class => CreateAuthClientAction::class,
+            DeleteAuthClientContract::class => DeleteAuthClientAction::class,
+            EndAuthClientSessionContract::class => EndAuthClientSessionAction::class,
+            ListAuthClientsContract::class => ListAuthClientsAction::class,
+            RecordAuthClientSessionContract::class => RecordAuthClientSessionAction::class,
+            SetAuthClientActiveContract::class => SetAuthClientActiveAction::class,
+            ShowAuthClientContract::class => ShowAuthClientAction::class,
+            StartAuthClientContract::class => StartAuthClientAction::class,
+            TouchAuthClientSessionContract::class => TouchAuthClientSessionAction::class,
+            UpdateAuthClientContract::class => UpdateAuthClientAction::class,
+            AcceptInvitationContract::class => AcceptInvitationAction::class,
+            CreateInvitationContract::class => CreateInvitationAction::class,
+            FindActiveInvitationContract::class => FindActiveInvitationAction::class,
+            ListInvitationProjectionsContract::class => ListInvitationProjectionsAction::class,
+            ListInvitationsContract::class => ListInvitationsAction::class,
+            PreviewInvitationContract::class => PreviewInvitationAction::class,
+            RecordInvitationDeliveryOutcomeContract::class => RecordInvitationDeliveryOutcomeAction::class,
+            RegisterInvitationContract::class => RegisterInvitationAction::class,
+            ResendInvitationContract::class => ResendInvitationAction::class,
+            RevokeInvitationContract::class => RevokeInvitationAction::class,
+            EnrollMembershipContract::class => EnrollMembershipAction::class,
+            ListMembershipsContract::class => ListMembershipsAction::class,
+            ListOwnMembershipsContract::class => ListOwnMembershipsAction::class,
+            ProvisionTenantOwnerContract::class => ProvisionTenantOwnerAction::class,
+            RevokeMembershipContract::class => RevokeMembershipAction::class,
+            SetMembershipStatusContract::class => SetMembershipStatusAction::class,
+            ShowMembershipContract::class => ShowMembershipAction::class,
+            TransferMembershipOwnershipContract::class => TransferMembershipOwnershipAction::class,
+            BeginPasskeyAuthenticationContract::class => BeginPasskeyAuthenticationAction::class,
+            BeginPasskeyRegistrationContract::class => BeginPasskeyRegistrationAction::class,
+            FinishPasskeyAuthenticationContract::class => FinishPasskeyAuthenticationAction::class,
+            FinishPasskeyRegistrationContract::class => FinishPasskeyRegistrationAction::class,
+            RevokePasskeyContract::class => RevokePasskeyAction::class,
+            ConfirmPasswordContract::class => ConfirmPasswordAction::class,
+            RequestPasswordResetContract::class => RequestPasswordResetAction::class,
+            ResetPasswordContract::class => ResetPasswordAction::class,
+            UpdatePasswordContract::class => UpdatePasswordAction::class,
+            AddRolePermissionsContract::class => AddRolePermissionsAction::class,
+            ApplyRoleTemplateContract::class => ApplyRoleTemplateAction::class,
+            BootstrapRbacContract::class => BootstrapRbacAction::class,
+            CheckRoleNameAvailabilityContract::class => CheckRoleNameAvailabilityAction::class,
+            CloneRoleContract::class => CloneRoleAction::class,
+            CreatePermissionContract::class => CreatePermissionAction::class,
+            CreatePermissionWithRolesContract::class => CreatePermissionWithRolesAction::class,
+            CreateRoleContract::class => CreateRoleAction::class,
+            DeletePermissionContract::class => DeletePermissionAction::class,
+            DeleteRoleContract::class => DeleteRoleAction::class,
+            ListPermissionCatalogContract::class => ListPermissionCatalogAction::class,
+            ListPermissionGroupsContract::class => ListPermissionGroupsAction::class,
+            ListPermissionOptionsContract::class => ListPermissionOptionsAction::class,
+            ListPermissionsContract::class => ListPermissionsAction::class,
+            ListRoleCatalogContract::class => ListRoleCatalogAction::class,
+            ListRoleHierarchyContract::class => ListRoleHierarchyAction::class,
+            ListRoleOptionsContract::class => ListRoleOptionsAction::class,
+            ListRoleTemplatesContract::class => ListRoleTemplatesAction::class,
+            ListRolesContract::class => ListRolesAction::class,
+            ResolvePermissionIdentifiersContract::class => ResolvePermissionIdentifiersAction::class,
+            ResolveRoleIdentifiersContract::class => ResolveRoleIdentifiersAction::class,
+            ShowPermissionContract::class => ShowPermissionAction::class,
+            ShowRbacAnalyticsContract::class => ShowRbacAnalyticsAction::class,
+            ShowRoleContract::class => ShowRoleAction::class,
+            ShowRoleAnalyticsContract::class => ShowRoleAnalyticsAction::class,
+            SuggestPermissionsContract::class => SuggestPermissionsAction::class,
+            SuggestRolesContract::class => SuggestRolesAction::class,
+            SyncRolePermissionsContract::class => SyncRolePermissionsAction::class,
+            SynchronizePermissionCatalogContract::class => SynchronizePermissionCatalogAction::class,
+            SynchronizeRbacContract::class => SynchronizeRbacAction::class,
+            SynchronizeRoleTemplatesContract::class => SynchronizeRoleTemplatesAction::class,
+            UpdatePermissionContract::class => UpdatePermissionAction::class,
+            UpdateRoleContract::class => UpdateRoleAction::class,
+            ConsumeRecoveryCodeContract::class => ConsumeRecoveryCodeAction::class,
+            RegenerateRecoveryCodesContract::class => RegenerateRecoveryCodesAction::class,
+            RevokeRecoveryCodesContract::class => RevokeRecoveryCodesAction::class,
+            CompleteSocialAuthorizationContract::class => CompleteSocialAuthorizationAction::class,
+            LinkSocialIdentityContract::class => LinkSocialIdentityAction::class,
+            RevokeSocialIdentityContract::class => RevokeSocialIdentityAction::class,
+            StartSocialAuthorizationContract::class => StartSocialAuthorizationAction::class,
+            ConfirmTotpEnrollmentContract::class => ConfirmTotpEnrollmentAction::class,
+            RevokeTotpCredentialContract::class => RevokeTotpCredentialAction::class,
+            StartTotpEnrollmentContract::class => StartTotpEnrollmentAction::class,
+            VerifyTotpContract::class => VerifyTotpAction::class,
+            BulkUpdateUsersContract::class => BulkUpdateUsersAction::class,
+            CreateUserContract::class => CreateUserAction::class,
+            DeleteOwnAccountContract::class => DeleteOwnAccountAction::class,
+            DeleteUserContract::class => DeleteUserAction::class,
+            ListUsersContract::class => ListUsersAction::class,
+            RestoreUserContract::class => RestoreUserAction::class,
+            SetUserActiveContract::class => SetUserActiveAction::class,
+            ShowProfileContract::class => ShowProfileAction::class,
+            ShowUserContract::class => ShowUserAction::class,
+            SuggestUsersContract::class => SuggestUsersAction::class,
+            SyncUserPermissionsContract::class => SyncUserPermissionsAction::class,
+            SyncUserRolesContract::class => SyncUserRolesAction::class,
+            UpdateProfileContract::class => UpdateProfileAction::class,
+            UpdateUserContract::class => UpdateUserAction::class,
+        ] as $contract => $implementation) {
+            $this->app->bindIf($contract, $implementation);
+        }
+    }
+
+    /** Preserve host membership adapters while upgrading only Core's native transient fallback. */
+    private function registerMembershipAccess(): void
+    {
+        $contract = TenantMembershipAccess::class;
+        if ($this->app->isAlias($contract) || $this->app->isShared($contract)) {
+            return;
+        }
+        $binding = $this->app->getBindings()[$contract] ?? null;
+        if ($binding !== null) {
+            if (! is_array($binding)) {
+                return;
+            }
+            $factory = $binding['concrete'] ?? null;
+            if (! $factory instanceof Closure || ($binding['shared'] ?? null) !== false) {
+                return;
+            }
+            $reflection = new ReflectionFunction($factory);
+            $native = new ReflectionMethod(LaravelContainer::class, 'getClosure');
+            if ($reflection->getClosureScopeClass()?->getName() !== LaravelContainer::class
+                || $reflection->getFileName() !== $native->getFileName()
+                || $reflection->getStartLine() <= $native->getStartLine()
+                || $reflection->getEndLine() >= $native->getEndLine()
+                || $reflection->getStaticVariables() !== [
+                    'abstract' => $contract,
+                    'concrete' => DisabledTenantMembershipAccess::class,
+                ]) {
+                return;
+            }
+
+            $this->app->offsetUnset($contract);
+        }
+        $this->app->scopedIf($contract, AuthTenantMembershipAccess::class);
     }
 
     /**

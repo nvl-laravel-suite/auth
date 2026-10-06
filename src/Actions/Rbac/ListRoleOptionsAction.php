@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
+use Nvl\Auth\Contracts\ListRoleOptionsContract;
 use Nvl\Auth\Data\Display\RoleOptionData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -20,7 +21,7 @@ use Nvl\Auth\Services\RbacOptionReadService;
  *
  * @api
  */
-final readonly class ListRoleOptionsAction
+final readonly class ListRoleOptionsAction implements ListRoleOptionsContract
 {
     /** Create the role option listing use case. */
     public function __construct(

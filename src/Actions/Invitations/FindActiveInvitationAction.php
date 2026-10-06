@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Invitations;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use InvalidArgumentException;
+use Nvl\Auth\Contracts\FindActiveInvitationContract;
 use Nvl\Auth\Data\Display\InvitationReadData;
 use Nvl\Auth\Data\Queries\InvitationIndexQueryData;
 use Nvl\Auth\Enums\AuthFeature;
@@ -24,7 +25,7 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
  *
  * @api
  */
-final readonly class FindActiveInvitationAction
+final readonly class FindActiveInvitationAction implements FindActiveInvitationContract
 {
     /**
      * Create the active invitation lookup use case.

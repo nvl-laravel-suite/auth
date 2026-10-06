@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\BootstrapRbacContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Results\RbacSynchronizationResult;
@@ -23,7 +24,7 @@ use Spatie\Permission\PermissionRegistrar;
  *
  * @api
  */
-final readonly class BootstrapRbacAction
+final readonly class BootstrapRbacAction implements BootstrapRbacContract
 {
     /**
      * Create the trusted bootstrap synchronization use case.

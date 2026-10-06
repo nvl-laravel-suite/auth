@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Invitations;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Nvl\Auth\Contracts\ListInvitationProjectionsContract;
 use Nvl\Auth\Data\Display\InvitationReadData;
 use Nvl\Auth\Data\Queries\InvitationIndexQueryData;
 use Nvl\Auth\Enums\AuthFeature;
@@ -19,7 +20,7 @@ use Nvl\Auth\Services\InvitationDeliveryMetadataPolicy;
  *
  * @api
  */
-final readonly class ListInvitationProjectionsAction
+final readonly class ListInvitationProjectionsAction implements ListInvitationProjectionsContract
 {
     /**
      * Create the invitation projection listing use case.

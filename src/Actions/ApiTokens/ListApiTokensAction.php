@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\ApiTokens;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Contracts\ApiTokenManager;
+use Nvl\Auth\Contracts\ListApiTokensContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Services\ApiTokenPolicy;
@@ -17,7 +18,7 @@ use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
  *
  * @api
  */
-final readonly class ListApiTokensAction
+final readonly class ListApiTokensAction implements ListApiTokensContract
 {
     /**
      * Create the token listing use case.

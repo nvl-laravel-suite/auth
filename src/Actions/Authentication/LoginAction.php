@@ -10,6 +10,7 @@ use Illuminate\Contracts\Auth\StatefulGuard;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\BrowserSession;
+use Nvl\Auth\Contracts\LoginContract;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Data\Mutations\LoginData;
@@ -39,7 +40,7 @@ use Throwable;
  *
  * @api
  */
-final readonly class LoginAction
+final readonly class LoginAction implements LoginContract
 {
     /**
      * Create the stateful login use case.

@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\RegenerateRecoveryCodesContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\RecoveryCode;
@@ -23,7 +24,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class RegenerateRecoveryCodesAction
+final readonly class RegenerateRecoveryCodesAction implements RegenerateRecoveryCodesContract
 {
     /**
      * Create the recovery-code regeneration use case.

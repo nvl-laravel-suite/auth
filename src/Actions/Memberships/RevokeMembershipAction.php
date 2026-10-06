@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\MembershipPrincipalResolver;
+use Nvl\Auth\Contracts\RevokeMembershipContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\MembershipStatus;
@@ -29,7 +30,7 @@ use Nvl\Support\Tenancy\Contracts\TenantContext;
  *
  * @api
  */
-final readonly class RevokeMembershipAction
+final readonly class RevokeMembershipAction implements RevokeMembershipContract
 {
     public function __construct(
         private FeatureGate $features,

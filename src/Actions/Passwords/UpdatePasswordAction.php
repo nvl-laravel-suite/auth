@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Contracts\Hashing\Hasher;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\PasswordUpdater;
+use Nvl\Auth\Contracts\UpdatePasswordContract;
 use Nvl\Auth\Data\Mutations\UpdatePasswordData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -22,7 +23,7 @@ use SensitiveParameter;
  *
  * @api
  */
-final readonly class UpdatePasswordAction
+final readonly class UpdatePasswordAction implements UpdatePasswordContract
 {
     /**
      * Create the password-update use case.

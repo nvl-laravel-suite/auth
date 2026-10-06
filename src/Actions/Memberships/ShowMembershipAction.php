@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Memberships;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Nvl\Auth\Contracts\MembershipPrincipalResolver;
+use Nvl\Auth\Contracts\ShowMembershipContract;
 use Nvl\Auth\Data\Display\TenantMembershipData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -21,7 +22,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class ShowMembershipAction
+final readonly class ShowMembershipAction implements ShowMembershipContract
 {
     public function __construct(
         private FeatureGate $features,

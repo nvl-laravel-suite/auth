@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Clients;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Nvl\Auth\Contracts\TouchAuthClientSessionContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
@@ -18,7 +19,7 @@ use Nvl\Auth\Services\SecretHasher;
  *
  * @api
  */
-final readonly class TouchAuthClientSessionAction
+final readonly class TouchAuthClientSessionAction implements TouchAuthClientSessionContract
 {
     /**
      * Create the session touch use case.

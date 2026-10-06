@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Clients;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\CreateAuthClientContract;
 use Nvl\Auth\Data\Mutations\StoreClientData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -19,7 +20,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
  *
  * @api
  */
-final readonly class CreateAuthClientAction
+final readonly class CreateAuthClientAction implements CreateAuthClientContract
 {
     /**
      * Create the client creation use case.

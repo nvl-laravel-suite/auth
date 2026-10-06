@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Nvl\Auth\Contracts\ListPermissionCatalogContract;
 use Nvl\Auth\Data\Display\PermissionListItemData;
 use Nvl\Auth\Data\Display\PermissionOptionData;
 use Nvl\Auth\Data\Queries\PermissionIndexQueryData;
@@ -24,7 +25,7 @@ use Nvl\Auth\Services\RbacPermissionGroupExpressions;
  *
  * @api
  */
-final readonly class ListPermissionCatalogAction
+final readonly class ListPermissionCatalogAction implements ListPermissionCatalogContract
 {
     /** Create the permission catalog use case. */
     public function __construct(

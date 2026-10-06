@@ -14,6 +14,7 @@ use Nvl\Auth\Contracts\InvitationRecipientProof;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Contracts\RegisterInvitationContract;
 use Nvl\Auth\Data\Mutations\AcceptInvitationData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -47,7 +48,7 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
  *
  * @api
  */
-final readonly class RegisterInvitationAction
+final readonly class RegisterInvitationAction implements RegisterInvitationContract
 {
     /** Create the atomic invitation registration use case. */
     public function __construct(

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Audit;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Nvl\Auth\Contracts\ShowAuthAuditContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\AuthAudit;
@@ -17,7 +18,7 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
  *
  * @api
  */
-final readonly class ShowAuthAuditAction
+final readonly class ShowAuthAuditAction implements ShowAuthAuditContract
 {
     /**
      * Create the audit detail use case.

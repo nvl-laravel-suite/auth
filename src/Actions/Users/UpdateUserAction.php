@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Contracts\UpdateUserContract;
 use Nvl\Auth\Data\Mutations\UpdateUserData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -24,7 +25,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class UpdateUserAction
+final readonly class UpdateUserAction implements UpdateUserContract
 {
     /** Create the principal update use case. */
     public function __construct(

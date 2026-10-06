@@ -24,6 +24,32 @@ Use this skill for work involving the `nvl/auth` Laravel package.
 Never add shadow browser-session tables, a notification sender, a delivery outbox,
 or an application-specific model/namespace to Auth.
 
+## Host workflow composition and tests
+
+Inject focused `Nvl\Auth\Contracts\<Action basename without Action>Contract`
+interfaces into host services, such as `ListApiTokensContract`,
+`ListInvitationProjectionsContract`, and `LogoutContract`. Preserve the native
+execute signatures, sensitive parameter attributes, generic DTO/model results,
+and void returns. Substitute an interface through the host container, then
+invoke a real host service; retain package integration coverage for admission,
+authorization, persistence, sessions, and delivery effects. Use factories only
+in tests and treat returned models as documented identity/result handles.
+
+Focused defaults are transient `bindIf` bindings. Existing feature extension
+defaults preserve host prebindings and retain their singleton/scoped lifetimes.
+Late interface replacement reaches newly constructed host services; scoped
+package defaults reset with the next native request/job scope. Keep concrete
+Action constructors and internal Action chains unchanged. Adoption/pruning and
+`Challenges\{IssueChallenge,ConsumeChallenge,ConsumeChallengeById}Action` remain
+internal; use their public commands or complete feature workflows.
+
+For neutral membership access, preserve genuine host adapters. Auth may upgrade
+only Core's exact native unshared disabled fallback, using native factory
+metadata without invocation. Do not replace aliases, instances, custom
+closures/classes or singletons, infer defaults from namespace prefixes, or gate
+replacement on historical transient resolution. See the package README's
+host-injection examples and UPGRADING binding-precedence notes.
+
 ## Implementation rules
 
 1. Read `config/nvl-auth.php` and `FeatureManifest` before changing a feature.

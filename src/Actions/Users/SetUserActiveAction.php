@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
+use Nvl\Auth\Contracts\SetUserActiveContract;
 use Nvl\Auth\Data\Mutations\UpdateUserStatusData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -28,7 +29,7 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
  *
  * @api
  */
-final readonly class SetUserActiveAction
+final readonly class SetUserActiveAction implements SetUserActiveContract
 {
     /** Create the activation use case. */
     public function __construct(

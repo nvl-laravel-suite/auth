@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Challenges;
 
 use Nvl\Auth\Actions\Authentication\EstablishAuthenticatedSessionAction;
+use Nvl\Auth\Contracts\VerifySecurityCodeAuthenticationContract;
 use Nvl\Auth\Data\Mutations\VerifySecurityCodeData;
 use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Enums\AuthFeature;
@@ -24,7 +25,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class VerifySecurityCodeAuthenticationAction
+final readonly class VerifySecurityCodeAuthenticationAction implements VerifySecurityCodeAuthenticationContract
 {
     /** Create the subject-bound passwordless verification use case. */
     public function __construct(

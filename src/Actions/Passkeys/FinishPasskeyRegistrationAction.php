@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\FinishPasskeyRegistrationContract;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Data\Mutations\FinishPasskeyRegistrationData;
 use Nvl\Auth\Enums\AuthFeature;
@@ -28,7 +29,7 @@ use Throwable;
  *
  * @api
  */
-final readonly class FinishPasskeyRegistrationAction
+final readonly class FinishPasskeyRegistrationAction implements FinishPasskeyRegistrationContract
 {
     /**
      * Create the registration completion use case.

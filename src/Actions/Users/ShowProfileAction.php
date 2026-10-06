@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Users;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Nvl\Auth\Contracts\ShowProfileContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -18,7 +19,7 @@ use Nvl\Auth\Services\UserLocator;
  *
  * @api
  */
-final readonly class ShowProfileAction
+final readonly class ShowProfileAction implements ShowProfileContract
 {
     /** Create the profile read use case. */
     public function __construct(

@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\ApiTokens;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\RevokeApiTokenContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Services\ApiTokenPolicy;
@@ -18,7 +19,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class RevokeApiTokenAction
+final readonly class RevokeApiTokenAction implements RevokeApiTokenContract
 {
     /**
      * Create the token revocation use case.

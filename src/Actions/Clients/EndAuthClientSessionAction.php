@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Clients;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\EndAuthClientSessionContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
@@ -19,7 +20,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class EndAuthClientSessionAction
+final readonly class EndAuthClientSessionAction implements EndAuthClientSessionContract
 {
     /**
      * Create the session-end use case.

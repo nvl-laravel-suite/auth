@@ -10,6 +10,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\CreateInvitationContract;
 use Nvl\Auth\Data\Mutations\StoreInvitationData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
@@ -40,7 +41,7 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
  *
  * @api
  */
-final readonly class CreateInvitationAction
+final readonly class CreateInvitationAction implements CreateInvitationContract
 {
     /**
      * Create the invitation issuance use case.

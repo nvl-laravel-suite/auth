@@ -11,6 +11,7 @@ use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\BrowserSession;
+use Nvl\Auth\Contracts\EstablishAuthenticatedSessionContract;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Contracts\TenantAuthenticationSession;
 use Nvl\Auth\Enums\AuthenticationPurpose;
@@ -39,7 +40,7 @@ use Throwable;
  *
  * @api
  */
-final readonly class EstablishAuthenticatedSessionAction
+final readonly class EstablishAuthenticatedSessionAction implements EstablishAuthenticatedSessionContract
 {
     /**
      * Create the session establishment use case.

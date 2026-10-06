@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Clients;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\StartAuthClientContract;
 use Nvl\Auth\Data\Mutations\StartClientAuthData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -22,7 +23,7 @@ use Nvl\Auth\ValueObjects\AuthPipelineContext;
  *
  * @api
  */
-final readonly class StartAuthClientAction
+final readonly class StartAuthClientAction implements StartAuthClientContract
 {
     /**
      * Create the hosted-client start use case.

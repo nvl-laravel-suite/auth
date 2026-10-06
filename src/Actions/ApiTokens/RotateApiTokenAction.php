@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\ApiTokens;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\RotateApiTokenContract;
 use Nvl\Auth\Data\Mutations\ApiTokenData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -20,7 +21,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class RotateApiTokenAction
+final readonly class RotateApiTokenAction implements RotateApiTokenContract
 {
     /**
      * Create the token rotation use case.

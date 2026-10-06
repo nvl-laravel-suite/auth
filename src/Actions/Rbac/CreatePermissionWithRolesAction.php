@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\CreatePermissionWithRolesContract;
 use Nvl\Auth\Data\Display\PermissionOptionData;
 use Nvl\Auth\Data\Mutations\StorePermissionData;
 use Nvl\Auth\Enums\AuthFeature;
@@ -25,7 +26,7 @@ use Nvl\Auth\Services\RbacAssignmentService;
  *
  * @api
  */
-final readonly class CreatePermissionWithRolesAction
+final readonly class CreatePermissionWithRolesAction implements CreatePermissionWithRolesContract
 {
     /** Create the permission and role assignment use case. */
     public function __construct(

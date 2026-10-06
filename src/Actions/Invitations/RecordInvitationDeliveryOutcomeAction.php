@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\RecordInvitationDeliveryOutcomeContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\InvitationDeliveryStatus;
@@ -21,7 +22,7 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
  *
  * @api
  */
-final readonly class RecordInvitationDeliveryOutcomeAction
+final readonly class RecordInvitationDeliveryOutcomeAction implements RecordInvitationDeliveryOutcomeContract
 {
     /**
      * Create the delivery outcome mutation use case.

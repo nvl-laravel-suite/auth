@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Challenges;
 
 use Nvl\Auth\Contracts\AuthIdentifierResolver;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Contracts\RequestSecurityCodeAuthenticationContract;
 use Nvl\Auth\Data\Mutations\RequestSecurityCodeData;
 use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Enums\AuthFeature;
@@ -27,7 +28,7 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
  *
  * @api
  */
-final readonly class RequestSecurityCodeAuthenticationAction
+final readonly class RequestSecurityCodeAuthenticationAction implements RequestSecurityCodeAuthenticationContract
 {
     public function __construct(
         private FeatureGate $features,

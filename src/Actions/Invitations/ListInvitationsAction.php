@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Invitations;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Nvl\Auth\Contracts\ListInvitationsContract;
 use Nvl\Auth\Data\Queries\InvitationIndexQueryData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -20,7 +21,7 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
  *
  * @api
  */
-final readonly class ListInvitationsAction
+final readonly class ListInvitationsAction implements ListInvitationsContract
 {
     /**
      * Create the invitation listing use case.

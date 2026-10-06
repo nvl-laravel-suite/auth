@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\RbacPrincipalAccess;
+use Nvl\Auth\Contracts\SyncUserRolesContract;
 use Nvl\Auth\Data\Mutations\SyncUserRolesData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -22,7 +23,7 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
  *
  * @api
  */
-final readonly class SyncUserRolesAction
+final readonly class SyncUserRolesAction implements SyncUserRolesContract
 {
     /** Create the role assignment use case. */
     public function __construct(

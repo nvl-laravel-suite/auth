@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\SocialIdentities;
 
 use Nvl\Auth\Contracts\SocialIdentityProvider;
+use Nvl\Auth\Contracts\StartSocialAuthorizationContract;
 use Nvl\Auth\Contracts\TenantAuthenticationSession;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
@@ -23,7 +24,7 @@ use Throwable;
  *
  * @api
  */
-final readonly class StartSocialAuthorizationAction
+final readonly class StartSocialAuthorizationAction implements StartSocialAuthorizationContract
 {
     /**
      * Create the social authorization start use case.

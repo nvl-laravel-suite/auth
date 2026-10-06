@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Nvl\Auth\Contracts\ListPermissionsContract;
 use Nvl\Auth\Data\Display\PermissionListItemData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -19,7 +20,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
  *
  * @api
  */
-final readonly class ListPermissionsAction
+final readonly class ListPermissionsAction implements ListPermissionsContract
 {
     /** Create the permission listing use case. */
     public function __construct(

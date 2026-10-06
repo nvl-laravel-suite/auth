@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\SyncRolePermissionsContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\RbacChanged;
@@ -20,7 +21,7 @@ use Nvl\Auth\Services\RbacAssignmentService;
  *
  * @api
  */
-final readonly class SyncRolePermissionsAction
+final readonly class SyncRolePermissionsAction implements SyncRolePermissionsContract
 {
     /** Create the role permission synchronization use case. */
     public function __construct(

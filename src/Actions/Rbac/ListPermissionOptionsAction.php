@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
+use Nvl\Auth\Contracts\ListPermissionOptionsContract;
 use Nvl\Auth\Data\Display\PermissionOptionData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -20,7 +21,7 @@ use Nvl\Auth\Services\RbacOptionReadService;
  *
  * @api
  */
-final readonly class ListPermissionOptionsAction
+final readonly class ListPermissionOptionsAction implements ListPermissionOptionsContract
 {
     /** Create the permission option listing use case. */
     public function __construct(

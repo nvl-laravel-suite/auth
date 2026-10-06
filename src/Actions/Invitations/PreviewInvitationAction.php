@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Actions\Invitations;
 
+use Nvl\Auth\Contracts\PreviewInvitationContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
@@ -19,7 +20,7 @@ use Nvl\Support\Tenancy\Contracts\TenantRunner;
  *
  * @api
  */
-final readonly class PreviewInvitationAction
+final readonly class PreviewInvitationAction implements PreviewInvitationContract
 {
     /**
      * Create the invitation preview use case.

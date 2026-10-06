@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Nvl\Auth\Contracts\ShowRbacAnalyticsContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\Permission;
@@ -19,7 +20,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
  *
  * @api
  */
-final readonly class ShowRbacAnalyticsAction
+final readonly class ShowRbacAnalyticsAction implements ShowRbacAnalyticsContract
 {
     /** Create the analytics use case. */
     public function __construct(

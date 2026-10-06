@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Clients;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\DeleteAuthClientContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\AuthClient;
@@ -18,7 +19,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
  *
  * @api
  */
-final readonly class DeleteAuthClientAction
+final readonly class DeleteAuthClientAction implements DeleteAuthClientContract
 {
     /**
      * Create the client deletion use case.

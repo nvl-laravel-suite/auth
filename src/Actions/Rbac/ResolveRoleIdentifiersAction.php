@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
+use Nvl\Auth\Contracts\ResolveRoleIdentifiersContract;
 use Nvl\Auth\Data\Display\RoleOptionData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -19,7 +20,7 @@ use Nvl\Auth\Services\RbacEntityLocator;
  *
  * @api
  */
-final readonly class ResolveRoleIdentifiersAction
+final readonly class ResolveRoleIdentifiersAction implements ResolveRoleIdentifiersContract
 {
     /** Create the role identifier resolution use case. */
     public function __construct(

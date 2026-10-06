@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Nvl\Auth\Contracts\ListRolesContract;
 use Nvl\Auth\Data\Display\RoleListItemData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -20,7 +21,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
  *
  * @api
  */
-final readonly class ListRolesAction
+final readonly class ListRolesAction implements ListRolesContract
 {
     /** Create the role listing use case. */
     public function __construct(

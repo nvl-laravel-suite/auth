@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
+use Nvl\Auth\Contracts\SuggestPermissionsContract;
 use Nvl\Auth\Data\Display\PermissionOptionData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -20,7 +21,7 @@ use Nvl\Auth\Services\RbacOptionReadService;
  *
  * @api
  */
-final readonly class SuggestPermissionsAction
+final readonly class SuggestPermissionsAction implements SuggestPermissionsContract
 {
     /** Create the permission suggestion use case. */
     public function __construct(

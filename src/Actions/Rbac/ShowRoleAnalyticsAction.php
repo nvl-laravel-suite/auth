@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Contracts\ShowRoleAnalyticsContract;
 use Nvl\Auth\Data\Display\RoleAnalyticsData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -25,7 +26,7 @@ use stdClass;
  *
  * @api
  */
-final readonly class ShowRoleAnalyticsAction
+final readonly class ShowRoleAnalyticsAction implements ShowRoleAnalyticsContract
 {
     /** Create the per-role analytics use case. */
     public function __construct(

@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\BulkUpdateUsersContract;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
 use Nvl\Auth\Data\Mutations\UpdateUserStatusData;
@@ -31,7 +32,7 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
  *
  * @api
  */
-final readonly class BulkUpdateUsersAction
+final readonly class BulkUpdateUsersAction implements BulkUpdateUsersContract
 {
     /** Create the bulk mutation use case. */
     public function __construct(

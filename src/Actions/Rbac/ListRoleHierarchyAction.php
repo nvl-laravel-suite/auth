@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Nvl\Auth\Contracts\ListRoleHierarchyContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Services\AuthModelRegistry;
@@ -18,7 +19,7 @@ use Nvl\Auth\Services\RoleHierarchy;
  *
  * @api
  */
-final readonly class ListRoleHierarchyAction
+final readonly class ListRoleHierarchyAction implements ListRoleHierarchyContract
 {
     /** Create the hierarchy read use case. */
     public function __construct(

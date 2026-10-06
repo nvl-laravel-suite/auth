@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\RevokeRecoveryCodesContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\RecoveryCode;
@@ -19,7 +20,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class RevokeRecoveryCodesAction
+final readonly class RevokeRecoveryCodesAction implements RevokeRecoveryCodesContract
 {
     /**
      * Create the recovery-code revocation use case.

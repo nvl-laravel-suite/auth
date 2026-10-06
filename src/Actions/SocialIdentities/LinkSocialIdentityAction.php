@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\SocialIdentities;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\LinkSocialIdentityContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -23,7 +24,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class LinkSocialIdentityAction
+final readonly class LinkSocialIdentityAction implements LinkSocialIdentityContract
 {
     /**
      * Create the social identity linking use case.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Actions\Challenges;
 
+use Nvl\Auth\Contracts\VerifySecurityCodeContract;
 use Nvl\Auth\Data\Mutations\VerifySecurityCodeData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
@@ -16,7 +17,7 @@ use Nvl\Auth\Services\FeatureGate;
  *
  * @api
  */
-final readonly class VerifySecurityCodeAction
+final readonly class VerifySecurityCodeAction implements VerifySecurityCodeContract
 {
     /**
      * Create the security-code verification use case.

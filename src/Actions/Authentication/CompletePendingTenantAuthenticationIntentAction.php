@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Authentication;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\CompletePendingTenantAuthenticationIntentContract;
 use Nvl\Auth\Contracts\TenantAuthenticationSession;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -24,7 +25,7 @@ use Throwable;
  *
  * @api
  */
-final readonly class CompletePendingTenantAuthenticationIntentAction
+final readonly class CompletePendingTenantAuthenticationIntentAction implements CompletePendingTenantAuthenticationIntentContract
 {
     /** Create the pending tenant-selection use case. */
     public function __construct(

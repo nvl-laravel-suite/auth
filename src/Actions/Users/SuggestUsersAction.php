@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Contracts\SuggestUsersContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\PrincipalAttribute;
@@ -23,7 +24,7 @@ use Nvl\Auth\Services\UserLocator;
  *
  * @api
  */
-final readonly class SuggestUsersAction
+final readonly class SuggestUsersAction implements SuggestUsersContract
 {
     /**
      * Create the suggestion use case.

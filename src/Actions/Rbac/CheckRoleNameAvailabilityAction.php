@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Rbac;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Str;
+use Nvl\Auth\Contracts\CheckRoleNameAvailabilityContract;
 use Nvl\Auth\Data\Display\RoleNameAvailabilityData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -21,7 +22,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
  *
  * @api
  */
-final readonly class CheckRoleNameAvailabilityAction
+final readonly class CheckRoleNameAvailabilityAction implements CheckRoleNameAvailabilityContract
 {
     /** Create the role availability use case. */
     public function __construct(

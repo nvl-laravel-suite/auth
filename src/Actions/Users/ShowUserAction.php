@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Users;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Nvl\Auth\Contracts\ShowUserContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\User;
@@ -17,7 +18,7 @@ use Nvl\Auth\Services\UserLocator;
  *
  * @api
  */
-final readonly class ShowUserAction
+final readonly class ShowUserAction implements ShowUserContract
 {
     /** Create the principal read use case. */
     public function __construct(

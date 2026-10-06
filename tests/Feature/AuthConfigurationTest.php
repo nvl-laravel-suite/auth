@@ -134,7 +134,7 @@ it('resolves the configured management access implementation through the provide
         'nvl-auth.services.management_access',
         ConfiguredPolicyAuthManagementAccess::class,
     );
-    app()->forgetInstance(AuthManagementAccess::class);
+    app()->offsetUnset(AuthManagementAccess::class);
     (new AuthServiceProvider(app()))->register();
 
     expect(app(AuthManagementAccess::class))

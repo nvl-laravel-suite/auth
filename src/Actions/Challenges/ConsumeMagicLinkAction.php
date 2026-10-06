@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Actions\Challenges;
 
+use Nvl\Auth\Contracts\ConsumeMagicLinkContract;
 use Nvl\Auth\Data\Mutations\ConsumeMagicLinkData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
@@ -16,7 +17,7 @@ use Nvl\Auth\Services\FeatureGate;
  *
  * @api
  */
-final readonly class ConsumeMagicLinkAction
+final readonly class ConsumeMagicLinkAction implements ConsumeMagicLinkContract
 {
     /**
      * Create the magic-link consumption use case.

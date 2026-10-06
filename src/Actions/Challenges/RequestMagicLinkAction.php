@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Actions\Challenges;
 
 use Carbon\CarbonImmutable;
+use Nvl\Auth\Contracts\RequestMagicLinkContract;
 use Nvl\Auth\Data\Mutations\RequestMagicLinkData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
@@ -19,7 +20,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class RequestMagicLinkAction
+final readonly class RequestMagicLinkAction implements RequestMagicLinkContract
 {
     /**
      * Create the magic-link request use case.

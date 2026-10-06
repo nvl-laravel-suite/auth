@@ -13,6 +13,7 @@ use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Contracts\ResetPasswordContract;
 use Nvl\Auth\Data\Mutations\ResetPasswordData;
 use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Enums\AuthFeature;
@@ -30,7 +31,7 @@ use SensitiveParameter;
  *
  * @api
  */
-final readonly class ResetPasswordAction
+final readonly class ResetPasswordAction implements ResetPasswordContract
 {
     /**
      * Create the password reset use case.

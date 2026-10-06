@@ -4,8 +4,13 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Focused execute contracts for supported Auth workflows, with exact existing signatures, generic results and sensitive parameter attributes; host services can substitute interfaces while concrete Actions retain their constructors and behavior.
+
 ### Changed
 
+- Register focused defaults transiently with `bindIf` and existing public extension defaults conditionally with their native lifetimes. Preserve host membership bindings while replacing only Core's exact native unshared disabled fallback when Auth membership enforcement is enabled.
 - Classify the supported consumer PHP surface with explicit source annotations and restrict package model handles to declared identity and in-memory read fields; preserve existing workflow behavior and concrete signatures.
 - Prepare lockstep major 5 with required and development NVL peer floors of `^5.0`. This candidate has not been tagged or published.
 - Default HTTP ingress, principal-model adoption, password-broker storage adoption and Spatie storage adoption to off.

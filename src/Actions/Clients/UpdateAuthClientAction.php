@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Clients;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\UpdateAuthClientContract;
 use Nvl\Auth\Data\Mutations\UpdateClientData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -19,7 +20,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
  *
  * @api
  */
-final readonly class UpdateAuthClientAction
+final readonly class UpdateAuthClientAction implements UpdateAuthClientContract
 {
     /**
      * Create the client update use case.

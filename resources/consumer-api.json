@@ -1166,11 +1166,29 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\AcceptInvitationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/AcceptInvitationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\AccountConfirmation": {
             "kind": "interface",
             "file": "src/Contracts/AccountConfirmation.php",
             "methods": [
                 "assertConfirmed"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\AddRolePermissionsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/AddRolePermissionsContract.php",
+            "methods": [
+                "execute"
             ],
             "properties": [],
             "constants": []
@@ -1194,6 +1212,15 @@
                 "revokeAll",
                 "rotate",
                 "update"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ApplyRoleTemplateContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ApplyRoleTemplateContract.php",
+            "methods": [
+                "execute"
             ],
             "properties": [],
             "constants": []
@@ -1263,6 +1290,33 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\BeginPasskeyAuthenticationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/BeginPasskeyAuthenticationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\BeginPasskeyRegistrationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/BeginPasskeyRegistrationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\BootstrapRbacContract": {
+            "kind": "interface",
+            "file": "src/Contracts/BootstrapRbacContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\BrowserSession": {
             "kind": "interface",
             "file": "src/Contracts/BrowserSession.php",
@@ -1275,11 +1329,434 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\BulkUpdateUsersContract": {
+            "kind": "interface",
+            "file": "src/Contracts/BulkUpdateUsersContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\CheckRoleNameAvailabilityContract": {
+            "kind": "interface",
+            "file": "src/Contracts/CheckRoleNameAvailabilityContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\CloneRoleContract": {
+            "kind": "interface",
+            "file": "src/Contracts/CloneRoleContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\CompletePendingTenantAuthenticationIntentContract": {
+            "kind": "interface",
+            "file": "src/Contracts/CompletePendingTenantAuthenticationIntentContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\CompleteSocialAuthorizationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/CompleteSocialAuthorizationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ConfirmPasswordContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ConfirmPasswordContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ConfirmTotpEnrollmentContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ConfirmTotpEnrollmentContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ConsumeMagicLinkContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ConsumeMagicLinkContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ConsumeRecoveryCodeContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ConsumeRecoveryCodeContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\CreateApiTokenContract": {
+            "kind": "interface",
+            "file": "src/Contracts/CreateApiTokenContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\CreateAuthClientContract": {
+            "kind": "interface",
+            "file": "src/Contracts/CreateAuthClientContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\CreateInvitationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/CreateInvitationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\CreatePermissionContract": {
+            "kind": "interface",
+            "file": "src/Contracts/CreatePermissionContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\CreatePermissionWithRolesContract": {
+            "kind": "interface",
+            "file": "src/Contracts/CreatePermissionWithRolesContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\CreateRoleContract": {
+            "kind": "interface",
+            "file": "src/Contracts/CreateRoleContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\CreateUserContract": {
+            "kind": "interface",
+            "file": "src/Contracts/CreateUserContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\DeleteAuthClientContract": {
+            "kind": "interface",
+            "file": "src/Contracts/DeleteAuthClientContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\DeleteOwnAccountContract": {
+            "kind": "interface",
+            "file": "src/Contracts/DeleteOwnAccountContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\DeletePermissionContract": {
+            "kind": "interface",
+            "file": "src/Contracts/DeletePermissionContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\DeleteRoleContract": {
+            "kind": "interface",
+            "file": "src/Contracts/DeleteRoleContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\DeleteUserContract": {
+            "kind": "interface",
+            "file": "src/Contracts/DeleteUserContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\EndAuthClientSessionContract": {
+            "kind": "interface",
+            "file": "src/Contracts/EndAuthClientSessionContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\EnrollMembershipContract": {
+            "kind": "interface",
+            "file": "src/Contracts/EnrollMembershipContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\EstablishAuthenticatedSessionContract": {
+            "kind": "interface",
+            "file": "src/Contracts/EstablishAuthenticatedSessionContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\FindActiveInvitationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/FindActiveInvitationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\FinishPasskeyAuthenticationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/FinishPasskeyAuthenticationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\FinishPasskeyRegistrationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/FinishPasskeyRegistrationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\InvitationSubjectResolver": {
             "kind": "interface",
             "file": "src/Contracts/InvitationSubjectResolver.php",
             "methods": [
                 "resolve"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\LinkSocialIdentityContract": {
+            "kind": "interface",
+            "file": "src/Contracts/LinkSocialIdentityContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListApiTokensContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListApiTokensContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListAuthAuditsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListAuthAuditsContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListAuthClientsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListAuthClientsContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListInvitationProjectionsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListInvitationProjectionsContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListInvitationsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListInvitationsContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListMembershipsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListMembershipsContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListOwnMembershipsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListOwnMembershipsContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListPermissionCatalogContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListPermissionCatalogContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListPermissionGroupsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListPermissionGroupsContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListPermissionOptionsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListPermissionOptionsContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListPermissionsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListPermissionsContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListRoleCatalogContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListRoleCatalogContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListRoleHierarchyContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListRoleHierarchyContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListRoleOptionsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListRoleOptionsContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListRoleTemplatesContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListRoleTemplatesContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListRolesContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListRolesContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ListUsersContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ListUsersContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\LoginContract": {
+            "kind": "interface",
+            "file": "src/Contracts/LoginContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\LogoutContract": {
+            "kind": "interface",
+            "file": "src/Contracts/LogoutContract.php",
+            "methods": [
+                "execute"
             ],
             "properties": [],
             "constants": []
@@ -1315,6 +1792,15 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\PreviewInvitationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/PreviewInvitationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\PrincipalAttributeMapper": {
             "kind": "interface",
             "file": "src/Contracts/PrincipalAttributeMapper.php",
@@ -1337,6 +1823,15 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\ProvisionTenantOwnerContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ProvisionTenantOwnerContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\RbacPrincipalAccess": {
             "kind": "interface",
             "file": "src/Contracts/RbacPrincipalAccess.php",
@@ -1352,11 +1847,335 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\RecordAuthClientSessionContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RecordAuthClientSessionContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RecordInvitationDeliveryOutcomeContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RecordInvitationDeliveryOutcomeContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RegenerateRecoveryCodesContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RegenerateRecoveryCodesContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RegisterInvitationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RegisterInvitationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RequestEmailVerificationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RequestEmailVerificationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RequestMagicLinkAuthenticationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RequestMagicLinkAuthenticationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RequestMagicLinkContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RequestMagicLinkContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RequestPasswordResetContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RequestPasswordResetContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RequestSecurityCodeAuthenticationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RequestSecurityCodeAuthenticationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RequestSecurityCodeContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RequestSecurityCodeContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ResendInvitationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ResendInvitationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ResetPasswordContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ResetPasswordContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ResolvePermissionIdentifiersContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ResolvePermissionIdentifiersContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ResolveRoleIdentifiersContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ResolveRoleIdentifiersContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RestoreUserContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RestoreUserContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RevokeAllApiTokensContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RevokeAllApiTokensContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RevokeApiTokenContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RevokeApiTokenContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RevokeInvitationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RevokeInvitationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RevokeMembershipContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RevokeMembershipContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RevokePasskeyContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RevokePasskeyContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RevokeRecoveryCodesContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RevokeRecoveryCodesContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RevokeSocialIdentityContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RevokeSocialIdentityContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RevokeTotpCredentialContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RevokeTotpCredentialContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\RoleTemplateProvider": {
             "kind": "interface",
             "file": "src/Contracts/RoleTemplateProvider.php",
             "methods": [
                 "roles"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\RotateApiTokenContract": {
+            "kind": "interface",
+            "file": "src/Contracts/RotateApiTokenContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SetAuthClientActiveContract": {
+            "kind": "interface",
+            "file": "src/Contracts/SetAuthClientActiveContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SetMembershipStatusContract": {
+            "kind": "interface",
+            "file": "src/Contracts/SetMembershipStatusContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SetUserActiveContract": {
+            "kind": "interface",
+            "file": "src/Contracts/SetUserActiveContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ShowAuthAuditContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ShowAuthAuditContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ShowAuthClientContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ShowAuthClientContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ShowMembershipContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ShowMembershipContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ShowPermissionContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ShowPermissionContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ShowProfileContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ShowProfileContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ShowRbacAnalyticsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ShowRbacAnalyticsContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ShowRoleAnalyticsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ShowRoleAnalyticsContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ShowRoleContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ShowRoleContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ShowUserContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ShowUserContract.php",
+            "methods": [
+                "execute"
             ],
             "properties": [],
             "constants": []
@@ -1380,11 +2199,119 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\StartAuthClientContract": {
+            "kind": "interface",
+            "file": "src/Contracts/StartAuthClientContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\StartSocialAuthorizationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/StartSocialAuthorizationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\StartTotpEnrollmentContract": {
+            "kind": "interface",
+            "file": "src/Contracts/StartTotpEnrollmentContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\SuccessfulLoginMetadataRecorder": {
             "kind": "interface",
             "file": "src/Contracts/SuccessfulLoginMetadataRecorder.php",
             "methods": [
                 "record"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SuggestPermissionsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/SuggestPermissionsContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SuggestRolesContract": {
+            "kind": "interface",
+            "file": "src/Contracts/SuggestRolesContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SuggestUsersContract": {
+            "kind": "interface",
+            "file": "src/Contracts/SuggestUsersContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SyncRolePermissionsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/SyncRolePermissionsContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SyncUserPermissionsContract": {
+            "kind": "interface",
+            "file": "src/Contracts/SyncUserPermissionsContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SyncUserRolesContract": {
+            "kind": "interface",
+            "file": "src/Contracts/SyncUserRolesContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SynchronizePermissionCatalogContract": {
+            "kind": "interface",
+            "file": "src/Contracts/SynchronizePermissionCatalogContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SynchronizeRbacContract": {
+            "kind": "interface",
+            "file": "src/Contracts/SynchronizeRbacContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SynchronizeRoleTemplatesContract": {
+            "kind": "interface",
+            "file": "src/Contracts/SynchronizeRoleTemplatesContract.php",
+            "methods": [
+                "execute"
             ],
             "properties": [],
             "constants": []
@@ -1403,6 +2330,123 @@
             "file": "src/Contracts/TenantBoundApiTokenManager.php",
             "methods": [
                 "tenantForToken"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\TouchAuthClientSessionContract": {
+            "kind": "interface",
+            "file": "src/Contracts/TouchAuthClientSessionContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\TransferMembershipOwnershipContract": {
+            "kind": "interface",
+            "file": "src/Contracts/TransferMembershipOwnershipContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\UpdateApiTokenContract": {
+            "kind": "interface",
+            "file": "src/Contracts/UpdateApiTokenContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\UpdateAuthClientContract": {
+            "kind": "interface",
+            "file": "src/Contracts/UpdateAuthClientContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\UpdatePasswordContract": {
+            "kind": "interface",
+            "file": "src/Contracts/UpdatePasswordContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\UpdatePermissionContract": {
+            "kind": "interface",
+            "file": "src/Contracts/UpdatePermissionContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\UpdateProfileContract": {
+            "kind": "interface",
+            "file": "src/Contracts/UpdateProfileContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\UpdateRoleContract": {
+            "kind": "interface",
+            "file": "src/Contracts/UpdateRoleContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\UpdateUserContract": {
+            "kind": "interface",
+            "file": "src/Contracts/UpdateUserContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\VerifyEmailContract": {
+            "kind": "interface",
+            "file": "src/Contracts/VerifyEmailContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\VerifySecurityCodeAuthenticationContract": {
+            "kind": "interface",
+            "file": "src/Contracts/VerifySecurityCodeAuthenticationContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\VerifySecurityCodeContract": {
+            "kind": "interface",
+            "file": "src/Contracts/VerifySecurityCodeContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\VerifyTotpContract": {
+            "kind": "interface",
+            "file": "src/Contracts/VerifyTotpContract.php",
+            "methods": [
+                "execute"
             ],
             "properties": [],
             "constants": []

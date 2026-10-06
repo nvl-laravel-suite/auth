@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Totp;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\StartTotpEnrollmentContract;
 use Nvl\Auth\Data\Mutations\StartTotpEnrollmentData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -21,7 +22,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class StartTotpEnrollmentAction
+final readonly class StartTotpEnrollmentAction implements StartTotpEnrollmentContract
 {
     /**
      * Create the TOTP enrollment use case.

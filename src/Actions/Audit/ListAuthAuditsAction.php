@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Audit;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Nvl\Auth\Contracts\ListAuthAuditsContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\AuthAudit;
@@ -18,7 +19,7 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
  *
  * @api
  */
-final readonly class ListAuthAuditsAction
+final readonly class ListAuthAuditsAction implements ListAuthAuditsContract
 {
     /**
      * Create the audit listing use case.

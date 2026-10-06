@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\SocialIdentities;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\CompleteSocialAuthorizationContract;
 use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Contracts\TenantAuthenticationSession;
@@ -31,7 +32,7 @@ use Throwable;
  *
  * @api
  */
-final readonly class CompleteSocialAuthorizationAction
+final readonly class CompleteSocialAuthorizationAction implements CompleteSocialAuthorizationContract
 {
     /**
      * Create the social callback use case.

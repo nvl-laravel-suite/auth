@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Passkeys;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\BeginPasskeyRegistrationContract;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -25,7 +26,7 @@ use Throwable;
  *
  * @api
  */
-final readonly class BeginPasskeyRegistrationAction
+final readonly class BeginPasskeyRegistrationAction implements BeginPasskeyRegistrationContract
 {
     /**
      * Create the registration start use case.

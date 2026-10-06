@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Passkeys;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\FinishPasskeyAuthenticationContract;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Data\Mutations\FinishPasskeyAuthenticationData;
 use Nvl\Auth\Enums\AuthFeature;
@@ -30,7 +31,7 @@ use Throwable;
  *
  * @api
  */
-final readonly class FinishPasskeyAuthenticationAction
+final readonly class FinishPasskeyAuthenticationAction implements FinishPasskeyAuthenticationContract
 {
     /**
      * Create the authentication completion use case.

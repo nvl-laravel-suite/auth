@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Memberships;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
+use Nvl\Auth\Contracts\ListOwnMembershipsContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -20,7 +21,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class ListOwnMembershipsAction
+final readonly class ListOwnMembershipsAction implements ListOwnMembershipsContract
 {
     public function __construct(private FeatureGate $features, private AuthOperationBoundary $operations) {}
 

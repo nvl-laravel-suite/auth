@@ -1,5 +1,44 @@
 # Upgrading NVL Auth
 
+## Major 5 consumer workflow contracts
+
+Supported feature Actions now implement focused interfaces under
+`Nvl\Auth\Contracts`, named `<Action basename without Action>Contract`.
+Change host constructor type hints such as `ListApiTokensAction` to
+`ListApiTokensContract` when the host needs to substitute that workflow in its
+own tests. Concrete Action resolution, constructors, final/readonly qualifiers,
+execute signatures, generic result types, and feature/security behavior remain
+available unchanged. Follow the [host injection example](README.md#injecting-workflows-into-host-services).
+
+New workflow defaults use `bindIf`. Existing public extension defaults now
+preserve host instances and interface bindings through provider registration,
+while retaining their native singleton/scoped lifetimes and lazy validation.
+Re-registering Auth no longer replaces a host binding with a configured default.
+To deliberately reselect a configured default, remove the old binding and its
+instance before registering the provider, or explicitly install the replacement
+yourself. `forgetInstance()` alone retains an existing binding. Late replacements
+affect newly resolved host services; already constructed services keep their
+existing dependencies. Scoped package defaults reset at the next request/job
+scope, while host prebindings keep the lifetime chosen by the host.
+
+When tenancy and memberships are enabled, Auth still supplies scoped
+`AuthTenantMembershipAccess` as its neutral membership default. It preserves
+real host instances, aliases, closures, singleton bindings and custom classes.
+It replaces only Core's exact native, unshared string-binding fallback to the
+internal `DisabledTenantMembershipAccess`, even if that transient fallback was
+previously resolved. Replacement inspects the installed Laravel factory's
+native closure provenance and captured target without invoking it. This narrow
+compatibility check depends on Laravel's native closure metadata; unfamiliar
+metadata leaves the existing binding intact. Explicitly class-binding that
+internal Core disabled implementation through the same native mechanism is
+treated as the package fallback; hosts should bind their supported membership
+adapter instead. No host identity or tenancy configuration is adopted globally.
+
+The five internal exclusions do not gain consumer contracts:
+`AdoptPrincipalsAction`, `PruneAuthStateAction`, `IssueChallengeAction`,
+`ConsumeChallengeAction`, and `ConsumeChallengeByIdAction`. Use the existing
+adoption/pruning commands or the complete magic-link/security-code Actions.
+
 ## 1.0.3 from 1.0.1 or 1.0.2
 
 ### Authentication and onboarding security

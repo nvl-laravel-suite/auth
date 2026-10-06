@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Nvl\Auth\Contracts\ListRoleCatalogContract;
 use Nvl\Auth\Data\Display\RoleListItemData;
 use Nvl\Auth\Data\Queries\RoleIndexQueryData;
 use Nvl\Auth\Enums\AuthFeature;
@@ -23,7 +24,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
  *
  * @api
  */
-final readonly class ListRoleCatalogAction
+final readonly class ListRoleCatalogAction implements ListRoleCatalogContract
 {
     /** Create the role catalog use case. */
     public function __construct(

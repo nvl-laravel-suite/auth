@@ -7,6 +7,7 @@ namespace Nvl\Auth\Actions\Rbac;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\CreatePermissionContract;
 use Nvl\Auth\Data\Display\PermissionOptionData;
 use Nvl\Auth\Data\Mutations\StorePermissionData;
 use Nvl\Auth\Enums\AuthFeature;
@@ -24,7 +25,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
  *
  * @api
  */
-final readonly class CreatePermissionAction
+final readonly class CreatePermissionAction implements CreatePermissionContract
 {
     /** Create the permission creation use case. */
     public function __construct(

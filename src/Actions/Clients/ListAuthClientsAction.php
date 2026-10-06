@@ -6,6 +6,7 @@ namespace Nvl\Auth\Actions\Clients;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Nvl\Auth\Contracts\ListAuthClientsContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\AuthClient;
@@ -17,7 +18,7 @@ use Nvl\Auth\Services\ManagementAuthorizer;
  *
  * @api
  */
-final readonly class ListAuthClientsAction
+final readonly class ListAuthClientsAction implements ListAuthClientsContract
 {
     /**
      * Create the client listing use case.

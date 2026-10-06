@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Contracts\RequestPasswordResetContract;
 use Nvl\Auth\Data\Mutations\RequestPasswordResetData;
 use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Enums\AuthFeature;
@@ -32,7 +33,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * @api
  */
-final readonly class RequestPasswordResetAction
+final readonly class RequestPasswordResetAction implements RequestPasswordResetContract
 {
     /**
      * Create the reset-request use case.
