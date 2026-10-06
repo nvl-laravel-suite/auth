@@ -15,7 +15,11 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacConsumerLimits;
 use Nvl\Auth\Services\RbacOptionReadService;
 
-/** Lists bounded permission options for consumer-owned selectors. */
+/**
+ * Lists bounded permission options for consumer-owned selectors.
+ *
+ * @api
+ */
 final readonly class ListPermissionOptionsAction
 {
     /** Create the permission option listing use case. */

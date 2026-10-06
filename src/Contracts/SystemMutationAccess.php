@@ -8,6 +8,8 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
  * Authorizes explicitly actorless package mutations for trusted host workflows.
+ *
+ * @api
  */
 interface SystemMutationAccess
 {

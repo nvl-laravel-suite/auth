@@ -16,6 +16,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Orchestrates magic-link policy through the canonical challenge issuer.
+ *
+ * @api
  */
 final readonly class RequestMagicLinkAction
 {

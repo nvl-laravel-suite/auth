@@ -13,6 +13,8 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
  * Minimal subject identity for delivery listeners and generated client types.
+ *
+ * @api
  */
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]

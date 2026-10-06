@@ -14,10 +14,14 @@ use Spatie\LaravelData\Mappers\CamelCaseMapper;
 use Spatie\LaravelData\Optional;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
+/**
+ * Validated sparse self-service principal profile mutation.
+ *
+ * @api
+ */
 #[MapInputName(CamelCaseMapper::class)]
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]
-/** Validated sparse self-service principal profile mutation. */
 final class UpdateProfileData extends Data
 {
     use DataTransform;

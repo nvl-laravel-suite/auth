@@ -6,6 +6,8 @@ namespace Nvl\Auth\Enums;
 
 /**
  * Identifies every independently configurable Auth capability.
+ *
+ * @api
  */
 enum AuthFeature: string
 {

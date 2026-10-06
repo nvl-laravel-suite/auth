@@ -8,6 +8,8 @@ use Nvl\Auth\Enums\UserBulkOperation;
 
 /**
  * Reports one bounded bulk principal mutation.
+ *
+ * @api
  */
 final readonly class BulkUserResult
 {

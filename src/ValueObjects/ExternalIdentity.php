@@ -8,6 +8,8 @@ use InvalidArgumentException;
 
 /**
  * Carries verified, provider-neutral social identity claims without OAuth tokens.
+ *
+ * @api
  */
 final readonly class ExternalIdentity
 {

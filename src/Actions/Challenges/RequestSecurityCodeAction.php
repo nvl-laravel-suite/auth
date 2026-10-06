@@ -16,6 +16,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Orchestrates security-code policy through the canonical challenge issuer.
+ *
+ * @api
  */
 final readonly class RequestSecurityCodeAction
 {

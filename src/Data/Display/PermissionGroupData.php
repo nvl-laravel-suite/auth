@@ -12,6 +12,8 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
  * Deterministic permission group option with its bounded catalog count.
+ *
+ * @api
  */
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]

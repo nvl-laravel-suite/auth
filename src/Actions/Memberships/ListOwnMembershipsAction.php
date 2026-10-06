@@ -15,7 +15,11 @@ use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
-/** Lists the authenticated global identity's own minimal active tenant projections. */
+/**
+ * Lists the authenticated global identity's own minimal active tenant projections.
+ *
+ * @api
+ */
 final readonly class ListOwnMembershipsAction
 {
     public function __construct(private FeatureGate $features, private AuthOperationBoundary $operations) {}

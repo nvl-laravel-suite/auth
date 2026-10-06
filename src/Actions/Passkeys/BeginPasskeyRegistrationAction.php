@@ -22,6 +22,8 @@ use Throwable;
 
 /**
  * Begins passkey registration and persists adapter state in a generic challenge.
+ *
+ * @api
  */
 final readonly class BeginPasskeyRegistrationAction
 {

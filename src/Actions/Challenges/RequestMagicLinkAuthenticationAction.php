@@ -24,6 +24,8 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
  * Delegation to RequestMagicLinkAction is deliberate domain orchestration: this
  * public authentication workflow resolves the subject while the canonical
  * issuance Action remains the sole owner of challenge creation and delivery.
+ *
+ * @api
  */
 final readonly class RequestMagicLinkAuthenticationAction
 {

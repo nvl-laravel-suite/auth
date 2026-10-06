@@ -18,6 +18,8 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
  * Revokes one invitation as a containment operation.
+ *
+ * @api
  */
 final readonly class RevokeInvitationAction
 {

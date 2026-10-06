@@ -32,6 +32,8 @@ use Spatie\LaravelData\Optional;
 
 /**
  * Updates the authenticated principal's self-service profile fields.
+ *
+ * @api
  */
 final readonly class UpdateProfileAction
 {

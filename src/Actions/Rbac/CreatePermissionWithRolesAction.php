@@ -20,7 +20,11 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacAssignmentService;
 
-/** Creates a permission together with its initial role assignments. */
+/**
+ * Creates a permission together with its initial role assignments.
+ *
+ * @api
+ */
 final readonly class CreatePermissionWithRolesAction
 {
     /** Create the permission and role assignment use case. */

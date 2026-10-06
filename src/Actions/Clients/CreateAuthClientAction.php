@@ -16,6 +16,8 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 
 /**
  * Creates one first-party authentication client.
+ *
+ * @api
  */
 final readonly class CreateAuthClientAction
 {

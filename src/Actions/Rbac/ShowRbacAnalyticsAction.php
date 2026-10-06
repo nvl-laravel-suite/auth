@@ -14,7 +14,11 @@ use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 
-/** Calculates bounded role, permission, and assignment aggregates. */
+/**
+ * Calculates bounded role, permission, and assignment aggregates.
+ *
+ * @api
+ */
 final readonly class ShowRbacAnalyticsAction
 {
     /** Create the analytics use case. */

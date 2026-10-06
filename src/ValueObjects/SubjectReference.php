@@ -10,6 +10,8 @@ use InvalidArgumentException;
 
 /**
  * Identifies a host-owned authenticatable without projecting it into Auth storage.
+ *
+ * @api
  */
 final readonly class SubjectReference
 {

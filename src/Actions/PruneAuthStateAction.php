@@ -27,6 +27,8 @@ use Nvl\Support\Tenancy\Exceptions\TenantContextMissing;
 
 /**
  * Prunes terminal, retention-expired Auth state without deleting audits.
+ *
+ * @internal
  */
 final readonly class PruneAuthStateAction
 {

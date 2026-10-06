@@ -8,6 +8,8 @@ use Carbon\CarbonImmutable;
 
 /**
  * Exposes provider-neutral Sanctum token metadata without its secret.
+ *
+ * @api
  */
 final readonly class ApiTokenSnapshot
 {

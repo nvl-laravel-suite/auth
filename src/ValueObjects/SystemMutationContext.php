@@ -10,6 +10,8 @@ use JsonException;
 
 /**
  * Describes one explicitly authorized actorless package mutation.
+ *
+ * @api
  */
 final readonly class SystemMutationContext
 {

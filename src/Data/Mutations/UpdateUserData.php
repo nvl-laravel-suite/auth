@@ -20,10 +20,14 @@ use Spatie\LaravelData\Optional;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
+/**
+ * Validated partial mutation for one managed principal.
+ *
+ * @api
+ */
 #[MapInputName(CamelCaseMapper::class)]
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]
-/** Validated partial mutation for one managed principal. */
 final class UpdateUserData extends Data
 {
     use DataTransform;

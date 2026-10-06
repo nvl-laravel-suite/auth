@@ -11,10 +11,14 @@ use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Mappers\CamelCaseMapper;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
+/**
+ * Validated active-state mutation for a managed principal.
+ *
+ * @api
+ */
 #[MapInputName(CamelCaseMapper::class)]
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]
-/** Validated active-state mutation for a managed principal. */
 final class UpdateUserStatusData extends Data
 {
     use DataTransform;

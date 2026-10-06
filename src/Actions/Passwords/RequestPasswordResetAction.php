@@ -29,6 +29,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Creates a Laravel password-broker token and delegates its delivery by event.
+ *
+ * @api
  */
 final readonly class RequestPasswordResetAction
 {

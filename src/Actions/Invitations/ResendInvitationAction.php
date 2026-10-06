@@ -31,6 +31,8 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Rotates and republishes one still-active invitation token.
+ *
+ * @api
  */
 final readonly class ResendInvitationAction
 {

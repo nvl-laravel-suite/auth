@@ -18,6 +18,8 @@ use SensitiveParameter;
 
 /**
  * Confirms the current password in Laravel's browser session.
+ *
+ * @api
  */
 final readonly class ConfirmPasswordAction
 {

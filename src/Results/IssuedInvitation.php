@@ -8,6 +8,8 @@ use Nvl\Auth\Models\Invitation;
 
 /**
  * Returns a persisted invitation and its one-time plaintext token.
+ *
+ * @api
  */
 final readonly class IssuedInvitation
 {

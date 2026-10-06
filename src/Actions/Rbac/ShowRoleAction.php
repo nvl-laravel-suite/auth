@@ -12,7 +12,11 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
 
-/** Shows one role and its canonical permission assignment. */
+/**
+ * Shows one role and its canonical permission assignment.
+ *
+ * @api
+ */
 final readonly class ShowRoleAction
 {
     /** Create the role read use case. */

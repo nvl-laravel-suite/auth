@@ -15,6 +15,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Revokes one provider-owned token as a containment operation.
+ *
+ * @api
  */
 final readonly class RevokeApiTokenAction
 {

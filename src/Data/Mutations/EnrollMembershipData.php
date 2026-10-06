@@ -11,8 +11,12 @@ use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\LiteralTypeScriptType;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
+/**
+ * Describes one tenant membership enrollment.
+ *
+ * @api
+ */
 #[TypeScript]
-/** Describes one tenant membership enrollment. */
 final class EnrollMembershipData extends Data
 {
     use DataTransform;

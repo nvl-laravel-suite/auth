@@ -15,6 +15,8 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
  * Lists simple package audit records.
+ *
+ * @api
  */
 final readonly class ListAuthAuditsAction
 {

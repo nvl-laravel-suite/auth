@@ -9,6 +9,8 @@ use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 
 /**
  * Persists host-specific metadata after successful authentication.
+ *
+ * @api
  */
 interface SuccessfulLoginMetadataRecorder
 {

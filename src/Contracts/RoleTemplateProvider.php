@@ -8,6 +8,8 @@ use Nvl\Auth\ValueObjects\RoleTemplate;
 
 /**
  * Contributes guard-aware role templates backed by Spatie Permission.
+ *
+ * @api
  */
 interface RoleTemplateProvider
 {

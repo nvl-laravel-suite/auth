@@ -7,7 +7,11 @@ namespace Nvl\Auth\Contracts;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
-/** Declares authoritative tenant ownership lookup for persisted API tokens. */
+/**
+ * Declares authoritative tenant ownership lookup for persisted API tokens.
+ *
+ * @api
+ */
 interface TenantBoundApiTokenManager
 {
     public function tenantForToken(Authenticatable $subject, string $tokenId): ?TenantId;

@@ -20,6 +20,8 @@ use Nvl\Auth\Services\UserLocator;
 
 /**
  * Lists package principals through bounded management filters.
+ *
+ * @api
  */
 final readonly class ListUsersAction
 {

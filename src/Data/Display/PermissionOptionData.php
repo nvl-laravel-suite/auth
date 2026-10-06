@@ -13,6 +13,8 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
  * Minimal permission identity for bounded consumer selectors and resolution results.
+ *
+ * @api
  */
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]
@@ -41,6 +43,8 @@ final class PermissionOptionData extends Data
 
     /**
      * Build a permission option from an already selected package model row.
+     *
+     * @internal
      */
     public static function fromModel(Permission $permission): self
     {

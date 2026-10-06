@@ -17,10 +17,14 @@ use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Mappers\CamelCaseMapper;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
+/**
+ * Validated creation mutation for one managed principal.
+ *
+ * @api
+ */
 #[MapInputName(CamelCaseMapper::class)]
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]
-/** Validated creation mutation for one managed principal. */
 final class StoreUserData extends Data
 {
     use DataTransform;

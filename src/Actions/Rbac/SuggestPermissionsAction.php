@@ -15,7 +15,11 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacConsumerLimits;
 use Nvl\Auth\Services\RbacOptionReadService;
 
-/** Resolves bounded permission suggestions for typeahead consumers. */
+/**
+ * Resolves bounded permission suggestions for typeahead consumers.
+ *
+ * @api
+ */
 final readonly class SuggestPermissionsAction
 {
     /** Create the permission suggestion use case. */

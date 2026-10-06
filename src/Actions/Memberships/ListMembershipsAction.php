@@ -16,7 +16,11 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
-/** Lists only membership rows inside the active tenant. */
+/**
+ * Lists only membership rows inside the active tenant.
+ *
+ * @api
+ */
 final readonly class ListMembershipsAction
 {
     public function __construct(

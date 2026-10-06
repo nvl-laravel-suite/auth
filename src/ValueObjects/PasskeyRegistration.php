@@ -8,6 +8,8 @@ use InvalidArgumentException;
 
 /**
  * Carries verified WebAuthn registration material from a ceremony adapter.
+ *
+ * @api
  */
 final readonly class PasskeyRegistration
 {

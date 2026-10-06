@@ -13,6 +13,8 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
  * Bounded invitation context for host-owned delivery listeners.
+ *
+ * @api
  */
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]

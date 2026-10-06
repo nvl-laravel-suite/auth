@@ -8,6 +8,8 @@ use Illuminate\Contracts\Auth\Authenticatable;
 
 /**
  * Delegates package management authorization to the host application.
+ *
+ * @api
  */
 interface AuthManagementAccess
 {

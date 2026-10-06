@@ -10,6 +10,8 @@ use Nvl\Auth\Exceptions\AuthException;
 
 /**
  * Enforces package ingress, feature flags, operation ownership, and dependencies.
+ *
+ * @api
  */
 final readonly class FeatureGate
 {

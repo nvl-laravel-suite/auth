@@ -8,6 +8,8 @@ use Illuminate\Contracts\Auth\Authenticatable;
 
 /**
  * Locates host principals and applies Spatie Permission assignments to them.
+ *
+ * @api
  */
 interface RbacPrincipalAccess
 {

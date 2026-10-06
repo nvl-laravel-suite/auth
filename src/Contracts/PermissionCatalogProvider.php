@@ -6,6 +6,8 @@ namespace Nvl\Auth\Contracts;
 
 /**
  * Contributes permission names to the package's Spatie catalog synchronization.
+ *
+ * @api
  */
 interface PermissionCatalogProvider
 {

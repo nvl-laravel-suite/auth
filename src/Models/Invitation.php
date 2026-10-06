@@ -41,6 +41,8 @@ use Nvl\Auth\Enums\InvitationDeliveryStatus;
  * @property CarbonImmutable $expires_at
  * @property CarbonImmutable|null $accepted_at
  * @property CarbonImmutable|null $revoked_at
+ *
+ * @api
  */
 #[UseFactory(InvitationFactory::class)]
 final class Invitation extends AuthModel

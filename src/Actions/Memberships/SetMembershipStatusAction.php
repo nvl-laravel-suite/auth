@@ -23,7 +23,11 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 
-/** Applies one optimistic membership status transition. */
+/**
+ * Applies one optimistic membership status transition.
+ *
+ * @api
+ */
 final readonly class SetMembershipStatusAction
 {
     public function __construct(

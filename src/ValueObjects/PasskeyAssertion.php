@@ -8,6 +8,8 @@ use InvalidArgumentException;
 
 /**
  * Carries verified WebAuthn assertion signals from a ceremony adapter.
+ *
+ * @api
  */
 final readonly class PasskeyAssertion
 {

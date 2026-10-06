@@ -25,6 +25,8 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
  * @property CarbonImmutable $last_seen_at
  * @property CarbonImmutable|null $ended_at
  * @property string|null $end_reason
+ *
+ * @api
  */
 #[UseFactory(AuthClientSessionFactory::class)]
 final class AuthClientSession extends AuthModel

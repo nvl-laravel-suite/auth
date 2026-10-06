@@ -23,7 +23,11 @@ use Nvl\Auth\Services\RoleHierarchy;
 use Nvl\Auth\Services\RoleTemplateRegistry;
 use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
-/** Creates or updates one role from the canonical template registry. */
+/**
+ * Creates or updates one role from the canonical template registry.
+ *
+ * @api
+ */
 final readonly class ApplyRoleTemplateAction
 {
     /** Create the template application use case. */

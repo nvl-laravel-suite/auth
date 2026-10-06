@@ -24,6 +24,8 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
  *
  * Delegation to RequestSecurityCodeAction is deliberate domain orchestration:
  * this workflow adds subject and tenant-intent binding to canonical issuance.
+ *
+ * @api
  */
 final readonly class RequestSecurityCodeAuthenticationAction
 {

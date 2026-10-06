@@ -6,6 +6,8 @@ namespace Nvl\Auth\Enums;
 
 /**
  * Identifies supported bounded bulk principal mutations.
+ *
+ * @api
  */
 enum UserBulkOperation: string
 {

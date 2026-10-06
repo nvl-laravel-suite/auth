@@ -16,6 +16,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Ends one correlation record without attempting to own the Laravel session.
+ *
+ * @api
  */
 final readonly class EndAuthClientSessionAction
 {

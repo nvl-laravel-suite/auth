@@ -25,6 +25,8 @@ use Throwable;
 
 /**
  * Begins a discoverable or subject-scoped passkey authentication ceremony.
+ *
+ * @api
  */
 final readonly class BeginPasskeyAuthenticationAction
 {

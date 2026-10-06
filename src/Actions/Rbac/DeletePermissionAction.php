@@ -17,7 +17,11 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
 
-/** Deletes one non-system package permission. */
+/**
+ * Deletes one non-system package permission.
+ *
+ * @api
+ */
 final readonly class DeletePermissionAction
 {
     /** Create the permission deletion use case. */

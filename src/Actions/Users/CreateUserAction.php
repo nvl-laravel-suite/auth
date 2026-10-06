@@ -23,6 +23,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Creates one complete package principal.
+ *
+ * @api
  */
 final readonly class CreateUserAction
 {

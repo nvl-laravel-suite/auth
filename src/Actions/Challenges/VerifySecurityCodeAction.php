@@ -13,6 +13,8 @@ use Nvl\Auth\Services\FeatureGate;
 
 /**
  * Orchestrates security-code verification through the canonical challenge consumer.
+ *
+ * @api
  */
 final readonly class VerifySecurityCodeAction
 {

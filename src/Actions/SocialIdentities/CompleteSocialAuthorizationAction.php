@@ -28,6 +28,8 @@ use Throwable;
 
 /**
  * Orchestrates provider acquisition, subject resolution, and canonical identity linking.
+ *
+ * @api
  */
 final readonly class CompleteSocialAuthorizationAction
 {

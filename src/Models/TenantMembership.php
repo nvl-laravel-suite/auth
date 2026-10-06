@@ -20,6 +20,8 @@ use Nvl\Support\Config\PackageStorage;
  * @property MembershipStatus $status
  * @property bool $is_owner
  * @property int $revision
+ *
+ * @api
  */
 #[UseFactory(TenantMembershipFactory::class)]
 final class TenantMembership extends AuthModel

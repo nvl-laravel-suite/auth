@@ -20,6 +20,8 @@ use Throwable;
 
 /**
  * Starts one allowlisted, stateful social authorization flow.
+ *
+ * @api
  */
 final readonly class StartSocialAuthorizationAction
 {

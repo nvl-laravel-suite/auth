@@ -37,6 +37,8 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Consumes one invitation and optionally applies its Spatie Permission payload.
+ *
+ * @api
  */
 final readonly class AcceptInvitationAction
 {

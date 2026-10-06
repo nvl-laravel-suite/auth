@@ -24,6 +24,8 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
  * Soft deletes one principal while revoking active API tokens.
+ *
+ * @api
  */
 final readonly class DeleteUserAction
 {

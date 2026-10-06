@@ -10,6 +10,8 @@ use Nvl\Auth\Data\Mutations\StoreRoleData;
 
 /**
  * Defines one validated RBAC role template and its presentation metadata.
+ *
+ * @api
  */
 final readonly class RoleTemplate
 {

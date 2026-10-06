@@ -6,6 +6,8 @@ namespace Nvl\Auth\Contracts;
 
 /**
  * Supplies optional transport context for package audit facts.
+ *
+ * @api
  */
 interface AuthAuditContextProvider
 {

@@ -11,7 +11,11 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RoleTemplateRegistry;
 
-/** Lists the merged package and consumer-contributed role templates. */
+/**
+ * Lists the merged package and consumer-contributed role templates.
+ *
+ * @api
+ */
 final readonly class ListRoleTemplatesAction
 {
     /** Create the template listing use case. */

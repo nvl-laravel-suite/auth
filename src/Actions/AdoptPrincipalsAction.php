@@ -29,7 +29,11 @@ use Nvl\Auth\ValueObjects\PrincipalAdoptionPlan;
 use RuntimeException;
 use stdClass;
 
-/** Plans, stages, and imports one bounded legacy principal data set. */
+/**
+ * Plans, stages, and imports one bounded legacy principal data set.
+ *
+ * @internal
+ */
 final readonly class AdoptPrincipalsAction
 {
     public function __construct(

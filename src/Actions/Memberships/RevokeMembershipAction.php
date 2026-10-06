@@ -24,7 +24,11 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 
-/** Revokes one tenant membership without mutating the global principal. */
+/**
+ * Revokes one tenant membership without mutating the global principal.
+ *
+ * @api
+ */
 final readonly class RevokeMembershipAction
 {
     public function __construct(

@@ -9,6 +9,8 @@ use Nvl\Auth\ValueObjects\ExternalIdentity;
 
 /**
  * Resolves or provisions a configured principal after verified social authentication.
+ *
+ * @api
  */
 interface SocialSubjectResolver
 {

@@ -9,6 +9,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Persists transport-neutral Auth audit facts in a host-selected store.
+ *
+ * @api
  */
 interface AuthAuditRecorder
 {

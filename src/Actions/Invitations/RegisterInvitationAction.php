@@ -44,6 +44,8 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Creates or resolves a principal and consumes its invitation atomically.
+ *
+ * @api
  */
 final readonly class RegisterInvitationAction
 {

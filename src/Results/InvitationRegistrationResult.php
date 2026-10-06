@@ -7,7 +7,11 @@ namespace Nvl\Auth\Results;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Models\Invitation;
 
-/** Returns the atomically consumed invitation and registered subject. */
+/**
+ * Returns the atomically consumed invitation and registered subject.
+ *
+ * @api
+ */
 final readonly class InvitationRegistrationResult
 {
     /** Create the registration result. */

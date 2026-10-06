@@ -20,7 +20,11 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 
-/** Provisions the first explicitly authorized owner for one tenant. */
+/**
+ * Provisions the first explicitly authorized owner for one tenant.
+ *
+ * @api
+ */
 final readonly class ProvisionTenantOwnerAction
 {
     public function __construct(

@@ -19,6 +19,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Issues one provider-owned personal access token.
+ *
+ * @api
  */
 final readonly class CreateApiTokenAction
 {

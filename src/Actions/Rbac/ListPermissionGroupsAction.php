@@ -17,7 +17,11 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacConsumerLimits;
 use Nvl\Auth\Services\RbacPermissionGroupExpressions;
 
-/** Lists normalized permission groups and their catalog counts. */
+/**
+ * Lists normalized permission groups and their catalog counts.
+ *
+ * @api
+ */
 final readonly class ListPermissionGroupsAction
 {
     /** Create the permission group listing use case. */

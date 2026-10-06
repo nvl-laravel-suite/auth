@@ -25,6 +25,8 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
  * @property CarbonImmutable|null $confirmed_at
  * @property CarbonImmutable|null $last_used_at
  * @property CarbonImmutable|null $revoked_at
+ *
+ * @api
  */
 #[UseFactory(TotpCredentialFactory::class)]
 final class TotpCredential extends AuthModel

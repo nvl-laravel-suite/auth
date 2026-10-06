@@ -9,6 +9,8 @@ use Nvl\Auth\Models\Invitation;
 
 /**
  * Resolves or provisions the host subject consuming a public invitation.
+ *
+ * @api
  */
 interface InvitationSubjectResolver
 {

@@ -17,6 +17,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Revokes one social identity link without touching provider-owned credentials.
+ *
+ * @api
  */
 final readonly class RevokeSocialIdentityAction
 {

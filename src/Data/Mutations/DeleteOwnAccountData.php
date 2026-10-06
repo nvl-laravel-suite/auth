@@ -12,9 +12,13 @@ use Spatie\LaravelData\Attributes\MapOutputName;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Mappers\CamelCaseMapper;
 
+/**
+ * Validated self-service account deletion confirmation.
+ *
+ * @api
+ */
 #[MapInputName(CamelCaseMapper::class)]
 #[MapOutputName(CamelCaseMapper::class)]
-/** Validated self-service account deletion confirmation. */
 final class DeleteOwnAccountData extends Data
 {
     use DataTransform;

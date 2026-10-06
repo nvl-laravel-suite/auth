@@ -15,7 +15,11 @@ use Nvl\Auth\Services\AuthTenantRbacQueries;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 
-/** Lists package roles with their hierarchy and assignment summaries. */
+/**
+ * Lists package roles with their hierarchy and assignment summaries.
+ *
+ * @api
+ */
 final readonly class ListRolesAction
 {
     /** Create the role listing use case. */

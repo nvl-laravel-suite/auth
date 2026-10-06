@@ -6,6 +6,8 @@ namespace Nvl\Auth\Contracts;
 
 /**
  * Adapts the current browser session without coupling Actions to HTTP.
+ *
+ * @api
  */
 interface BrowserSession
 {

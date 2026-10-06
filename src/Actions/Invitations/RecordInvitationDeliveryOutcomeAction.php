@@ -18,6 +18,8 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
  * Records one bounded host delivery result against the current invitation message.
+ *
+ * @api
  */
 final readonly class RecordInvitationDeliveryOutcomeAction
 {

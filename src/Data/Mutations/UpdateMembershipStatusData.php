@@ -15,10 +15,14 @@ use Spatie\LaravelData\Mappers\CamelCaseMapper;
 use Spatie\LaravelData\Mappers\SnakeCaseMapper;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
+/**
+ * Describes one optimistic membership status mutation.
+ *
+ * @api
+ */
 #[MapInputName(SnakeCaseMapper::class)]
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]
-/** Describes one optimistic membership status mutation. */
 final class UpdateMembershipStatusData extends Data
 {
     use DataTransform;

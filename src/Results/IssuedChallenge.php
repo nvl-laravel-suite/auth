@@ -8,6 +8,8 @@ use Nvl\Auth\Models\Challenge;
 
 /**
  * Returns a persisted challenge and its one-time plaintext secret.
+ *
+ * @api
  */
 final readonly class IssuedChallenge
 {

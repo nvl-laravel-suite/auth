@@ -8,6 +8,8 @@ use Nvl\Auth\Models\AuthClient;
 
 /**
  * Returns a validated hosted-client authentication start target.
+ *
+ * @api
  */
 final readonly class AuthClientStartResult
 {

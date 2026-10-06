@@ -16,7 +16,11 @@ use Nvl\Auth\Services\AuthTenantRbacQueries;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 
-/** Checks one canonical role name without exposing role models. */
+/**
+ * Checks one canonical role name without exposing role models.
+ *
+ * @api
+ */
 final readonly class CheckRoleNameAvailabilityAction
 {
     /** Create the role availability use case. */

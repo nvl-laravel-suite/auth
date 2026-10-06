@@ -15,7 +15,11 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacAssignmentService;
 
-/** Replaces all permissions assigned to one role. */
+/**
+ * Replaces all permissions assigned to one role.
+ *
+ * @api
+ */
 final readonly class SyncRolePermissionsAction
 {
     /** Create the role permission synchronization use case. */

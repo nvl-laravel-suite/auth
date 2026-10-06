@@ -14,10 +14,14 @@ use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Mappers\CamelCaseMapper;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
+/**
+ * Validated replacement mutation for one principal's direct permissions.
+ *
+ * @api
+ */
 #[MapInputName(CamelCaseMapper::class)]
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]
-/** Validated replacement mutation for one principal's direct permissions. */
 final class SyncUserPermissionsData extends Data
 {
     use DataTransform;

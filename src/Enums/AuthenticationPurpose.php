@@ -6,6 +6,8 @@ namespace Nvl\Auth\Enums;
 
 /**
  * Identifies subject-policy checkpoints shared by authentication flows.
+ *
+ * @api
  */
 enum AuthenticationPurpose: string
 {

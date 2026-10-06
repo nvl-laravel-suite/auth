@@ -7,7 +7,11 @@ namespace Nvl\Auth\Contracts;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Models\User;
 
-/** Maps package principal semantics onto a configured host model schema. */
+/**
+ * Maps package principal semantics onto a configured host model schema.
+ *
+ * @api
+ */
 interface PrincipalAttributeMapper
 {
     public function column(PrincipalAttribute $attribute): string;

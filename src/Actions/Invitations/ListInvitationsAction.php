@@ -17,6 +17,8 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
  * Lists invitation records after host business authorization.
+ *
+ * @api
  */
 final readonly class ListInvitationsAction
 {

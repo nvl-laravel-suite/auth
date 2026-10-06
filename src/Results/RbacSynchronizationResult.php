@@ -8,6 +8,8 @@ use JsonSerializable;
 
 /**
  * Reports deterministic permission and role synchronization counts.
+ *
+ * @api
  */
 final readonly class RbacSynchronizationResult implements JsonSerializable
 {

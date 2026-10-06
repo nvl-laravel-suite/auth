@@ -9,6 +9,8 @@ use SensitiveParameter;
 
 /**
  * Confirms a subject-controlled credential before sensitive self-service mutations.
+ *
+ * @api
  */
 interface AccountConfirmation
 {

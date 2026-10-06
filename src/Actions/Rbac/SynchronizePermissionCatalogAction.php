@@ -19,6 +19,8 @@ use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Synchronizes contributed permission names into Spatie Permission storage.
+ *
+ * @api
  */
 final readonly class SynchronizePermissionCatalogAction
 {

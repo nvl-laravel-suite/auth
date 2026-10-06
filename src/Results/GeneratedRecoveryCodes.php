@@ -6,6 +6,8 @@ namespace Nvl\Auth\Results;
 
 /**
  * Returns one generated recovery-code batch exactly once.
+ *
+ * @api
  */
 final readonly class GeneratedRecoveryCodes
 {

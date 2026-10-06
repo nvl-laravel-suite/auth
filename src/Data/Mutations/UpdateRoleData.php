@@ -17,10 +17,14 @@ use Spatie\LaravelData\Mappers\CamelCaseMapper;
 use Spatie\LaravelData\Support\Validation\ValidationContext;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
+/**
+ * Validated replacement mutation for one managed role.
+ *
+ * @api
+ */
 #[MapInputName(CamelCaseMapper::class)]
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]
-/** Validated replacement mutation for one managed role. */
 final class UpdateRoleData extends Data
 {
     use DataTransform;

@@ -23,6 +23,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Logs out through Laravel's configured stateful guard.
+ *
+ * @api
  */
 final readonly class LogoutAction
 {

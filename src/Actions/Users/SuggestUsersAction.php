@@ -20,6 +20,8 @@ use Nvl\Auth\Services\UserLocator;
 
 /**
  * Returns a minimal, bounded principal suggestion list.
+ *
+ * @api
  */
 final readonly class SuggestUsersAction
 {

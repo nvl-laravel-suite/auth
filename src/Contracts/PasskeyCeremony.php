@@ -13,6 +13,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Adapts WebAuthn ceremonies while Auth owns credential lifecycle and storage.
+ *
+ * @api
  */
 interface PasskeyCeremony
 {

@@ -13,6 +13,8 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
  * Minimal role identity for bounded consumer selectors and resolution results.
+ *
+ * @api
  */
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]
@@ -37,6 +39,8 @@ final class RoleOptionData extends Data
 
     /**
      * Build a role option from an already selected package model row.
+     *
+     * @internal
      */
     public static function fromModel(Role $role): self
     {

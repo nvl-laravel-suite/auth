@@ -7,7 +7,11 @@ namespace Nvl\Auth\Results;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
-/** Carries a verified passkey subject and its server-owned tenant intent context. */
+/**
+ * Carries a verified passkey subject and its server-owned tenant intent context.
+ *
+ * @api
+ */
 final readonly class CompletedPasskeyAuthentication
 {
     public function __construct(

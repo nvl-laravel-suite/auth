@@ -6,6 +6,8 @@ namespace Nvl\Auth\Results;
 
 /**
  * Reports bounded RBAC catalog and assignment aggregates.
+ *
+ * @api
  */
 final readonly class RbacAnalytics
 {

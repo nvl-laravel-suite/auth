@@ -15,6 +15,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Marks one host-owned email as verified after transport signature validation.
+ *
+ * @api
  */
 final readonly class VerifyEmailAction
 {

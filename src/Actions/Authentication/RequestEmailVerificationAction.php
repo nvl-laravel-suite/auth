@@ -20,6 +20,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Emits email-verification delivery data without sending a notification.
+ *
+ * @api
  */
 final readonly class RequestEmailVerificationAction
 {

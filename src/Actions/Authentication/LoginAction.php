@@ -36,6 +36,8 @@ use Throwable;
 
 /**
  * Authenticates a browser user through the configured Laravel guard.
+ *
+ * @api
  */
 final readonly class LoginAction
 {

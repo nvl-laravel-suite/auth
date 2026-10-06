@@ -14,7 +14,11 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
 
-/** Resolves bounded mixed permission IDs and names into stable projections. */
+/**
+ * Resolves bounded mixed permission IDs and names into stable projections.
+ *
+ * @api
+ */
 final readonly class ResolvePermissionIdentifiersAction
 {
     /** Create the permission identifier resolution use case. */

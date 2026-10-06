@@ -9,6 +9,8 @@ use Nvl\Auth\ValueObjects\AuthPipelineContext;
 
 /**
  * Extends one named Auth use-case pipeline.
+ *
+ * @api
  */
 interface AuthPipelineStage
 {

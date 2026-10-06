@@ -21,6 +21,8 @@ use SensitiveParameter;
 
 /**
  * Atomically consumes one recovery code.
+ *
+ * @api
  */
 final readonly class ConsumeRecoveryCodeAction
 {

@@ -14,6 +14,8 @@ use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
 
 /**
  * Lists provider-owned tokens for one host subject.
+ *
+ * @api
  */
 final readonly class ListApiTokensAction
 {

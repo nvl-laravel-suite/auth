@@ -8,6 +8,8 @@ use InvalidArgumentException;
 
 /**
  * Carries stored passkey material into a stateless ceremony verifier.
+ *
+ * @api
  */
 final readonly class PasskeyCredential
 {

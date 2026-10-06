@@ -16,6 +16,8 @@ use Nvl\Support\Tenancy\Contracts\TenantRunner;
 
 /**
  * Resolves public, non-secret invitation context before host provisioning.
+ *
+ * @api
  */
 final readonly class PreviewInvitationAction
 {

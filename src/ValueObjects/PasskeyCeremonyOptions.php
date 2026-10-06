@@ -10,6 +10,8 @@ use JsonException;
 
 /**
  * Carries browser-safe WebAuthn options and encrypted-at-rest adapter state.
+ *
+ * @api
  */
 final readonly class PasskeyCeremonyOptions
 {

@@ -36,6 +36,8 @@ use Throwable;
 
 /**
  * Establishes a Laravel session after passwordless identity proof succeeds.
+ *
+ * @api
  */
 final readonly class EstablishAuthenticatedSessionAction
 {

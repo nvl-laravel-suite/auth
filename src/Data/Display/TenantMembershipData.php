@@ -9,8 +9,12 @@ use Nvl\Data\Traits\DataTransform;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
+/**
+ * Exposes only tenant-safe membership and allowlisted principal identity fields.
+ *
+ * @api
+ */
 #[TypeScript]
-/** Exposes only tenant-safe membership and allowlisted principal identity fields. */
 final class TenantMembershipData extends Data
 {
     use DataTransform;

@@ -18,6 +18,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Starts one encrypted TOTP enrollment.
+ *
+ * @api
  */
 final readonly class StartTotpEnrollmentAction
 {

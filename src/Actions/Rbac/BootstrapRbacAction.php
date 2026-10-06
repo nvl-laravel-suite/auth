@@ -20,6 +20,8 @@ use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Bootstraps RBAC storage without fabricating a privileged human principal.
+ *
+ * @api
  */
 final readonly class BootstrapRbacAction
 {

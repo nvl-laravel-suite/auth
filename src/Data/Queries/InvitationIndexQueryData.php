@@ -12,10 +12,14 @@ use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Mappers\CamelCaseMapper;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
+/**
+ * Validated invitation management filters over queryable package fields.
+ *
+ * @api
+ */
 #[MapInputName(CamelCaseMapper::class)]
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]
-/** Validated invitation management filters over queryable package fields. */
 final class InvitationIndexQueryData extends Data
 {
     use DataTransform;

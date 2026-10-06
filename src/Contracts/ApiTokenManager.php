@@ -11,6 +11,8 @@ use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
 
 /**
  * Manages provider-owned personal access tokens without Auth projections.
+ *
+ * @api
  */
 interface ApiTokenManager
 {

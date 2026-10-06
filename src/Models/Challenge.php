@@ -29,6 +29,8 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
  * @property CarbonImmutable $expires_at
  * @property CarbonImmutable|null $consumed_at
  * @property CarbonImmutable|null $revoked_at
+ *
+ * @api
  */
 #[UseFactory(ChallengeFactory::class)]
 final class Challenge extends AuthModel

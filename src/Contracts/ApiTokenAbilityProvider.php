@@ -8,6 +8,8 @@ use Illuminate\Contracts\Auth\Authenticatable;
 
 /**
  * Supplies the API-token abilities a host subject may request.
+ *
+ * @api
  */
 interface ApiTokenAbilityProvider
 {

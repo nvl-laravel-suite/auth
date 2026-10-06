@@ -20,6 +20,8 @@ use SensitiveParameter;
 
 /**
  * Confirms a pending TOTP credential with a valid non-replayed code.
+ *
+ * @api
  */
 final readonly class ConfirmTotpEnrollmentAction
 {

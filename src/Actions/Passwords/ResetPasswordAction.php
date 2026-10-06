@@ -27,6 +27,8 @@ use SensitiveParameter;
 
 /**
  * Consumes a Laravel password-broker token and updates the host credential.
+ *
+ * @api
  */
 final readonly class ResetPasswordAction
 {

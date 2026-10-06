@@ -14,6 +14,8 @@ use Nvl\Auth\Services\UserLocator;
 
 /**
  * Shows one package principal and its effective access assignments.
+ *
+ * @api
  */
 final readonly class ShowUserAction
 {

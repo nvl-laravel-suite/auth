@@ -13,7 +13,11 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RoleHierarchy;
 
-/** Renders the complete package role hierarchy. */
+/**
+ * Renders the complete package role hierarchy.
+ *
+ * @api
+ */
 final readonly class ListRoleHierarchyAction
 {
     /** Create the hierarchy read use case. */

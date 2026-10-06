@@ -14,6 +14,8 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 
 /**
  * Lists first-party authentication clients.
+ *
+ * @api
  */
 final readonly class ListAuthClientsAction
 {

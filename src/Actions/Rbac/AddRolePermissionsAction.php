@@ -15,7 +15,11 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacAssignmentService;
 
-/** Adds permissions to a role without replacing existing assignments. */
+/**
+ * Adds permissions to a role without replacing existing assignments.
+ *
+ * @api
+ */
 final readonly class AddRolePermissionsAction
 {
     /** Create the additive role permission use case. */

@@ -16,7 +16,11 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\MembershipLocator;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
-/** Shows an allowlisted membership and principal projection. */
+/**
+ * Shows an allowlisted membership and principal projection.
+ *
+ * @api
+ */
 final readonly class ShowMembershipAction
 {
     public function __construct(

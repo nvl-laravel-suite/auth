@@ -14,7 +14,11 @@ use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 
-/** Lists package permissions and assignment counts. */
+/**
+ * Lists package permissions and assignment counts.
+ *
+ * @api
+ */
 final readonly class ListPermissionsAction
 {
     /** Create the permission listing use case. */

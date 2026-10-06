@@ -17,6 +17,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Revokes one TOTP credential as a containment operation.
+ *
+ * @api
  */
 final readonly class RevokeTotpCredentialAction
 {

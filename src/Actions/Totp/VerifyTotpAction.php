@@ -20,6 +20,8 @@ use SensitiveParameter;
 
 /**
  * Verifies a TOTP proof and advances its replay cursor atomically.
+ *
+ * @api
  */
 final readonly class VerifyTotpAction
 {

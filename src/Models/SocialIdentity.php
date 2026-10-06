@@ -22,6 +22,8 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
  * @property array<string, mixed>|null $profile
  * @property CarbonImmutable|null $last_used_at
  * @property CarbonImmutable|null $revoked_at
+ *
+ * @api
  */
 #[UseFactory(SocialIdentityFactory::class)]
 final class SocialIdentity extends AuthModel

@@ -20,6 +20,8 @@ use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Atomically synchronizes the complete contributed Spatie RBAC catalog.
+ *
+ * @api
  */
 final readonly class SynchronizeRbacAction
 {

@@ -13,6 +13,8 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 
 /**
  * Returns one authorized first-party authentication client.
+ *
+ * @api
  */
 final readonly class ShowAuthClientAction
 {

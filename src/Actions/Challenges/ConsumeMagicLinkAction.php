@@ -13,6 +13,8 @@ use Nvl\Auth\Services\FeatureGate;
 
 /**
  * Orchestrates magic-link admission through the canonical challenge consumer.
+ *
+ * @api
  */
 final readonly class ConsumeMagicLinkAction
 {

@@ -17,6 +17,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Rotates one provider-owned personal access token.
+ *
+ * @api
  */
 final readonly class RotateApiTokenAction
 {

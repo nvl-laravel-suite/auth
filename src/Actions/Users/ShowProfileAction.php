@@ -15,6 +15,8 @@ use Nvl\Auth\Services\UserLocator;
 
 /**
  * Returns the authenticated package principal profile.
+ *
+ * @api
  */
 final readonly class ShowProfileAction
 {

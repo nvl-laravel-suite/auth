@@ -15,7 +15,11 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacConsumerLimits;
 use Nvl\Auth\Services\RbacOptionReadService;
 
-/** Resolves bounded role suggestions for typeahead consumers. */
+/**
+ * Resolves bounded role suggestions for typeahead consumers.
+ *
+ * @api
+ */
 final readonly class SuggestRolesAction
 {
     /** Create the role suggestion use case. */

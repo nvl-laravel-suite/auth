@@ -14,7 +14,11 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
 
-/** Shows one permission and its role assignments. */
+/**
+ * Shows one permission and its role assignments.
+ *
+ * @api
+ */
 final readonly class ShowPermissionAction
 {
     /** Create the permission read use case. */

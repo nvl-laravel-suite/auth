@@ -19,6 +19,8 @@ use Nvl\Auth\ValueObjects\AuthPipelineContext;
 
 /**
  * Validates one hosted-client authentication start request.
+ *
+ * @api
  */
 final readonly class StartAuthClientAction
 {

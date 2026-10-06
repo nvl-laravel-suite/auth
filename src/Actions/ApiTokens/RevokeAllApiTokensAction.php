@@ -15,6 +15,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Revokes every provider-owned token for one subject.
+ *
+ * @api
  */
 final readonly class RevokeAllApiTokensAction
 {

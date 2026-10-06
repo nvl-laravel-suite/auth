@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Enums;
 
-/** Declares the bounded tenant-aware authentication bootstrap operations. */
+/**
+ * Declares the bounded tenant-aware authentication bootstrap operations.
+ *
+ * @api
+ */
 enum TenantAuthenticationPurpose: string
 {
     case Login = 'login';

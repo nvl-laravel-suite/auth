@@ -16,6 +16,8 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
  * Value-only invitation state for management lists and trusted lookup results.
+ *
+ * @api
  */
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]
@@ -53,6 +55,8 @@ final class InvitationReadData extends Data
 
     /**
      * Build a read projection from one already loaded invitation.
+     *
+     * @internal
      */
     public static function fromModel(
         Invitation $invitation,

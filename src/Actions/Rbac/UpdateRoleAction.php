@@ -18,7 +18,11 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
 use Nvl\Auth\Services\RoleHierarchy;
 
-/** Updates one package role and its permission assignment. */
+/**
+ * Updates one package role and its permission assignment.
+ *
+ * @api
+ */
 final readonly class UpdateRoleAction
 {
     /** Create the role update use case. */

@@ -20,6 +20,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Revokes existing recovery codes and issues one new one-time batch.
+ *
+ * @api
  */
 final readonly class RegenerateRecoveryCodesAction
 {

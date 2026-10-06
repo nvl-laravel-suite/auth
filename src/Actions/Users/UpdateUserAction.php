@@ -21,6 +21,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Updates one package principal without changing its access assignment.
+ *
+ * @api
  */
 final readonly class UpdateUserAction
 {

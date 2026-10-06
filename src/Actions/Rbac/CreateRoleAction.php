@@ -23,7 +23,11 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 
-/** Creates one package role and permission assignment. */
+/**
+ * Creates one package role and permission assignment.
+ *
+ * @api
+ */
 final readonly class CreateRoleAction
 {
     /** Create the role creation use case. */

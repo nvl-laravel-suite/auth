@@ -9,6 +9,8 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
  * Revokes credentials and sessions when a principal lifecycle transition requires containment.
+ *
+ * @api
  */
 interface PrincipalSessionContainment
 {

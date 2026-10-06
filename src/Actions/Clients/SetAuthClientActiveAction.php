@@ -15,6 +15,8 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 
 /**
  * Activates or deactivates one first-party authentication client.
+ *
+ * @api
  */
 final readonly class SetAuthClientActiveAction
 {

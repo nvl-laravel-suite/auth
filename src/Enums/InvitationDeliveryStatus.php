@@ -6,6 +6,8 @@ namespace Nvl\Auth\Enums;
 
 /**
  * Describes the current host-reported outcome for one invitation delivery.
+ *
+ * @api
  */
 enum InvitationDeliveryStatus: string
 {

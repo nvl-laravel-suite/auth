@@ -21,6 +21,8 @@ use Throwable;
 
 /**
  * Completes one server-owned pending tenant selection after global authentication.
+ *
+ * @api
  */
 final readonly class CompletePendingTenantAuthenticationIntentAction
 {

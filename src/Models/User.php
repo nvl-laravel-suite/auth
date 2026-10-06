@@ -47,6 +47,8 @@ use Spatie\Permission\Traits\HasRoles;
  * @property CarbonImmutable|null $locked_until
  * @property string|null $remember_token
  * @property CarbonImmutable|null $deleted_at
+ *
+ * @api
  */
 #[UseFactory(UserFactory::class)]
 class User extends Authenticatable implements CanResetPasswordContract, HasApiTokensContract, HasLocalePreference, MustVerifyEmailContract

@@ -15,6 +15,8 @@ use Nvl\Auth\Services\SecretHasher;
 
 /**
  * Refreshes activity for an existing client-session correlation.
+ *
+ * @api
  */
 final readonly class TouchAuthClientSessionAction
 {

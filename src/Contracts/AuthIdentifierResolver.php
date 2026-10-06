@@ -8,6 +8,8 @@ use Illuminate\Contracts\Auth\Authenticatable;
 
 /**
  * Resolves a login identifier through host authentication authority.
+ *
+ * @api
  */
 interface AuthIdentifierResolver
 {

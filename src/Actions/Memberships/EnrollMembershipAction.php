@@ -20,7 +20,11 @@ use Nvl\Auth\Services\TenantMembershipAssignments;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 
-/** Enrolls or safely reactivates one tenant membership. */
+/**
+ * Enrolls or safely reactivates one tenant membership.
+ *
+ * @api
+ */
 final readonly class EnrollMembershipAction
 {
     public function __construct(

@@ -13,10 +13,14 @@ use Spatie\LaravelData\Mappers\CamelCaseMapper;
 use Spatie\LaravelData\Mappers\SnakeCaseMapper;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
+/**
+ * Selects the recipient and revision for an ownership transfer.
+ *
+ * @api
+ */
 #[MapInputName(SnakeCaseMapper::class)]
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]
-/** Selects the recipient and revision for an ownership transfer. */
 final class TransferMembershipOwnershipData extends Data
 {
     use DataTransform;

@@ -16,6 +16,8 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 
 /**
  * Updates one first-party authentication client.
+ *
+ * @api
  */
 final readonly class UpdateAuthClientAction
 {

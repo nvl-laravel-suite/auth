@@ -30,6 +30,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Confirms and contains credentials before self-service principal deletion.
+ *
+ * @api
  */
 final readonly class DeleteOwnAccountAction
 {

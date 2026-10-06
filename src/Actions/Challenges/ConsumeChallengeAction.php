@@ -18,6 +18,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Atomically verifies and consumes one package challenge.
+ *
+ * @internal
  */
 final readonly class ConsumeChallengeAction
 {

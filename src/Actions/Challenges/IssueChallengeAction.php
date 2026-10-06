@@ -25,6 +25,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Issues one hashed challenge and emits a transport-neutral delivery payload.
+ *
+ * @internal
  */
 final readonly class IssueChallengeAction
 {

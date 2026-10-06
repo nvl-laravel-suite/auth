@@ -15,6 +15,8 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 
 /**
  * Deletes one Auth client after host authorization.
+ *
+ * @api
  */
 final readonly class DeleteAuthClientAction
 {

@@ -16,6 +16,8 @@ use Nvl\Auth\Services\InvitationDeliveryMetadataPolicy;
 
 /**
  * Orchestrates the canonical invitation listing Action into value-only projections.
+ *
+ * @api
  */
 final readonly class ListInvitationProjectionsAction
 {

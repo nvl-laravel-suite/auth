@@ -8,6 +8,8 @@ use Nvl\Auth\Models\TotpCredential;
 
 /**
  * Returns a pending TOTP credential and one-time provisioning material.
+ *
+ * @api
  */
 final readonly class TotpEnrollment
 {

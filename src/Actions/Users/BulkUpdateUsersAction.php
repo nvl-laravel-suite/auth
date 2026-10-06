@@ -28,6 +28,8 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
  * Applies one bounded principal lifecycle operation atomically.
+ *
+ * @api
  */
 final readonly class BulkUpdateUsersAction
 {

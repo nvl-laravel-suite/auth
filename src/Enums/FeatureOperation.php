@@ -6,6 +6,8 @@ namespace Nvl\Auth\Enums;
 
 /**
  * Describes the lifecycle operation requested from an Auth feature.
+ *
+ * @api
  */
 enum FeatureOperation: string
 {

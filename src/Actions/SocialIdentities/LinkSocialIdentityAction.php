@@ -20,6 +20,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Links verified external claims to one host-owned subject.
+ *
+ * @api
  */
 final readonly class LinkSocialIdentityAction
 {

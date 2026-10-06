@@ -27,14 +27,18 @@ requests a fresh verification delivery.
 
 - `RequestMagicLinkAction`, `ConsumeMagicLinkAction`
 - `RequestSecurityCodeAction`, `VerifySecurityCodeAction`
-- lower-level `IssueChallengeAction`, `ConsumeChallengeAction`,
-  `ConsumeChallengeByIdAction`
 - `CreateInvitationAction`, `PreviewInvitationAction`, `AcceptInvitationAction`
 - `RegisterInvitationAction`, `ResendInvitationAction`,
   `RevokeInvitationAction`, `ListInvitationsAction`
 - value-only `ListInvitationProjectionsAction` and
   `FindActiveInvitationAction`
 - `RecordInvitationDeliveryOutcomeAction`
+
+`IssueChallengeAction`, `ConsumeChallengeAction`, and `ConsumeChallengeByIdAction`
+are internal challenge steps. Migrate direct calls to the complete
+`RequestMagicLinkAction`/`ConsumeMagicLinkAction` or
+`RequestSecurityCodeAction`/`VerifySecurityCodeAction` workflow so eligibility,
+challenge state, delivery, and single-use checks stay together.
 
 Magic links contain one opaque token and one numeric fallback code for the same
 single-use challenge. Token-only callbacks carry `challengeId` and the chosen
@@ -99,7 +103,7 @@ configured package namespace.
 ## Audit and cleanup
 
 - `ListAuthAuditsAction`, `ShowAuthAuditAction`
-- `PruneAuthStateAction`
+- Run `nvl:auth:prune` for retention cleanup; `PruneAuthStateAction` is internal.
 
 The `AuthAuditRecorder` contract is used after successful or failed package
 transitions. Configure a host implementation under

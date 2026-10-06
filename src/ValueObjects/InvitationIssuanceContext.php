@@ -10,6 +10,8 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Carries trusted host issuance policy that must never be hydrated from public input.
+ *
+ * @api
  */
 final readonly class InvitationIssuanceContext
 {

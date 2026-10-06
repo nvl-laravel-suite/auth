@@ -19,6 +19,8 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
  * Bounded role catalog row containing only allowlisted assignment identifiers.
+ *
+ * @api
  */
 #[MapOutputName(CamelCaseMapper::class)]
 #[TypeScript]
@@ -56,6 +58,8 @@ final class RoleListItemData extends Data
 
     /**
      * Build a catalog row without triggering relationship queries.
+     *
+     * @internal
      */
     public static function fromModel(Role $role): self
     {

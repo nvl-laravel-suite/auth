@@ -27,6 +27,8 @@ use Throwable;
 
 /**
  * Verifies a passkey assertion and advances its signature counter.
+ *
+ * @api
  */
 final readonly class FinishPasskeyAuthenticationAction
 {

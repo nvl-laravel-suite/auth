@@ -26,6 +26,8 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
  * @property bool $backed_up
  * @property CarbonImmutable|null $last_used_at
  * @property CarbonImmutable|null $revoked_at
+ *
+ * @api
  */
 #[UseFactory(PasskeyFactory::class)]
 final class Passkey extends AuthModel

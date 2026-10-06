@@ -23,6 +23,8 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
  * @property array<string, mixed>|null $metadata
  * @property bool $is_active
  * @property CarbonImmutable|null $last_used_at
+ *
+ * @api
  */
 #[UseFactory(AuthClientFactory::class)]
 final class AuthClient extends AuthModel

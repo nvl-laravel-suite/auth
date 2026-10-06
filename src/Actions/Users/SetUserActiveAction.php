@@ -25,6 +25,8 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
  * Enables or disables one package principal and contains active tokens on disable.
+ *
+ * @api
  */
 final readonly class SetUserActiveAction
 {

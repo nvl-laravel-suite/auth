@@ -18,7 +18,11 @@ use Nvl\Auth\Services\AuthTenantRbacQueries;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 
-/** Lists a safe, stable role catalog for non-HTTP consumers. */
+/**
+ * Lists a safe, stable role catalog for non-HTTP consumers.
+ *
+ * @api
+ */
 final readonly class ListRoleCatalogAction
 {
     /** Create the role catalog use case. */

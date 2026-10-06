@@ -17,6 +17,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Updates provider-owned token metadata.
+ *
+ * @api
  */
 final readonly class UpdateApiTokenAction
 {

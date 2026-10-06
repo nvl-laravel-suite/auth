@@ -22,7 +22,11 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 
-/** Transfers tenant ownership inside one locked transaction. */
+/**
+ * Transfers tenant ownership inside one locked transaction.
+ *
+ * @api
+ */
 final readonly class TransferMembershipOwnershipAction
 {
     public function __construct(

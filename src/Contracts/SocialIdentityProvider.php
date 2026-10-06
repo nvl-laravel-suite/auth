@@ -8,6 +8,8 @@ use Nvl\Auth\ValueObjects\ExternalIdentity;
 
 /**
  * Adapts an external identity acquisition provider such as Laravel Socialite.
+ *
+ * @api
  */
 interface SocialIdentityProvider
 {

@@ -30,6 +30,8 @@ use Spatie\Permission\Models\Permission as SpatiePermission;
  * @property array<string, mixed>|null $metadata
  * @property-read int|null $users_count
  * @property-read int|null $roles_count
+ *
+ * @api
  */
 #[UseFactory(PermissionFactory::class)]
 class Permission extends SpatiePermission

@@ -9,6 +9,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Resolves a package subject reference back to its host authenticatable.
+ *
+ * @api
  */
 interface AuthSubjectResolver
 {

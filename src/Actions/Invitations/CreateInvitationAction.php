@@ -37,6 +37,8 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Issues one simple invitation and publishes its delivery payload after commit.
+ *
+ * @api
  */
 final readonly class CreateInvitationAction
 {

@@ -19,6 +19,8 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
  * Replaces one principal's direct permission assignment.
+ *
+ * @api
  */
 final readonly class SyncUserPermissionsAction
 {

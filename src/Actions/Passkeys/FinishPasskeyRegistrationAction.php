@@ -25,6 +25,8 @@ use Throwable;
 
 /**
  * Finishes and persists one verified passkey registration.
+ *
+ * @api
  */
 final readonly class FinishPasskeyRegistrationAction
 {

@@ -10,6 +10,8 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Carries optional transport context into authentication use cases.
+ *
+ * @api
  */
 final readonly class AuthenticationRequestContext
 {

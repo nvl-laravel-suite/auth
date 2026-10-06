@@ -26,6 +26,8 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
  * @property string|null $user_agent
  * @property string|null $request_id
  * @property array<string, mixed>|null $metadata
+ *
+ * @api
  */
 #[UseFactory(AuthAuditFactory::class)]
 final class AuthAudit extends AuthModel

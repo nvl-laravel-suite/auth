@@ -14,6 +14,8 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
  * Returns one authorized authentication audit fact.
+ *
+ * @api
  */
 final readonly class ShowAuthAuditAction
 {

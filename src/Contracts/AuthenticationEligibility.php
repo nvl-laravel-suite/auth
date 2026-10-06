@@ -9,6 +9,8 @@ use Nvl\Auth\Enums\AuthenticationPurpose;
 
 /**
  * Enforces host-replaceable subject eligibility before sensitive authentication operations.
+ *
+ * @api
  */
 interface AuthenticationEligibility
 {

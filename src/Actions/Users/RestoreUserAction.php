@@ -22,6 +22,8 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
  * Restores one soft-deleted package principal.
+ *
+ * @api
  */
 final readonly class RestoreUserAction
 {

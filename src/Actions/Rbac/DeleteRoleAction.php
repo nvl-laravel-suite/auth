@@ -16,7 +16,11 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
 
-/** Deletes one non-system package role. */
+/**
+ * Deletes one non-system package role.
+ *
+ * @api
+ */
 final readonly class DeleteRoleAction
 {
     /** Create the role deletion use case. */

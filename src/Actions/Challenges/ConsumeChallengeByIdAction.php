@@ -18,6 +18,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Consumes either credential of a compound challenge through its callback-safe identifier.
+ *
+ * @internal
  */
 final readonly class ConsumeChallengeByIdAction
 {

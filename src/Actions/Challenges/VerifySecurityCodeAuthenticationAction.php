@@ -21,6 +21,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  *
  * Delegation to the generic verification and session Actions is deliberate domain
  * orchestration: this entry point alone turns security-code proof into authentication.
+ *
+ * @api
  */
 final readonly class VerifySecurityCodeAuthenticationAction
 {

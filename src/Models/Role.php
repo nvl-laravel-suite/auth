@@ -34,6 +34,8 @@ use Spatie\Permission\Models\Role as SpatieRole;
  * @property array<string, mixed>|null $metadata
  * @property-read int|null $users_count
  * @property-read int|null $permissions_count
+ *
+ * @api
  */
 #[UseFactory(RoleFactory::class)]
 class Role extends SpatieRole

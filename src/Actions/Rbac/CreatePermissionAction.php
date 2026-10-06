@@ -19,7 +19,11 @@ use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 
-/** Creates one package permission. */
+/**
+ * Creates one package permission.
+ *
+ * @api
+ */
 final readonly class CreatePermissionAction
 {
     /** Create the permission creation use case. */

@@ -17,7 +17,11 @@ use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
 use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
-/** Clones one role's metadata and permission assignment under a new name. */
+/**
+ * Clones one role's metadata and permission assignment under a new name.
+ *
+ * @api
+ */
 final readonly class CloneRoleAction
 {
     /** Create the role cloning use case. */

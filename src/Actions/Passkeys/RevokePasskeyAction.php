@@ -17,6 +17,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Revokes one subject-owned passkey as a containment operation.
+ *
+ * @api
  */
 final readonly class RevokePasskeyAction
 {

@@ -20,7 +20,11 @@ use Nvl\Auth\Services\RbacEntityLocator;
 use Nvl\Auth\Services\RbacPermissionGroupExpressions;
 use stdClass;
 
-/** Returns identity-free, constant-query analytics for one role. */
+/**
+ * Returns identity-free, constant-query analytics for one role.
+ *
+ * @api
+ */
 final readonly class ShowRoleAnalyticsAction
 {
     /** Create the per-role analytics use case. */

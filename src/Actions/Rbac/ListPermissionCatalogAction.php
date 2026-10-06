@@ -19,7 +19,11 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacPermissionGroupExpressions;
 
-/** Lists a safe, stable permission catalog for non-HTTP consumers. */
+/**
+ * Lists a safe, stable permission catalog for non-HTTP consumers.
+ *
+ * @api
+ */
 final readonly class ListPermissionCatalogAction
 {
     /** Create the permission catalog use case. */

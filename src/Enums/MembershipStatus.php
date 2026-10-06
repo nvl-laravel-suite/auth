@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Enums;
 
-/** Describes whether a tenant membership currently admits its principal. */
+/**
+ * Describes whether a tenant membership currently admits its principal.
+ *
+ * @api
+ */
 enum MembershipStatus: string
 {
     case Active = 'active';

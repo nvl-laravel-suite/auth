@@ -21,6 +21,8 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
  * Finds one active invitation through an explicitly trusted read boundary.
+ *
+ * @api
  */
 final readonly class FindActiveInvitationAction
 {

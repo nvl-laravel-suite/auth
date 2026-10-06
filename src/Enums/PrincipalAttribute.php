@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Enums;
 
-/** Canonical principal fields understood by package orchestration. */
+/**
+ * Canonical principal fields understood by package orchestration.
+ *
+ * @api
+ */
 enum PrincipalAttribute: string
 {
     case Id = 'id';

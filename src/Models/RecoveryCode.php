@@ -19,6 +19,8 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
  * @property string $code_hash
  * @property CarbonImmutable|null $used_at
  * @property CarbonImmutable|null $revoked_at
+ *
+ * @api
  */
 #[UseFactory(RecoveryCodeFactory::class)]
 final class RecoveryCode extends AuthModel

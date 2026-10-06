@@ -8,6 +8,8 @@ use InvalidArgumentException;
 
 /**
  * Carries typed use-case identity and bounded extension attributes.
+ *
+ * @api
  */
 final readonly class AuthPipelineContext
 {

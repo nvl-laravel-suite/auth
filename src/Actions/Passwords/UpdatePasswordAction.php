@@ -19,6 +19,8 @@ use SensitiveParameter;
 
 /**
  * Changes the current host subject's password after current-password proof.
+ *
+ * @api
  */
 final readonly class UpdatePasswordAction
 {

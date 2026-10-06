@@ -14,7 +14,11 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
 
-/** Resolves bounded mixed role IDs and names into stable projections. */
+/**
+ * Resolves bounded mixed role IDs and names into stable projections.
+ *
+ * @api
+ */
 final readonly class ResolveRoleIdentifiersAction
 {
     /** Create the role identifier resolution use case. */

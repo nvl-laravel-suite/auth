@@ -8,6 +8,8 @@ use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
 
 /**
  * Returns newly issued token metadata and its one-time Sanctum plaintext token.
+ *
+ * @api
  */
 final readonly class IssuedApiToken
 {

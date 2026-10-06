@@ -8,6 +8,8 @@ use Illuminate\Contracts\Auth\CanResetPassword;
 
 /**
  * Updates a host-owned password after package authorization succeeds.
+ *
+ * @api
  */
 interface PasswordUpdater
 {

@@ -16,6 +16,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Revokes every unused recovery code for one subject.
+ *
+ * @api
  */
 final readonly class RevokeRecoveryCodesAction
 {

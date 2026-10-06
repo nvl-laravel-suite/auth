@@ -21,6 +21,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Correlates an existing Laravel session with one first-party Auth client.
+ *
+ * @api
  */
 final readonly class RecordAuthClientSessionAction
 {

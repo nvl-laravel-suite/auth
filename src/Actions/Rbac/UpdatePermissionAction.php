@@ -19,7 +19,11 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
 
-/** Updates one package permission. */
+/**
+ * Updates one package permission.
+ *
+ * @api
+ */
 final readonly class UpdatePermissionAction
 {
     /** Create the permission update use case. */

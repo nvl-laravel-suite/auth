@@ -18,6 +18,8 @@ use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Creates or updates contributed role templates in Spatie Permission storage.
+ *
+ * @api
  */
 final readonly class SynchronizeRoleTemplatesAction
 {
