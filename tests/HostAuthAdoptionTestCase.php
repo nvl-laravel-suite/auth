@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests;
 
+use Illuminate\Foundation\Testing\DatabaseMigrations;
+
 /** Boots enabled Auth services while retaining a complete host integration snapshot. */
 abstract class HostAuthAdoptionTestCase extends DisabledAuthProviderTestCase
 {
+    use DatabaseMigrations;
+
     /** @var array<string, mixed> */
     public array $hostAuth = [];
 
@@ -18,6 +22,7 @@ abstract class HostAuthAdoptionTestCase extends DisabledAuthProviderTestCase
     {
         parent::defineEnvironment($app);
         $app['config']->set('nvl-auth.enabled', true);
+        $app['config']->set('nvl-auth.migrations.enabled', false);
         $app['config']->set('permission.teams', true);
         $app['config']->set('permission.column_names.team_foreign_key', 'host_team_id');
         $this->hostAuth = $app['config']->get('auth');
