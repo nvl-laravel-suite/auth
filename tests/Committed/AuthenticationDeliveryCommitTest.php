@@ -37,7 +37,6 @@ it('emits verification data without sending and marks the host email verified', 
     config()->set('nvl-auth.features.email_verification.enabled', true);
     $user = $this->user();
     Event::fake([AuthDeliveryRequested::class]);
-    app()->forgetInstance(DomainEventDispatcher::class);
     $connection = $user->getConnection();
     expect($connection->transactionLevel())->toBe(0);
     $connection->beginTransaction();
@@ -64,7 +63,6 @@ it('emits verification data without sending and marks the host email verified', 
 
 it('uses laravel password broker storage and emits delivery instead of notifications', function (): void {
     Event::fake([AuthDeliveryRequested::class]);
-    app()->forgetInstance(DomainEventDispatcher::class);
     $user = $this->user();
     $connection = $user->getConnection();
     expect($connection->transactionLevel())->toBe(0);
@@ -98,7 +96,6 @@ it('uses laravel password broker storage and emits delivery instead of notificat
 it('uses the original directly supplied invitation audit recorder after the owning commit', function (): void {
     config()->set('nvl-auth.features.invitations.enabled', true);
     Event::fake([AuthDeliveryRequested::class]);
-    app()->forgetInstance(DomainEventDispatcher::class);
     $originalRecorder = new class implements AuthAuditRecorder
     {
         /** @var list<string> */
