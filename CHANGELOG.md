@@ -16,6 +16,8 @@ All notable changes to `nvl/auth` are documented here.
 - Prepare lockstep major 5 with required and development NVL peer floors of `^5.0`. This candidate has not been tagged or published.
 - Default HTTP ingress, principal-model adoption, password-broker storage adoption and Spatie storage adoption to off.
 - Require explicit host targets; preserve host teams and use scoped audit services and one permission readiness hook.
+- Allow Spatie's provider-boot registrar wiring without probing adopted tables; subsequent runtime resolution still requires ready storage.
+- Invalidate scoped permission readiness after Auth tenant-storage activation, so new roles immediately use the activated tenant ownership.
 - Review [UPGRADING.md](UPGRADING.md) before adopting the new names and infrastructure boundaries.
 
 ## [2.2.1] - 2026-09-26

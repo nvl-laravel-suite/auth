@@ -690,6 +690,10 @@ final class AuthServiceProvider extends ServiceProvider
         $this->app->forgetInstance(PermissionRegistrar::class);
         $registrarReference = new PermissionRegistrarReference;
         $this->app->beforeResolving(PermissionRegistrar::class, function () use ($registrarReference): void {
+            // Spatie constructs the registrar while wiring the Gate during provider boot.
+            if (! $this->app->isBooted()) {
+                return;
+            }
             $teams = $this->app->make(PermissionStorageReadiness::class)->initialize();
             $registrar = $registrarReference->current();
             if ($registrar instanceof PermissionRegistrar) {

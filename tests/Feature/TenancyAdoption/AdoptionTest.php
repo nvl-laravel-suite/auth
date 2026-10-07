@@ -6,7 +6,6 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Models\Role;
-use Nvl\Auth\Services\PermissionStorageReadiness;
 use Nvl\Auth\Tests\Fixtures\AuthTenancyScenario;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Tenancy\Contracts\TenantMembershipAccess;
@@ -14,6 +13,26 @@ use Nvl\Tenancy\Exceptions\TenantConfigurationInvalid;
 use Nvl\Tenancy\Services\TenantAdoptionCoordinator;
 use Nvl\Tenancy\ValueObjects\PlatformOperation;
 use Nvl\Tenancy\ValueObjects\TenantAssignment;
+use Spatie\Permission\PermissionRegistrar;
+
+it('refreshes permission readiness after activation without a caller lifecycle reset', function (): void {
+    $scenario = new AuthTenancyScenario;
+    expect(app(PermissionRegistrar::class)->teams)->toBeFalse();
+    $coordinator = app(TenantAdoptionCoordinator::class);
+    $operation = new PlatformOperation('auth-test.adoption', 'system', 'fixture');
+    $plan = $coordinator->prepare(['auth'], [], $operation);
+    while (! $coordinator->backfill($plan, 100, $operation)) {
+        // Exercise the complete adoption graph before checking the activated runtime.
+    }
+    $coordinator->activate($plan, $operation);
+
+    expect(app(PermissionRegistrar::class)->teams)->toBeTrue();
+    $one = $scenario->run($scenario->a(), fn () => Role::findOrCreate('new-tenant-role', 'web'));
+    $two = $scenario->run($scenario->b(), fn () => Role::findOrCreate('new-tenant-role', 'web'));
+    expect($one->tenant_id)->toBe($scenario->a()->value)
+        ->and($two->tenant_id)->toBe($scenario->b()->value)
+        ->and($one->id)->not->toBe($two->id);
+});
 
 it('maps a shared legacy role into reviewed tenant memberships', function (): void {
     $scenario = new AuthTenancyScenario;
@@ -48,7 +67,6 @@ it('maps a shared legacy role into reviewed tenant memberships', function (): vo
 
     expect($coordinator->verify($plan)->errors)->toBe([]);
     $coordinator->activate($plan, $operation);
-    app()->forgetInstance(PermissionStorageReadiness::class);
     app(TenantMembershipAccess::class)->assertMember($one, $scenario->a());
     app(TenantMembershipAccess::class)->assertMember($two, $scenario->b());
     expect($scenario->run($scenario->a(), fn () => $one->fresh()->hasRole('manager')))->toBeTrue()

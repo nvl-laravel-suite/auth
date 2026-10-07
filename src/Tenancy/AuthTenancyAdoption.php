@@ -13,6 +13,7 @@ use Illuminate\Database\Schema\Builder;
 use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Models\Role;
+use Nvl\Auth\Services\PermissionStorageReadiness;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Tenancy\Exceptions\TenantBoundaryViolation;
 use Nvl\Support\Tenancy\Exceptions\TenantConfigurationInvalid;
@@ -40,6 +41,7 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
         private EffectiveTenantConnection $connections,
         private ConfigRepository $configuration,
         private PermissionRegistrar $registrar,
+        private PermissionStorageReadiness $permissionReadiness,
     ) {}
 
     /** Validate Auth's exact reviewed mapping metadata before preparation. */
@@ -245,6 +247,7 @@ final readonly class AuthTenancyAdoption implements TenantAdoptionAdapter, Tenan
         if (! $this->verify($plan)->passed()) {
             throw new TenantBoundaryViolation('Auth tenant schema did not verify after activation.');
         }
+        $this->permissionReadiness->invalidate();
     }
 
     /** Apply one already validated assignment. */

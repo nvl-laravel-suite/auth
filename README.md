@@ -32,6 +32,8 @@ See the [installation and publishing guide](https://github.com/nvl-laravel-suite
 
 Principal adoption (`nvl-auth.adoption.principal_model.enabled` with explicit `guard` and `provider`), password-broker storage (`adoption.password_broker.enabled` with explicit `broker`), and Spatie storage (`adoption.spatie_storage.enabled`) are independent and default to `false`. Installation preserves the complete host `auth` and `permission` configuration, including team scoping. Auth HTTP routes remain disabled until explicitly enabled. Adopted permission storage initializes lazily, fails closed when unavailable, and memoizes readiness per request/job; restart workers after changing adoption or tenancy configuration. Doctor reports each adopted target and effective storage.
 
+For a fresh installation, run the owned migrations before enabling Spatie storage adoption, then rebuild config and restart workers. Spatie's provider-boot registrar wiring does not probe tables; resolving permission services after boot requires the adopted storage to be ready, including when Artisan discovers permission commands.
+
 ## Quick reference
 
 | Item | Value |

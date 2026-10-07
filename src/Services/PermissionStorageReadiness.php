@@ -16,8 +16,18 @@ final class PermissionStorageReadiness
 
     private ?AuthException $failure = null;
 
+    private bool $awaitingTenantActivation = false;
+
     /** Retain live configuration and the package role model boundary. */
     public function __construct(private readonly Repository $configuration, private readonly AuthModelRegistry $models) {}
+
+    /** Recheck transitional readiness until the coordinator publishes active Auth storage. */
+    public function invalidate(): void
+    {
+        $this->teams = null;
+        $this->failure = null;
+        $this->awaitingTenantActivation = true;
+    }
 
     /** Initialize team state only after adopted storage can be verified. */
     public function initialize(): bool
@@ -49,7 +59,10 @@ final class PermissionStorageReadiness
                 }
                 $teams = $connection->table($stateTable)->where('resource', 'auth.roles')->where('state', 'active')->exists();
             }
-            $this->teams = $teams;
+            if ($teams || ! $this->awaitingTenantActivation) {
+                $this->teams = $teams;
+                $this->awaitingTenantActivation = false;
+            }
             $this->configuration->set('permission.teams', $teams);
 
             return $teams;

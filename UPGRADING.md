@@ -2,6 +2,8 @@
 
 ## Consumer contracts, committed events and runtime policy (5.x)
 
+Enable `adoption.spatie_storage.enabled` explicitly for consumers using NVL RBAC storage. On fresh databases, keep it disabled while installing the owned migrations, then enable it and rebuild config before exercising RBAC. Provider-boot registrar wiring performs no readiness queries; permission service resolution after boot still fails closed until storage is ready. Restart workers after changing adoption configuration.
+
 Prefer focused public interfaces in constructor injection; native implementations remain container defaults and host prebindings win. Returned models are documented identity/data handles: use package contracts for reads/writes and capability-specific batch readers instead of direct package queries. Enable the shipped Core PHPStan include in your host; do not invoke the suite workbench static audit command in a consumer.
 
 Events now carry immutable schemaVersion=1 and scalar/DTO snapshots. Replace model-bearing event fields with the IDs listed in [events](docs/events.md); load only through an authorized public reader when needed. Only six declared legacy `*Event` names are retained as PHP aliases for major 5, removal no earlier than major 6. Migrate exact imports/listeners/fakes to canonical names, replace suffix wildcard patterns explicitly, drain old queued payloads, rebuild event caches and restart workers. Framework Verified/PasswordReset remain native classes. Source-connection callbacks are process-local after-commit publication, not a durable outbox or exactly-once delivery.
