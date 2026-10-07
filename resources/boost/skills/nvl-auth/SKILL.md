@@ -58,7 +58,7 @@ host-injection examples and UPGRADING binding-precedence notes.
 4. Put reusable provider/invariant logic behind a typed contract or Service.
 5. Keep optional adapters lazy and fail closed through an unavailable adapter.
 6. Add HTTP routes only through the owning feature/surface family and preserve
-   `nvl-auth.feature` middleware.
+   `nvl.auth.feature` middleware.
 7. Install only tables required by enabled features. When a feature is enabled
    later, plan and reconcile with `nvl:auth:schema`; keep migrations idempotent.
    A globally disabled provider must remain passive unless migration loading is
