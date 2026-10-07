@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Nvl\Auth\Tests\Fixtures;
 
 use CBOR\ByteStringObject;
-use CBOR\Encoder;
 use CBOR\MapObject;
+use CBOR\TextStringObject;
 use Cose\Algorithm\Signature\ECDSA\ECSignature;
 use OpenSSLAsymmetricKey;
 use ParagonIE\ConstantTime\Base64UrlSafe;
@@ -86,11 +86,10 @@ PEM;
             .pack('n', strlen($this->credentialId))
             .$this->credentialId
             .$this->credentialPublicKey;
-        $attestationObject = (new Encoder)->encode([
-            'fmt' => 'none',
-            'attStmt' => MapObject::create(),
-            'authData' => ByteStringObject::create($authenticatorData),
-        ]);
+        $attestationObject = (string) MapObject::create()
+            ->add(TextStringObject::create('fmt'), TextStringObject::create('none'))
+            ->add(TextStringObject::create('attStmt'), MapObject::create())
+            ->add(TextStringObject::create('authData'), ByteStringObject::create($authenticatorData));
 
         return [
             'id' => $this->credentialId(),
