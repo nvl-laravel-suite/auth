@@ -50,7 +50,7 @@ it('restores delivery context in a genuine database worker and clears it between
 <?php
 return Illuminate\Foundation\Application::configure(basePath: dirname(__DIR__))
     ->withProviders([
-        Nvl\Support\Providers\SupportServiceProvider::class,
+        Nvl\Support\Providers\LocaleServiceProvider::class, Nvl\Support\Providers\SupportServiceProvider::class,
         Nvl\Data\Providers\DataServiceProvider::class,
         Nvl\Auth\Tests\Fixtures\AuthDeliveryWorkerProvider::class,
         Nvl\Tenancy\Providers\TenancyServiceProvider::class,
