@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Contracts\DomainEvent;
+use ReflectionProperty;
 
 /**
  * Publishes one privacy-bounded invitation acceptance after storage commits.
@@ -41,7 +42,7 @@ final class InvitationAccepted implements DomainEvent
             'type' => $this->type,
             'purpose' => $this->purpose,
             'subject' => $this->subject,
-            'schemaVersion' => $this->schemaVersion,
+            'schemaVersion' => (new ReflectionProperty($this, 'schemaVersion'))->isInitialized($this) ? $this->schemaVersion : 1,
         ];
 
         if (isset($this->acceptedAt)) {

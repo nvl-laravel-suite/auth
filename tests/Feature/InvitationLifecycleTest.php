@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Nvl\Auth\Actions\Invitations\AcceptInvitationAction;
@@ -30,6 +29,7 @@ use Nvl\Auth\Models\User;
 use Nvl\Auth\Tests\Fixtures\RejectLoginStage;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Contracts\DomainEvent;
 
 beforeEach(function (): void {
     config()->set('nvl-auth.features.invitations.enabled', true);
@@ -200,7 +200,7 @@ it('keeps invitation acceptance events privacy bounded', function (): void {
     );
     $serialized = serialize($event);
 
-    expect($event)->toBeInstanceOf(ShouldDispatchAfterCommit::class)
+    expect($event)->toBeInstanceOf(DomainEvent::class)
         ->and(get_object_vars($event))->toHaveKeys([
             'invitationId',
             'type',
