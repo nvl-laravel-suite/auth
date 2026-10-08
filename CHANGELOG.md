@@ -3,7 +3,9 @@
 
 All notable changes to `nvl/auth` are documented here.
 
-## [5.0.0] — release candidate (unpublished)
+## [Unreleased]
+
+## [5.0.0] - 2026-10-08
 
 ### Added
 
@@ -13,7 +15,7 @@ All notable changes to `nvl/auth` are documented here.
 
 - Register focused defaults transiently with `bindIf` and existing public extension defaults conditionally with their native lifetimes. Preserve host membership bindings while replacing only Core's exact native unshared disabled fallback when Auth membership enforcement is enabled.
 - Classify the supported consumer PHP surface with explicit source annotations and restrict package model handles to declared identity and in-memory read fields; preserve existing workflow behavior and concrete signatures.
-- Prepare lockstep major 5 with required and development NVL peer floors of `^5.0`. This candidate has not been tagged or published.
+- Adopt lockstep major 5 with required and development NVL peer floors of `^5.0`.
 - Default HTTP ingress, principal-model adoption, password-broker storage adoption and Spatie storage adoption to off.
 - Require explicit host targets; preserve host teams and use scoped audit services and one permission readiness hook.
 - Allow Spatie's provider-boot registrar wiring without probing adopted tables; subsequent runtime resolution still requires ready storage.
