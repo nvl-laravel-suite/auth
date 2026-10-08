@@ -6,6 +6,7 @@ namespace Nvl\Auth\Http\Controllers\Public;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Timebox;
 use Nvl\Auth\Actions\Passwords\RequestPasswordResetAction;
 use Nvl\Auth\Actions\Passwords\ResetPasswordAction;
 use Nvl\Auth\Data\Mutations\RequestPasswordResetData;
@@ -26,8 +27,11 @@ final class PasswordController
         RequestPasswordResetData $data,
         Request $request,
         RequestPasswordResetAction $action,
+        Timebox $timebox,
     ): JsonResponse {
-        $action->execute($data, $request->getPreferredLanguage());
+        $timebox->dontReturnEarly()->call(static function () use ($action, $data, $request): void {
+            $action->execute($data, $request->getPreferredLanguage());
+        }, 200_000);
 
         return response()->json([
             'data' => null,

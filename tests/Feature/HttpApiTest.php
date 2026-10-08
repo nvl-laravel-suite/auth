@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Timebox;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Models\AuthAudit;
@@ -57,7 +58,46 @@ it('serves the authorized client and audit management lifecycle', function (): v
         ->assertJsonPath('data.metadata.surface', 'web');
 });
 
-it('keeps public magic-link account discovery neutral while binding known subjects', function (): void {
+it('timeboxes known and unknown account requests while keeping responses neutral', function (string $path, AuthFeature $feature, string $identifier): void {
+    app()->instance('routes.cached', false);
+    config()->set('nvl-auth.routes.enabled', true);
+    config()->set('nvl-auth.routes.public.enabled', true);
+    config()->set("nvl-auth.features.{$feature->value}.enabled", true);
+    config()->set("nvl-auth.features.{$feature->value}.routes.public.enabled", true);
+    Event::fake([AuthDeliveryRequested::class]);
+    (new RouteServiceProvider(app()))->boot(
+        app(Router::class),
+        app(AuthConfiguration::class),
+        app(FeatureManifest::class),
+        app(FeatureGate::class),
+    );
+    $user = $this->user();
+    $timebox = Mockery::mock(Timebox::class);
+    $timebox->shouldReceive('dontReturnEarly')->twice()->andReturnSelf();
+    $timebox->shouldReceive('call')->twice()->withArgs(static fn (callable $callback, int $duration): bool => $duration === 200_000)
+        ->andReturnUsing(static fn (callable $callback): mixed => $callback());
+    app()->instance(Timebox::class, $timebox);
+
+    $extra = $feature === AuthFeature::SecurityCodes ? ['purpose' => 'passwordless_login'] : [];
+    $unknown = $this->postJson('/nvl/api/v1/auth/'.$path, [$identifier => 'unknown@example.test', ...$extra])
+        ->assertAccepted();
+    $known = $this->postJson('/nvl/api/v1/auth/'.$path, [$identifier => $user->email, ...$extra])
+        ->assertAccepted();
+
+    expect($known->json())->toBe($unknown->json());
+
+    Event::assertDispatchedTimes(AuthDeliveryRequested::class, 1);
+    Event::assertDispatched(
+        AuthDeliveryRequested::class,
+        static fn (AuthDeliveryRequested $event): bool => $event->request->feature === $feature,
+    );
+})->with([
+    ['magic-links', AuthFeature::MagicLinks, 'recipient'],
+    ['security-codes/authentication', AuthFeature::SecurityCodes, 'recipient'],
+    ['password/forgot', AuthFeature::Password, 'identifier'],
+]);
+
+it('rejects oversized magic-link purposes identically for known and unknown accounts', function (int $length): void {
     app()->instance('routes.cached', false);
     config()->set('nvl-auth.routes.enabled', true);
     config()->set('nvl-auth.routes.public.enabled', true);
@@ -71,17 +111,18 @@ it('keeps public magic-link account discovery neutral while binding known subjec
         app(FeatureGate::class),
     );
     $user = $this->user();
+    $purpose = str_repeat('a', $length);
+    $unknown = $this->postJson('/nvl/api/v1/auth/magic-links', [
+        'recipient' => 'unknown@example.test',
+        'purpose' => $purpose,
+    ]);
+    $known = $this->postJson('/nvl/api/v1/auth/magic-links', [
+        'recipient' => $user->email,
+        'purpose' => $purpose,
+    ]);
 
-    $this->postJson('/nvl/api/v1/auth/magic-links', ['recipient' => 'unknown@example.test'])
-        ->assertAccepted()
-        ->assertJsonPath('code', 'magic_link_requested');
-    $this->postJson('/nvl/api/v1/auth/magic-links', ['recipient' => $user->email])
-        ->assertAccepted()
-        ->assertJsonPath('code', 'magic_link_requested');
-
-    Event::assertDispatchedTimes(AuthDeliveryRequested::class, 1);
-    Event::assertDispatched(
-        AuthDeliveryRequested::class,
-        static fn (AuthDeliveryRequested $event): bool => $event->request->feature === AuthFeature::MagicLinks,
-    );
-});
+    $unknown->assertUnprocessable()->assertJsonValidationErrors('purpose');
+    $known->assertUnprocessable()->assertJsonValidationErrors('purpose');
+    expect($known->json())->toBe($unknown->json());
+    Event::assertNotDispatched(AuthDeliveryRequested::class);
+})->with([121, 255]);

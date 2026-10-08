@@ -22,6 +22,9 @@ rows. Do not log Action result objects containing issuance secrets.
   policy before changing credentials.
 - Public magic-link requests resolve through the configured user provider, emit no
   delivery for unknown identifiers, and return the same neutral HTTP response.
+- Account-bound magic-link, security-code and password-reset HTTP requests use a
+  200 ms minimum Laravel Timebox without early return. Queue delivery listeners;
+  host work exceeding that floor can still expose account-dependent timing.
 - Challenges bind message type, purpose, normalized recipient, and secret.
   Compound magic links store independently purpose-separated hashes for their
   link token and fallback code; consuming either credential consumes both.

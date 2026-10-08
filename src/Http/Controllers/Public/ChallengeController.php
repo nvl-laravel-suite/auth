@@ -6,6 +6,7 @@ namespace Nvl\Auth\Http\Controllers\Public;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Timebox;
 use Nvl\Auth\Actions\Authentication\EstablishAuthenticatedSessionAction;
 use Nvl\Auth\Actions\Challenges\ConsumeMagicLinkAction;
 use Nvl\Auth\Actions\Challenges\RequestMagicLinkAuthenticationAction;
@@ -42,8 +43,11 @@ final class ChallengeController
         Request $request,
         RequestMagicLinkAuthenticationAction $action,
         TenantHttpResolver $tenants,
+        Timebox $timebox,
     ): JsonResponse {
-        $action->execute($data, $request->getPreferredLanguage(), $this->requestedTenant($request, $tenants));
+        $timebox->dontReturnEarly()->call(function () use ($action, $data, $request, $tenants): void {
+            $action->execute($data, $request->getPreferredLanguage(), $this->requestedTenant($request, $tenants));
+        }, 200_000);
 
         return response()->json(['data' => null, 'code' => 'magic_link_requested', 'message' => trans('nvl-auth::responsecode.magic_link_requested')], 202);
     }
@@ -112,12 +116,15 @@ final class ChallengeController
         Request $request,
         RequestSecurityCodeAuthenticationAction $action,
         TenantHttpResolver $tenants,
+        Timebox $timebox,
     ): JsonResponse {
-        $action->execute(
-            $data,
-            locale: $request->getPreferredLanguage(),
-            tenant: $this->requestedTenant($request, $tenants),
-        );
+        $timebox->dontReturnEarly()->call(function () use ($action, $data, $request, $tenants): void {
+            $action->execute(
+                $data,
+                locale: $request->getPreferredLanguage(),
+                tenant: $this->requestedTenant($request, $tenants),
+            );
+        }, 200_000);
 
         return response()->json(['data' => null, 'code' => 'security_code_authentication_requested', 'message' => trans('nvl-auth::responsecode.security_code_authentication_requested')], 202);
     }

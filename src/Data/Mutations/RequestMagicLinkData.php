@@ -33,7 +33,7 @@ final class RequestMagicLinkData extends Data
     {
         return [
             'recipient' => ['required', 'string', 'max:255'],
-            'purpose' => ['sometimes', 'string', 'max:255'],
+            'purpose' => ['sometimes', 'string', 'max:120'],
         ];
     }
 }
