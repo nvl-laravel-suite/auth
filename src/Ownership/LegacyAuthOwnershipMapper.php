@@ -14,7 +14,11 @@ use Nvl\Support\Ownership\Exceptions\OwnershipConfigurationInvalid;
 use Nvl\Support\Ownership\Services\OwnershipResourceRegistry;
 use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 
-/** Inventories immutable legacy identities without writing storage or guessing native owners. @api */
+/**
+ * Inventories immutable legacy identities without writing storage or guessing native owners.
+ *
+ * @api
+ */
 final readonly class LegacyAuthOwnershipMapper
 {
     /** Retain the effective graph and canonical native owner resolver. */

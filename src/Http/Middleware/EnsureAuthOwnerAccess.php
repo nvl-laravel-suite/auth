@@ -14,7 +14,11 @@ use Nvl\Auth\Services\AuthOwnershipState;
 use Nvl\Support\Ownership\Exceptions\OwnershipException;
 use Symfony\Component\HttpFoundation\Response;
 
-/** Revalidates the authenticated principal inside an explicitly admitted native owner scope. @api */
+/**
+ * Revalidates the authenticated principal inside an explicitly admitted native owner scope.
+ *
+ * @api
+ */
 final readonly class EnsureAuthOwnerAccess
 {
     /** Retain the authenticated guard and fresh owner admission policy. */

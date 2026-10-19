@@ -1761,6 +1761,15 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\OwnerBoundApiTokenManager": {
+            "kind": "interface",
+            "file": "src/Contracts/OwnerBoundApiTokenManager.php",
+            "methods": [
+                "ownerForToken"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\PasskeyCeremony": {
             "kind": "interface",
             "file": "src/Contracts/PasskeyCeremony.php",
@@ -2722,6 +2731,7 @@
                 "id",
                 "name",
                 "owner",
+                "ownerReference",
                 "revision",
                 "status",
                 "subjectId",
@@ -3641,6 +3651,16 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Database\\Factories\\OwnerMembershipFactory": {
+            "kind": "class",
+            "file": "database/factories/OwnerMembershipFactory.php",
+            "methods": [
+                "definition",
+                "modelName"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Database\\Factories\\PasskeyFactory": {
             "kind": "class",
             "file": "database/factories/PasskeyFactory.php",
@@ -4060,6 +4080,28 @@
                 "Suspended"
             ]
         },
+        "Nvl\\Auth\\Enums\\OwnerAuthenticationPurpose": {
+            "kind": "enum",
+            "file": "src/Enums/OwnerAuthenticationPurpose.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "Invitation",
+                "Login",
+                "MagicLink",
+                "PasskeyLogin",
+                "SecurityCode",
+                "SocialLink",
+                "SocialLogin"
+            ]
+        },
         "Nvl\\Auth\\Enums\\PrincipalAttribute": {
             "kind": "enum",
             "file": "src/Enums/PrincipalAttribute.php",
@@ -4309,6 +4351,16 @@
             ],
             "constants": []
         },
+        "Nvl\\Auth\\Http\\Middleware\\EnsureAuthOwnerAccess": {
+            "kind": "class",
+            "file": "src/Http/Middleware/EnsureAuthOwnerAccess.php",
+            "methods": [
+                "__construct",
+                "handle"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Models\\AuthAudit": {
             "kind": "class",
             "file": "src/Models/AuthAudit.php",
@@ -4376,6 +4428,38 @@
         "Nvl\\Auth\\Models\\Invitation": {
             "kind": "class",
             "file": "src/Models/Invitation.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Models\\Membership": {
+            "kind": "class",
+            "file": "src/Models/Membership.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Models\\OwnerMembership": {
+            "kind": "class",
+            "file": "src/Models/OwnerMembership.php",
             "methods": [
                 "getKey",
                 "getKeyName",
@@ -4535,6 +4619,26 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Ownership\\AuthOwnerAccess": {
+            "kind": "class",
+            "file": "src/Ownership/AuthOwnerAccess.php",
+            "methods": [
+                "__construct",
+                "assertCanEnter"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Ownership\\LegacyAuthOwnershipMapper": {
+            "kind": "class",
+            "file": "src/Ownership/LegacyAuthOwnershipMapper.php",
+            "methods": [
+                "__construct",
+                "mappings"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Results\\AuthClientStartResult": {
             "kind": "class",
             "file": "src/Results/AuthClientStartResult.php",
@@ -4682,6 +4786,16 @@
             ],
             "constants": []
         },
+        "Nvl\\Auth\\Services\\AuthOwnerAdmission": {
+            "kind": "class",
+            "file": "src/Services/AuthOwnerAdmission.php",
+            "methods": [
+                "__construct",
+                "assertAllowed"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Services\\FeatureGate": {
             "kind": "class",
             "file": "src/Services/FeatureGate.php",
@@ -4689,6 +4803,33 @@
                 "__construct",
                 "allows",
                 "assertAllowed"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\OwnerAuthenticationIntents": {
+            "kind": "class",
+            "file": "src/Services/OwnerAuthenticationIntents.php",
+            "methods": [
+                "__construct",
+                "consume",
+                "issue"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\OwnerMemberships": {
+            "kind": "class",
+            "file": "src/Services/OwnerMemberships.php",
+            "methods": [
+                "__construct",
+                "assertPrincipalCanBeDisabled",
+                "enroll",
+                "find",
+                "lock",
+                "provision",
+                "setStatus",
+                "transfer"
             ],
             "properties": [],
             "constants": []
@@ -4771,7 +4912,12 @@
             ],
             "properties": [
                 "ipAddress",
+                "ownerIntentNonce",
+                "ownerIntentSubjectBound",
+                "ownerPurpose",
+                "ownerSessionBinding",
                 "requestId",
+                "requestedOwner",
                 "requestedTenant",
                 "tenantIntentExpiresAt",
                 "tenantIntentNonce",
@@ -4813,6 +4959,19 @@
                 "expiresAt",
                 "returnPath",
                 "tenant"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\IssuedOwnerAuthenticationIntent": {
+            "kind": "class",
+            "file": "src/ValueObjects/IssuedOwnerAuthenticationIntent.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "expiresAt",
+                "id",
+                "nonce"
             ],
             "constants": []
         },
@@ -4986,6 +5145,34 @@
             "capability_relations": []
         },
         "Nvl\\Auth\\Models\\Invitation": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        },
+        "Nvl\\Auth\\Models\\Membership": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        },
+        "Nvl\\Auth\\Models\\OwnerMembership": {
             "read": [],
             "identity_methods": [
                 "getKey",

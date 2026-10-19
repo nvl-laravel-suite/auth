@@ -15,7 +15,11 @@ use Nvl\Ownership\Services\OwnerIdentityResolver;
 use Nvl\Support\Ownership\Contracts\OwnershipReadiness;
 use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 
-/** Optional NVL membership adapter; hosts may use their own OwnerAccess with no membership tables. @api */
+/**
+ * Optional NVL membership adapter; hosts may use their own OwnerAccess with no membership tables.
+ *
+ * @api
+ */
 final readonly class AuthOwnerAccess implements OwnerAccess
 {
     public function __construct(private OwnerIdentityResolver $owners, private AuthModelRegistry $models, private MembershipPrincipalResolver $principals, private OwnershipReadiness $readiness) {}

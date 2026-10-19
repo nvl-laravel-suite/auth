@@ -20,7 +20,11 @@ use Nvl\Support\Ownership\Contracts\OwnershipContext;
 use Nvl\Support\Ownership\Contracts\OwnershipReadiness;
 use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
 
-/** Revalidates the principal, optional membership, and authoritative native token binding. @api */
+/**
+ * Revalidates the principal, optional membership, and authoritative native token binding.
+ *
+ * @api
+ */
 final readonly class AuthOwnerAdmission
 {
     public function __construct(private Container $container, private OwnershipContext $context, private MembershipPrincipalResolver $principals, private ApiTokenManager $tokens, private OwnershipReadiness $readiness, private AuthOwnershipState $state) {}

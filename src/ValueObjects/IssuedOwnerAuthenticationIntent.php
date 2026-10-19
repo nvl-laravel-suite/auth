@@ -6,7 +6,11 @@ namespace Nvl\Auth\ValueObjects;
 
 use Carbon\CarbonImmutable;
 
-/** Returns a owner selection intent nonce exactly once with its bounded expiry. */
+/**
+ * Returns an owner selection intent nonce exactly once with its bounded expiry.
+ *
+ * @api
+ */
 final readonly class IssuedOwnerAuthenticationIntent
 {
     public function __construct(
