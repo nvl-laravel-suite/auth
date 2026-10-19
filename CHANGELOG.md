@@ -5,6 +5,13 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-10-20
+
+### Changed
+
+- Integrate native owner admission and captured delivery, proof and permission-storage boundaries with explicit host Auth adoption. Drain or expire legacy pending proofs before native activation; keep host principal keys, role policies and Spatie opt-in intact.
+- Align required/development NVL peers on `^6.0`, optional peer conflicts on major 6, and `dev-main` on `6.x-dev`. Review [UPGRADING.md](UPGRADING.md) before rollout.
+
 ## [5.0.1] - 2026-10-08
 
 ### Changed

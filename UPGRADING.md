@@ -1,5 +1,12 @@
 # Upgrading NVL Auth
 
+## Major 6 ownership rollout
+
+Integrate native owner admission and captured delivery, proof and permission-storage boundaries with explicit host Auth adoption. Drain or expire legacy pending proofs before native activation; keep host principal keys, role policies and Spatie opt-in intact.
+
+Upgrade the selected NVL dependency closure together to `^6.0`. Ordinary unowned hosts retain the default unscoped declarations and need no ownership context. For isolation, use the installed Ownership README and UPGRADING guide, exact configured subclasses and reviewed adoption before accepting traffic. Disabling or removing Ownership is not rollback; Core retains durable denial guards. Keep existing tenant IDs and migration history. The explicit Tenancy bridge remains deprecated through major 6; its retirement is a separate reviewed migration no earlier than major 7.
+
+
 ## Consumer contracts, committed events and runtime policy (5.x)
 
 Enable `adoption.spatie_storage.enabled` explicitly for consumers using NVL RBAC storage. On fresh databases, keep it disabled while installing the owned migrations, then enable it and rebuild config before exercising RBAC. Provider-boot registrar wiring performs no readiness queries; permission service resolution after boot still fails closed until storage is ready. Restart workers after changing adoption configuration.

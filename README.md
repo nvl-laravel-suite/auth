@@ -3,12 +3,12 @@
 ## Quickstart
 
 ```sh
-composer require nvl/auth:^5.0
+composer require nvl/auth:^6.0
 php artisan nvl:install auth --dry-run
 php artisan nvl:install auth
 ```
 
-Required NVL dependencies: `nvl/core` (`^5.0`). Select Auth features deliberately and bind host identity/management policies. Installing the package does not adopt your existing auth guards or user model.
+Required NVL dependencies: `nvl/core` (`^6.0`). Select Auth features deliberately and bind host identity/management policies. Installing the package does not adopt your existing auth guards or user model.
 Review the published common config, select one migration owner, and run schema preflight before existing-table upgrades. The installer does not enable features or run migrations. Follow the detailed installation and capability sections below before invoking a storage/provider operation.
 
 Inject `Nvl\Auth\Contracts\ListUsersContract` in a host service. After supplying the trusted inputs described above, the first public call is:
@@ -38,7 +38,7 @@ For a fresh installation, run the owned migrations before enabling Spatie storag
 
 | Item | Value |
 |---|---|
-| Installed through | `composer require nvl/auth:^5.0` |
+| Installed through | `composer require nvl/auth:^6.0` |
 | Module identifier | `nvl/auth` |
 | PHP namespace | `Nvl\Auth` |
 | Service provider | `Nvl\Auth\Providers\AuthServiceProvider` |
@@ -144,7 +144,7 @@ for binding precedence and the bounded Core membership fallback exception.
 For a clean application, review the Auth configuration before running migrations:
 
 ```bash
-composer require nvl/auth:^5.0
+composer require nvl/auth:^6.0
 php artisan vendor:publish --tag=nvl-auth-translations
 php artisan vendor:publish --tag=nvl-auth-config
 php artisan migrate
