@@ -36,7 +36,7 @@ final readonly class AuthOwnerSchema
                     $table->string('subject_id', 191);
                     $table->string('status', 32)->default('active');
                     $table->boolean('is_owner')->default(false);
-                    $table->unsignedInteger('revision')->default(1);
+                    $table->unsignedBigInteger('revision')->default(1);
                 } elseif ($key === 'auth.authentication_intents') {
                     $table->string('purpose', 80);
                     $table->string('nonce_hash', 64)->unique();
@@ -44,10 +44,10 @@ final readonly class AuthOwnerSchema
                     $table->string('subject_type', 191)->nullable();
                     $table->string('subject_id', 191)->nullable();
                     $table->text('payload')->nullable();
-                    $table->timestamp('expires_at');
-                    $table->timestamp('consumed_at')->nullable();
+                    $table->timestampTz('expires_at');
+                    $table->timestampTz('consumed_at')->nullable();
                 }
-                $table->timestamps();
+                $table->timestampsTz();
             });
         }
     }

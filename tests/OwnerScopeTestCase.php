@@ -19,6 +19,8 @@ use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Ownership\Contracts\OwnershipAdoptionAccess;
 use Nvl\Ownership\Services\OwnershipAdoptionCoordinator;
 use Nvl\Ownership\Tests\OwnershipTestCase;
+use Nvl\Ownership\ValueObjects\OwnershipAdoptionPlan;
+use Nvl\Ownership\ValueObjects\OwnershipMapping;
 use Nvl\Ownership\ValueObjects\OwnershipOperation;
 use Nvl\Support\Providers\LocaleServiceProvider;
 use Spatie\LaravelData\LaravelDataServiceProvider;
@@ -27,6 +29,8 @@ use Spatie\Permission\PermissionServiceProvider;
 /** Runs native Auth ownership without the Tenancy provider or outer database transactions. */
 abstract class OwnerScopeTestCase extends OwnershipTestCase
 {
+    public OwnershipAdoptionPlan $adoptionPlan;
+
     /** @var array<string, class-string<Model>> */
     private array $originalMorphMap = [];
 
@@ -84,11 +88,20 @@ abstract class OwnerScopeTestCase extends OwnershipTestCase
         $this->app->make(MaintenanceMode::class)->activate([]);
         $coordinator = $this->app->make(OwnershipAdoptionCoordinator::class);
         $operation = new OwnershipOperation('auth-adopt', 'operator', '1');
-        $plan = $coordinator->prepare(['auth'], [], $operation);
+        $plan = $coordinator->prepare(['auth'], $this->adoptionMappings(), $operation);
+        $this->adoptionPlan = $plan;
         while (! $coordinator->backfill($plan, 100, $operation)) {
         }
         $coordinator->activate($plan, $operation);
         $this->app->make(MaintenanceMode::class)->deactivate();
         $this->allowOwners();
+    }
+
+    /** Supply reviewed legacy records before the first native preparation.
+     * @return list<OwnershipMapping>
+     */
+    protected function adoptionMappings(): array
+    {
+        return [];
     }
 }
