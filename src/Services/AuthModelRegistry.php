@@ -7,16 +7,38 @@ namespace Nvl\Auth\Services;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\OwnerMembership;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\PersonalAccessToken;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Models\User;
+use Nvl\Support\Models\ConfiguredModelResolver;
+use Nvl\Support\OwnerRegistry;
 
 /**
  * Resolves validated, host-extensible package model classes.
  */
 final readonly class AuthModelRegistry
 {
+    /** Retain the shared native identity registry rather than adding an Auth morph map. */
+    public function __construct(private OwnerRegistry $identities) {}
+
+    /** Resolve the exact native membership extension without changing its ownership strategy.
+     * @return class-string<OwnerMembership>
+     */
+    public function ownerMembershipClass(): string
+    {
+        $base = OwnerMembership::class;
+        $configured = config('nvl-auth.features.memberships.models.membership', $base);
+        if (! is_string($configured)) {
+            throw AuthException::invalidConfiguration('Owner memberships require a concrete configured model.');
+        }
+        $class = (new ConfiguredModelResolver)->resolve($configured, $base);
+        $this->identities->registerReplacement('auth.memberships', $base, $class);
+
+        return $class;
+    }
+
     /**
      * Return the configured principal model.
      *
@@ -68,6 +90,10 @@ final readonly class AuthModelRegistry
         }
 
         /** @var class-string<Model&Authenticatable> $configured */
+        if (config('nvl-auth.ownership.scoped') === true) {
+            $this->identities->register('auth.rbac-principal', $configured);
+        }
+
         return $configured;
     }
 
@@ -88,7 +114,7 @@ final readonly class AuthModelRegistry
     /**
      * Validate one configured model subclass.
      *
-     * @template TModel of object
+     * @template TModel of Model
      *
      * @param  class-string<TModel>  $default
      * @param  class-string<TModel>  $base
@@ -102,6 +128,11 @@ final readonly class AuthModelRegistry
             throw AuthException::invalidConfiguration(
                 "Auth model [{$path}] must extend [{$base}].",
             );
+        }
+
+        if (config('nvl-auth.ownership.scoped') === true) {
+            $configured = (new ConfiguredModelResolver)->resolve($configured, $base);
+            $this->identities->registerReplacement('auth.models.'.strtolower((new \ReflectionClass($base))->getShortName()), $base, $configured);
         }
 
         return $configured;

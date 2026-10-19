@@ -10,7 +10,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 use Nvl\Auth\Database\Factories\PersonalAccessTokenFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Traits\HasAuthOwnership;
 use Nvl\Support\Config\PackageStorage;
+use Nvl\Support\Ownership\Contracts\Ownable;
 
 /**
  * Stores Sanctum tokens in the package-owned namespaced token table.
@@ -27,10 +29,15 @@ use Nvl\Support\Config\PackageStorage;
  * @api
  *
  * @nvl-consumer-read id
+ *
+ * @property string|null $owner_scope_key
+ * @property string|null $owner_reference
  */
 #[UseFactory(PersonalAccessTokenFactory::class)]
-class PersonalAccessToken extends SanctumPersonalAccessToken
+class PersonalAccessToken extends SanctumPersonalAccessToken implements Ownable
 {
+    use HasAuthOwnership;
+
     /** @use HasFactory<PersonalAccessTokenFactory> */
     use HasFactory;
 

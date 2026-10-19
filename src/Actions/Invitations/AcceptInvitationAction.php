@@ -25,6 +25,7 @@ use Nvl\Auth\Services\InvitationTenantBootstrap;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\MembershipWriter;
+use Nvl\Auth\Services\OwnerInvitations;
 use Nvl\Auth\Services\RbacManager;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\Services\TenantMembershipAssignments;
@@ -32,7 +33,7 @@ use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Events\DomainEventDispatcher;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Support\Tenancy\Contracts\TenantRunner;
 use Nvl\Support\Tenancy\Enums\TenantContextMode;
@@ -50,12 +51,13 @@ final readonly class AcceptInvitationAction implements AcceptInvitationContract
      */
     public function __construct(
         private FeatureGate $features,
+        private OwnerInvitations $owned,
         private SecretHasher $hasher,
         private InvitationRecipientProof $recipientProof,
         private RbacManager $rbac,
         private InvitationTenantBootstrap $bootstrap,
         private TenantRunner $runner,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
         private MembershipPrincipalResolver $principals,
         private MembershipOwnerGuard $owners,
         private MembershipWriter $memberships,
@@ -74,6 +76,9 @@ final readonly class AcceptInvitationAction implements AcceptInvitationContract
     public function execute(string $token, Authenticatable $subject): Invitation
     {
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Use);
+        if (config('nvl-auth.ownership.scoped') === true) {
+            return $this->owned->accept($token, $subject);
+        }
         $reference = SubjectReference::fromAuthenticatable($subject);
 
         if (config('nvl-tenancy.enabled') === true) {

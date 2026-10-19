@@ -16,7 +16,7 @@ use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 
 /**
  * Revokes one invitation as a containment operation.
@@ -35,7 +35,7 @@ final readonly class RevokeInvitationAction implements RevokeInvitationContract
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
         AuthAuditRecorder $audits,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
         AuthCommittedAudit $committedAudits,
     ) {
         $this->committedAudits = $committedAudits->withRecorder($audits);

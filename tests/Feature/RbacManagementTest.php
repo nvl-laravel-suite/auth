@@ -505,11 +505,13 @@ it('returns compatibility role and permission pages as stable DTOs without mappi
             perPage: 1,
         );
         $roleQueryCount = count(DB::getQueryLog());
+        $roleCatalogReads = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => str_contains($query['query'], 'sqlite_master')));
         $roleItem = $roles->items()[0] ?? null;
         $roleItem?->toArray();
 
         expect(DB::getQueryLog())->toHaveCount($roleQueryCount)
-            ->and($roleQueryCount)->toBeLessThanOrEqual(3)
+            ->and($roleQueryCount - $roleCatalogReads)->toBeLessThanOrEqual(3)
+            ->and($roleCatalogReads)->toBeLessThanOrEqual(3)
             ->and($roles->total())->toBe(1)
             ->and($roles->currentPage())->toBe(1)
             ->and($roles->perPage())->toBe(1)
@@ -533,11 +535,13 @@ it('returns compatibility role and permission pages as stable DTOs without mappi
             perPage: 1,
         );
         $permissionQueryCount = count(DB::getQueryLog());
+        $permissionCatalogReads = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => str_contains($query['query'], 'sqlite_master')));
         $permissionItem = $permissions->items()[0] ?? null;
         $permissionItem?->toArray();
 
         expect(DB::getQueryLog())->toHaveCount($permissionQueryCount)
-            ->and($permissionQueryCount)->toBeLessThanOrEqual(2)
+            ->and($permissionQueryCount - $permissionCatalogReads)->toBeLessThanOrEqual(2)
+            ->and($permissionCatalogReads)->toBeLessThanOrEqual(4)
             ->and($permissions->total())->toBe(1)
             ->and($permissions->currentPage())->toBe(1)
             ->and($permissions->perPage())->toBe(1)
@@ -575,7 +579,10 @@ it('keeps option and catalog query counts independent of fixture size', function
             DB::flushQueryLog();
             DB::enableQueryLog();
             $read();
-            $counts[$name] = count(DB::getQueryLog());
+            $catalogReads = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => str_contains($query['query'], 'sqlite_master')));
+            $counts[$name] = count(DB::getQueryLog()) - $catalogReads;
+            $counts[$name.'_ownership_probes'] = $catalogReads;
+            expect($catalogReads)->toBeLessThanOrEqual(4);
             DB::disableQueryLog();
         }
 

@@ -12,7 +12,9 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
+use Nvl\Support\Ownership\Contracts\OwnershipReadiness;
 
 /**
  * Contains Sanctum tokens, remember credentials, and Laravel database sessions.
@@ -25,6 +27,8 @@ final readonly class LaravelPrincipalSessionContainment implements PrincipalSess
     public function __construct(
         private ConfigRepository $configuration,
         private DatabaseManager $database,
+        private OwnershipReadiness $readiness,
+        private AuthModelRegistry $models,
     ) {}
 
     /**
@@ -44,7 +48,17 @@ final readonly class LaravelPrincipalSessionContainment implements PrincipalSess
             if (! $tokens instanceof MorphMany) {
                 throw AuthException::invalidConfiguration('Session containment requires a Sanctum token relationship.');
             }
-            $tokens->delete();
+            if ($this->configuration->get('nvl-auth.ownership.scoped') === true) {
+                $this->readiness->assertActive('auth.tokens');
+                $class = $this->models->personalAccessTokenClass();
+                $model = new $class;
+                if ($tokens->getRelated()::class !== $class || $tokens->getRelated()->getConnection() !== $model->getConnection() || $tokens->getRelated()->getTable() !== $model->getTable()) {
+                    throw AuthException::invalidConfiguration('Global containment requires canonical token storage.');
+                }
+                $model->getConnection()->table($model->getTable())->where('tokenable_type', $principal->getMorphClass())->where('tokenable_id', $principal->getKey())->delete();
+            } else {
+                $tokens->delete();
+            }
         }
 
         $rememberTokenName = $principal->getRememberTokenName();

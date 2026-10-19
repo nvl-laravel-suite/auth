@@ -6,7 +6,7 @@ namespace Nvl\Auth\Contracts;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Data\Display\TenantMembershipData;
-use Nvl\Auth\Models\TenantMembership;
+use Nvl\Auth\Models\Membership;
 
 /**
  * Defines the show membership use-case boundary.
@@ -15,5 +15,5 @@ use Nvl\Auth\Models\TenantMembership;
  */
 interface ShowMembershipContract
 {
-    public function execute(Authenticatable $actor, TenantMembership|string $membership): TenantMembershipData;
+    public function execute(Authenticatable $actor, Membership|string $membership): TenantMembershipData;
 }

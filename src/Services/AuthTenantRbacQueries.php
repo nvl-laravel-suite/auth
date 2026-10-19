@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +13,9 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipContext;
+use Nvl\Support\Ownership\Enums\OwnershipContextMode;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 
@@ -22,11 +25,13 @@ final readonly class AuthTenantRbacQueries
     public function __construct(
         private AuthModelRegistry $models,
         private AuthConfiguration $configuration,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
         private TenantContext $context,
         private TenantMembershipAccess $membership,
         private MembershipPrincipalResolver $principals,
         private RbacPrincipalTracker $tracker,
+        private Container $container,
+        private OwnershipContext $ownership,
     ) {}
 
     /** @return Builder<Role> */
@@ -35,7 +40,9 @@ final readonly class AuthTenantRbacQueries
         $class = $this->models->roleClass();
 
         /** @var Builder<Role> $query */
-        $query = $this->boundary->query($class::query(), 'auth.roles');
+        $query = config('nvl-auth.ownership.scoped') === true
+            ? $this->container->make(OwnershipBoundary::class)->query($class::query(), 'auth.roles')
+            : $this->boundary->query($class::query(), 'auth.roles');
 
         return $query->where('guard_name', $this->configuration->string('features.rbac.settings.guard', 'web'));
     }
@@ -61,7 +68,13 @@ final readonly class AuthTenantRbacQueries
     public function assertAssignmentPrincipal(Authenticatable $principal): Authenticatable
     {
         $reloaded = $this->principals->resolve(SubjectReference::fromAuthenticatable($principal), true);
-        $this->membership->assertMember($reloaded, $this->context->requireTenant());
+        if (config('nvl-auth.ownership.scoped') === true) {
+            if ($this->ownership->snapshot()->mode !== OwnershipContextMode::Central) {
+                $this->container->make(AuthOwnerAdmission::class)->assertAllowed($reloaded);
+            }
+        } else {
+            $this->membership->assertMember($reloaded, $this->context->requireTenant());
+        }
         if (! $reloaded instanceof Model) {
             throw AuthException::invalidConfiguration('RBAC assignment principals must be Eloquent models.');
         }

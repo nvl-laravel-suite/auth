@@ -63,7 +63,7 @@ final readonly class SetUserActiveAction implements SetUserActiveContract
         }
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $context, $data, $metadata, $user): User {
-            if (! $data->active && config('nvl-tenancy.enabled') === true) {
+            if (! $data->active) {
                 $this->owners->assertPrincipalCanBeDisabled(SubjectReference::fromAuthenticatable($user));
             }
             $user->update($this->attributes->map($data->toArray()));

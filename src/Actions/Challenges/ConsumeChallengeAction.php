@@ -12,6 +12,7 @@ use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
+use Nvl\Auth\Services\AuthIdentityChallenges;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -28,6 +29,7 @@ final readonly class ConsumeChallengeAction
      */
     public function __construct(
         private FeatureGate $features,
+        private AuthIdentityChallenges $records,
         private SecretHasher $hasher,
         private AuthAuditRecorder $audits,
     ) {}
@@ -61,7 +63,7 @@ final readonly class ConsumeChallengeAction
             $secretHash,
             $secondarySecretHash,
         ): ?Challenge {
-            Challenge::query()
+            $this->records->query()
                 ->when(config('nvl-tenancy.enabled') === true, fn ($query) => $query->where('ownership_key', 'platform'))
                 ->where('type', $messageType->value)
                 ->where('purpose', $purpose)
@@ -71,7 +73,7 @@ final readonly class ConsumeChallengeAction
                 ->where('expires_at', '<=', CarbonImmutable::now())
                 ->update(['active_key' => null]);
             /** @var Challenge|null $challenge */
-            $challenge = Challenge::query()
+            $challenge = $this->records->query()
                 ->when(config('nvl-tenancy.enabled') === true, fn ($query) => $query->where('ownership_key', 'platform'))
                 ->where('type', $messageType->value)
                 ->where('purpose', $purpose)
@@ -84,7 +86,7 @@ final readonly class ConsumeChallengeAction
 
             if (! $challenge instanceof Challenge || ! $challenge->isUsable()) {
                 /** @var Challenge|null $active */
-                $active = Challenge::query()
+                $active = $this->records->query()
                     ->when(config('nvl-tenancy.enabled') === true, fn ($query) => $query->where('ownership_key', 'platform'))
                     ->where('type', $messageType->value)
                     ->where('purpose', $purpose)
@@ -98,19 +100,19 @@ final readonly class ConsumeChallengeAction
 
                 if ($active instanceof Challenge) {
                     $attempts = min($active->attempts + 1, $active->max_attempts);
-                    $active->forceFill([
+                    $this->records->save($active->forceFill([
                         'attempts' => $attempts,
                         'active_key' => $attempts >= $active->max_attempts ? null : $active->active_key,
-                    ])->save();
+                    ]));
                 }
 
                 return null;
             }
 
-            $challenge->forceFill([
+            $this->records->save($challenge->forceFill([
                 'active_key' => null,
                 'consumed_at' => CarbonImmutable::now(),
-            ])->save();
+            ]));
 
             if (is_string($challenge->subject_type) && is_string($challenge->subject_id)) {
                 $subject = new SubjectReference(

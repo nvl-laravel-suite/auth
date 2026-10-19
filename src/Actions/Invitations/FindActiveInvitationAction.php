@@ -18,7 +18,7 @@ use Nvl\Auth\Services\InvitationDeliveryMetadataPolicy;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 
 /**
  * Finds one active invitation through an explicitly trusted read boundary.
@@ -35,7 +35,7 @@ final readonly class FindActiveInvitationAction implements FindActiveInvitationC
         private ManagementAuthorizer $authorization,
         private SecretHasher $hasher,
         private InvitationDeliveryMetadataPolicy $deliveryMetadata,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
     ) {}
 
     /**

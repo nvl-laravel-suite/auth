@@ -18,6 +18,7 @@ use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Enums\OwnerAuthenticationPurpose;
 use Nvl\Auth\Events\AuthenticationAttempted;
 use Nvl\Auth\Events\AuthenticationRejected;
 use Nvl\Auth\Events\UserAuthenticated;
@@ -27,6 +28,7 @@ use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Services\OwnerAuthenticationSelection;
 use Nvl\Auth\Services\TenantAuthenticationIntents;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
@@ -49,6 +51,7 @@ final readonly class EstablishAuthenticatedSessionAction implements EstablishAut
      */
     public function __construct(
         private FeatureGate $features,
+        private OwnerAuthenticationSelection $ownerSelection,
         private AuthConfiguration $configuration,
         private AuthSubjectResolver $subjects,
         private AuthManager $auth,
@@ -114,6 +117,7 @@ final readonly class EstablishAuthenticatedSessionAction implements EstablishAut
                 metadata: ['method' => $purpose->value],
             );
             $this->selectTenant($authenticated, $reference, $requestContext);
+            $this->ownerSelection->select($authenticated, $requestContext, ($purpose === AuthenticationPurpose::SocialLogin ? OwnerAuthenticationPurpose::SocialLogin : ($requestContext->ownerPurpose ?? OwnerAuthenticationPurpose::Login)));
             $this->domainEvents->dispatch(new UserAuthenticated($reference), (new AuthAudit)->getConnection());
 
             return $authenticated;

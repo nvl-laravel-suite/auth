@@ -12,6 +12,10 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Ownership\Contracts\OwnershipContext;
+use Nvl\Support\Ownership\Contracts\OwnershipQueueContext;
+use Nvl\Support\Ownership\Enums\OwnershipContextMode;
+use Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 use Nvl\Support\Tenancy\Enums\TenantContextMode;
 
@@ -27,6 +31,8 @@ final readonly class AuthAuditRecorder implements AuthAuditRecorderContract
         private TenantContext $tenantContext,
         private AuthAuditWriter $writer,
         private CentralIdentityAuditRecorder $central,
+        private OwnershipContext $ownership,
+        private OwnershipQueueContext $queue,
     ) {}
 
     /**
@@ -42,6 +48,11 @@ final readonly class AuthAuditRecorder implements AuthAuditRecorderContract
         ?string $clientId = null,
         array $metadata = [],
     ): ?AuthAudit {
+        if (config('nvl-auth.ownership.scoped') === true
+            && in_array($this->ownership->snapshot()->mode, [OwnershipContextMode::Owner, OwnershipContextMode::Central], true)) {
+            return $this->writer->write(new AuthEventContext(TenantContextMode::Disabled), $action, $outcome, $subject, $actor, $clientId, $metadata);
+        }
+
         return ($this->prepare($action, $outcome, $subject, $actor, $clientId, $metadata))();
     }
 
@@ -61,6 +72,22 @@ final readonly class AuthAuditRecorder implements AuthAuditRecorderContract
         ?string $clientId = null,
         array $metadata = [],
     ): Closure {
+        if (config('nvl-auth.ownership.scoped') === true) {
+            $snapshot = $this->ownership->snapshot();
+            if ($snapshot->mode === OwnershipContextMode::Unresolved) {
+                $operation = $this->centralOperation($action);
+                if (! $operation instanceof AuthIdentityOperation || $clientId !== null) {
+                    throw new AuthException('owner_audit_context_required', 'Owner audit admission is required.', 500);
+                }
+
+                return fn (): ?AuthAudit => $this->central->record($operation, $action, $outcome, $subject, $actor, $metadata);
+            }
+            $envelope = OwnershipJobEnvelope::capture($this->ownership);
+
+            return fn (): ?AuthAudit => $this->queue->run($envelope, fn (): ?AuthAudit => $this->writer->write(
+                new AuthEventContext(TenantContextMode::Disabled), $action, $outcome, $subject, $actor, $clientId, $metadata,
+            ));
+        }
         $snapshot = $this->tenantContext->snapshot();
 
         return function () use ($snapshot, $action, $outcome, $subject, $actor, $clientId, $metadata): ?AuthAudit {

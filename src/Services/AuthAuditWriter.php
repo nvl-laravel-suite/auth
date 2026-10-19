@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Str;
 use JsonException;
 use Nvl\Auth\Contracts\AuthAuditContextProvider;
 use Nvl\Auth\Enums\AuthFeature;
@@ -14,6 +15,7 @@ use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Events\DomainEventDispatcher;
+use Nvl\Support\Ownership\Contracts\OwnershipReadiness;
 use Nvl\Support\Tenancy\Enums\TenantContextMode;
 
 /** Persists an Auth audit against an already-captured ownership context. */
@@ -23,6 +25,7 @@ final readonly class AuthAuditWriter
         private AuthConfiguration $configuration,
         private AuthAuditContextProvider $request,
         private DomainEventDispatcher $domainEvents,
+        private OwnershipReadiness $readiness,
     ) {}
 
     /** @param array<string, mixed> $metadata */
@@ -56,7 +59,7 @@ final readonly class AuthAuditWriter
             : null;
 
         return (new AuthAudit)->getConnection()->transaction(function () use ($context, $action, $outcome, $subject, $actorReference, $clientId, $metadata): AuthAudit {
-            $audit = AuthAudit::query()->create([
+            $audit = $this->persist($context, [
                 ...$this->ownership($context),
                 'action' => $action,
                 'outcome' => $outcome,
@@ -76,6 +79,28 @@ final readonly class AuthAuditWriter
 
             return $audit;
         });
+    }
+
+    /** Persist only a closed identity-audit family outside normal owner admission.
+     * @param  array<string,mixed>  $attributes
+     */
+    private function persist(AuthEventContext $context, array $attributes): AuthAudit
+    {
+        if (config('nvl-auth.ownership.scoped') !== true || $context->mode !== TenantContextMode::Platform) {
+            return AuthAudit::query()->create($attributes);
+        }
+        $action = $attributes['action'] ?? null;
+        $allowed = ['authentication.', 'session.', 'client.', 'password.', 'magic_link.', 'magic_links.', 'security_code.', 'security_codes.', 'email_verification.', 'profile.', 'account.', 'totp.', 'passkey.', 'recovery_code.', 'social_identity.', 'membership.discovery'];
+        if (! is_string($action) || ($attributes['client_id'] ?? null) !== null
+            || ! array_any($allowed, static fn (string $prefix): bool => str_starts_with($action, $prefix))) {
+            throw AuthException::invalidConfiguration('Only the closed central identity audit families can use this writer.');
+        }
+        $this->readiness->assertActive('auth.audits');
+        $record = new AuthAudit;
+        $record->forceFill([...$attributes, 'id' => (string) Str::uuid(), 'owner_scope_key' => 'central', 'owner_reference' => null, 'created_at' => now(), 'updated_at' => now()]);
+        $record->getConnection()->table($record->getTable())->insert($record->getAttributes());
+
+        return $record->newFromBuilder($record->getAttributes());
     }
 
     /** @return array{tenant_id?: string|null, ownership_key?: string} */

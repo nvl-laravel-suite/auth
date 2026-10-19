@@ -126,7 +126,7 @@ final readonly class BulkUpdateUsersAction implements BulkUpdateUsersContract
         ?SystemMutationContext $context = null,
     ): bool {
         if (! $data->active) {
-            if (config('nvl-tenancy.enabled') === true) {
+            if ($this->owners->isEnabled()) {
                 $this->owners->assertPrincipalCanBeDisabled(SubjectReference::fromAuthenticatable($user));
             }
             $this->sessions->contain($user, 'disabled', $context);
@@ -138,7 +138,7 @@ final readonly class BulkUpdateUsersAction implements BulkUpdateUsersContract
     /** Soft-delete one principal and revoke its tokens. */
     private function delete(User $user, ?SystemMutationContext $context): bool
     {
-        if (config('nvl-tenancy.enabled') === true) {
+        if ($this->owners->isEnabled()) {
             $this->owners->assertPrincipalCanBeDisabled(SubjectReference::fromAuthenticatable($user));
         }
         $this->sessions->contain($user, 'deleted', $context);

@@ -12,12 +12,14 @@ use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Data\Mutations\EnrollMembershipData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Models\Membership;
 use Nvl\Auth\Models\TenantMembership;
 use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\MembershipWriter;
 use Nvl\Auth\Services\MutationAuthorizer;
+use Nvl\Auth\Services\OwnerMemberships;
 use Nvl\Auth\Services\TenantMembershipAssignments;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
@@ -34,6 +36,7 @@ final readonly class EnrollMembershipAction implements EnrollMembershipContract
 
     public function __construct(
         private FeatureGate $features,
+        private OwnerMemberships $native,
         private MutationAuthorizer $authorization,
         private MembershipPrincipalResolver $principals,
         private MembershipWriter $writer,
@@ -46,13 +49,16 @@ final readonly class EnrollMembershipAction implements EnrollMembershipContract
         $this->committedAudits = $committedAudits->withRecorder($audits);
     }
 
-    public function execute(Authenticatable|SystemMutationContext $authority, EnrollMembershipData $data): TenantMembership
+    public function execute(Authenticatable|SystemMutationContext $authority, EnrollMembershipData $data): Membership
     {
         $this->features->assertAllowed(AuthFeature::Memberships, FeatureOperation::Enroll);
+        if (config('nvl-auth.ownership.scoped') === true) {
+            return $this->native->enroll($authority, $data->subject, $data->roles, $data->permissions);
+        }
 
         $actor = $this->authorization->authorize($authority, 'nvl.auth.memberships.enroll');
 
-        return DB::connection((new TenantMembership)->getConnectionName())->transaction(function () use ($actor, $authority, $data): TenantMembership {
+        return DB::connection((new TenantMembership)->getConnectionName())->transaction(function () use ($actor, $authority, $data): Membership {
             $this->owners->lock($this->context->requireTenant());
             $principal = $this->principals->resolve($data->subject, true);
             $membership = $this->writer->enroll($data->subject);

@@ -32,6 +32,7 @@ use Nvl\Auth\Services\InvitationTenantBootstrap;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\MembershipWriter;
+use Nvl\Auth\Services\OwnerInvitations;
 use Nvl\Auth\Services\RbacManager;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\Services\TenantMembershipAssignments;
@@ -39,7 +40,7 @@ use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Events\DomainEventDispatcher;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Support\Tenancy\Contracts\TenantRunner;
 use Nvl\Support\Tenancy\Enums\TenantContextMode;
@@ -58,6 +59,7 @@ final readonly class RegisterInvitationAction implements RegisterInvitationContr
     /** Create the atomic invitation registration use case. */
     public function __construct(
         private FeatureGate $features,
+        private OwnerInvitations $owned,
         private SecretHasher $hasher,
         private InvitationSubjectResolver $subjects,
         private InvitationRecipientProof $recipientProof,
@@ -68,7 +70,7 @@ final readonly class RegisterInvitationAction implements RegisterInvitationContr
         private AuthModelRegistry $models,
         private PrincipalAttributeMapper $attributes,
         private TenantRunner $runner,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
         private MembershipPrincipalResolver $principals,
         private MembershipOwnerGuard $owners,
         private MembershipWriter $memberships,
@@ -87,6 +89,9 @@ final readonly class RegisterInvitationAction implements RegisterInvitationContr
         ?Authenticatable $authenticatedRecipient = null,
     ): InvitationRegistrationResult {
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Use);
+        if (config('nvl-auth.ownership.scoped') === true) {
+            return $this->owned->register($data, $authenticatedRecipient);
+        }
         if (config('nvl-tenancy.enabled') === true) {
             $tenant = $this->bootstrap->tenantForToken($data->token);
             if (! $tenant instanceof TenantId) {

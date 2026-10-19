@@ -58,7 +58,7 @@ final readonly class DeleteUserAction implements DeleteUserContract
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $context, $metadata, $user): bool {
             $reference = SubjectReference::fromAuthenticatable($user);
-            if (config('nvl-tenancy.enabled') === true) {
+            if ($this->owners->isEnabled()) {
                 $this->owners->assertPrincipalCanBeDisabled($reference);
             }
             $this->sessions->contain($user, 'deleted', $context);

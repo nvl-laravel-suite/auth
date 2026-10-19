@@ -16,26 +16,28 @@ use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\NewAccessToken;
 use Laravel\Sanctum\PersonalAccessToken;
 use Nvl\Auth\Contracts\ApiTokenManager;
+use Nvl\Auth\Contracts\OwnerBoundApiTokenManager;
 use Nvl\Auth\Contracts\TenantBoundApiTokenManager;
 use Nvl\Auth\Data\Mutations\ApiTokenData;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Results\IssuedApiToken;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
+use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Manages personal access tokens directly in Sanctum's authoritative table.
  */
-final class SanctumApiTokenManager implements ApiTokenManager, TenantBoundApiTokenManager
+final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiTokenManager, TenantBoundApiTokenManager
 {
     /**
      * Create the namespaced Sanctum adapter.
      */
     public function __construct(
         private readonly AuthConfiguration $configuration,
-        private readonly TenantBoundary $boundary,
+        private readonly OwnershipBoundary $boundary,
     ) {}
 
     /**
@@ -136,6 +138,23 @@ final class SanctumApiTokenManager implements ApiTokenManager, TenantBoundApiTok
         }
 
         return $deleted;
+    }
+
+    /** Resolve only a live persisted subject-owned token; an ambient scope never supplies its owner. */
+    public function ownerForToken(Authenticatable $subject, string $tokenId): ?OwnerReference
+    {
+        $model = $this->subject($subject);
+        $token = $this->tokens($model)->getModel();
+        $row = $token->getConnection()->table($token->getTable())->useWritePdo()->where($token->getKeyName(), $tokenId)
+            ->where('tokenable_type', $model->getMorphClass())->where('tokenable_id', $model->getKey())
+            ->whereRaw('name LIKE ?', [$this->namespace().':%'])->first();
+        if ($row === null || ! is_string($row->owner_reference ?? null)
+            || ($row->expires_at !== null && (! is_string($row->expires_at) || CarbonImmutable::parse($row->expires_at)->isPast()))) {
+            return null;
+        }
+        $reference = OwnerReference::fromJson($row->owner_reference);
+
+        return $row->owner_scope_key === $reference->scopeKey() ? $reference : null;
     }
 
     /** Resolve exact persisted token ownership without accepting an ambient tenant. */

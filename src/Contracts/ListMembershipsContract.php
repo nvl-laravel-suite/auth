@@ -6,7 +6,7 @@ namespace Nvl\Auth\Contracts;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Nvl\Auth\Models\TenantMembership;
+use Nvl\Auth\Models\Membership;
 
 /**
  * Defines the list memberships use-case boundary.
@@ -15,6 +15,6 @@ use Nvl\Auth\Models\TenantMembership;
  */
 interface ListMembershipsContract
 {
-    /** @return LengthAwarePaginator<int, TenantMembership> */
+    /** @return LengthAwarePaginator<int, Membership> */
     public function execute(Authenticatable $actor, ?string $search = null, int $perPage = 25): LengthAwarePaginator;
 }

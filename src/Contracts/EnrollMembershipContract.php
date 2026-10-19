@@ -6,7 +6,7 @@ namespace Nvl\Auth\Contracts;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Data\Mutations\EnrollMembershipData;
-use Nvl\Auth\Models\TenantMembership;
+use Nvl\Auth\Models\Membership;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
@@ -16,5 +16,5 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
  */
 interface EnrollMembershipContract
 {
-    public function execute(Authenticatable|SystemMutationContext $authority, EnrollMembershipData $data): TenantMembership;
+    public function execute(Authenticatable|SystemMutationContext $authority, EnrollMembershipData $data): Membership;
 }

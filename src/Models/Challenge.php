@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\ChallengeFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Traits\HasAuthOwnership;
+use Nvl\Support\Ownership\Contracts\Ownable;
 
 /**
  * Stores one hashed magic-link, verification, or security-code challenge.
@@ -31,10 +33,15 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
  * @property CarbonImmutable|null $revoked_at
  *
  * @api
+ *
+ * @property string|null $owner_scope_key
+ * @property string|null $owner_reference
  */
 #[UseFactory(ChallengeFactory::class)]
-final class Challenge extends AuthModel
+final class Challenge extends AuthModel implements Ownable
 {
+    use HasAuthOwnership;
+
     public const TABLE = AuthTables::Challenges;
 
     /** @use HasFactory<ChallengeFactory> */

@@ -72,6 +72,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'ownership' => [
+        'scoped' => false,
         'http' => 'package',
         'delivery' => 'host',
         'host_routes' => [],

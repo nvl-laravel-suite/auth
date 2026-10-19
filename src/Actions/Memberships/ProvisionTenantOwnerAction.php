@@ -11,6 +11,7 @@ use Nvl\Auth\Contracts\ProvisionTenantOwnerContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\MembershipStatus;
+use Nvl\Auth\Models\Membership;
 use Nvl\Auth\Models\TenantMembership;
 use Nvl\Auth\Models\TenantMembershipLock;
 use Nvl\Auth\Services\AuthCommittedAudit;
@@ -18,6 +19,7 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\MembershipWriter;
 use Nvl\Auth\Services\MutationAuthorizer;
+use Nvl\Auth\Services\OwnerMemberships;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
@@ -34,6 +36,7 @@ final readonly class ProvisionTenantOwnerAction implements ProvisionTenantOwnerC
 
     public function __construct(
         private FeatureGate $features,
+        private OwnerMemberships $native,
         private MutationAuthorizer $authorization,
         private MembershipPrincipalResolver $principals,
         private MembershipOwnerGuard $owners,
@@ -45,13 +48,16 @@ final readonly class ProvisionTenantOwnerAction implements ProvisionTenantOwnerC
         $this->committedAudits = $committedAudits->withRecorder($audits);
     }
 
-    public function execute(SystemMutationContext $authority, SubjectReference $subject): TenantMembership
+    public function execute(SystemMutationContext $authority, SubjectReference $subject): Membership
     {
         $this->features->assertAllowed(AuthFeature::Memberships, FeatureOperation::Enroll);
+        if (config('nvl-auth.ownership.scoped') === true) {
+            return $this->native->provision($authority, $subject);
+        }
 
         $actor = $this->authorization->authorize($authority, 'nvl.auth.memberships.enroll');
 
-        return DB::connection((new TenantMembership)->getConnectionName())->transaction(function () use ($actor, $authority, $subject): TenantMembership {
+        return DB::connection((new TenantMembership)->getConnectionName())->transaction(function () use ($actor, $authority, $subject): Membership {
             $tenant = $this->context->requireTenant();
             TenantMembershipLock::query()->firstOrCreate(['tenant_id' => $tenant->value]);
             $this->owners->lock($tenant);

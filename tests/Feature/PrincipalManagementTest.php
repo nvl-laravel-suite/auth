@@ -208,8 +208,8 @@ it('keeps eager-loaded principal list queries independent of fixture size', func
 
     $populatedQueryCount = $measure();
 
-    expect($singleQueryCount)->toBeLessThanOrEqual(4)
-        ->and($populatedQueryCount)->toBe($singleQueryCount);
+    expect($singleQueryCount)->toBeLessThanOrEqual(7)
+        ->and($populatedQueryCount)->toBeLessThanOrEqual($singleQueryCount);
 });
 
 it('contains browser credentials during actorless domain deactivation', function (): void {

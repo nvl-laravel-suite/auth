@@ -26,7 +26,7 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
         if ($principal instanceof Authenticatable) {
             $principal = $this->assertCompatible($principal);
 
-            return config('nvl-tenancy.enabled') === true
+            return (config('nvl-auth.ownership.scoped') === true || config('nvl-tenancy.enabled') === true)
                 ? $this->queries()->assertAssignmentPrincipal($principal)
                 : $principal;
         }
@@ -40,7 +40,7 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
 
         $resolved = $this->assertCompatible($resolved);
 
-        return config('nvl-tenancy.enabled') === true
+        return (config('nvl-auth.ownership.scoped') === true || config('nvl-tenancy.enabled') === true)
             ? $this->queries()->assertAssignmentPrincipal($resolved)
             : $resolved;
     }
@@ -149,7 +149,7 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
     private function assignmentPrincipal(Authenticatable $principal): Model
     {
         $principal = $this->assertCompatible($principal);
-        if (config('nvl-tenancy.enabled') === true) {
+        if ((config('nvl-auth.ownership.scoped') === true || config('nvl-tenancy.enabled') === true)) {
             $principal = $this->queries()->assertAssignmentPrincipal($principal);
         }
 

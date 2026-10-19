@@ -18,6 +18,7 @@ use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Enums\OwnerAuthenticationPurpose;
 use Nvl\Auth\Events\AuthenticationAttempted;
 use Nvl\Auth\Events\AuthenticationRejected;
 use Nvl\Auth\Events\UserAuthenticated;
@@ -27,6 +28,7 @@ use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthOperationBoundary;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Services\OwnerAuthenticationSelection;
 use Nvl\Auth\Services\TenantAuthenticationIntents;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
@@ -49,6 +51,7 @@ final readonly class LoginAction implements LoginContract
      */
     public function __construct(
         private FeatureGate $features,
+        private OwnerAuthenticationSelection $ownerSelection,
         private AuthConfiguration $configuration,
         private PrincipalAttributeMapper $principalAttributes,
         private AuthManager $auth,
@@ -132,6 +135,7 @@ final readonly class LoginAction implements LoginContract
             $this->loginMetadata->record($authenticated, $requestContext ?? new AuthenticationRequestContext);
             $this->audits->record('authentication.succeeded', subject: $reference, actor: $authenticated);
             $this->selectTenant($authenticated, $reference, $requestContext);
+            $this->ownerSelection->select($authenticated, $requestContext, OwnerAuthenticationPurpose::Login);
             $this->domainEvents->dispatch(new UserAuthenticated($reference), (new AuthAudit)->getConnection());
 
             return $authenticated;

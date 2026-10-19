@@ -29,7 +29,7 @@ use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 use Nvl\Support\Events\DomainEventDispatcher;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
@@ -52,7 +52,7 @@ final readonly class ResendInvitationAction implements ResendInvitationContract
         private SecretHasher $hasher,
         private ManagementAuthorizer $authorization,
         AuthAuditRecorder $audits,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
         AuthCommittedAudit $committedAudits,
         private DomainEventDispatcher $domainEvents,
         private ?InvitationDeliveryMetadataPolicy $deliveryMetadata = null,

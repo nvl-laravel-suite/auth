@@ -14,7 +14,7 @@ use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\SecretHasher;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 
 /**
  * Lists invitation records after host business authorization.
@@ -30,7 +30,7 @@ final readonly class ListInvitationsAction implements ListInvitationsContract
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
         private SecretHasher $hasher,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
     ) {}
 
     /**

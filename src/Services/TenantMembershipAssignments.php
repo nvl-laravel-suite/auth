@@ -10,13 +10,19 @@ use Illuminate\Database\Eloquent\Model;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipContext;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 
 /** Validates canonical tenant roles and fixed vocabulary permissions before assignment. */
 final readonly class TenantMembershipAssignments
 {
-    public function __construct(private TenantBoundary $boundary, private TenantContext $context) {}
+    public function __construct(private OwnershipBoundary $boundary, private TenantContext $context,
+        private OwnershipContext $ownership,
+        private AuthModelRegistry $models,
+        private AuthConfiguration $configuration,
+        private RbacPrincipalTracker $tracker,
+    ) {}
 
     /**
      * @param  list<string>  $roles
@@ -28,9 +34,10 @@ final readonly class TenantMembershipAssignments
             throw AuthException::invalidConfiguration('The membership principal must support tenant RBAC assignments.');
         }
         [$roleRecords, $permissionRecords] = $this->records($roles, $permissions);
-        setPermissionsTeamId($this->context->requireTenant()->value);
+        setPermissionsTeamId(config('nvl-auth.ownership.scoped') === true ? $this->ownership->requireOwner()->scopeKey() : $this->context->requireTenant()->value);
         $principal->syncRoles($roleRecords);
         $principal->syncPermissions($permissionRecords);
+        $this->tracker->clearRelations();
     }
 
     /**
@@ -57,9 +64,12 @@ final readonly class TenantMembershipAssignments
      */
     private function records(array $roles, array $permissions): array
     {
-        $roleRecords = $this->boundary->query(Role::query(), 'auth.roles')
+        $roleClass = $this->models->roleClass();
+        $permissionClass = $this->models->permissionClass();
+        $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
+        $roleRecords = $this->boundary->query($roleClass::query(), 'auth.roles')->where('guard_name', $guard)
             ->where(static fn ($query) => $query->whereIn('id', $roles)->orWhereIn('name', $roles))->get();
-        $permissionRecords = Permission::query()
+        $permissionRecords = $permissionClass::query()->where('guard_name', $guard)
             ->where(static fn ($query) => $query->whereIn('id', $permissions)->orWhereIn('name', $permissions))->get();
         if ($roleRecords->count() !== count($roles) || $permissionRecords->count() !== count($permissions)) {
             throw new AuthException('membership_assignment_invalid', 'A membership access assignment is invalid.', 422);

@@ -27,6 +27,8 @@ final readonly class ApiTokenPolicy
         private TenantMembershipAccess $memberships,
         private TenantContext $context,
         private AuthOperationBoundary $operations,
+        private AuthOwnerAdmission $owners,
+        private AuthOwnershipState $state,
     ) {}
 
     /**
@@ -51,6 +53,11 @@ final readonly class ApiTokenPolicy
     /** Require a fresh eligible principal in the active tenant or explicit platform boundary. */
     public function authorizeSubject(Authenticatable $subject): void
     {
+        if ($this->state->configured()) {
+            $this->owners->assertAllowed($subject);
+
+            return;
+        }
         if (config('nvl-tenancy.enabled') === true) {
             $this->principals->assertEligible($subject);
             $snapshot = $this->context->snapshot();

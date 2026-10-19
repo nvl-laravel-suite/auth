@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Nvl\Auth\Database\Factories\AuthAuditFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Traits\HasAuthOwnership;
+use Nvl\Support\Ownership\Contracts\Ownable;
 
 /**
  * Stores one simple, queryable Auth audit fact and bounded metadata.
@@ -28,10 +30,15 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
  * @property array<string, mixed>|null $metadata
  *
  * @api
+ *
+ * @property string|null $owner_scope_key
+ * @property string|null $owner_reference
  */
 #[UseFactory(AuthAuditFactory::class)]
-final class AuthAudit extends AuthModel
+final class AuthAudit extends AuthModel implements Ownable
 {
+    use HasAuthOwnership;
+
     public const TABLE = AuthTables::Audits;
 
     /** @use HasFactory<AuthAuditFactory> */

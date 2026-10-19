@@ -21,6 +21,7 @@ final readonly class FeatureGate
     public function __construct(
         private AuthConfiguration $configuration,
         private FeatureManifest $manifest,
+        private AuthOwnershipState $ownership,
     ) {}
 
     /**
@@ -57,6 +58,8 @@ final readonly class FeatureGate
     public function assertAllowed(AuthFeature $feature, FeatureOperation $operation): void
     {
         if ($this->allows($feature, $operation)) {
+            $this->ownership->configured();
+
             return;
         }
 

@@ -11,6 +11,9 @@ use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Ownership\Contracts\OwnershipContext;
+use Nvl\Support\Ownership\Enums\OwnershipContextMode;
+use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 use Nvl\Support\Tenancy\Enums\TenantContextMode;
 use Nvl\Support\Tenancy\Exceptions\TenantBoundaryViolation;
@@ -22,6 +25,8 @@ final readonly class AuthOperationBoundary
         private FeatureGate $features,
         private AuthModelRegistry $models,
         private TenantContext $context,
+        private OwnershipContext $ownership,
+        private AuthOwnershipState $state,
     ) {}
 
     public function central(AuthIdentityOperation $operation, ?Authenticatable $subject = null): void
@@ -50,6 +55,13 @@ final readonly class AuthOperationBoundary
 
     public function requirePlatformAdministration(): void
     {
+        if ($this->state->native()) {
+            if ($this->ownership->snapshot()->mode !== OwnershipContextMode::Central) {
+                throw new OwnershipViolation('Global Auth administration requires explicit central admission.');
+            }
+
+            return;
+        }
         if (config('nvl-tenancy.enabled') !== true) {
             return;
         }
@@ -61,7 +73,7 @@ final readonly class AuthOperationBoundary
     /** Reject legacy RBAC entry points that mix platform and tenant-owned writes. */
     public function rejectMixedRbacOperation(): void
     {
-        if (config('nvl-tenancy.enabled') === true) {
+        if ($this->state->configured() || config('nvl-tenancy.enabled') === true) {
             throw new AuthException(
                 'rbac_mixed_context_operation',
                 'This RBAC operation mixes platform and tenant-owned state.',

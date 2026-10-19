@@ -14,12 +14,13 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Auth\Models\TenantMembership;
+use Nvl\Auth\Models\Membership;
 use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\MembershipLocator;
 use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\MutationAuthorizer;
+use Nvl\Auth\Services\OwnerMemberships;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
@@ -36,6 +37,7 @@ final readonly class TransferMembershipOwnershipAction implements TransferMember
 
     public function __construct(
         private FeatureGate $features,
+        private OwnerMemberships $native,
         private MutationAuthorizer $authorization,
         private MembershipPrincipalResolver $principals,
         private MembershipLocator $memberships,
@@ -47,15 +49,18 @@ final readonly class TransferMembershipOwnershipAction implements TransferMember
         $this->committedAudits = $committedAudits->withRecorder($audits);
     }
 
-    public function execute(Authenticatable|SystemMutationContext $authority, TenantMembership|string $membership, TransferMembershipOwnershipData $data): TenantMembership
+    public function execute(Authenticatable|SystemMutationContext $authority, Membership|string $membership, TransferMembershipOwnershipData $data): Membership
     {
         $this->features->assertAllowed(AuthFeature::Memberships, FeatureOperation::Update);
+        if (config('nvl-auth.ownership.scoped') === true) {
+            return $this->native->transfer($authority, $membership, $data->recipientMembershipId, $data->expectedRevision);
+        }
 
         $candidate = $this->memberships->find($membership);
         $recipientCandidate = $this->memberships->find($data->recipientMembershipId);
         $actor = $this->authorization->authorize($authority, 'nvl.auth.memberships.transferOwnership', $candidate);
 
-        return DB::connection($candidate->getConnectionName())->transaction(function () use ($actor, $authority, $candidate, $data, $recipientCandidate): TenantMembership {
+        return DB::connection($candidate->getConnectionName())->transaction(function () use ($actor, $authority, $candidate, $data, $recipientCandidate): Membership {
             $this->owners->lock($this->context->requireTenant());
             $identifiers = [$candidate->identifier(), $recipientCandidate->identifier()];
             sort($identifiers, SORT_STRING);

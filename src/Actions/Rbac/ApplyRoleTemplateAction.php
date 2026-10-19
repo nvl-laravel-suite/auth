@@ -23,7 +23,7 @@ use Nvl\Auth\Services\RbacEntityLocator;
 use Nvl\Auth\Services\RoleHierarchy;
 use Nvl\Auth\Services\RoleTemplateRegistry;
 use Nvl\Support\Events\DomainEventDispatcher;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 
 /**
  * Creates or updates one role from the canonical template registry.
@@ -42,7 +42,7 @@ final readonly class ApplyRoleTemplateAction implements ApplyRoleTemplateContrac
         private RbacEntityLocator $entities,
         private RoleHierarchy $hierarchy,
         private AuthAuditRecorder $audits,
-        private TenantBoundary $tenancy,
+        private OwnershipBoundary $tenancy,
         private DomainEventDispatcher $domainEvents,
     ) {}
 

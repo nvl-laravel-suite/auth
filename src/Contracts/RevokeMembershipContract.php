@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Contracts;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use Nvl\Auth\Models\TenantMembership;
+use Nvl\Auth\Models\Membership;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
@@ -15,5 +15,5 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
  */
 interface RevokeMembershipContract
 {
-    public function execute(Authenticatable|SystemMutationContext $authority, TenantMembership|string $membership, int $expectedRevision): TenantMembership;
+    public function execute(Authenticatable|SystemMutationContext $authority, Membership|string $membership, int $expectedRevision): Membership;
 }

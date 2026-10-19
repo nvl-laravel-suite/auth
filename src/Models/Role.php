@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Models;
 
+use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,12 +12,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Query\Grammars\PostgresGrammar;
 use Nvl\Auth\Database\Factories\RoleFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Relations\TextCastColumnComparison;
+use Nvl\Auth\Services\AuthOwnershipState;
+use Nvl\Auth\Services\OwnerRbacRelations;
+use Nvl\Auth\Traits\HasAuthOwnership;
 use Nvl\Support\Config\PackageStorage;
+use Nvl\Support\Ownership\Contracts\Ownable;
 use Spatie\Permission\Models\Role as SpatieRole;
 
 /**
@@ -36,10 +42,15 @@ use Spatie\Permission\Models\Role as SpatieRole;
  * @property-read int|null $permissions_count
  *
  * @api
+ *
+ * @property string|null $owner_scope_key
+ * @property string|null $owner_reference
  */
 #[UseFactory(RoleFactory::class)]
-class Role extends SpatieRole
+class Role extends SpatieRole implements Ownable
 {
+    use HasAuthOwnership;
+
     /** @use HasFactory<RoleFactory> */
     use HasFactory;
 
@@ -109,9 +120,12 @@ class Role extends SpatieRole
     }
 
     /** Constrain inverse assignments to the active team and membership. */
-    /** @return BelongsToMany<Model, $this> */
+    /** @return BelongsToMany<covariant Model, $this, covariant Pivot> */
     public function users(): BelongsToMany
     {
+        if (Container::getInstance()->make(AuthOwnershipState::class)->native()) {
+            return Container::getInstance()->make(OwnerRbacRelations::class)->users($this, 'role');
+        }
         if (config('nvl-tenancy.enabled') !== true) {
             return parent::users();
         }

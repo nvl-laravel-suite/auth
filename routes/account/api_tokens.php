@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Nvl\Auth\Http\Controllers\Account\ApiTokenController;
+use Nvl\Auth\Http\Middleware\EnsureAuthOwnerAccess;
 use Nvl\Auth\Http\Middleware\EnsureAuthTenantAccess;
 use Nvl\Tenancy\Http\Middleware\RequireTenantMembership;
 
-$tenantAdmission = config('nvl-tenancy.enabled') === true
-    ? [EnsureAuthTenantAccess::class, RequireTenantMembership::class]
-    : [];
+$tenantAdmission = config('nvl-auth.ownership.scoped') === true
+    ? [EnsureAuthOwnerAccess::class]
+    : (config('nvl-tenancy.enabled') === true ? [EnsureAuthTenantAccess::class, RequireTenantMembership::class] : []);
 
 Route::middleware($tenantAdmission)->group(function (): void {
     Route::get('api-tokens', [ApiTokenController::class, 'index'])

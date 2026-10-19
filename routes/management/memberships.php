@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Nvl\Auth\Http\Controllers\Management\MembershipController;
+use Nvl\Auth\Http\Middleware\EnsureAuthOwnerAccess;
 use Nvl\Tenancy\Http\Middleware\RequireTenantMembership;
 
-Route::middleware(RequireTenantMembership::class)->group(function (): void {
+Route::middleware(config('nvl-auth.ownership.scoped') === true ? EnsureAuthOwnerAccess::class : RequireTenantMembership::class)->group(function (): void {
     Route::get('memberships', [MembershipController::class, 'index'])->name('memberships.index');
     Route::post('memberships', [MembershipController::class, 'store'])->name('memberships.store');
     Route::get('memberships/{membership}', [MembershipController::class, 'show'])->whereUuid('membership')->name('memberships.show');

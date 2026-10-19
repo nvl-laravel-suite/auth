@@ -12,6 +12,7 @@ use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
+use Nvl\Auth\Services\AuthIdentityChallenges;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -26,6 +27,7 @@ final readonly class ConsumeChallengeByIdAction
     /** Create the direct challenge consumption use case. */
     public function __construct(
         private FeatureGate $features,
+        private AuthIdentityChallenges $records,
         private SecretHasher $hasher,
         private AuthAuditRecorder $audits,
     ) {}
@@ -48,7 +50,7 @@ final readonly class ConsumeChallengeByIdAction
             $secret,
         ): ?Challenge {
             /** @var Challenge|null $challenge */
-            $challenge = Challenge::query()
+            $challenge = $this->records->query()
                 ->when(config('nvl-tenancy.enabled') === true, fn ($query) => $query->where('ownership_key', 'platform'))
                 ->whereKey($challengeId)
                 ->where('type', $messageType->value)
@@ -73,18 +75,18 @@ final readonly class ConsumeChallengeByIdAction
                 && (! is_string($challenge->secondary_secret_hash)
                     || ! hash_equals($challenge->secondary_secret_hash, $secondary))) {
                 $attempts = min($challenge->attempts + 1, $challenge->max_attempts);
-                $challenge->forceFill([
+                $this->records->save($challenge->forceFill([
                     'attempts' => $attempts,
                     'active_key' => $attempts >= $challenge->max_attempts ? null : $challenge->active_key,
-                ])->save();
+                ]));
 
                 return null;
             }
 
-            $challenge->forceFill([
+            $this->records->save($challenge->forceFill([
                 'active_key' => null,
                 'consumed_at' => CarbonImmutable::now(),
-            ])->save();
+            ]));
 
             return $challenge;
         }, 3);

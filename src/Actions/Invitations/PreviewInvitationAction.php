@@ -11,8 +11,9 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\InvitationTenantBootstrap;
+use Nvl\Auth\Services\OwnerInvitations;
 use Nvl\Auth\Services\SecretHasher;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use Nvl\Support\Tenancy\Contracts\TenantRunner;
 
 /**
@@ -27,10 +28,11 @@ final readonly class PreviewInvitationAction implements PreviewInvitationContrac
      */
     public function __construct(
         private FeatureGate $features,
+        private OwnerInvitations $owned,
         private SecretHasher $hasher,
         private InvitationTenantBootstrap $bootstrap,
         private TenantRunner $runner,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
     ) {}
 
     /**
@@ -39,6 +41,9 @@ final readonly class PreviewInvitationAction implements PreviewInvitationContrac
     public function execute(string $token): Invitation
     {
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Read);
+        if (config('nvl-auth.ownership.scoped') === true) {
+            return $this->owned->preview($token);
+        }
         if (config('nvl-tenancy.enabled') === true) {
             $tenant = $this->bootstrap->tenantForToken($token);
             if ($tenant === null) {

@@ -26,9 +26,9 @@ use Nvl\Auth\Services\TenantMembershipAssignments;
 use Nvl\Auth\Tests\CommittedDeliveryTestCase;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Support\Events\ConnectionCommitCallbacks;
 use Nvl\Support\Events\DomainEventDispatcher;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipContext;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 
 uses(CommittedDeliveryTestCase::class);
@@ -116,7 +116,7 @@ it('uses the original directly supplied invitation audit recorder after the owni
         }
     };
     $adapterRecorder = clone $originalRecorder;
-    $adapter = new AuthCommittedAudit($adapterRecorder, app(ConnectionCommitCallbacks::class));
+    $adapter = app(AuthCommittedAudit::class)->withRecorder($adapterRecorder);
     $action = new CreateInvitationAction(
         features: app(FeatureGate::class),
         configuration: app(AuthConfiguration::class),
@@ -125,7 +125,8 @@ it('uses the original directly supplied invitation audit recorder after the owni
         authorization: app(ManagementAuthorizer::class),
         pipeline: app(AuthPipeline::class),
         audits: $originalRecorder,
-        boundary: app(TenantBoundary::class),
+        boundary: app(OwnershipBoundary::class),
+        ownerContext: app(OwnershipContext::class),
         membershipAccess: app(TenantMembershipAccess::class),
         assignments: app(TenantMembershipAssignments::class),
         committedAudits: $adapter,

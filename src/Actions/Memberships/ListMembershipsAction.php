@@ -11,11 +11,12 @@ use Nvl\Auth\Contracts\ListMembershipsContract;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Auth\Models\TenantMembership;
+use Nvl\Auth\Models\Membership;
 use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 
 /**
  * Lists only membership rows inside the active tenant.
@@ -26,12 +27,13 @@ final readonly class ListMembershipsAction implements ListMembershipsContract
 {
     public function __construct(
         private FeatureGate $features,
+        private AuthModelRegistry $models,
         private ManagementAuthorizer $authorization,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
         private AuthConfiguration $configuration,
     ) {}
 
-    /** @return LengthAwarePaginator<int, TenantMembership> */
+    /** @return LengthAwarePaginator<int, Membership> */
     public function execute(Authenticatable $actor, ?string $search = null, int $perPage = 25): LengthAwarePaginator
     {
         $this->features->assertAllowed(AuthFeature::Memberships, FeatureOperation::Read);
@@ -39,7 +41,8 @@ final readonly class ListMembershipsAction implements ListMembershipsContract
         if ($search !== null && mb_strlen($search) > 191) {
             throw new AuthException('invalid_membership_filter', 'Membership search is too long.', 422);
         }
-        $query = $this->boundary->query(TenantMembership::query(), 'auth.memberships');
+        $class = config('nvl-auth.ownership.scoped') === true ? $this->models->ownerMembershipClass() : Membership::class;
+        $query = $this->boundary->query($class::query(), 'auth.memberships');
         if ($search !== null && trim($search) !== '') {
             $term = '%'.trim($search).'%';
             $query->where(static function (Builder $builder) use ($term): void {

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Nvl\Auth\ValueObjects;
 
 use Carbon\CarbonImmutable;
+use Nvl\Auth\Enums\OwnerAuthenticationPurpose;
 use Nvl\Auth\Enums\TenantAuthenticationPurpose;
+use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
@@ -30,5 +32,10 @@ final readonly class AuthenticationRequestContext
         public ?CarbonImmutable $tenantIntentExpiresAt = null,
         public ?TenantId $requestedTenant = null,
         public bool $tenantIntentSubjectBound = false,
+        public ?string $ownerIntentNonce = null,
+        public ?string $ownerSessionBinding = null,
+        public ?OwnerReference $requestedOwner = null,
+        public ?OwnerAuthenticationPurpose $ownerPurpose = null,
+        public bool $ownerIntentSubjectBound = false,
     ) {}
 }

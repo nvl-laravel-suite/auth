@@ -5,17 +5,18 @@ declare(strict_types=1);
 namespace Nvl\Auth\Services;
 
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\Membership;
 use Nvl\Auth\Models\TenantMembership;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 
 /** Reloads membership targets through the canonical tenant predicate. */
 final readonly class MembershipLocator
 {
-    public function __construct(private TenantBoundary $boundary) {}
+    public function __construct(private OwnershipBoundary $boundary) {}
 
-    public function find(TenantMembership|string $membership, bool $lock = false): TenantMembership
+    public function find(Membership|string $membership, bool $lock = false): TenantMembership
     {
-        $id = $membership instanceof TenantMembership ? $membership->getKey() : $membership;
+        $id = $membership instanceof Membership ? $membership->getKey() : $membership;
         if (! is_string($id) || $id === '') {
             throw new AuthException('membership_unavailable', 'The tenant membership is unavailable.', 404);
         }

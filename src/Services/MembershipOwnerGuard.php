@@ -10,13 +10,19 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\TenantMembership;
 use Nvl\Auth\Models\TenantMembershipLock;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /** Serializes and protects tenant owner lifecycle transitions. */
 final readonly class MembershipOwnerGuard
 {
-    public function __construct(private TenantBoundary $boundary) {}
+    public function __construct(private OwnershipBoundary $boundary, private OwnerMemberships $native, private AuthOwnershipState $state) {}
+
+    /** Check global principal responsibilities even when native flags have been removed. */
+    public function isEnabled(): bool
+    {
+        return $this->state->native() || config('nvl-tenancy.enabled') === true;
+    }
 
     public function lock(TenantId $tenant): void
     {
@@ -37,6 +43,14 @@ final readonly class MembershipOwnerGuard
 
     public function assertPrincipalCanBeDisabled(SubjectReference $subject): void
     {
+        if ($this->state->native()) {
+            $this->native->assertPrincipalCanBeDisabled($subject);
+
+            return;
+        }
+        if (config('nvl-tenancy.enabled') !== true) {
+            return;
+        }
         $owners = TenantMembership::query()->where('subject_type', $subject->type)->where('subject_id', $subject->identifier)
             ->where('status', MembershipStatus::Active->value)->where('is_owner', true)->orderBy('tenant_id')->get();
         foreach ($owners as $owner) {

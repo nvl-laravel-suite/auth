@@ -300,12 +300,16 @@ use Nvl\Auth\Models\TenantAuthenticationIntent;
 use Nvl\Auth\Models\TenantMembership;
 use Nvl\Auth\Models\TenantMembershipLock;
 use Nvl\Auth\Models\User;
+use Nvl\Auth\Ownership\AuthAdoptionAdapter;
+use Nvl\Auth\Ownership\AuthResourceRegistrar;
 use Nvl\Auth\Services\AuthAuditRecorder;
 use Nvl\Auth\Services\AuthAuditWriter;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthDoctor;
 use Nvl\Auth\Services\AuthManagementAbilityCatalog;
 use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\AuthOwnerContextParticipant;
+use Nvl\Auth\Services\AuthOwnershipState;
 use Nvl\Auth\Services\AuthSchemaManager;
 use Nvl\Auth\Services\AuthTenantContextParticipant;
 use Nvl\Auth\Services\AuthTenantMembershipAccess;
@@ -337,9 +341,13 @@ use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
 use Nvl\Auth\Tenancy\AuthTenancyAdoption;
 use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
+use Nvl\Ownership\Services\OwnershipAdoptionRegistry;
 use Nvl\Support\Config\PackageOptions;
 use Nvl\Support\Doctor\PackageDoctorContributor;
 use Nvl\Support\Globals\GlobalNames;
+use Nvl\Support\Ownership\Contracts\OwnershipIntegratedProvider;
+use Nvl\Support\Ownership\Services\OwnershipContextParticipants;
+use Nvl\Support\Ownership\Services\OwnershipResourceRegistry;
 use Nvl\Support\Providers\TenantServiceProvider;
 use Nvl\Support\Tenancy\Contracts\TenantHttpResolver;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
@@ -358,7 +366,7 @@ use Spatie\Permission\PermissionRegistrar;
 /**
  * Registers the passive package layer and lazy feature integrations.
  */
-final class AuthServiceProvider extends ServiceProvider
+final class AuthServiceProvider extends ServiceProvider implements OwnershipIntegratedProvider
 {
     use MergesPackageConfiguration;
     use RegistersNamespacedResources;
@@ -393,12 +401,24 @@ final class AuthServiceProvider extends ServiceProvider
         $this->app->singleton(AuthManagementAbilityCatalog::class);
         $this->app->singleton(AuthSchemaManager::class);
         $this->app->singleton(FeatureManifest::class);
-        $this->app->singleton(FeatureGate::class);
+        $this->app->scoped(FeatureGate::class);
+        $this->app->scoped(AuthOwnershipState::class);
         $this->app->scoped(RbacPrincipalTracker::class);
         $this->app->scoped(AuthTenantContextParticipant::class);
         $this->app->scoped(AuthTenantRbacQueries::class);
-        $this->app->make(TenantContextParticipants::class)->register(AuthTenantContextParticipant::class);
         $this->registerTenancyResources();
+        $this->app->scoped(AuthOwnerContextParticipant::class);
+        $this->app->booted(function (): void {
+            if (config('nvl-auth.ownership.scoped') === true) {
+                $this->app->make(OwnershipContextParticipants::class)->register(AuthOwnerContextParticipant::class);
+            } else {
+                $this->app->make(TenantContextParticipants::class)->register(AuthTenantContextParticipant::class);
+            }
+            $this->app->make(AuthResourceRegistrar::class)->register($this->app->make(OwnershipResourceRegistry::class));
+            if ($this->app->bound(OwnershipAdoptionRegistry::class)) {
+                $this->app->make(OwnershipAdoptionRegistry::class)->register('auth', AuthAdoptionAdapter::class);
+            }
+        });
         $this->app->scopedIf(BrowserSession::class, LaravelBrowserSession::class);
         $this->app->scopedIf(TenantAuthenticationSession::class, LaravelBrowserSession::class);
         $this->app->singletonIf(TenantAwareAuthActivityBridge::class, function (Container $container): TenantAwareAuthActivityBridge {
@@ -567,7 +587,7 @@ final class AuthServiceProvider extends ServiceProvider
             $kernel = $this->app->make(HttpKernelContract::class);
             $kernel->addToMiddlewarePriorityAfter(AuthenticatesRequests::class, EnsureAuthTenantAccess::class);
         }
-        if (config('nvl-tenancy.enabled') === true && $configuration->featureEnabled(AuthFeature::Rbac)) {
+        if ((config('nvl-auth.ownership.scoped') === true || config('nvl-tenancy.enabled') === true) && $configuration->featureEnabled(AuthFeature::Rbac)) {
             $principal = $this->app->make(AuthModelRegistry::class)->rbacPrincipalClass();
             $principal::retrieved(fn (Model $model) => $this->app->make(RbacPrincipalTracker::class)->track($model));
             $principal::created(fn (Model $model) => $this->app->make(RbacPrincipalTracker::class)->track($model));
@@ -674,7 +694,7 @@ final class AuthServiceProvider extends ServiceProvider
             'role_pivot_key' => 'role_id',
             'permission_pivot_key' => 'permission_id',
             'model_morph_key' => 'model_id',
-            'team_foreign_key' => 'tenant_id',
+            'team_foreign_key' => config('nvl-auth.ownership.scoped') === true ? 'owner_scope_key' : 'tenant_id',
         ]));
         $this->registerPermissionReadiness();
     }
@@ -698,7 +718,7 @@ final class AuthServiceProvider extends ServiceProvider
             $registrar = $registrarReference->current();
             if ($registrar instanceof PermissionRegistrar) {
                 $registrar->teams = $teams;
-                $registrar->teamsKey = 'tenant_id';
+                $registrar->teamsKey = config('nvl-auth.ownership.scoped') === true ? 'owner_scope_key' : 'tenant_id';
             }
         });
         $this->app->afterResolving(PermissionRegistrar::class, static function (PermissionRegistrar $registrar) use ($registrarReference): void {

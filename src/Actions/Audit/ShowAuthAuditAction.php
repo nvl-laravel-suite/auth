@@ -11,7 +11,7 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 
 /**
  * Returns one authorized authentication audit fact.
@@ -26,7 +26,7 @@ final readonly class ShowAuthAuditAction implements ShowAuthAuditContract
     public function __construct(
         private FeatureGate $features,
         private ManagementAuthorizer $authorization,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
     ) {}
 
     /**

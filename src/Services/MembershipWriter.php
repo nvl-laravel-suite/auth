@@ -8,13 +8,13 @@ use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\TenantMembership;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 
 /** Performs transaction-owned membership persistence without public Action chaining. */
 final readonly class MembershipWriter
 {
-    public function __construct(private TenantContext $context, private TenantBoundary $boundary) {}
+    public function __construct(private TenantContext $context, private OwnershipBoundary $boundary) {}
 
     public function enroll(SubjectReference $subject): TenantMembership
     {

@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Models;
 
+use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Query\Grammars\PostgresGrammar;
 use Nvl\Auth\Database\Factories\PermissionFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Relations\TextCastColumnComparison;
+use Nvl\Auth\Services\AuthOwnershipState;
+use Nvl\Auth\Services\OwnerRbacRelations;
 use Nvl\Support\Config\PackageStorage;
 use Spatie\Permission\Models\Permission as SpatiePermission;
 
@@ -81,9 +85,12 @@ class Permission extends SpatiePermission
     }
 
     /** Constrain direct inverse assignments to the active team and membership. */
-    /** @return BelongsToMany<Model, $this> */
+    /** @return BelongsToMany<covariant Model, $this, covariant Pivot> */
     public function users(): BelongsToMany
     {
+        if (Container::getInstance()->make(AuthOwnershipState::class)->native()) {
+            return Container::getInstance()->make(OwnerRbacRelations::class)->users($this, 'permission');
+        }
         if (config('nvl-tenancy.enabled') !== true) {
             return parent::users();
         }

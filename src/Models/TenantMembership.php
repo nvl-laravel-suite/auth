@@ -24,7 +24,7 @@ use Nvl\Support\Config\PackageStorage;
  * @api
  */
 #[UseFactory(TenantMembershipFactory::class)]
-final class TenantMembership extends AuthModel
+final class TenantMembership extends Membership
 {
     /** @use HasFactory<TenantMembershipFactory> */
     use HasFactory;

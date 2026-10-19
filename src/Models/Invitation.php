@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\InvitationFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\InvitationDeliveryStatus;
+use Nvl\Auth\Traits\HasAuthOwnership;
+use Nvl\Support\Ownership\Contracts\Ownable;
 
 /**
  * Represents one bounded, bearer-token invitation.
@@ -43,10 +45,15 @@ use Nvl\Auth\Enums\InvitationDeliveryStatus;
  * @property CarbonImmutable|null $revoked_at
  *
  * @api
+ *
+ * @property string|null $owner_scope_key
+ * @property string|null $owner_reference
  */
 #[UseFactory(InvitationFactory::class)]
-final class Invitation extends AuthModel
+final class Invitation extends AuthModel implements Ownable
 {
+    use HasAuthOwnership;
+
     public const TABLE = AuthTables::Invitations;
 
     /** @use HasFactory<InvitationFactory> */

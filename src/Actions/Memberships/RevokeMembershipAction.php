@@ -13,14 +13,15 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\Membership;
 use Nvl\Auth\Models\PersonalAccessToken;
-use Nvl\Auth\Models\TenantMembership;
 use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\MembershipLocator;
 use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\MembershipWriter;
 use Nvl\Auth\Services\MutationAuthorizer;
+use Nvl\Auth\Services\OwnerMemberships;
 use Nvl\Auth\Services\TenantMembershipAssignments;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
@@ -38,6 +39,7 @@ final readonly class RevokeMembershipAction implements RevokeMembershipContract
 
     public function __construct(
         private FeatureGate $features,
+        private OwnerMemberships $native,
         private MutationAuthorizer $authorization,
         private MembershipPrincipalResolver $principals,
         private MembershipLocator $memberships,
@@ -51,14 +53,17 @@ final readonly class RevokeMembershipAction implements RevokeMembershipContract
         $this->committedAudits = $committedAudits->withRecorder($audits);
     }
 
-    public function execute(Authenticatable|SystemMutationContext $authority, TenantMembership|string $membership, int $expectedRevision): TenantMembership
+    public function execute(Authenticatable|SystemMutationContext $authority, Membership|string $membership, int $expectedRevision): Membership
     {
         $this->features->assertAllowed(AuthFeature::Memberships, FeatureOperation::Revoke);
+        if (config('nvl-auth.ownership.scoped') === true) {
+            return $this->native->setStatus($authority, $membership, MembershipStatus::Revoked, $expectedRevision);
+        }
 
         $candidate = $this->memberships->find($membership);
         $actor = $this->authorization->authorize($authority, 'nvl.auth.memberships.revoke', $candidate);
 
-        return DB::connection($candidate->getConnectionName())->transaction(function () use ($actor, $authority, $candidate, $expectedRevision): TenantMembership {
+        return DB::connection($candidate->getConnectionName())->transaction(function () use ($actor, $authority, $candidate, $expectedRevision): Membership {
             $tenant = $this->context->requireTenant();
             $this->owners->lock($tenant);
             $target = $this->memberships->find($candidate, true);

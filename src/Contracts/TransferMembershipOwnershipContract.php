@@ -6,7 +6,7 @@ namespace Nvl\Auth\Contracts;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Data\Mutations\TransferMembershipOwnershipData;
-use Nvl\Auth\Models\TenantMembership;
+use Nvl\Auth\Models\Membership;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
@@ -16,5 +16,5 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
  */
 interface TransferMembershipOwnershipContract
 {
-    public function execute(Authenticatable|SystemMutationContext $authority, TenantMembership|string $membership, TransferMembershipOwnershipData $data): TenantMembership;
+    public function execute(Authenticatable|SystemMutationContext $authority, Membership|string $membership, TransferMembershipOwnershipData $data): Membership;
 }

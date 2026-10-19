@@ -15,7 +15,7 @@ use Nvl\Auth\Enums\InvitationDeliveryStatus;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Services\FeatureGate;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 
 /**
  * Records one bounded host delivery result against the current invitation message.
@@ -30,7 +30,7 @@ final readonly class RecordInvitationDeliveryOutcomeAction implements RecordInvi
     public function __construct(
         private FeatureGate $features,
         private AuthAuditRecorder $audits,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
     ) {}
 
     /**

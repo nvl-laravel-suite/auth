@@ -21,7 +21,7 @@ use Nvl\Auth\Services\MembershipOwnerGuard;
 use Nvl\Auth\Services\RbacEntityLocator;
 use Nvl\Auth\Services\RoleHierarchy;
 use Nvl\Support\Events\DomainEventDispatcher;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 
@@ -41,7 +41,7 @@ final readonly class CreateRoleAction implements CreateRoleContract
         private RoleHierarchy $hierarchy,
         private AuthConfiguration $configuration,
         private AuthAuditRecorder $audits,
-        private TenantBoundary $tenancy,
+        private OwnershipBoundary $tenancy,
         private TenantContext $context,
         private TenantMembershipAccess $memberships,
         private MembershipOwnerGuard $owners,

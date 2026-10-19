@@ -68,7 +68,7 @@ final readonly class DeleteOwnAccountAction implements DeleteOwnAccountContract
 
         $deleted = DB::connection($user->getConnectionName())->transaction(function () use ($user): bool {
             $reference = SubjectReference::fromAuthenticatable($user);
-            if (config('nvl-tenancy.enabled') === true) {
+            if ($this->owners->isEnabled()) {
                 $this->owners->assertPrincipalCanBeDisabled($reference);
             }
             $tokens = $user->tokens();

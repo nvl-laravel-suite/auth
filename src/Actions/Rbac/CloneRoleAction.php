@@ -17,7 +17,7 @@ use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\ManagementAuthorizer;
 use Nvl\Auth\Services\RbacEntityLocator;
 use Nvl\Support\Events\DomainEventDispatcher;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 
 /**
  * Clones one role's metadata and permission assignment under a new name.
@@ -33,7 +33,7 @@ final readonly class CloneRoleAction implements CloneRoleContract
         private AuthModelRegistry $models,
         private RbacEntityLocator $entities,
         private AuthAuditRecorder $audits,
-        private TenantBoundary $tenancy,
+        private OwnershipBoundary $tenancy,
         private DomainEventDispatcher $domainEvents,
     ) {}
 

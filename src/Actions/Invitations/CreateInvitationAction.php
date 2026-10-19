@@ -34,7 +34,8 @@ use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Events\DomainEventDispatcher;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipContext;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
@@ -53,13 +54,14 @@ final readonly class CreateInvitationAction implements CreateInvitationContract
      */
     public function __construct(
         private FeatureGate $features,
+        private OwnershipContext $ownerContext,
         private AuthConfiguration $configuration,
         private OpaqueTokenFactory $tokens,
         private SecretHasher $hasher,
         private ManagementAuthorizer $authorization,
         private AuthPipeline $pipeline,
         AuthAuditRecorder $audits,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
         private TenantMembershipAccess $membershipAccess,
         private TenantMembershipAssignments $assignments,
         AuthCommittedAudit $committedAudits,
@@ -87,7 +89,11 @@ final readonly class CreateInvitationAction implements CreateInvitationContract
         }
 
         $ownership = $this->boundary->attributes('auth.invitations');
-        $tenant = isset($ownership['tenant_id'])
+        $nativeOwner = config('nvl-auth.ownership.scoped') === true ? $this->ownerContext->requireOwner() : null;
+        if ($nativeOwner !== null && ! $actor instanceof Authenticatable) {
+            throw new AuthException('forbidden', 'Owned invitation issuance requires an authenticated issuer.', 403);
+        }
+        $tenant = is_string($ownership['tenant_id'] ?? null)
             ? new TenantId($ownership['tenant_id'])
             : null;
         if ($context->tenant !== null && $context->tenant->value !== $tenant?->value) {
@@ -108,9 +114,9 @@ final readonly class CreateInvitationAction implements CreateInvitationContract
 
         $recipient = mb_strtolower(trim($data->recipient));
         $recipientHash = $this->hasher->hash('invitation-recipient', $recipient);
-        $ownershipKey = is_string($ownership['ownership_key'] ?? null) ? $ownership['ownership_key'] : 'platform';
+        $ownershipKey = $nativeOwner?->scopeKey() ?? (is_string($ownership['ownership_key'] ?? null) ? $ownership['ownership_key'] : 'platform');
         $activeKey = $this->hasher->hash('active-invitation', $ownershipKey."\0".$recipientHash."\0".$data->purpose);
-        $grants = $tenant === null
+        $grants = $tenant === null && $nativeOwner === null
             ? ['roles' => $data->roles, 'permissions' => $data->permissions]
             : $this->assignments->canonicalIdentifiers($data->roles, $data->permissions);
         $actorReference = $actor instanceof Authenticatable
@@ -163,8 +169,7 @@ final readonly class CreateInvitationAction implements CreateInvitationContract
                                 8_760,
                             ),
                         );
-                        $invitation = Invitation::query()->create([
-                            ...$ownership,
+                        $invitation = new Invitation([
                             'token_hash' => $this->hasher->hash('invitation-token', $token),
                             'active_key' => $activeKey,
                             'recipient' => $recipient,
@@ -188,6 +193,7 @@ final readonly class CreateInvitationAction implements CreateInvitationContract
                             'last_sent_at' => CarbonImmutable::now(),
                             'expires_at' => $expiresAt,
                         ]);
+                        $invitation->forceFill($ownership)->save();
 
                         $delivery = new AuthDeliveryRequest(
                             messageId: $messageId,

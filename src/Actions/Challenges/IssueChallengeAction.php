@@ -17,6 +17,7 @@ use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Results\IssuedChallenge;
+use Nvl\Auth\Services\AuthIdentityChallenges;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\OpaqueTokenFactory;
 use Nvl\Auth\Services\SecretHasher;
@@ -36,6 +37,7 @@ final readonly class IssueChallengeAction
      */
     public function __construct(
         private FeatureGate $features,
+        private AuthIdentityChallenges $records,
         private OpaqueTokenFactory $tokens,
         private SecretHasher $hasher,
         private AuthAuditRecorder $audits,
@@ -129,11 +131,11 @@ final readonly class IssueChallengeAction
                 $secondarySecretHash,
                 $ownership,
             ): IssuedChallenge {
-                Challenge::query()
+                $this->records->query()
                     ->when(config('nvl-tenancy.enabled') === true, fn ($query) => $query->where('ownership_key', 'platform'))
                     ->where('active_key', $activeKey)
                     ->update(['active_key' => null, 'revoked_at' => CarbonImmutable::now()]);
-                $challenge = Challenge::query()->create([
+                $challenge = $this->records->create([
                     ...$ownership,
                     'type' => $messageType->value,
                     'purpose' => $purpose,
