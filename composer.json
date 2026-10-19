@@ -13,7 +13,6 @@
         "totp"
     ],
     "require": {
-        "php": "^8.4",
         "ext-ctype": "*",
         "ext-filter": "*",
         "ext-json": "*",
@@ -21,8 +20,9 @@
         "laravel/framework": "^12.0 || ^13.0",
         "laravel/sanctum": "^4.3",
         "nesbot/carbon": "^2.72 || ^3.0",
-        "nvl/core": "^5.0",
+        "nvl/core": "^5.1",
         "paragonie/constant_time_encoding": "^2.6 || ^3.0",
+        "php": "^8.4",
         "pragmarx/google2fa": "^9.0",
         "spatie/laravel-data": "^4.23",
         "spatie/laravel-permission": "^8.0",
@@ -38,12 +38,14 @@
         "laravel/pint": "^1.27",
         "laravel/socialite": "^5.29",
         "mockery/mockery": "^1.6",
+        "nvl/ownership": "^5.0",
         "nvl/tenancy": "^5.0",
         "orchestra/testbench": "^10.0 || ^11.0",
         "pestphp/pest": "^4.0",
         "pestphp/pest-plugin-laravel": "^4.0",
         "spatie/typescript-transformer": "^3.3",
         "spomky-labs/cbor-php": "^3.0",
+        "symfony/process": "^7.0 || ^8.0",
         "web-auth/cose-lib": "^4.2.3"
     },
     "suggest": {
@@ -51,7 +53,8 @@
         "laravel/socialite": "Enables the optional OAuth identity adapter.",
         "nvl/activity": "Can consume the package's after-commit audit and authentication events.",
         "nvl/mail-notifications": "Can consume AuthDeliveryRequested events and deliver the typed payloads.",
-        "nvl/tenancy": "Enables enforcing tenant ownership, scoped execution, adoption, and captured tenant queue contexts.",
+        "nvl/ownership": "Adds optional model-declared ownership, isolation, adoption and captured worker contexts.",
+        "nvl/tenancy": "Temporary legacy tenancy bridge for existing tenant installations; native ownership does not require it.",
         "spatie/typescript-transformer": "Consume the declared TypeScript attributes and metadata (^3.3); Core retains the runtime transformation engine."
     },
     "autoload": {
@@ -121,6 +124,7 @@
     "conflict": {
         "nvl/activity": "<5.0 || >=6.0",
         "nvl/mail-notifications": "<5.0 || >=6.0",
+        "nvl/ownership": "<5.0 || >=6.0",
         "nvl/tenancy": "<5.0 || >=6.0"
     },
     "homepage": "https://github.com/nvl-laravel-suite/auth",
