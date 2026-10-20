@@ -7,6 +7,10 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [6.0.0] - 2026-10-20
 
+### Fixed
+
+- Export the nullable native membership owner reference as its exact scalar TypeScript shape without a frontend dependency in the neutral Core identity type.
+
 ### Changed
 
 - Integrate native owner admission and captured delivery, proof and permission-storage boundaries with explicit host Auth adoption. Drain or expire legacy pending proofs before native activation; keep host principal keys, role policies and Spatie opt-in intact.

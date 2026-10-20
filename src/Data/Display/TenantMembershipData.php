@@ -8,6 +8,7 @@ use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Data\Traits\DataTransform;
 use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 use Spatie\LaravelData\Data;
+use Spatie\TypeScriptTransformer\Attributes\LiteralTypeScriptType;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
@@ -30,6 +31,7 @@ final class TenantMembershipData extends Data
         public readonly int $revision,
         public readonly ?string $name = null,
         public readonly ?string $email = null,
+        #[LiteralTypeScriptType("{ version: 1; type: string; storage: string; keyType: 'int' | 'string'; key: string } | null")]
         public readonly ?OwnerReference $ownerReference = null,
     ) {}
 }
