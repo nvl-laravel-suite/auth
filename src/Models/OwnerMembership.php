@@ -6,6 +6,7 @@ namespace Nvl\Auth\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\OwnerMembershipFactory;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Support\Ownership\Contracts\Ownable;
 use Nvl\Support\Ownership\Exceptions\OwnershipConfigurationInvalid;
@@ -31,7 +32,7 @@ class OwnerMembership extends Membership implements Ownable
 
     use HasOwnership;
 
-    protected $table = 'nvl_auth_owner_memberships';
+    protected $table = AuthTables::OwnerMemberships;
 
     protected $fillable = ['subject_type', 'subject_id', 'status', 'is_owner', 'revision'];
 

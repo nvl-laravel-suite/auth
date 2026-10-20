@@ -51,6 +51,12 @@ final class AuthTables
 
     public const string TenantAuthenticationIntents = 'nvl_auth_tenant_authentication_intents';
 
+    public const string OwnerMemberships = 'nvl_auth_owner_memberships';
+
+    public const string OwnerMembershipLocks = 'nvl_auth_owner_membership_locks';
+
+    public const string OwnerAuthenticationIntents = 'nvl_auth_owner_authentication_intents';
+
     /** Return one configured logical or historical package table. */
     public static function get(string $key): string
     {

@@ -7,6 +7,10 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [6.0.0] - 2026-10-20
 
+### Release fixes
+
+- Centralize native membership and authentication-intent table names and classify the ownership opt-in in advanced configuration without changing storage identities.
+
 ### Fixed
 
 - Export the nullable native membership owner reference as its exact scalar TypeScript shape without a frontend dependency in the neutral Core identity type.

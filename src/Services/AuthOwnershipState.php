@@ -14,6 +14,8 @@ use Nvl\Support\Ownership\Services\PersistedOwnershipStorage;
 /** Prevents mutable flags or a cold unscoped boot from declassifying adopted Auth storage. @internal */
 final class AuthOwnershipState
 {
+    private const string ColumnMetadataCatalog = 'information_schema.columns';
+
     /** Create a request-scoped guard over immutable declarations and actual source identities. */
     public function __construct(
         private readonly OwnershipResourceRegistry $resources,
@@ -89,7 +91,7 @@ final class AuthOwnershipState
                 $catalog = $namespace.'.sqlite_master';
                 $partitioned = $connection->table($catalog)->useWritePdo()->where('type', 'table')->whereIn('name', $names)->where('sql', 'like', '%owner_scope_key%')->exists();
             } else {
-                $partitioned = $connection->table('information_schema.columns')->useWritePdo()->where('table_schema', $namespace)->whereIn('table_name', $names)->where('column_name', 'owner_scope_key')->exists();
+                $partitioned = $connection->table(self::ColumnMetadataCatalog)->useWritePdo()->where('table_schema', $namespace)->whereIn('table_name', $names)->where('column_name', 'owner_scope_key')->exists();
             }
             if ($partitioned) {
                 throw new OwnershipConfigurationInvalid('Physical Auth ownership requires its native deployment configuration.');

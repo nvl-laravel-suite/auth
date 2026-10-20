@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Models;
 
 use Carbon\CarbonImmutable;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Support\Ownership\Contracts\Ownable;
 use Nvl\Support\Ownership\Traits\HasOwnership;
 use Nvl\Support\Ownership\ValueObjects\OwnershipDefinition;
@@ -29,7 +30,7 @@ final class OwnerAuthenticationIntent extends AuthModel implements Ownable
 {
     use HasOwnership;
 
-    protected $table = 'nvl_auth_owner_authentication_intents';
+    protected $table = AuthTables::OwnerAuthenticationIntents;
 
     protected $guarded = ['id', 'owner_scope_key', 'owner_reference'];
 

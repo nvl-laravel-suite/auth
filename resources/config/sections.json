@@ -186,6 +186,7 @@
                 "ownership.delivery",
                 "ownership.host_routes",
                 "ownership.http",
+                "ownership.scoped",
                 "ownership.service_only",
                 "password_broker",
                 "pipelines.api_token_issued",

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Models;
 
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Support\Ownership\Contracts\Ownable;
 use Nvl\Support\Ownership\Traits\HasOwnership;
 use Nvl\Support\Ownership\ValueObjects\OwnershipDefinition;
@@ -20,7 +21,7 @@ final class OwnerMembershipLock extends AuthModel implements Ownable
 {
     use HasOwnership;
 
-    protected $table = 'nvl_auth_owner_membership_locks';
+    protected $table = AuthTables::OwnerMembershipLocks;
 
     protected $guarded = ['*'];
 
