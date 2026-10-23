@@ -136,6 +136,7 @@ return [
     'permission_deleted' => 'The permission was deleted.',
     'auth_audits_listed' => 'Auth audits were listed.',
     'auth_audit_shown' => 'The Auth audit was shown.',
+    'totp_security_state_shown' => 'TOTP security state was shown.',
     'totp_enrollment_started' => 'TOTP enrollment was started.',
     'totp_enrolled' => 'TOTP was enrolled.',
     'totp_verified' => 'TOTP was verified.',

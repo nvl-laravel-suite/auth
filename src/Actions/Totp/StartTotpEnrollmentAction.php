@@ -34,7 +34,10 @@ final readonly class StartTotpEnrollmentAction implements StartTotpEnrollmentCon
     ) {}
 
     /**
-     * Create a pending TOTP credential and return its one-time secret.
+     * Replace prior pending enrollments and return new provisioning material once.
+     *
+     * Hosts must authorize and reauthenticate the owning principal before restarting.
+     * Pending secrets cannot be resumed; confirmed credentials remain unchanged.
      */
     public function execute(
         Authenticatable $subject,
@@ -57,6 +60,7 @@ final readonly class StartTotpEnrollmentAction implements StartTotpEnrollmentCon
                 ->where('subject_type', $reference->type)
                 ->where('subject_id', $reference->identifier)
                 ->whereNull('confirmed_at')
+                ->whereNull('revoked_at')
                 ->delete();
             $credential = TotpCredential::query()->create([
                 'subject_type' => $reference->type,

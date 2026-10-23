@@ -119,6 +119,7 @@ use Nvl\Auth\Actions\SocialIdentities\RevokeSocialIdentityAction;
 use Nvl\Auth\Actions\SocialIdentities\StartSocialAuthorizationAction;
 use Nvl\Auth\Actions\Totp\ConfirmTotpEnrollmentAction;
 use Nvl\Auth\Actions\Totp\RevokeTotpCredentialAction;
+use Nvl\Auth\Actions\Totp\ShowTotpSecurityStateAction;
 use Nvl\Auth\Actions\Totp\StartTotpEnrollmentAction;
 use Nvl\Auth\Actions\Totp\VerifyTotpAction;
 use Nvl\Auth\Actions\Users\BulkUpdateUsersAction;
@@ -245,6 +246,7 @@ use Nvl\Auth\Contracts\ShowProfileContract;
 use Nvl\Auth\Contracts\ShowRbacAnalyticsContract;
 use Nvl\Auth\Contracts\ShowRoleAnalyticsContract;
 use Nvl\Auth\Contracts\ShowRoleContract;
+use Nvl\Auth\Contracts\ShowTotpSecurityStateContract;
 use Nvl\Auth\Contracts\ShowUserContract;
 use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
@@ -402,6 +404,7 @@ dataset('auth focused consumer contracts', [
     'StartSocialAuthorizationAction' => [StartSocialAuthorizationContract::class, StartSocialAuthorizationAction::class, [['features', 'Nvl\\Auth\\Services\\FeatureGate', false, null, true], ['configuration', 'Nvl\\Auth\\Services\\SocialProviderConfiguration', false, null, true], ['provider', 'Nvl\\Auth\\Contracts\\SocialIdentityProvider', false, null, true], ['operations', 'Nvl\\Auth\\Services\\AuthOperationBoundary', false, null, true], ['intents', 'Nvl\\Auth\\Services\\TenantAuthenticationIntents', false, null, true], ['session', 'Nvl\\Auth\\Contracts\\TenantAuthenticationSession', false, null, true]]],
     'ConfirmTotpEnrollmentAction' => [ConfirmTotpEnrollmentContract::class, ConfirmTotpEnrollmentAction::class, [['features', 'Nvl\\Auth\\Services\\FeatureGate', false, null, true], ['totp', 'Nvl\\Auth\\Services\\TotpEngine', false, null, true], ['audits', 'Nvl\\Auth\\Contracts\\AuthAuditRecorder', false, null, true]]],
     'RevokeTotpCredentialAction' => [RevokeTotpCredentialContract::class, RevokeTotpCredentialAction::class, [['features', 'Nvl\\Auth\\Services\\FeatureGate', false, null, true], ['audits', 'Nvl\\Auth\\Contracts\\AuthAuditRecorder', false, null, true]]],
+    'ShowTotpSecurityStateAction' => [ShowTotpSecurityStateContract::class, ShowTotpSecurityStateAction::class, [['features', 'Nvl\\Auth\\Services\\FeatureGate', false, null, true], ['operations', 'Nvl\\Auth\\Services\\AuthOperationBoundary', false, null, true]]],
     'StartTotpEnrollmentAction' => [StartTotpEnrollmentContract::class, StartTotpEnrollmentAction::class, [['features', 'Nvl\\Auth\\Services\\FeatureGate', false, null, true], ['totp', 'Nvl\\Auth\\Services\\TotpEngine', false, null, true], ['audits', 'Nvl\\Auth\\Contracts\\AuthAuditRecorder', false, null, true]]],
     'VerifyTotpAction' => [VerifyTotpContract::class, VerifyTotpAction::class, [['features', 'Nvl\\Auth\\Services\\FeatureGate', false, null, true], ['totp', 'Nvl\\Auth\\Services\\TotpEngine', false, null, true], ['audits', 'Nvl\\Auth\\Contracts\\AuthAuditRecorder', false, null, true]]],
     'BulkUpdateUsersAction' => [BulkUpdateUsersContract::class, BulkUpdateUsersAction::class, [['features', 'Nvl\\Auth\\Services\\FeatureGate', false, null, true], ['authorization', 'Nvl\\Auth\\Services\\MutationAuthorizer', false, null, true], ['users', 'Nvl\\Auth\\Services\\UserLocator', false, null, true], ['audits', 'Nvl\\Auth\\Contracts\\AuthAuditRecorder', false, null, true], ['attributes', 'Nvl\\Auth\\Contracts\\PrincipalAttributeMapper', false, null, true], ['sessions', 'Nvl\\Auth\\Contracts\\PrincipalSessionContainment', false, null, true], ['owners', 'Nvl\\Auth\\Services\\MembershipOwnerGuard', false, null, true], ['domainEvents', 'Nvl\\Support\\Events\\DomainEventDispatcher', false, null, true]]],
@@ -830,6 +833,7 @@ function authFocusedContractPairs(): array
         [ConfirmTotpEnrollmentContract::class, ConfirmTotpEnrollmentAction::class],
         [RevokeTotpCredentialContract::class, RevokeTotpCredentialAction::class],
         [StartTotpEnrollmentContract::class, StartTotpEnrollmentAction::class],
+        [ShowTotpSecurityStateContract::class, ShowTotpSecurityStateAction::class],
         [VerifyTotpContract::class, VerifyTotpAction::class],
         [BulkUpdateUsersContract::class, BulkUpdateUsersAction::class],
         [CreateUserContract::class, CreateUserAction::class],

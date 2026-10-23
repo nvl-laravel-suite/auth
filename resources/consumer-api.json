@@ -1006,6 +1006,16 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Actions\\Totp\\ShowTotpSecurityStateAction": {
+            "kind": "class",
+            "file": "src/Actions/Totp/ShowTotpSecurityStateAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Actions\\Totp\\StartTotpEnrollmentAction": {
             "kind": "class",
             "file": "src/Actions/Totp/StartTotpEnrollmentAction.php",
@@ -2180,6 +2190,15 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\ShowTotpSecurityStateContract": {
+            "kind": "interface",
+            "file": "src/Contracts/ShowTotpSecurityStateContract.php",
+            "methods": [
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\ShowUserContract": {
             "kind": "interface",
             "file": "src/Contracts/ShowUserContract.php",
@@ -2737,6 +2756,26 @@
                 "subjectId",
                 "subjectType",
                 "tenantId"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Data\\Display\\TotpSecurityStateData": {
+            "kind": "class",
+            "file": "src/Data/Display/TotpSecurityStateData.php",
+            "methods": [
+                "__construct",
+                "scopedRules",
+                "toArray",
+                "toModel",
+                "toModelFiltered",
+                "toModelPatch",
+                "translatedAttributes",
+                "translatedMessages"
+            ],
+            "properties": [
+                "confirmedCredentials",
+                "pendingEnrollments",
+                "revokedCredentials"
             ],
             "constants": []
         },
@@ -3984,6 +4023,7 @@
                 "TotpEnrollmentStarted",
                 "TotpInvalid",
                 "TotpRevoked",
+                "TotpSecurityStateShown",
                 "TotpUnavailable",
                 "TotpVerified",
                 "Unauthenticated",
@@ -5312,7 +5352,62 @@
                 "isNot",
                 "relationLoaded"
             ],
-            "capability_relations": []
+            "capability_relations": [
+                "acceptedInvitations",
+                "authAudits",
+                "authChallenges",
+                "authClientSessions",
+                "passkeys",
+                "performedAuthAudits",
+                "permissions",
+                "recoveryCodes",
+                "roles",
+                "sentInvitations",
+                "socialIdentities",
+                "teams",
+                "tokens",
+                "totpCredentials"
+            ],
+            "host_subclasses": true,
+            "capability_methods": [
+                "assignRole",
+                "bootHasPermissions",
+                "bootHasRoles",
+                "collectPermissions",
+                "collectRoles",
+                "convertToPermissionModels",
+                "createToken",
+                "detachPermissions",
+                "detachRoles",
+                "filterPermission",
+                "forgetCachedPermissions",
+                "forgetWildcardPermissionIndex",
+                "getAllPermissions",
+                "getArrayableRelations",
+                "getDirectPermissions",
+                "getPermissionNames",
+                "getPermissionsViaRoles",
+                "getRelations",
+                "getRoleNames",
+                "getStoredPermission",
+                "getStoredRole",
+                "givePermissionTo",
+                "jsonSerialize",
+                "relationsToArray",
+                "removeRole",
+                "revokePermissionTo",
+                "scopePermission",
+                "scopeRole",
+                "scopeTeam",
+                "scopeWithoutPermission",
+                "scopeWithoutRole",
+                "scopeWithoutTeam",
+                "syncPermissions",
+                "syncRoles",
+                "toArray",
+                "toJson",
+                "toPrettyJson"
+            ]
         }
     },
     "capability_relations": {},

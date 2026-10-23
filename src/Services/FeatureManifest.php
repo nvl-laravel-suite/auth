@@ -133,7 +133,7 @@ final class FeatureManifest
                 $all,
                 [AuthFeature::Authentication],
                 ['account' => 'totp'],
-                ['account' => ['totp.enroll', 'totp.confirm', 'totp.verify', 'totp.revoke']],
+                ['account' => ['totp.show', 'totp.enroll', 'totp.confirm', 'totp.verify', 'totp.revoke']],
             ),
             new FeatureDefinition(
                 AuthFeature::Passkeys,

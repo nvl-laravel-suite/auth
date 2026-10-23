@@ -50,6 +50,13 @@ it('keeps OpenAPI operations and feature metadata identical to the manifest', fu
 
     expect($actualNames)->toBe($expectedNames);
 
+    expect($document['paths']['/totp']['get'])->toMatchArray([
+        'operationId' => 'nvl.auth.account.totp.show',
+        'x-nvl-feature' => AuthFeature::Totp->value,
+        'x-nvl-feature-operation' => FeatureOperation::Read->value,
+        'x-nvl-route-surface' => 'account',
+    ])->not->toHaveKey('requestBody');
+
     foreach ($operations as $operation) {
         $feature = AuthFeature::from($operation['x-nvl-feature']);
         $definition = $manifest->definition($feature);

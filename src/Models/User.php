@@ -49,6 +49,61 @@ use Spatie\Permission\Traits\HasRoles;
  * @property CarbonImmutable|null $deleted_at
  *
  * @api
+ *
+ * @nvl-consumer-host-subclasses
+ *
+ * @nvl-consumer-relation roles
+ * @nvl-consumer-relation permissions
+ * @nvl-consumer-relation teams
+ * @nvl-consumer-relation tokens
+ * @nvl-consumer-relation authChallenges
+ * @nvl-consumer-relation totpCredentials
+ * @nvl-consumer-relation passkeys
+ * @nvl-consumer-relation recoveryCodes
+ * @nvl-consumer-relation socialIdentities
+ * @nvl-consumer-relation authClientSessions
+ * @nvl-consumer-relation sentInvitations
+ * @nvl-consumer-relation acceptedInvitations
+ * @nvl-consumer-relation authAudits
+ * @nvl-consumer-relation performedAuthAudits
+ *
+ * @nvl-consumer-capability-method collectRoles
+ * @nvl-consumer-capability-method detachRoles
+ * @nvl-consumer-capability-method getStoredRole
+ * @nvl-consumer-capability-method convertToPermissionModels
+ * @nvl-consumer-capability-method collectPermissions
+ * @nvl-consumer-capability-method detachPermissions
+ * @nvl-consumer-capability-method getStoredPermission
+ * @nvl-consumer-capability-method getRelations
+ * @nvl-consumer-capability-method getArrayableRelations
+ * @nvl-consumer-capability-method toPrettyJson
+ * @nvl-consumer-capability-method toArray
+ * @nvl-consumer-capability-method toJson
+ * @nvl-consumer-capability-method jsonSerialize
+ * @nvl-consumer-capability-method relationsToArray
+ * @nvl-consumer-capability-method assignRole
+ * @nvl-consumer-capability-method removeRole
+ * @nvl-consumer-capability-method syncRoles
+ * @nvl-consumer-capability-method givePermissionTo
+ * @nvl-consumer-capability-method syncPermissions
+ * @nvl-consumer-capability-method revokePermissionTo
+ * @nvl-consumer-capability-method getAllPermissions
+ * @nvl-consumer-capability-method getDirectPermissions
+ * @nvl-consumer-capability-method getPermissionsViaRoles
+ * @nvl-consumer-capability-method getRoleNames
+ * @nvl-consumer-capability-method getPermissionNames
+ * @nvl-consumer-capability-method filterPermission
+ * @nvl-consumer-capability-method scopeRole
+ * @nvl-consumer-capability-method scopeWithoutRole
+ * @nvl-consumer-capability-method scopeTeam
+ * @nvl-consumer-capability-method scopeWithoutTeam
+ * @nvl-consumer-capability-method scopePermission
+ * @nvl-consumer-capability-method scopeWithoutPermission
+ * @nvl-consumer-capability-method createToken
+ * @nvl-consumer-capability-method forgetCachedPermissions
+ * @nvl-consumer-capability-method forgetWildcardPermissionIndex
+ * @nvl-consumer-capability-method bootHasRoles
+ * @nvl-consumer-capability-method bootHasPermissions
  */
 #[UseFactory(UserFactory::class)]
 class User extends Authenticatable implements CanResetPasswordContract, HasApiTokensContract, HasLocalePreference, MustVerifyEmailContract

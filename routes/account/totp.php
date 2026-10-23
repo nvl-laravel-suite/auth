@@ -5,6 +5,10 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Nvl\Auth\Http\Controllers\Account\TotpController;
 
+Route::get('totp', [TotpController::class, 'show'])
+    ->withoutMiddleware('auth')
+    ->middleware(['nvl.auth.guard', 'nvl.auth.feature:totp,read'])
+    ->name('totp.show');
 Route::post('totp/enroll', [TotpController::class, 'start'])
     ->middleware('nvl.auth.feature:totp,enroll')
     ->name('totp.enroll');

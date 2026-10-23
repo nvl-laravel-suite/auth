@@ -378,6 +378,23 @@ unlisted host attribute protected. Extension fields therefore survive `fill()`,
 ],
 ```
 
+The consumer checker permits ordinary fields, business relations, queries,
+persistence, and authorization on a host-authored `User` subclass. Native Auth
+storage capabilities remain guarded: roles/permissions, tokens and security
+relations, their mutation/projection helpers, and aliases of those helpers.
+Subclasses defined by another installed Composer package retain package-handle
+restrictions. Project explicitly selected host fields into application DTOs:
+
+```php
+$profile = ['id' => $user->id, 'name' => $user->name];
+```
+
+Generic `toArray()`, `toJson()`, `toPrettyJson()`, `jsonSerialize()`,
+`relationsToArray()`, `getRelations()`, and `json_encode($user)` can expose native
+relations loaded by authorization helpers, so the checker rejects them on the
+host principal and its typed collections. Use public package read contracts for
+native projections and explicit host-field DTOs for application profile data.
+
 Use named pipelines for application policy around login, logout, password reset,
 invitations, clients, and API-token issue. Replace contract bindings only where
 the application needs different identity, authorization, social, passkey, token,
@@ -414,6 +431,64 @@ or domain transitions require a traceable `SystemMutationContext` and an
 explicit host `SystemMutationAccess` grant. Destructive lifecycle Actions invoke
 the replaceable `PrincipalSessionContainment` contract for API tokens, remember
 credentials, Laravel database sessions, and host extensions.
+
+## TOTP security state and pending enrollment
+
+`ShowTotpSecurityStateContract::execute(Authenticatable $subject)` returns
+`TotpSecurityStateData` with `confirmedCredentials`, `pendingEnrollments`, and
+`revokedCredentials` counts. Revoked credentials belong only to the revoked
+count, even when previously confirmed. This is one subject-type/identifier
+filtered database snapshot; it never selects or decrypts secrets, exposes model
+handles, records an audit, or starts enrollment.
+
+Resolve the current principal through the host's configured authenticated guard
+and authorize that principal before invoking a self-service contract. For
+example, inside an authenticated host account controller:
+
+```php
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Nvl\Auth\Contracts\ShowTotpSecurityStateContract;
+use Nvl\Auth\Data\Display\TotpSecurityStateData;
+
+public function security(Request $request, ShowTotpSecurityStateContract $show): TotpSecurityStateData
+{
+    $subject = $request->user();
+    abort_unless($subject instanceof Authenticatable, 401);
+    Gate::authorize('manage-security', $subject); // Host-defined self-service policy.
+
+    return $show->execute($subject);
+}
+```
+
+With the account TOTP routes enabled, `GET /nvl/api/v1/auth/totp`
+(`nvl.auth.account.totp.show`) returns the same counts under `data`, uses the
+configured Auth guard, and sends private/no-store security headers. A status GET
+never creates or replaces a pending credential. Feature and authentication
+admission remain required; this reader does not grant owner or platform authority.
+
+Provisioning material is returned once by `StartTotpEnrollmentContract`. Lost
+pending material is handled by an explicit restart: the host must authorize and
+reauthenticate the owning principal before submitting the mutation, for example
+behind its account confirmation or `password.confirm` middleware:
+
+```php
+use Nvl\Auth\Contracts\StartTotpEnrollmentContract;
+use Nvl\Auth\Data\Mutations\StartTotpEnrollmentData;
+
+$enrollment = app(StartTotpEnrollmentContract::class)->execute(
+    $reauthenticatedSubject,
+    new StartTotpEnrollmentData(accountName: $accountLabel, name: 'Authenticator'),
+);
+```
+
+Each start deletes that principal's prior active unconfirmed credential and returns a
+new credential handle, secret, and provisioning URI. The old pending handle can
+no longer be confirmed. Confirmed and revoked credentials and other principals' enrollments
+remain intact. Pending secrets cannot be resumed or recovered through the state
+reader; confirmed and revoked secrets are never returned by it. Deliver the new
+material only in the authorized mutation response and do not log or cache it.
 
 ## RBAC consumer reads and analytics
 
@@ -845,6 +920,7 @@ The table lists enum discriminators, including any successful codes retained for
 | `permission_deleted` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.permission_deleted` |
 | `auth_audits_listed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.auth_audits_listed` |
 | `auth_audit_shown` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.auth_audit_shown` |
+| `totp_security_state_shown` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.totp_security_state_shown` |
 | `totp_enrollment_started` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.totp_enrollment_started` |
 | `totp_enrolled` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.totp_enrolled` |
 | `totp_verified` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-auth::responsecode.totp_verified` |

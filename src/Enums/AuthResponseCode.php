@@ -144,6 +144,7 @@ enum AuthResponseCode: string implements ResponseCode
     case PermissionDeleted = 'permission_deleted';
     case AuthAuditsListed = 'auth_audits_listed';
     case AuthAuditShown = 'auth_audit_shown';
+    case TotpSecurityStateShown = 'totp_security_state_shown';
     case TotpEnrollmentStarted = 'totp_enrollment_started';
     case TotpEnrolled = 'totp_enrolled';
     case TotpVerified = 'totp_verified';

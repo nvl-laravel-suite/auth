@@ -136,6 +136,7 @@ return [
     'permission_deleted' => 'Операцията е завършена успешно.',
     'auth_audits_listed' => 'Операцията е завършена успешно.',
     'auth_audit_shown' => 'Операцията е завършена успешно.',
+    'totp_security_state_shown' => 'Състоянието на TOTP защитата е заредено.',
     'totp_enrollment_started' => 'Операцията е завършена успешно.',
     'totp_enrolled' => 'Операцията е завършена успешно.',
     'totp_verified' => 'Операцията е завършена успешно.',

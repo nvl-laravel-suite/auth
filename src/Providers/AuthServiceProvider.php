@@ -113,6 +113,7 @@ use Nvl\Auth\Actions\SocialIdentities\RevokeSocialIdentityAction;
 use Nvl\Auth\Actions\SocialIdentities\StartSocialAuthorizationAction;
 use Nvl\Auth\Actions\Totp\ConfirmTotpEnrollmentAction;
 use Nvl\Auth\Actions\Totp\RevokeTotpCredentialAction;
+use Nvl\Auth\Actions\Totp\ShowTotpSecurityStateAction;
 use Nvl\Auth\Actions\Totp\StartTotpEnrollmentAction;
 use Nvl\Auth\Actions\Totp\VerifyTotpAction;
 use Nvl\Auth\Actions\Users\BulkUpdateUsersAction;
@@ -255,6 +256,7 @@ use Nvl\Auth\Contracts\ShowProfileContract;
 use Nvl\Auth\Contracts\ShowRbacAnalyticsContract;
 use Nvl\Auth\Contracts\ShowRoleAnalyticsContract;
 use Nvl\Auth\Contracts\ShowRoleContract;
+use Nvl\Auth\Contracts\ShowTotpSecurityStateContract;
 use Nvl\Auth\Contracts\ShowUserContract;
 use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
@@ -902,6 +904,7 @@ final class AuthServiceProvider extends ServiceProvider implements OwnershipInte
             ConfirmTotpEnrollmentContract::class => ConfirmTotpEnrollmentAction::class,
             RevokeTotpCredentialContract::class => RevokeTotpCredentialAction::class,
             StartTotpEnrollmentContract::class => StartTotpEnrollmentAction::class,
+            ShowTotpSecurityStateContract::class => ShowTotpSecurityStateAction::class,
             VerifyTotpContract::class => VerifyTotpAction::class,
             BulkUpdateUsersContract::class => BulkUpdateUsersAction::class,
             CreateUserContract::class => CreateUserAction::class,

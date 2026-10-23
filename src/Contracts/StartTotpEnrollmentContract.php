@@ -16,7 +16,10 @@ use Nvl\Auth\Results\TotpEnrollment;
 interface StartTotpEnrollmentContract
 {
     /**
-     * Create a pending TOTP credential and return its one-time secret.
+     * Replace prior pending enrollments and return new provisioning material once.
+     *
+     * Hosts must authorize and reauthenticate the owning principal before restarting.
+     * Pending secrets cannot be resumed; confirmed credentials remain unchanged.
      */
     public function execute(
         Authenticatable $subject,

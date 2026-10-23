@@ -10,6 +10,7 @@ use Nvl\Auth\Actions\Totp\ConfirmTotpEnrollmentAction;
 use Nvl\Auth\Actions\Totp\RevokeTotpCredentialAction;
 use Nvl\Auth\Actions\Totp\StartTotpEnrollmentAction;
 use Nvl\Auth\Actions\Totp\VerifyTotpAction;
+use Nvl\Auth\Contracts\ShowTotpSecurityStateContract;
 use Nvl\Auth\Data\Mutations\ConfirmTotpEnrollmentData;
 use Nvl\Auth\Data\Mutations\StartTotpEnrollmentData;
 use Nvl\Auth\Data\Mutations\VerifyTotpData;
@@ -20,6 +21,16 @@ use Nvl\Auth\Models\TotpCredential;
  */
 final class TotpController extends AuthenticatedController
 {
+    /** Return secret-free state for the authenticated principal without restarting enrollment. */
+    public function show(Request $request, ShowTotpSecurityStateContract $action): JsonResponse
+    {
+        return response()->json([
+            'data' => $action->execute($this->subject($request))->toArray(),
+            'code' => 'totp_security_state_shown',
+            'message' => trans('nvl-auth::responsecode.totp_security_state_shown'),
+        ]);
+    }
+
     /**
      * Start TOTP enrollment.
      */
