@@ -4,25 +4,15 @@ declare(strict_types=1);
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\QueryException;
-use Nvl\Auth\Actions\ApiTokens\CreateApiTokenAction;
-use Nvl\Auth\Actions\Memberships\EnrollMembershipAction;
-use Nvl\Auth\Actions\Memberships\ListMembershipsAction;
-use Nvl\Auth\Actions\Memberships\ListOwnMembershipsAction;
-use Nvl\Auth\Actions\Memberships\RevokeMembershipAction;
-use Nvl\Auth\Actions\Memberships\ShowMembershipAction;
-use Nvl\Auth\Actions\Memberships\TransferMembershipOwnershipAction;
-use Nvl\Auth\Actions\Users\SetUserActiveAction;
-use Nvl\Auth\Data\Mutations\ApiTokenData;
-use Nvl\Auth\Data\Mutations\EnrollMembershipData;
-use Nvl\Auth\Data\Mutations\TransferMembershipOwnershipData;
-use Nvl\Auth\Data\Mutations\UpdateUserStatusData;
 use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\OwnerMembership;
 use Nvl\Auth\Models\PersonalAccessToken;
 use Nvl\Auth\Ownership\AuthOwnerAccess;
-use Nvl\Auth\Services\OwnerMemberships;
+use Nvl\Auth\Services\AuthMemberships;
+use Nvl\Auth\Services\AuthTokens;
+use Nvl\Auth\Services\AuthUsers;
 use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Auth\Tests\OwnerScopeTestCase;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -38,7 +28,7 @@ uses(OwnerScopeTestCase::class);
 
 it('keeps one principal memberships separate in native owners seven and eight', function (): void {
     $user = TestUser::factory()->create();
-    $memberships = app(OwnerMemberships::class);
+    $memberships = app(AuthMemberships::class);
     $runner = app(OwnershipRunner::class);
     $actor = Actor::query()->findOrFail(1);
     $authority = new SystemMutationContext('reviewed bootstrap', 'bootstrap-1');
@@ -48,15 +38,15 @@ it('keeps one principal memberships separate in native owners seven and eight', 
     }
     expect($ids[0])->not->toBe($ids[1]);
     $runner->run(Company::query()->findOrFail(7), $actor, function () use ($memberships, $ids, $user): void {
-        expect($memberships->find($ids[0])->subject_id)->toBe($user->id)
-            ->and(fn () => $memberships->find($ids[1]))->toThrow(OwnershipViolation::class);
+        expect($memberships->find(TestUser::query()->firstOrFail(), $ids[0])->subject_id)->toBe($user->id)
+            ->and(fn () => $memberships->find(TestUser::query()->firstOrFail(), $ids[1]))->toThrow(OwnershipViolation::class);
     });
 });
 
 it('denies enrollment without an admitted owner and never creates owners or credentials', function (): void {
     $before = Company::query()->count();
     $user = TestUser::factory()->create();
-    expect(fn () => app(OwnerMemberships::class)->provision(new SystemMutationContext('bootstrap', 'b'), SubjectReference::fromAuthenticatable($user)))
+    expect(fn () => app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'b'), SubjectReference::fromAuthenticatable($user)))
         ->toThrow(OwnershipViolation::class)
         ->and(Company::query()->count())->toBe($before)
         ->and(TestUser::query()->count())->toBe(1);
@@ -67,7 +57,7 @@ it('protects the last owner and revalidates membership revocation on entry', fun
     $other = TestUser::factory()->create();
     $company = Company::query()->findOrFail(7);
     $actor = Actor::query()->findOrFail(1);
-    $memberships = app(OwnerMemberships::class);
+    $memberships = app(AuthMemberships::class);
     $authority = new SystemMutationContext('reviewed bootstrap', 'b');
     app(OwnershipRunner::class)->run($company, $actor, function () use ($memberships, $authority, $user, $other): void {
         $first = $memberships->provision($authority, SubjectReference::fromAuthenticatable($user));
@@ -84,13 +74,13 @@ it('uses ownership through the existing membership Actions', function (): void {
     $admin = TestUser::factory()->create();
     $recipient = TestUser::factory()->create();
     app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), function () use ($admin, $recipient): void {
-        app(OwnerMemberships::class)->provision(new SystemMutationContext('bootstrap', 'actions'), SubjectReference::fromAuthenticatable($admin));
-        $membership = app(EnrollMembershipAction::class)->execute($admin, new EnrollMembershipData(SubjectReference::fromAuthenticatable($recipient)));
+        app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'actions'), SubjectReference::fromAuthenticatable($admin));
+        $membership = app(AuthMemberships::class)->enroll($admin, SubjectReference::fromAuthenticatable($recipient));
         expect($membership)->toBeInstanceOf(OwnerMembership::class)
-            ->and(app(ListMembershipsAction::class)->execute($admin)->total())->toBe(2)
-            ->and(app(ShowMembershipAction::class)->execute($admin, $membership)->subjectId)->toBe($recipient->id);
-        app(RevokeMembershipAction::class)->execute($admin, $membership, $membership->revision);
-        expect(app(OwnerMemberships::class)->find($membership)->status)->toBe(MembershipStatus::Revoked);
+            ->and(app(AuthMemberships::class)->paginate($admin)->total())->toBe(2)
+            ->and(app(AuthMemberships::class)->find($admin, $membership)->subject_id)->toBe($recipient->id);
+        app(AuthMemberships::class)->revoke($admin, $membership, $membership->revision);
+        expect(app(AuthMemberships::class)->find(TestUser::query()->firstOrFail(), $membership)->status)->toBe(MembershipStatus::Revoked);
     });
 });
 
@@ -107,25 +97,25 @@ it('transfers owner administration inside one native owner and exposes only the 
     $first = TestUser::factory()->create();
     $second = TestUser::factory()->create();
     app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), function () use ($first, $second): void {
-        $source = app(OwnerMemberships::class)->provision(new SystemMutationContext('bootstrap', 'transfer'), SubjectReference::fromAuthenticatable($first));
-        $target = app(OwnerMemberships::class)->enroll($first, SubjectReference::fromAuthenticatable($second));
-        app(TransferMembershipOwnershipAction::class)->execute($first, $source, new TransferMembershipOwnershipData($target->id, $source->revision));
-        expect(app(OwnerMemberships::class)->find($source)->is_owner)->toBeFalse()
-            ->and(app(OwnerMemberships::class)->find($target)->is_owner)->toBeTrue();
+        $source = app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'transfer'), SubjectReference::fromAuthenticatable($first));
+        $target = app(AuthMemberships::class)->enroll($first, SubjectReference::fromAuthenticatable($second));
+        app(AuthMemberships::class)->transfer($first, $source, $target->id, $source->revision);
+        expect(app(AuthMemberships::class)->find(TestUser::query()->firstOrFail(), $source)->is_owner)->toBeFalse()
+            ->and(app(AuthMemberships::class)->find(TestUser::query()->firstOrFail(), $target)->is_owner)->toBeTrue();
     });
-    $own = app(ListOwnMembershipsAction::class)->execute($second);
+    $own = app(AuthMemberships::class)->own($second);
     expect($own)->toHaveCount(1)->and($own->first()['owner']['key'])->toBe('7');
 });
 
 it('protects native last-owner responsibility when the global principal is disabled', function (): void {
     $user = TestUser::factory()->create();
-    app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), fn () => app(OwnerMemberships::class)->provision(new SystemMutationContext('bootstrap', 'global'), SubjectReference::fromAuthenticatable($user)));
+    app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), fn () => app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'global'), SubjectReference::fromAuthenticatable($user)));
     config(['nvl-ownership.central_operations' => ['auth-principals']]);
     $this->app->bind(CentralAccess::class, static fn () => new class implements CentralAccess
     {
         public function assertCanRun(string $operation, Authenticatable $actor): void {}
     });
-    expect(fn () => app(OwnershipRunner::class)->central('auth-principals', Actor::query()->findOrFail(1), fn () => app(SetUserActiveAction::class)->execute(new SystemMutationContext('disable', 'global'), $user, new UpdateUserStatusData(false))))->toThrow(AuthException::class);
+    expect(fn () => app(OwnershipRunner::class)->central('auth-principals', Actor::query()->findOrFail(1), fn () => app(AuthUsers::class)->setActive(new SystemMutationContext('disable', 'global'), $user, ['active' => false])))->toThrow(AuthException::class);
     expect($user->fresh()->is_active)->toBeTrue();
 });
 
@@ -133,16 +123,16 @@ it('contains all owner-bound credentials during authorized global principal disa
     $admin = TestUser::factory()->create();
     $user = TestUser::factory()->create();
     app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), function () use ($admin, $user): void {
-        app(OwnerMemberships::class)->provision(new SystemMutationContext('bootstrap', 'contain'), SubjectReference::fromAuthenticatable($admin));
-        app(OwnerMemberships::class)->enroll($admin, SubjectReference::fromAuthenticatable($user));
-        app(CreateApiTokenAction::class)->execute($user, new ApiTokenData('owner-token', ['profile:read']));
+        app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'contain'), SubjectReference::fromAuthenticatable($admin));
+        app(AuthMemberships::class)->enroll($admin, SubjectReference::fromAuthenticatable($user));
+        app(AuthTokens::class)->create($user, ['name' => 'owner-token', 'abilities' => ['profile:read']]);
     });
     config(['nvl-ownership.central_operations' => ['auth-principals']]);
     $this->app->bind(CentralAccess::class, static fn () => new class implements CentralAccess
     {
         public function assertCanRun(string $operation, Authenticatable $actor): void {}
     });
-    $disabled = app(OwnershipRunner::class)->central('auth-principals', Actor::query()->findOrFail(1), fn () => app(SetUserActiveAction::class)->execute(new SystemMutationContext('disable', 'contain'), $user, new UpdateUserStatusData(false)));
+    $disabled = app(OwnershipRunner::class)->central('auth-principals', Actor::query()->findOrFail(1), fn () => app(AuthUsers::class)->setActive(new SystemMutationContext('disable', 'contain'), $user, ['active' => false]));
     expect($disabled->is_active)->toBeFalse()
         ->and((new PersonalAccessToken)->getConnection()->table('nvl_auth_personal_access_tokens')->where('tokenable_id', $user->id)->count())->toBe(0);
 });
@@ -153,7 +143,7 @@ it('persists membership lifecycle audits with their owning transaction', functio
         $connection = (new OwnerMembership)->getConnection();
         try {
             $connection->transaction(function () use ($user): void {
-                app(OwnerMemberships::class)->provision(new SystemMutationContext('bootstrap', 'audit-rollback'), SubjectReference::fromAuthenticatable($user));
+                app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'audit-rollback'), SubjectReference::fromAuthenticatable($user));
                 expect(AuthAudit::query()->where('action', 'membership.owner_provisioned')->count())->toBe(1);
                 throw new RuntimeException('rollback');
             });
@@ -168,7 +158,7 @@ it('persists membership lifecycle audits with their owning transaction', functio
 it('prevents relabeling an existing membership to a different principal', function (): void {
     $user = TestUser::factory()->create();
     app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), function () use ($user): void {
-        $membership = app(OwnerMemberships::class)->provision(new SystemMutationContext('bootstrap', 'immutable-subject'), SubjectReference::fromAuthenticatable($user));
+        $membership = app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'immutable-subject'), SubjectReference::fromAuthenticatable($user));
         expect(fn () => $membership->getConnection()->table($membership->getTable())->where('id', $membership->id)->update(['subject_id' => 'foreign-principal']))
             ->toThrow(QueryException::class);
     });

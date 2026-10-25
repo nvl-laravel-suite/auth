@@ -16,7 +16,9 @@ use Nvl\Ownership\Contracts\OwnerAccess;
 use Nvl\Ownership\Services\OwnerIdentityResolver;
 use Nvl\Support\Ownership\Exceptions\OwnershipException;
 
-/** Verifies owner selection after global authentication without entering a privileged execution scope. @internal */
+/** Verifies owner selection after global authentication without entering a privileged execution scope.
+ * @internal
+ */
 final readonly class OwnerAuthenticationSelection
 {
     public function __construct(private Container $container, private AuthAuditRecorder $audits) {}
@@ -32,7 +34,7 @@ final readonly class OwnerAuthenticationSelection
                 || ($context->ownerPurpose !== null && $context->ownerPurpose !== $purpose)) {
                 throw new AuthException('owner_authentication_intent_invalid', 'The owner selection proof is invalid.', 410);
             }
-            $owner = $this->container->make(OwnerAuthenticationIntents::class)->consume($context->ownerIntentNonce, $purpose, $context->ownerSessionBinding, $context->requestedOwner, $context->ownerIntentSubjectBound ? $reference : null);
+            $owner = $this->container->make(OwnerAuthenticationIntents::class)->consume($context->ownerIntentNonce, $purpose, $context->ownerSessionBinding, $context->requestedOwner, $context->ownerIntentSubjectBound ? $reference : null, $context->ownerProvider);
             $canonical = $this->container->make(OwnerIdentityResolver::class)->resolve($owner);
             $access = config('nvl-auth.features.memberships.enabled') === true ? AuthOwnerAccess::class : OwnerAccess::class;
             $this->container->make($access)->assertCanEnter($subject, $canonical);

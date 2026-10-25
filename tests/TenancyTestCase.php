@@ -12,8 +12,6 @@ use Laravel\Sanctum\SanctumServiceProvider;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\SystemMutationAccess;
-use Nvl\Auth\Http\Middleware\ApplyAuthSecurityHeaders;
-use Nvl\Auth\Http\Middleware\RenderAuthExceptions;
 use Nvl\Auth\Providers\AuthServiceProvider;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Tests\Fixtures\AllowAllManagementAccess;
@@ -22,10 +20,11 @@ use Nvl\Auth\Tests\Fixtures\AuthTestMaintenanceMode;
 use Nvl\Auth\Tests\Fixtures\AuthTestPlatformAccess;
 use Nvl\Auth\Tests\Fixtures\AuthTestTenantDirectory;
 use Nvl\Auth\Tests\Fixtures\AuthTestTenantHttpResolver;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\Middleware\ApplyAuthSecurityHeaders;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\Middleware\RenderAuthExceptions;
 use Nvl\Auth\Tests\Fixtures\RecordingTenantAwareAuthActivityBridge;
 use Nvl\Auth\Tests\Fixtures\TestSubjectResolver;
 use Nvl\Auth\Tests\Fixtures\TestUser;
-use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
 use Nvl\Support\Providers\LocaleServiceProvider;
 use Nvl\Tenancy\Contracts\PlatformAccess;
@@ -55,7 +54,6 @@ abstract class TenancyTestCase extends Orchestra
             PermissionServiceProvider::class,
             SanctumServiceProvider::class,
             LaravelDataServiceProvider::class,
-            DataServiceProvider::class,
             TenancyServiceProvider::class,
             AuthServiceProvider::class,
         ];
@@ -71,7 +69,7 @@ abstract class TenancyTestCase extends Orchestra
         $app['config']->set('auth.defaults.passwords', 'users');
         $app['config']->set('auth.guards.web', ['driver' => 'session', 'provider' => 'users']);
         $app['config']->set('auth.providers.users', ['driver' => 'eloquent', 'model' => TestUser::class]);
-        $app['config']->set('auth.passwords.users', ['provider' => 'users', 'table' => 'password_reset_tokens', 'expire' => 60, 'throttle' => 0]);
+        $app['config']->set('auth.passwords.users', ['provider' => 'users', 'table' => 'nvl_auth_password_reset_tokens', 'expire' => 60, 'throttle' => 0]);
         $app['config']->set('nvl-auth.features.principal_management.models.user', TestUser::class);
         $app['config']->set('nvl-auth.migrations.install_all', true);
         foreach (['authentication', 'sessions', 'memberships', 'invitations', 'rbac', 'audit', 'api_tokens', 'magic_links', 'security_codes', 'passkeys'] as $feature) {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Illuminate\Container\Container;
 use Illuminate\Support\Collection;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
@@ -22,7 +23,7 @@ final readonly class RbacAssignmentService
         private RbacEntityLocator $entities,
         private AuthModelRegistry $models,
         private AuthConfiguration $configuration,
-        private PermissionRegistrar $registrar,
+        private Container $rbacContainer,
     ) {}
 
     /** Resolve the connection used by one role assignment transaction. */
@@ -102,7 +103,7 @@ final readonly class RbacAssignmentService
     /** Clear Spatie's global permission map after a durable assignment change. */
     public function clearPermissionCache(): void
     {
-        $this->registrar->forgetCachedPermissions();
+        $this->registrar()->forgetCachedPermissions();
     }
 
     /** Resolve one role while enforcing the configured model and guard. */
@@ -242,5 +243,14 @@ final readonly class RbacAssignmentService
         }
 
         return $names;
+    }
+
+    private function registrar(): PermissionRegistrar
+    {
+        if (! class_exists(PermissionRegistrar::class)) {
+            throw AuthException::invalidConfiguration('RBAC requires spatie/laravel-permission.');
+        }
+
+        return $this->rbacContainer->make(PermissionRegistrar::class);
     }
 }

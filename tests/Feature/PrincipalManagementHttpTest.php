@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Route;
-use Nvl\Auth\Providers\RouteServiceProvider;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
-use Nvl\Auth\Services\FeatureManifest;
+use Nvl\Auth\Tests\Fixtures\Consumer\RouteServiceProvider;
 
 it('serves configurable principal profile and RBAC APIs without Inertia', function (): void {
     app()->instance('routes.cached', false);
@@ -20,7 +19,7 @@ it('serves configurable principal profile and RBAC APIs without Inertia', functi
     (new RouteServiceProvider(app()))->boot(
         app(Router::class),
         app(AuthConfiguration::class),
-        app(FeatureManifest::class),
+        app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class),
         app(FeatureGate::class),
     );
     Route::getRoutes()->refreshNameLookups();

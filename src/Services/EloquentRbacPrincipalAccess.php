@@ -16,7 +16,7 @@ use ReflectionMethod;
 final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
 {
     /** Create the configured Eloquent RBAC adapter. */
-    public function __construct(private ?AuthModelRegistry $models = null, private ?AuthTenantRbacQueries $tenancy = null) {}
+    public function __construct(private ?AuthModelRegistry $models = null, private ?AuthRbacQueries $queries = null) {}
 
     /**
      * Resolve a configured host principal instance or identifier.
@@ -26,23 +26,16 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
         if ($principal instanceof Authenticatable) {
             $principal = $this->assertCompatible($principal);
 
-            return (config('nvl-auth.ownership.scoped') === true || config('nvl-tenancy.enabled') === true)
-                ? $this->queries()->assertAssignmentPrincipal($principal)
-                : $principal;
+            return config('nvl-auth.ownership.scoped') === true ? $this->queries()->assertAssignmentPrincipal($principal) : $principal;
         }
-
         $class = $this->principalClass();
         $resolved = $class::query()->findOrFail($principal);
-
         if (! $resolved instanceof Authenticatable) {
             throw AuthException::invalidConfiguration('The configured RBAC principal must implement Authenticatable.');
         }
-
         $resolved = $this->assertCompatible($resolved);
 
-        return (config('nvl-auth.ownership.scoped') === true || config('nvl-tenancy.enabled') === true)
-            ? $this->queries()->assertAssignmentPrincipal($resolved)
-            : $resolved;
+        return config('nvl-auth.ownership.scoped') === true ? $this->queries()->assertAssignmentPrincipal($resolved) : $resolved;
     }
 
     /**
@@ -51,7 +44,6 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
     public function identifier(Authenticatable $principal): string
     {
         $identifier = $principal->getAuthIdentifier();
-
         if (! is_string($identifier) && ! is_int($identifier)) {
             throw AuthException::invalidConfiguration('RBAC principals must expose a string-compatible identifier.');
         }
@@ -78,11 +70,9 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
     public function assign(Authenticatable $principal, array $roles, array $permissions): void
     {
         $principal = $this->assignmentPrincipal($principal);
-
         if ($roles !== []) {
             $this->invokeAssignment($principal, 'assignRole', $roles);
         }
-
         if ($permissions !== []) {
             $this->invokeAssignment($principal, 'givePermissionTo', $permissions);
         }
@@ -116,7 +106,6 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
     public function refresh(Authenticatable $principal, array $relations = []): Authenticatable
     {
         $principal = $this->assertCompatible($principal)->refresh();
-
         if ($relations !== []) {
             $principal->load($relations);
         }
@@ -134,22 +123,16 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
         return ($this->models ?? app(AuthModelRegistry::class))->rbacPrincipalClass();
     }
 
-    private function queries(): AuthTenantRbacQueries
+    private function queries(): AuthRbacQueries
     {
-        if (! $this->tenancy instanceof AuthTenantRbacQueries) {
-            throw AuthException::invalidConfiguration(
-                'Tenant RBAC principal access requires the tenant query collaborator.',
-            );
-        }
-
-        return $this->tenancy;
+        return $this->queries ?? app(AuthRbacQueries::class);
     }
 
     /** @return Model&Authenticatable */
     private function assignmentPrincipal(Authenticatable $principal): Model
     {
         $principal = $this->assertCompatible($principal);
-        if ((config('nvl-auth.ownership.scoped') === true || config('nvl-tenancy.enabled') === true)) {
+        if (config('nvl-auth.ownership.scoped') === true) {
             $principal = $this->queries()->assertAssignmentPrincipal($principal);
         }
 
@@ -177,14 +160,8 @@ final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
      */
     private function assertCompatible(Authenticatable $principal): Model
     {
-        if (! $principal instanceof Model
-            || ! method_exists($principal, 'assignRole')
-            || ! method_exists($principal, 'givePermissionTo')
-            || ! method_exists($principal, 'syncRoles')
-            || ! method_exists($principal, 'syncPermissions')) {
-            throw AuthException::invalidConfiguration(
-                'RBAC principals must be Eloquent Authenticatable models using Spatie Permission HasRoles.',
-            );
+        if (! $principal instanceof Model || ! method_exists($principal, 'assignRole') || ! method_exists($principal, 'givePermissionTo') || ! method_exists($principal, 'syncRoles') || ! method_exists($principal, 'syncPermissions')) {
+            throw AuthException::invalidConfiguration('RBAC principals must be Eloquent Authenticatable models using Spatie Permission HasRoles.');
         }
 
         return $principal;

@@ -6,17 +6,15 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
-use Nvl\Auth\Actions\Passkeys\BeginPasskeyRegistrationAction;
-use Nvl\Auth\Actions\Passkeys\FinishPasskeyRegistrationAction;
 use Nvl\Auth\Adapters\Laravel\LaravelBrowserSession;
 use Nvl\Auth\Contracts\PasskeyCeremony;
-use Nvl\Auth\Data\Mutations\FinishPasskeyRegistrationData;
 use Nvl\Auth\Enums\TenantAuthenticationPurpose;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\TenantAuthenticationIntent;
+use Nvl\Auth\Services\AuthPasskeys;
 use Nvl\Auth\Tests\Fixtures\AuthTenancyScenario;
 use Nvl\Auth\Tests\Fixtures\AuthTestTenantDirectory;
 use Nvl\Auth\Tests\Fixtures\TestPasskeyCeremony;
@@ -266,10 +264,10 @@ it('carries tenant intent through real security-code and passkey HTTP transports
 
     auth('web')->logout();
     $this->app->singleton(PasskeyCeremony::class, TestPasskeyCeremony::class);
-    $registration = app(BeginPasskeyRegistrationAction::class)->execute($user);
-    app(FinishPasskeyRegistrationAction::class)->execute(
+    $registration = app(AuthPasskeys::class)->beginRegistration($user);
+    app(AuthPasskeys::class)->finishRegistration(
         $user,
-        new FinishPasskeyRegistrationData($registration->ceremonyId, ['valid' => true]),
+        ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]],
     );
     $authentication = $this->withHeader('X-Test-Tenant', $scenario->a()->value)
         ->postJson('/nvl/api/v1/auth/passkeys/authentication/options')

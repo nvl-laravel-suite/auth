@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Model;
+use Nvl\Auth\Exceptions\AuthException;
 use Spatie\Permission\PermissionRegistrar;
 use WeakReference;
 
@@ -14,7 +16,7 @@ final class RbacPrincipalTracker
     /** @var array<int, WeakReference<Model>> */
     private array $principals = [];
 
-    public function __construct(private readonly PermissionRegistrar $registrar) {}
+    public function __construct(private readonly Container $rbacContainer) {}
 
     public function track(Model $principal): void
     {
@@ -31,7 +33,16 @@ final class RbacPrincipalTracker
                 continue;
             }
             $principal->unsetRelation('roles')->unsetRelation('permissions');
-            $this->registrar->forgetWildcardPermissionIndex($principal);
+            $this->registrar()->forgetWildcardPermissionIndex($principal);
         }
+    }
+
+    private function registrar(): PermissionRegistrar
+    {
+        if (! class_exists(PermissionRegistrar::class)) {
+            throw AuthException::invalidConfiguration('RBAC requires spatie/laravel-permission.');
+        }
+
+        return $this->rbacContainer->make(PermissionRegistrar::class);
     }
 }

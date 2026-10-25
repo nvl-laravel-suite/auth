@@ -45,13 +45,7 @@ final class AuthTables
 
     public const string Audits = 'nvl_auth_audits';
 
-    public const string TenantMemberships = 'nvl_auth_tenant_memberships';
-
-    public const string TenantMembershipLocks = 'nvl_auth_tenant_membership_locks';
-
-    public const string TenantAuthenticationIntents = 'nvl_auth_tenant_authentication_intents';
-
-    public const string OwnerMemberships = 'nvl_auth_owner_memberships';
+    public const string AuthMemberships = 'nvl_auth_owner_memberships';
 
     public const string OwnerMembershipLocks = 'nvl_auth_owner_membership_locks';
 

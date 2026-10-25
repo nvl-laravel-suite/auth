@@ -11,7 +11,7 @@ material, social identity claims, client-session context, challenge adapter
 state, and audit context. `APP_KEY` is therefore installation-critical.
 
 Do not change `APP_KEY` or the operational connection without migrating retained
-rows. Do not log Action result objects containing issuance secrets.
+rows. Do not log service results containing issuance secrets.
 
 ## Authentication and enumeration
 
@@ -85,7 +85,7 @@ to share one connection so the acceptance transaction cannot partially commit.
 Public registration resolves or creates the principal, applies RBAC, consumes
 the invitation, and runs acceptance hooks inside that one transaction.
 
-Actorless RBAC and principal lifecycle Actions require a bounded
+Actorless RBAC and principal lifecycle operations require a bounded
 `SystemMutationContext` and host `SystemMutationAccess` approval. The default
 policy denies every system mutation. Reasons and correlation identifiers are
 included in package audits and events; an optional real actor remains optional
@@ -110,21 +110,13 @@ recheck feature admission, reject expired payloads, and prevent observability
 systems from capturing payload values.
 The value object rejects feature/message pairs outside the package-owned map.
 
-## Tenant boundaries
+## Native owner boundaries
 
-Tenant IDs originate only from verified context, one-use authentication intent,
-invitation proof, or an immutable operator-reviewed adoption mapping. Global
-principals and credentials never become tenant projections. Enabled RBAC has no
-null-team roles; every role lookup, parent edge, inverse relation, and assignment
-must match the active tenant and an active membership. Package Sanctum tokens
-carry immutable tenant ownership and admission rechecks membership on every use.
-Socialite state remains authoritative for OAuth; the separate tenant intent is
-single-use and session-bound. Audit and queued delivery payloads capture tenant
-context at record/dispatch time and restore it fail-closed in workers.
+Canonical owners and one-use authentication intents select native owner scope; caller IDs alone never grant admission. Global principals and credentials remain global. RBAC assignments, invitations and package tokens must satisfy current owner/membership rules. OAuth state remains owned by the SDK, and the separate owner intent is single-use, purpose/provider/session-bound. Audit facts and queued delivery capture native immutable ownership context and revalidate at worker entry.
 
 ## Disablement
 
 Disabling a feature blocks normal read/enroll/issue/use/update admission and
-removes its routes on cache rebuild. Data remains. Revoke retained credentials
+closes new service admission. Data remains. Revoke retained credentials
 before disablement if later re-enablement must not reactivate them. Revoke and
-cleanup Actions remain admitted as containment operations.
+cleanup operations remain admitted as containment operations.

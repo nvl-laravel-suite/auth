@@ -2,14 +2,13 @@
 
 declare(strict_types=1);
 
-use Nvl\Auth\Actions\ApiTokens\CreateApiTokenAction;
-use Nvl\Auth\Data\Mutations\ApiTokenData;
 use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Auth\Http\Middleware\EnsureAuthTenantAccess;
 use Nvl\Auth\Models\PersonalAccessToken;
 use Nvl\Auth\Services\AuthTenantAdmission;
+use Nvl\Auth\Services\AuthTokens;
 use Nvl\Auth\Tests\Fixtures\AuthTenancyScenario;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\Middleware\EnsureAuthTenantAccess;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Tenancy\Http\Middleware\RequireTenantMembership;
 
@@ -41,11 +40,11 @@ it('rejects a persisted tenant token in another tenant despite membership there'
     $reference = SubjectReference::fromAuthenticatable($user);
     $scenario->member($scenario->a(), $reference);
     $scenario->member($scenario->b(), $reference);
-    $issued = $scenario->run($scenario->a(), fn () => app(CreateApiTokenAction::class)->execute(
+    $issued = $scenario->run($scenario->a(), fn () => app(AuthTokens::class)->create(
         $user,
-        new ApiTokenData('automation', ['profile:read']),
+        ['name' => 'automation', 'abilities' => ['profile:read']],
     ));
-    $persisted = PersonalAccessToken::query()->findOrFail($issued->token->id);
+    $persisted = PersonalAccessToken::query()->findOrFail($issued->token['id']);
     $user->withAccessToken($persisted);
 
     app(AuthTenantAdmission::class)->assertAllowed($user, $scenario->a());
@@ -58,11 +57,11 @@ it('rechecks membership and principal eligibility after token issuance', functio
     $scenario = new AuthTenancyScenario;
     $user = $this->user();
     $membership = $scenario->member($scenario->a(), SubjectReference::fromAuthenticatable($user));
-    $issued = $scenario->run($scenario->a(), fn () => app(CreateApiTokenAction::class)->execute(
+    $issued = $scenario->run($scenario->a(), fn () => app(AuthTokens::class)->create(
         $user,
-        new ApiTokenData('automation', ['profile:read']),
+        ['name' => 'automation', 'abilities' => ['profile:read']],
     ));
-    $user->withAccessToken(PersonalAccessToken::query()->findOrFail($issued->token->id));
+    $user->withAccessToken(PersonalAccessToken::query()->findOrFail($issued->token['id']));
     $membership->forceFill(['status' => MembershipStatus::Revoked])->save();
 
     expect(fn () => app(AuthTenantAdmission::class)->assertAllowed($user, $scenario->a()))

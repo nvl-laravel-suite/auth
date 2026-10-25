@@ -30,7 +30,7 @@ final readonly class CentralIdentityAuditRecorder
         }
 
         return $this->writer->write(
-            AuthEventContext::platform(),
+            AuthEventContext::centralIdentity(),
             $action,
             $outcome,
             $subject,

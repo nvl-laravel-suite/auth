@@ -4,14 +4,10 @@ declare(strict_types=1);
 
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use Nvl\Auth\Actions\Invitations\AcceptInvitationAction;
-use Nvl\Auth\Actions\Invitations\CreateInvitationAction;
-use Nvl\Auth\Actions\Invitations\RegisterInvitationAction;
-use Nvl\Auth\Actions\Memberships\RevokeMembershipAction;
-use Nvl\Auth\Data\Mutations\AcceptInvitationData;
-use Nvl\Auth\Data\Mutations\StoreInvitationData;
 use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Auth\Models\TenantMembership;
+use Nvl\Auth\Services\AuthInvitations;
+use Nvl\Auth\Services\AuthMemberships;
 use Nvl\Auth\Tests\Fixtures\AuthMembershipRace;
 use Nvl\Auth\Tests\Fixtures\AuthTenancyScenario;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -32,8 +28,8 @@ it('serializes simultaneous owner removals and retains one active owner', functi
     }
 
     $results = $scenario->run($scenario->a(), fn (): array => AuthMembershipRace::run($connection, [
-        static fn (): array => ['id' => app(RevokeMembershipAction::class)->execute($first, $firstMembership->identifier(), 1)->identifier()],
-        static fn (): array => ['id' => app(RevokeMembershipAction::class)->execute($second, $secondMembership->identifier(), 1)->identifier()],
+        static fn (): array => ['id' => app(AuthMemberships::class)->revoke($first, $firstMembership->identifier(), 1)->identifier()],
+        static fn (): array => ['id' => app(AuthMemberships::class)->revoke($second, $secondMembership->identifier(), 1)->identifier()],
     ]));
 
     expect(collect($results)->where('ok', true))->toHaveCount(1, json_encode($results, JSON_THROW_ON_ERROR))
@@ -53,24 +49,19 @@ it('serializes direct acceptance against registration without a database deadloc
     $recipient = $this->user('race-recipient@example.test');
     $recipient->markEmailAsVerified();
     $scenario->member($scenario->a(), SubjectReference::fromAuthenticatable($owner), true);
-    $issued = $scenario->run($scenario->a(), fn () => app(CreateInvitationAction::class)->execute(
-        new StoreInvitationData($recipient->email),
+    $issued = $scenario->run($scenario->a(), fn () => app(AuthInvitations::class)->create(
+        ['recipient' => $recipient->email],
         $owner,
     ));
-    $registration = new AcceptInvitationData(
-        token: $issued->token,
-        name: 'Race Recipient',
-        password: 'correct-password',
-        passwordConfirmation: 'correct-password',
-    );
+    $registration = ['token' => $issued['token'], 'name' => 'Race Recipient', 'password' => 'correct-password', 'passwordConfirmation' => 'correct-password'];
     $connection = config('database.default');
     if (! is_string($connection)) {
         throw new RuntimeException('The race connection is unavailable.');
     }
 
     $results = AuthMembershipRace::run($connection, [
-        static fn (): array => ['id' => app(AcceptInvitationAction::class)->execute($issued->token, $recipient)->identifier()],
-        static fn (): array => ['id' => app(RegisterInvitationAction::class)->execute($registration, $recipient)->invitation->identifier()],
+        static fn (): array => ['id' => app(AuthInvitations::class)->accept($issued['token'], $recipient)->identifier()],
+        static fn (): array => ['id' => app(AuthInvitations::class)->register($registration, $recipient)->invitation->identifier()],
     ]);
 
     expect(collect($results)->where('ok', true))->toHaveCount(1, json_encode($results, JSON_THROW_ON_ERROR))

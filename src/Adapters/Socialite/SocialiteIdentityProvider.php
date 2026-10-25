@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Nvl\Auth\Adapters\Socialite;
 
 use Laravel\Socialite\AbstractUser;
-use Laravel\Socialite\Contracts\Factory;
 use Laravel\Socialite\Contracts\Provider;
 use Laravel\Socialite\Two\AbstractProvider;
 use Nvl\Auth\Contracts\SocialIdentityProvider;
@@ -20,7 +19,7 @@ final readonly class SocialiteIdentityProvider implements SocialIdentityProvider
     /**
      * Create the Socialite adapter.
      */
-    public function __construct(private Factory $socialite) {}
+    public function __construct(private Provider $providerDriver, private string $providerName) {}
 
     /**
      * Build a stateful provider authorization URL.
@@ -118,13 +117,16 @@ final readonly class SocialiteIdentityProvider implements SocialIdentityProvider
      */
     private function driver(string $provider, ?string $callbackUrl): Provider
     {
-        if (! interface_exists(Factory::class)) {
+        if (! interface_exists(Provider::class)) {
             throw AuthException::invalidConfiguration(
                 'Social identities require laravel/socialite.',
             );
         }
 
-        $driver = $this->socialite->driver($provider);
+        if ($provider !== $this->providerName) {
+            throw AuthException::invalidConfiguration('The supplied Socialite driver belongs to a different provider.');
+        }
+        $driver = $this->providerDriver;
 
         if ($callbackUrl !== null) {
             if (! $driver instanceof AbstractProvider) {

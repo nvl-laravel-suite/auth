@@ -5,33 +5,34 @@ declare(strict_types=1);
 namespace Nvl\Auth\Tests\Fixtures;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use Nvl\Auth\Contracts\ListApiTokensContract;
-use Nvl\Auth\Contracts\ListInvitationProjectionsContract;
-use Nvl\Auth\Contracts\LogoutContract;
-use Nvl\Auth\Data\Display\InvitationReadData;
-use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
+use Illuminate\Contracts\Auth\StatefulGuard;
+use Illuminate\Contracts\Session\Session;
+use Nvl\Auth\Models\Invitation;
+use Nvl\Auth\Services\AuthenticationSessions;
+use Nvl\Auth\Services\AuthInvitations;
+use Nvl\Auth\Services\AuthTokens;
 
 /** A real host service which turns package results into its own presentation. */
 final readonly class AuthConsumerWorkflow
 {
-    public function __construct(private ListApiTokensContract $tokens, private ListInvitationProjectionsContract $invitations, private LogoutContract $logout) {}
+    public function __construct(private AuthTokens $tokens, private AuthInvitations $invitations, private AuthenticationSessions $sessions) {}
 
     /** @return list<string> */
     public function tokenNames(Authenticatable $actor): array
     {
-        return array_map(static fn (ApiTokenSnapshot $token): string => $token->name, $this->tokens->execute($actor));
+        return array_map(static fn (array $token): string => $token['name'], $this->tokens->all($actor));
     }
 
     /** @return list<string> */
     public function invitationRecipients(Authenticatable $actor): array
     {
-        return array_map(static fn (InvitationReadData $invitation): string => $invitation->recipient, $this->invitations->execute($actor, null, 10)->items());
+        return array_map(static fn (Invitation $invitation): string => $invitation->recipient, $this->invitations->paginate($actor, [], 10)->items());
     }
 
     /** Continue host orchestration after the void package boundary. */
-    public function signOut(): string
+    public function signOut(StatefulGuard $guard, Session $session): string
     {
-        $this->logout->execute();
+        $this->sessions->logout($guard, $session);
 
         return '/signed-out';
     }

@@ -2,13 +2,11 @@
 
 declare(strict_types=1);
 
-use Nvl\Auth\Actions\SocialIdentities\CompleteSocialAuthorizationAction;
-use Nvl\Auth\Actions\SocialIdentities\RevokeSocialIdentityAction;
-use Nvl\Auth\Actions\SocialIdentities\StartSocialAuthorizationAction;
 use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\SocialIdentity;
+use Nvl\Auth\Services\AuthSocialIdentities;
 use Nvl\Auth\Tests\Fixtures\TestSocialIdentityProvider;
 use Nvl\Auth\Tests\Fixtures\TestSocialSubjectResolver;
 
@@ -23,17 +21,17 @@ it('acquires, links, encrypts, and revokes an allowlisted social identity', func
     $this->app->singleton(SocialIdentityProvider::class, TestSocialIdentityProvider::class);
     $this->app->instance(SocialSubjectResolver::class, new TestSocialSubjectResolver($user));
 
-    expect(app(StartSocialAuthorizationAction::class)->execute('github'))
+    expect(app(AuthSocialIdentities::class)->startAuthorization('github'))
         ->toBe('https://provider.example/authorize/github');
 
-    $identity = app(CompleteSocialAuthorizationAction::class)->execute('github');
+    $identity = app(AuthSocialIdentities::class)->completeAuthorization('github');
 
     expect($identity)->toBeInstanceOf(SocialIdentity::class)
         ->and($identity->subject_id)->toBe((string) $user->getKey())
         ->and($identity->getRawOriginal('provider_user_id'))->not->toBe('provider-user-123')
         ->and($identity->getRawOriginal('profile'))->not->toContain('source');
 
-    app(RevokeSocialIdentityAction::class)->execute($user, $identity);
+    app(AuthSocialIdentities::class)->revoke($user, $identity);
 
     expect($identity->refresh()->revoked_at)->not->toBeNull();
 });
@@ -49,7 +47,7 @@ it('normalizes provider failures without leaking adapter details', function (): 
     $this->app->instance(SocialIdentityProvider::class, new TestSocialIdentityProvider(failRedirect: true));
 
     try {
-        app(StartSocialAuthorizationAction::class)->execute('github');
+        app(AuthSocialIdentities::class)->startAuthorization('github');
         $this->fail('The provider start should fail.');
     } catch (AuthException $exception) {
         expect($exception->errorCode)->toBe('social_provider_unavailable')
@@ -60,7 +58,7 @@ it('normalizes provider failures without leaking adapter details', function (): 
     $this->app->instance(SocialIdentityProvider::class, new TestSocialIdentityProvider(failUser: true));
 
     try {
-        app(CompleteSocialAuthorizationAction::class)->execute('github', $this->user());
+        app(AuthSocialIdentities::class)->completeAuthorization('github', $this->user());
         $this->fail('The provider callback should fail.');
     } catch (AuthException $exception) {
         expect($exception->errorCode)->toBe('social_authorization_failed')

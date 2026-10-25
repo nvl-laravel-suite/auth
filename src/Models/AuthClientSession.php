@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Nvl\Auth\Database\Factories\AuthClientSessionFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Support\AuthInstantCast;
 
 /**
  * Correlates a host Laravel session with one Auth client without replacing it.
@@ -68,9 +69,9 @@ final class AuthClientSession extends AuthModel
             'ip_address' => 'encrypted',
             'user_agent' => 'encrypted',
             'metadata' => 'encrypted:array',
-            'authenticated_at' => 'immutable_datetime',
-            'last_seen_at' => 'immutable_datetime',
-            'ended_at' => 'immutable_datetime',
+            'authenticated_at' => AuthInstantCast::class,
+            'last_seen_at' => AuthInstantCast::class,
+            'ended_at' => AuthInstantCast::class,
         ];
     }
 

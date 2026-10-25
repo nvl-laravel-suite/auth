@@ -7,7 +7,9 @@ namespace Nvl\Auth\Services;
 use Nvl\Auth\Exceptions\AuthException;
 use stdClass;
 
-/** Validates database attribute names before hydrating a bounded Auth capability record. @internal */
+/** Validates database attribute names before hydrating a bounded Auth capability record.
+ * @internal
+ */
 final readonly class AuthStoredRow
 {
     /** @return array<string, mixed> */

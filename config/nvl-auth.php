@@ -20,8 +20,6 @@ use Nvl\Support\Config\PackageEnvironment;
 /** Complete runtime defaults; publication sections are declared in ../resources/config/sections.json. */
 return [
     'adoption' => [
-        'principal_model' => ['enabled' => false, 'guard' => null, 'provider' => null],
-        'password_broker' => ['enabled' => false, 'broker' => null],
         'spatie_storage' => ['enabled' => false],
         'maximum_manifest_bytes' => 1_048_576,
         'maximum_records' => 10_000,
@@ -45,6 +43,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'guard' => PackageEnvironment::get('NVL_AUTH_GUARD', 'web'),
+    'provider' => 'users',
     'password_broker' => PackageEnvironment::get('NVL_AUTH_PASSWORD_BROKER'),
     'identifier' => PackageEnvironment::get('NVL_AUTH_IDENTIFIER', 'email'),
     'services' => [
@@ -73,10 +72,7 @@ return [
     */
     'ownership' => [
         'scoped' => false,
-        'http' => 'package',
         'delivery' => 'host',
-        'host_routes' => [],
-        'service_only' => [],
     ],
 
     /*
@@ -84,25 +80,25 @@ return [
     | Feature ownership
     |--------------------------------------------------------------------------
     |
-    | A disabled feature exposes no routes and every public Action fails closed.
+    | Disabled features reject new operations; explicit cleanup remains available.
     | Feature data is retained until explicitly revoked or pruned.
     |
     */
     'features' => [
         'authentication' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_AUTHENTICATION_ENABLED', true),
-            'routes' => ['public' => ['enabled' => false], 'account' => ['enabled' => false]],
+
             'services' => [
                 'subject_resolver' => null,
                 'identifier_resolver' => null,
                 'login_metadata_recorder' => null,
                 'eligibility' => null,
             ],
-            'settings' => ['tenant_intent_ttl_minutes' => 10],
+            'settings' => ['owner_intent_ttl_minutes' => 10],
         ],
         'principal_management' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_PRINCIPAL_MANAGEMENT_ENABLED', true),
-            'routes' => ['account' => ['enabled' => false], 'management' => ['enabled' => false]],
+
             'models' => ['user' => User::class],
             'services' => [
                 'attribute_mapper' => ConfiguredPrincipalAttributeMapper::class,
@@ -139,37 +135,38 @@ return [
         ],
         'memberships' => [
             'enabled' => false,
-            'routes' => ['account' => ['enabled' => false], 'management' => ['enabled' => false]],
+
             'services' => ['principal_resolver' => null],
             'settings' => ['per_page' => 25, 'maximum_per_page' => 100],
         ],
         'password' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_PASSWORD_ENABLED', true),
-            'routes' => ['public' => ['enabled' => false], 'account' => ['enabled' => false]],
+
             'services' => ['updater' => null],
             'settings' => ['reset_ttl_minutes' => 60],
         ],
         'email_verification' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_EMAIL_VERIFICATION_ENABLED', false),
-            'routes' => ['public' => ['enabled' => false], 'account' => ['enabled' => false]],
+
             'settings' => ['ttl_minutes' => 60],
         ],
         'magic_links' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_MAGIC_LINKS_ENABLED', false),
-            'routes' => ['public' => ['enabled' => false]],
+
             'settings' => ['ttl_minutes' => 15, 'max_attempts' => 5, 'fallback_code_digits' => 6],
         ],
         'security_codes' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_SECURITY_CODES_ENABLED', false),
-            'routes' => ['public' => ['enabled' => false]],
+
             'settings' => ['ttl_minutes' => 10, 'digits' => 6, 'max_attempts' => 5],
         ],
         'invitations' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_INVITATIONS_ENABLED', false),
-            'routes' => ['public' => ['enabled' => false], 'management' => ['enabled' => false]],
+
             'services' => [
                 'subject_resolver' => null,
                 'registration_mapper' => null,
+                'recipient_proof' => VerifiedInvitationRecipientProof::class,
             ],
             'settings' => [
                 'ttl_hours' => 72,
@@ -179,7 +176,7 @@ return [
         ],
         'totp' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_TOTP_ENABLED', false),
-            'routes' => ['account' => ['enabled' => false]],
+
             'settings' => [
                 'issuer' => env('APP_NAME', 'Laravel'),
                 'algorithm' => 'sha1',
@@ -191,7 +188,7 @@ return [
         ],
         'passkeys' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_PASSKEYS_ENABLED', false),
-            'routes' => ['public' => ['enabled' => false], 'account' => ['enabled' => false]],
+
             'services' => ['ceremony' => null],
             'settings' => [
                 'relying_party_id' => PackageEnvironment::get('NVL_AUTH_PASSKEY_RP_ID'),
@@ -210,35 +207,35 @@ return [
         ],
         'recovery_codes' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_RECOVERY_CODES_ENABLED', false),
-            'routes' => ['account' => ['enabled' => false]],
+
             'settings' => ['count' => 8, 'length' => 10],
         ],
         'social_identities' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_SOCIAL_IDENTITIES_ENABLED', false),
-            'routes' => ['public' => ['enabled' => false], 'account' => ['enabled' => false]],
+
             'services' => ['provider' => null, 'subject_resolver' => null],
             'settings' => ['providers' => []],
         ],
         'clients' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_CLIENTS_ENABLED', false),
-            'routes' => ['public' => ['enabled' => false], 'management' => ['enabled' => false]],
+
             'settings' => [],
         ],
         'sessions' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_SESSIONS_ENABLED', true),
-            'routes' => ['public' => ['enabled' => false], 'account' => ['enabled' => false]],
+
             'settings' => [],
         ],
         'api_tokens' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_API_TOKENS_ENABLED', false),
-            'routes' => ['account' => ['enabled' => false]],
+
             'services' => ['manager' => null, 'ability_provider' => null],
             'models' => ['personal_access_token' => PersonalAccessToken::class],
             'settings' => ['abilities' => [], 'namespace' => 'nvl-auth'],
         ],
         'rbac' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_RBAC_ENABLED', true),
-            'routes' => ['management' => ['enabled' => false]],
+
             'models' => [
                 'role' => Role::class,
                 'permission' => Permission::class,
@@ -261,16 +258,10 @@ return [
         ],
         'audit' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_AUDIT_ENABLED', true),
-            'routes' => ['management' => ['enabled' => false]],
+
             'services' => ['recorder' => null],
             'settings' => ['capture_ip' => true, 'capture_user_agent' => true],
         ],
-    ],
-
-    'tenancy' => [
-        'migrations' => ['enabled' => false],
-        'recipient_proof' => VerifiedInvitationRecipientProof::class,
-        'activity_bridge' => 'disabled',
     ],
 
     /*
@@ -278,14 +269,6 @@ return [
     | Optional HTTP API
     |--------------------------------------------------------------------------
     */
-    'routes' => [
-        'enabled' => PackageEnvironment::get('NVL_AUTH_ROUTES_ENABLED', false),
-        'prefix' => PackageEnvironment::get('NVL_AUTH_ROUTES_PREFIX', 'nvl/api/v1/auth'),
-        'middleware' => ['api'],
-        'public' => ['enabled' => false, 'middleware' => ['throttle:nvl.auth.public']],
-        'account' => ['enabled' => false, 'middleware' => ['auth', 'throttle:nvl.auth.account']],
-        'management' => ['enabled' => false, 'middleware' => ['auth', 'throttle:nvl.auth.management']],
-    ],
 
     /*
     |--------------------------------------------------------------------------

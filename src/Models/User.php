@@ -18,13 +18,10 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\Contracts\HasApiTokens as HasApiTokensContract;
-use Laravel\Sanctum\HasApiTokens;
 use Nvl\Auth\Database\Factories\UserFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Support\Config\PackageStorage;
-use Spatie\Permission\Traits\HasRoles;
 
 /**
  * Provides the package's complete, extensible default authentication principal.
@@ -106,15 +103,13 @@ use Spatie\Permission\Traits\HasRoles;
  * @nvl-consumer-capability-method bootHasPermissions
  */
 #[UseFactory(UserFactory::class)]
-class User extends Authenticatable implements CanResetPasswordContract, HasApiTokensContract, HasLocalePreference, MustVerifyEmailContract
+class User extends Authenticatable implements CanResetPasswordContract, HasLocalePreference, MustVerifyEmailContract
 {
     use CanResetPassword;
-    use HasApiTokens;
 
     /** @use HasFactory<UserFactory> */
     use HasFactory;
 
-    use HasRoles;
     use HasUuids;
     use MustVerifyEmail;
     use Notifiable;

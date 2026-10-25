@@ -9,10 +9,9 @@ use Illuminate\Support\Timebox;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Models\AuthAudit;
-use Nvl\Auth\Providers\RouteServiceProvider;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
-use Nvl\Auth\Services\FeatureManifest;
+use Nvl\Auth\Tests\Fixtures\Consumer\RouteServiceProvider;
 
 it('serves the authorized client and audit management lifecycle', function (): void {
     app()->instance('routes.cached', false);
@@ -24,7 +23,7 @@ it('serves the authorized client and audit management lifecycle', function (): v
     (new RouteServiceProvider(app()))->boot(
         app(Router::class),
         app(AuthConfiguration::class),
-        app(FeatureManifest::class),
+        app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class),
         app(FeatureGate::class),
     );
     Route::getRoutes()->refreshNameLookups();
@@ -68,7 +67,7 @@ it('timeboxes known and unknown account requests while keeping responses neutral
     (new RouteServiceProvider(app()))->boot(
         app(Router::class),
         app(AuthConfiguration::class),
-        app(FeatureManifest::class),
+        app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class),
         app(FeatureGate::class),
     );
     $user = $this->user();
@@ -107,7 +106,7 @@ it('rejects oversized magic-link purposes identically for known and unknown acco
     (new RouteServiceProvider(app()))->boot(
         app(Router::class),
         app(AuthConfiguration::class),
-        app(FeatureManifest::class),
+        app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class),
         app(FeatureGate::class),
     );
     $user = $this->user();

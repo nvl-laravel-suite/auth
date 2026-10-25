@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 use Carbon\CarbonImmutable;
-use Nvl\Auth\Data\Display\AuthSubjectReferenceData;
-use Nvl\Auth\Data\Display\InvitationDeliveryData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Events\InvitationAccepted;
@@ -62,18 +60,7 @@ it('rejects delivery message types outside their owning feature', function (): v
 it('carries queue-safe typed subject and invitation context without exposing values in debug output', function (): void {
     $expiresAt = CarbonImmutable::now()->addHour();
     $subject = new SubjectReference('user', 'subject-1');
-    $invitation = new InvitationDeliveryData(
-        id: 'invitation-1',
-        type: 'registration',
-        purpose: 'registration',
-        recipient: 'invitee@example.test',
-        inviter: AuthSubjectReferenceData::fromReference($subject),
-        roles: ['member'],
-        permissions: ['articles.read'],
-        metadata: ['member_id' => 'member-1'],
-        expiresAt: $expiresAt,
-        resendCount: 0,
-    );
+    $invitation = ['id' => 'invitation-1', 'type' => 'registration', 'purpose' => 'registration', 'recipient' => 'invitee@example.test', 'inviter' => ['type' => $subject->type, 'identifier' => $subject->identifier], 'roles' => ['member'], 'permissions' => ['articles.read'], 'metadata' => ['member_id' => 'member-1'], 'expiresAt' => $expiresAt, 'resendCount' => 0];
     $request = new AuthDeliveryRequest(
         messageId: 'message-1',
         feature: AuthFeature::Invitations,
@@ -89,8 +76,8 @@ it('carries queue-safe typed subject and invitation context without exposing val
     $restored = unserialize(serialize($request));
 
     expect($restored->subject?->identifier)->toBe('subject-1')
-        ->and($restored->invitation?->id)->toBe('invitation-1')
-        ->and($restored->invitation?->metadata)->toBe(['member_id' => 'member-1'])
+        ->and($restored->invitation['id'])->toBe('invitation-1')
+        ->and($restored->invitation['metadata'])->toBe(['member_id' => 'member-1'])
         ->and($request->__debugInfo())->toMatchArray([
             'subject_type' => 'user',
             'has_invitation' => true,
@@ -112,58 +99,15 @@ it('rejects invitation context on unrelated delivery features', function (): voi
         recipient: 'user@example.test',
         payload: [],
         expiresAt: $expiresAt,
-        invitation: new InvitationDeliveryData(
-            id: 'invitation-1',
-            type: 'registration',
-            purpose: 'registration',
-            recipient: 'invitee@example.test',
-            inviter: null,
-            roles: [],
-            permissions: [],
-            metadata: [],
-            expiresAt: $expiresAt,
-            resendCount: 0,
-        ),
+        invitation: ['id' => 'invitation-1', 'type' => 'registration', 'purpose' => 'registration', 'recipient' => 'invitee@example.test', 'inviter' => null, 'roles' => [], 'permissions' => [], 'metadata' => [], 'expiresAt' => $expiresAt, 'resendCount' => 0],
     ))->toThrow(InvalidArgumentException::class, 'Invitation delivery context');
 });
 
-it('restores optional context as null from delivery and acceptance events queued by an older release', function (): void {
-    $expiresAt = CarbonImmutable::now()->addHour();
-    $requestReflection = new ReflectionClass(AuthDeliveryRequest::class);
-    /** @var AuthDeliveryRequest $legacyRequest */
-    $legacyRequest = $requestReflection->newInstanceWithoutConstructor();
-
-    foreach ([
-        'messageId' => 'legacy-message',
-        'feature' => AuthFeature::MagicLinks,
-        'type' => AuthMessageType::MagicLink,
-        'recipient' => 'legacy@example.test',
-        'payload' => [],
-        'expiresAt' => $expiresAt,
-        'locale' => null,
-        'metadata' => [],
-    ] as $property => $value) {
-        $requestReflection->getProperty($property)->setValue($legacyRequest, $value);
-    }
-
-    $acceptanceReflection = new ReflectionClass(InvitationAccepted::class);
-    /** @var InvitationAccepted $legacyAcceptance */
-    $legacyAcceptance = $acceptanceReflection->newInstanceWithoutConstructor();
-
-    foreach ([
-        'invitationId' => 'legacy-invitation',
-        'type' => 'registration',
-        'purpose' => 'registration',
-        'subject' => new SubjectReference('user', 'subject-1'),
-    ] as $property => $value) {
-        $acceptanceReflection->getProperty($property)->setValue($legacyAcceptance, $value);
-    }
-
-    /** @var AuthDeliveryRequest $restoredRequest */
-    $restoredRequest = unserialize(serialize($legacyRequest));
-    /** @var InvitationAccepted $restoredAcceptance */
-    $restoredAcceptance = unserialize(serialize($legacyAcceptance));
-
+it('round trips current delivery defaults without adding optional context', function (): void {
+    $request = new AuthDeliveryRequest('message', AuthFeature::MagicLinks, AuthMessageType::MagicLink, 'user@example.test', [], CarbonImmutable::now()->addHour());
+    $accepted = new InvitationAccepted('invitation', 'registration', 'registration', new SubjectReference('user', 'subject-1'));
+    $restoredRequest = unserialize(serialize($request));
+    $restoredAcceptance = unserialize(serialize($accepted));
     expect($restoredRequest->subject)->toBeNull()
         ->and($restoredRequest->invitation)->toBeNull()
         ->and($restoredAcceptance->acceptedAt)->toBeNull();

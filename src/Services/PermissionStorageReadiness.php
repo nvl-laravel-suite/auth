@@ -9,7 +9,6 @@ use Illuminate\Contracts\Config\Repository;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Ownership\Services\OwnershipDatabaseConstraints;
 use Nvl\Support\Ownership\Contracts\OwnershipReadiness;
-use Nvl\Tenancy\Definitions\Tables\TenancyTables;
 use Throwable;
 
 /** Memoizes adopted permission storage readiness for one request or job scope. */
@@ -19,7 +18,7 @@ final class PermissionStorageReadiness
 
     private ?AuthException $failure = null;
 
-    private bool $awaitingTenantActivation = false;
+    private bool $awaitingOwnerActivation = false;
 
     /** Retain live configuration and the package role model boundary. */
     public function __construct(private readonly Repository $configuration, private readonly AuthModelRegistry $models, private readonly Container $container) {}
@@ -29,7 +28,7 @@ final class PermissionStorageReadiness
     {
         $this->teams = null;
         $this->failure = null;
-        $this->awaitingTenantActivation = true;
+        $this->awaitingOwnerActivation = true;
     }
 
     /** Recheck live RBAC references and immutable pivots at every native scope entry. */
@@ -83,16 +82,9 @@ final class PermissionStorageReadiness
                 $teams = true;
             }
 
-            if ($this->configuration->get('nvl-tenancy.enabled') === true) {
-                $stateTable = TenancyTables::get(TenancyTables::InstallationState);
-                if (! $schema->hasTable($stateTable)) {
-                    throw AuthException::invalidConfiguration('Tenant permission storage readiness requires installation state.');
-                }
-                $teams = $connection->table($stateTable)->where('resource', 'auth.roles')->where('state', 'active')->exists();
-            }
-            if ($teams || ! $this->awaitingTenantActivation) {
+            if ($teams || ! $this->awaitingOwnerActivation) {
                 $this->teams = $teams;
-                $this->awaitingTenantActivation = false;
+                $this->awaitingOwnerActivation = false;
             }
             $this->configuration->set('permission.teams', $teams);
 

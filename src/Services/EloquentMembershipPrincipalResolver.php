@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Exceptions\AuthException;
@@ -13,11 +14,11 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 /** Resolves membership principals through the independently configured RBAC model. */
 final readonly class EloquentMembershipPrincipalResolver implements MembershipPrincipalResolver
 {
-    public function __construct(private AuthModelRegistry $models, private RbacPrincipalTracker $tracker) {}
+    public function __construct(private AuthModelRegistry $models, private Container $container) {}
 
     public function resolve(SubjectReference $reference, bool $lock = false): Authenticatable
     {
-        $class = $this->models->rbacPrincipalClass();
+        $class = config('nvl-auth.features.rbac.enabled') === true ? $this->models->rbacPrincipalClass() : $this->models->userClass();
         $model = new $class;
         if ($reference->type !== $model->getMorphClass()) {
             throw new AuthException('membership_principal_unavailable', 'The membership principal is unavailable.', 404);
@@ -31,7 +32,9 @@ final readonly class EloquentMembershipPrincipalResolver implements MembershipPr
             throw new AuthException('membership_principal_unavailable', 'The membership principal is unavailable.', 404);
         }
         $this->assertEligible($principal);
-        $this->tracker->track($principal);
+        if (config('nvl-auth.features.rbac.enabled') === true) {
+            $this->container->make(RbacPrincipalTracker::class)->track($principal);
+        }
 
         return $principal;
     }

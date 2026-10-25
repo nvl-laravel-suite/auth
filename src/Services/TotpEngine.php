@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Services;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Container\Container;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\TotpCredential;
 use PragmaRX\Google2FA\Google2FA;
@@ -19,7 +20,7 @@ final readonly class TotpEngine
      * Create the Google2FA integration.
      */
     public function __construct(
-        private Google2FA $google2fa,
+        private Container $container,
         private AuthConfiguration $configuration,
     ) {}
 
@@ -121,7 +122,10 @@ final readonly class TotpEngine
         ?int $window = null,
     ): Google2FA {
         $parameters = $this->parameters();
-        $google2fa = clone $this->google2fa;
+        if (! class_exists(Google2FA::class)) {
+            throw AuthException::invalidConfiguration('TOTP requires pragmarx/google2fa.');
+        }
+        $google2fa = clone $this->container->make(Google2FA::class);
         $google2fa->setEnforceGoogleAuthenticatorCompatibility(false);
         $google2fa->setAlgorithm($algorithm ?? $parameters['algorithm']);
         $google2fa->setOneTimePasswordLength($digits ?? $parameters['digits']);

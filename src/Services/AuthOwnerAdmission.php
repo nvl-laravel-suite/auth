@@ -27,8 +27,10 @@ use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
  */
 final readonly class AuthOwnerAdmission
 {
-    public function __construct(private Container $container, private OwnershipContext $context, private MembershipPrincipalResolver $principals, private ApiTokenManager $tokens, private OwnershipReadiness $readiness, private AuthOwnershipState $state) {}
+    /** Native Auth operation. */
+    public function __construct(private Container $container, private OwnershipContext $context, private MembershipPrincipalResolver $principals, private OwnershipReadiness $readiness, private AuthOwnershipState $state) {}
 
+    /** Native Auth operation. */
     public function assertAllowed(Authenticatable $subject): void
     {
         $this->state->configured();
@@ -48,9 +50,9 @@ final readonly class AuthOwnerAdmission
             return;
         }
         $this->readiness->assertActive('auth.tokens');
+        $tokens = $this->container->get(ApiTokenManager::class);
         $id = $token instanceof Model ? $token->getKey() : null;
-        if ((! is_string($id) && ! is_int($id)) || ! $this->tokens instanceof OwnerBoundApiTokenManager
-            || $this->tokens->ownerForToken($principal, (string) $id) != $owner) {
+        if (! is_string($id) && ! is_int($id) || ! $tokens instanceof OwnerBoundApiTokenManager || $tokens->ownerForToken($principal, (string) $id) != $owner) {
             throw new AuthException('owner_token_invalid', 'The access token is unavailable for this owner.', 403);
         }
     }

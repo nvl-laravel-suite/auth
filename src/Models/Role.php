@@ -13,11 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\Pivot;
-use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Database\Query\Grammars\PostgresGrammar;
 use Nvl\Auth\Database\Factories\RoleFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
-use Nvl\Auth\Relations\TextCastColumnComparison;
 use Nvl\Auth\Services\AuthOwnershipState;
 use Nvl\Auth\Services\OwnerRbacRelations;
 use Nvl\Auth\Traits\HasAuthOwnership;
@@ -29,7 +26,6 @@ use Spatie\Permission\Models\Role as SpatieRole;
  * Provides the package-owned, hierarchical Spatie Permission role model.
  *
  * @property string $id
- * @property string $tenant_id
  * @property string $name
  * @property string $guard_name
  * @property string|null $display_name
@@ -62,23 +58,10 @@ class Role extends SpatieRole implements Ownable
     protected $keyType = 'string';
 
     /** @var list<string> */
-    protected $fillable = [
-        'tenant_id',
-        'name',
-        'guard_name',
-        'display_name',
-        'description',
-        'parent_id',
-        'priority',
-        'is_system',
-        'metadata',
-    ];
+    protected $fillable = ['name', 'guard_name', 'display_name', 'description', 'parent_id', 'priority', 'is_system', 'metadata'];
 
     /** @var array<string, mixed> */
-    protected $attributes = [
-        'priority' => 0,
-        'is_system' => false,
-    ];
+    protected $attributes = ['priority' => 0, 'is_system' => false];
 
     /**
      * Resolve the configured package table.
@@ -87,9 +70,7 @@ class Role extends SpatieRole implements Ownable
     {
         $configured = config('nvl-auth.tables.roles');
 
-        return is_string($configured) && trim($configured) !== ''
-            ? trim($configured)
-            : self::TABLE;
+        return is_string($configured) && trim($configured) !== '' ? trim($configured) : self::TABLE;
     }
 
     /**
@@ -105,50 +86,25 @@ class Role extends SpatieRole implements Ownable
     {
         $relation = $this->belongsTo(static::class, 'parent_id');
 
-        return config('nvl-tenancy.enabled') === true ? $relation->where('tenant_id', $this->tenant_id) : $relation;
+        return $relation;
     }
 
     /** @return HasMany<static, $this> */
     public function children(): HasMany
     {
         $relation = $this->hasMany(static::class, 'parent_id');
-        if (config('nvl-tenancy.enabled') === true) {
-            $relation->where('tenant_id', $this->tenant_id);
-        }
 
         return $relation->orderByDesc('priority')->orderBy('name');
     }
 
-    /** Constrain inverse assignments to the active team and membership. */
     /** @return BelongsToMany<covariant Model, $this, covariant Pivot> */
     public function users(): BelongsToMany
     {
         if (Container::getInstance()->make(AuthOwnershipState::class)->native()) {
             return Container::getInstance()->make(OwnerRbacRelations::class)->users($this, 'role');
         }
-        if (config('nvl-tenancy.enabled') !== true) {
-            return parent::users();
-        }
-        $tenant = getPermissionsTeamId();
-        $relation = parent::users()->wherePivot('tenant_id', $tenant);
-        $principal = $relation->getRelated();
 
-        return $relation->whereExists(static function (QueryBuilder $query) use ($principal, $tenant): void {
-            $principalKey = $principal->qualifyColumn($principal->getKeyName());
-            $query->selectRaw('1')->from(AuthTables::get(AuthTables::TenantMemberships));
-            if ($query->getGrammar() instanceof PostgresGrammar) {
-                $query->whereRaw(new TextCastColumnComparison(
-                    $query->getGrammar()->wrap(AuthTables::get(AuthTables::TenantMemberships).'.subject_id'),
-                    $query->getGrammar()->wrap($principalKey),
-                ));
-            } else {
-                $query->whereColumn(AuthTables::get(AuthTables::TenantMemberships).'.subject_id', $principalKey);
-            }
-            $query
-                ->where(AuthTables::get(AuthTables::TenantMemberships).'.subject_type', $principal->getMorphClass())
-                ->where(AuthTables::get(AuthTables::TenantMemberships).'.tenant_id', $tenant)
-                ->where(AuthTables::get(AuthTables::TenantMemberships).'.status', 'active');
-        });
+        return parent::users();
     }
 
     /**
@@ -158,11 +114,7 @@ class Role extends SpatieRole implements Ownable
      */
     protected function casts(): array
     {
-        return [
-            'priority' => 'integer',
-            'is_system' => 'boolean',
-            'metadata' => 'array',
-        ];
+        return ['priority' => 'integer', 'is_system' => 'boolean', 'metadata' => 'array'];
     }
 
     /** Return the runtime package fixture factory.

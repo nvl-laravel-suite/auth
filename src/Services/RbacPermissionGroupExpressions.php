@@ -110,4 +110,11 @@ final class RbacPermissionGroupExpressions
 
         return "{$normalized} AS \"normalized_group\"";
     }
+
+    public static function normalize(?string $group): ?string
+    {
+        $group = trim(str_replace(["\t", "\n", "\v", "\r"], '', (string) $group), ' ');
+
+        return $group !== '' ? $group : null;
+    }
 }

@@ -8,7 +8,7 @@ use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Auth\Models\OwnerMembership;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Ownership\AuthOwnerAccess;
-use Nvl\Auth\Services\OwnerMemberships;
+use Nvl\Auth\Services\AuthMemberships;
 use Nvl\Auth\Tests\Fixtures\AuthMembershipRace;
 use Nvl\Auth\Tests\Fixtures\Ownership\MembershipProbeJob;
 use Nvl\Auth\Tests\OwnerScopeTestCase;
@@ -31,10 +31,10 @@ it('serializes competing native last-owner removals on independent connections',
     }
     $authority = new SystemMutationContext('race', 'native-last-owner');
     $ids = app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), function () use ($authority): array {
-        return array_map(static fn (User $user): string => app(OwnerMemberships::class)->provision($authority, SubjectReference::fromAuthenticatable($user))->id, User::factory()->count(2)->create()->all());
+        return array_map(static fn (User $user): string => app(AuthMemberships::class)->provision($authority, SubjectReference::fromAuthenticatable($user))->id, User::factory()->count(2)->create()->all());
     });
     $results = AuthMembershipRace::run('sqlite', array_map(static fn (string $id): Closure => static function () use ($id, $authority): array {
-        app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), fn () => app(OwnerMemberships::class)->setStatus($authority, $id, MembershipStatus::Revoked, 1));
+        app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), fn () => app(AuthMemberships::class)->setStatus($authority, $id, MembershipStatus::Revoked, 1));
 
         return ['removed' => $id];
     }, $ids));
@@ -54,9 +54,9 @@ it('rechecks native membership before command restoration in a separate worker p
     $memberships = [];
     foreach ([7, 8] as $key) {
         $memberships[$key] = app(OwnershipRunner::class)->run(Company::query()->findOrFail($key), Actor::query()->findOrFail(1), function () use ($subject, $admin, $key): OwnerMembership {
-            app(OwnerMemberships::class)->provision(new SystemMutationContext('bootstrap', 'worker-'.$key), SubjectReference::fromAuthenticatable($admin));
+            app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'worker-'.$key), SubjectReference::fromAuthenticatable($admin));
 
-            return app(OwnerMemberships::class)->enroll($admin, SubjectReference::fromAuthenticatable($subject));
+            return app(AuthMemberships::class)->enroll($admin, SubjectReference::fromAuthenticatable($subject));
         });
     }
     $this->app->bind(OwnerAccess::class, AuthOwnerAccess::class);
@@ -65,7 +65,7 @@ it('rechecks native membership before command restoration in a separate worker p
             Queue::connection('database')->push(new MembershipProbeJob(OwnershipJobEnvelope::capture(app(OwnershipContext::class)), $memberships[$key]->id, 'owner-'.$key));
         });
     }
-    app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), $admin, fn () => app(OwnerMemberships::class)->setStatus($admin, $memberships[7], MembershipStatus::Revoked, 1));
+    app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), $admin, fn () => app(AuthMemberships::class)->setStatus($admin, $memberships[7], MembershipStatus::Revoked, 1));
     $process = new Process([PHP_BINARY, __DIR__.'/../Fixtures/Ownership/worker.php', json_encode(config('database.connections.sqlite'), JSON_THROW_ON_ERROR)], timeout: 40);
     $process->mustRun();
     expect($process->getOutput())->toBe('auth-worker-complete')

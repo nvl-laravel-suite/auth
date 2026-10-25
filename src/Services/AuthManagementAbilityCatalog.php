@@ -9,9 +9,9 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\AuthClient;
 use Nvl\Auth\Models\Invitation;
+use Nvl\Auth\Models\OwnerMembership;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
-use Nvl\Auth\Models\TenantMembership;
 use Nvl\Auth\Models\User;
 
 /**
@@ -33,37 +33,7 @@ final class AuthManagementAbilityCatalog
      */
     public function definitions(): array
     {
-        return [
-            'users.viewAny' => $this->definitionFor('nvl.auth.users.viewAny', AuthFeature::PrincipalManagement, 'viewAny', 'none', 'users', User::class),
-            'users.view' => $this->definitionFor('nvl.auth.users.view', AuthFeature::PrincipalManagement, 'view', 'target', 'users', User::class),
-            'users.create' => $this->definitionFor('nvl.auth.users.create', AuthFeature::PrincipalManagement, 'create', 'none', 'users', User::class),
-            'users.update' => $this->definitionFor('nvl.auth.users.update', AuthFeature::PrincipalManagement, 'update', 'target', 'users', User::class),
-            'users.delete' => $this->definitionFor('nvl.auth.users.delete', AuthFeature::PrincipalManagement, 'delete', 'target', 'users', User::class),
-            'users.restore' => $this->definitionFor('nvl.auth.users.restore', AuthFeature::PrincipalManagement, 'restore', 'target', 'users', User::class),
-            'users.manageAccess' => $this->definitionFor('nvl.auth.users.manageAccess', AuthFeature::PrincipalManagement, 'manageAccess', 'optional', 'users', User::class),
-            'memberships.viewAny' => $this->definitionFor('nvl.auth.memberships.viewAny', AuthFeature::Memberships, 'viewAny', 'none', 'memberships', TenantMembership::class),
-            'memberships.view' => $this->definitionFor('nvl.auth.memberships.view', AuthFeature::Memberships, 'view', 'target', 'memberships', TenantMembership::class),
-            'memberships.enroll' => $this->definitionFor('nvl.auth.memberships.enroll', AuthFeature::Memberships, 'enroll', 'none', 'memberships', TenantMembership::class),
-            'memberships.update' => $this->definitionFor('nvl.auth.memberships.update', AuthFeature::Memberships, 'update', 'target', 'memberships', TenantMembership::class),
-            'memberships.revoke' => $this->definitionFor('nvl.auth.memberships.revoke', AuthFeature::Memberships, 'revoke', 'target', 'memberships', TenantMembership::class),
-            'memberships.transferOwnership' => $this->definitionFor('nvl.auth.memberships.transferOwnership', AuthFeature::Memberships, 'transferOwnership', 'target', 'memberships', TenantMembership::class),
-            'memberships.manageAccess' => $this->definitionFor('nvl.auth.memberships.manageAccess', AuthFeature::Memberships, 'manageAccess', 'target', 'memberships', TenantMembership::class),
-            'invitations.viewAny' => $this->definitionFor('nvl.auth.invitations.viewAny', AuthFeature::Invitations, 'viewAny', 'none', 'invitations', Invitation::class),
-            'invitations.create' => $this->definitionFor('nvl.auth.invitations.create', AuthFeature::Invitations, 'create', 'none', 'invitations', Invitation::class),
-            'invitations.resend' => $this->definitionFor('nvl.auth.invitations.resend', AuthFeature::Invitations, 'resend', 'target', 'invitations', Invitation::class),
-            'invitations.revoke' => $this->definitionFor('nvl.auth.invitations.revoke', AuthFeature::Invitations, 'revoke', 'target', 'invitations', Invitation::class),
-            'clients.viewAny' => $this->definitionFor('nvl.auth.clients.viewAny', AuthFeature::Clients, 'viewAny', 'none', 'clients', AuthClient::class),
-            'clients.view' => $this->definitionFor('nvl.auth.clients.view', AuthFeature::Clients, 'view', 'target', 'clients', AuthClient::class),
-            'clients.create' => $this->definitionFor('nvl.auth.clients.create', AuthFeature::Clients, 'create', 'none', 'clients', AuthClient::class),
-            'clients.update' => $this->definitionFor('nvl.auth.clients.update', AuthFeature::Clients, 'update', 'target', 'clients', AuthClient::class),
-            'clients.delete' => $this->definitionFor('nvl.auth.clients.delete', AuthFeature::Clients, 'delete', 'target', 'clients', AuthClient::class),
-            'rbac.view' => $this->definitionFor('nvl.auth.rbac.view', AuthFeature::Rbac, 'viewRbac', 'none', 'roles', Role::class),
-            'rbac.manageRoles' => $this->definitionFor('nvl.auth.rbac.manageRoles', AuthFeature::Rbac, 'manageRoles', 'none', 'roles', Role::class),
-            'rbac.managePermissions' => $this->definitionFor('nvl.auth.rbac.managePermissions', AuthFeature::Rbac, 'managePermissions', 'none', 'permissions', Permission::class),
-            'rbac.synchronize' => $this->definitionFor('nvl.auth.rbac.synchronize', AuthFeature::Rbac, 'synchronizeRbac', 'none', 'permissions', Permission::class),
-            'audits.viewAny' => $this->definitionFor('nvl.auth.audits.viewAny', AuthFeature::Audit, 'viewAny', 'none', 'audits', AuthAudit::class),
-            'audits.view' => $this->definitionFor('nvl.auth.audits.view', AuthFeature::Audit, 'view', 'target', 'audits', AuthAudit::class),
-        ];
+        return ['users.viewAny' => $this->definitionFor('nvl.auth.users.viewAny', AuthFeature::PrincipalManagement, 'viewAny', 'none', 'users', User::class), 'users.view' => $this->definitionFor('nvl.auth.users.view', AuthFeature::PrincipalManagement, 'view', 'target', 'users', User::class), 'users.create' => $this->definitionFor('nvl.auth.users.create', AuthFeature::PrincipalManagement, 'create', 'none', 'users', User::class), 'users.update' => $this->definitionFor('nvl.auth.users.update', AuthFeature::PrincipalManagement, 'update', 'target', 'users', User::class), 'users.delete' => $this->definitionFor('nvl.auth.users.delete', AuthFeature::PrincipalManagement, 'delete', 'target', 'users', User::class), 'users.restore' => $this->definitionFor('nvl.auth.users.restore', AuthFeature::PrincipalManagement, 'restore', 'target', 'users', User::class), 'users.manageAccess' => $this->definitionFor('nvl.auth.users.manageAccess', AuthFeature::PrincipalManagement, 'manageAccess', 'optional', 'users', User::class), 'memberships.viewAny' => $this->definitionFor('nvl.auth.memberships.viewAny', AuthFeature::Memberships, 'viewAny', 'none', 'memberships', OwnerMembership::class), 'memberships.view' => $this->definitionFor('nvl.auth.memberships.view', AuthFeature::Memberships, 'view', 'target', 'memberships', OwnerMembership::class), 'memberships.enroll' => $this->definitionFor('nvl.auth.memberships.enroll', AuthFeature::Memberships, 'enroll', 'none', 'memberships', OwnerMembership::class), 'memberships.update' => $this->definitionFor('nvl.auth.memberships.update', AuthFeature::Memberships, 'update', 'target', 'memberships', OwnerMembership::class), 'memberships.revoke' => $this->definitionFor('nvl.auth.memberships.revoke', AuthFeature::Memberships, 'revoke', 'target', 'memberships', OwnerMembership::class), 'memberships.transferOwnership' => $this->definitionFor('nvl.auth.memberships.transferOwnership', AuthFeature::Memberships, 'transferOwnership', 'target', 'memberships', OwnerMembership::class), 'memberships.manageAccess' => $this->definitionFor('nvl.auth.memberships.manageAccess', AuthFeature::Memberships, 'manageAccess', 'target', 'memberships', OwnerMembership::class), 'invitations.viewAny' => $this->definitionFor('nvl.auth.invitations.viewAny', AuthFeature::Invitations, 'viewAny', 'none', 'invitations', Invitation::class), 'invitations.create' => $this->definitionFor('nvl.auth.invitations.create', AuthFeature::Invitations, 'create', 'none', 'invitations', Invitation::class), 'invitations.resend' => $this->definitionFor('nvl.auth.invitations.resend', AuthFeature::Invitations, 'resend', 'target', 'invitations', Invitation::class), 'invitations.revoke' => $this->definitionFor('nvl.auth.invitations.revoke', AuthFeature::Invitations, 'revoke', 'target', 'invitations', Invitation::class), 'clients.viewAny' => $this->definitionFor('nvl.auth.clients.viewAny', AuthFeature::Clients, 'viewAny', 'none', 'clients', AuthClient::class), 'clients.view' => $this->definitionFor('nvl.auth.clients.view', AuthFeature::Clients, 'view', 'target', 'clients', AuthClient::class), 'clients.create' => $this->definitionFor('nvl.auth.clients.create', AuthFeature::Clients, 'create', 'none', 'clients', AuthClient::class), 'clients.update' => $this->definitionFor('nvl.auth.clients.update', AuthFeature::Clients, 'update', 'target', 'clients', AuthClient::class), 'clients.delete' => $this->definitionFor('nvl.auth.clients.delete', AuthFeature::Clients, 'delete', 'target', 'clients', AuthClient::class), 'rbac.view' => $this->definitionFor('nvl.auth.rbac.view', AuthFeature::Rbac, 'viewRbac', 'none', 'roles', Role::class), 'rbac.manageRoles' => $this->definitionFor('nvl.auth.rbac.manageRoles', AuthFeature::Rbac, 'manageRoles', 'none', 'roles', Role::class), 'rbac.managePermissions' => $this->definitionFor('nvl.auth.rbac.managePermissions', AuthFeature::Rbac, 'managePermissions', 'none', 'permissions', Permission::class), 'rbac.synchronize' => $this->definitionFor('nvl.auth.rbac.synchronize', AuthFeature::Rbac, 'synchronizeRbac', 'none', 'permissions', Permission::class), 'audits.viewAny' => $this->definitionFor('nvl.auth.audits.viewAny', AuthFeature::Audit, 'viewAny', 'none', 'audits', AuthAudit::class), 'audits.view' => $this->definitionFor('nvl.auth.audits.view', AuthFeature::Audit, 'view', 'target', 'audits', AuthAudit::class)];
     }
 
     /**
@@ -80,8 +50,7 @@ final class AuthManagementAbilityCatalog
      */
     public function definition(string $alias): array
     {
-        return $this->definitions()[$alias]
-            ?? throw AuthException::invalidConfiguration("Unknown Auth management alias [{$alias}].");
+        return $this->definitions()[$alias] ?? throw AuthException::invalidConfiguration("Unknown Auth management alias [{$alias}].");
     }
 
     /**
@@ -115,13 +84,7 @@ final class AuthManagementAbilityCatalog
      */
     public function abilitiesFor(AuthFeature $feature): array
     {
-        return array_values(array_map(
-            static fn (array $definition): string => $definition['ability'],
-            array_filter(
-                $this->definitions(),
-                static fn (array $definition): bool => $definition['feature'] === $feature,
-            ),
-        ));
+        return array_values(array_map(static fn (array $definition): string => $definition['ability'], array_filter($this->definitions(), static fn (array $definition): bool => $definition['feature'] === $feature)));
     }
 
     /**
@@ -138,21 +101,8 @@ final class AuthManagementAbilityCatalog
      *     default_model: class-string
      * }
      */
-    private function definitionFor(
-        string $ability,
-        AuthFeature $feature,
-        string $operation,
-        string $subject,
-        string $policy,
-        string $defaultModel,
-    ): array {
-        return [
-            'ability' => $ability,
-            'feature' => $feature,
-            'operation' => $operation,
-            'subject' => $subject,
-            'policy' => $policy,
-            'default_model' => $defaultModel,
-        ];
+    private function definitionFor(string $ability, AuthFeature $feature, string $operation, string $subject, string $policy, string $defaultModel): array
+    {
+        return ['ability' => $ability, 'feature' => $feature, 'operation' => $operation, 'subject' => $subject, 'policy' => $policy, 'default_model' => $defaultModel];
     }
 }

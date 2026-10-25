@@ -8,6 +8,7 @@ use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Sanctum\Sanctum;
 use Laravel\Sanctum\SanctumServiceProvider;
 use Nvl\Auth\Providers\AuthServiceProvider;
+use Nvl\Auth\Tests\Fixtures\Consumer\RouteServiceProvider;
 use Nvl\Auth\Tests\Fixtures\HostPersonalAccessToken;
 use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Support\Providers\LocaleServiceProvider;
@@ -33,6 +34,7 @@ abstract class DisabledAuthProviderTestCase extends Orchestra
             PermissionServiceProvider::class,
             SanctumServiceProvider::class,
             AuthServiceProvider::class,
+            RouteServiceProvider::class,
         ];
     }
 

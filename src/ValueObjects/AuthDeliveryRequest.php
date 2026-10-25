@@ -7,11 +7,8 @@ namespace Nvl\Auth\ValueObjects;
 use Carbon\CarbonImmutable;
 use InvalidArgumentException;
 use JsonException;
-use Nvl\Auth\Data\Display\InvitationDeliveryData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
-use Nvl\Support\Tenancy\Enums\TenantContextMode;
-use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Carries a transport-neutral message request to host delivery listeners.
@@ -20,28 +17,15 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
  */
 final readonly class AuthDeliveryRequest
 {
-    public ?AuthEventContext $eventContext;
-
     /**
      * Create a delivery request.
      *
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $metadata
+     * @param  array<string, mixed>|null  $invitation
      */
-    public function __construct(
-        public string $messageId,
-        public AuthFeature $feature,
-        public AuthMessageType $type,
-        public string $recipient,
-        public array $payload,
-        public CarbonImmutable $expiresAt,
-        public ?string $locale = null,
-        public array $metadata = [],
-        public ?SubjectReference $subject = null,
-        public ?InvitationDeliveryData $invitation = null,
-        public ?TenantId $tenant = null,
-        ?AuthEventContext $eventContext = null,
-    ) {
+    public function __construct(public string $messageId, public AuthFeature $feature, public AuthMessageType $type, public string $recipient, public array $payload, public CarbonImmutable $expiresAt, public ?string $locale = null, public array $metadata = [], public ?SubjectReference $subject = null, public ?array $invitation = null)
+    {
         $supportedType = match ($this->feature) {
             AuthFeature::Invitations => AuthMessageType::Invitation,
             AuthFeature::MagicLinks => AuthMessageType::MagicLink,
@@ -50,50 +34,28 @@ final readonly class AuthDeliveryRequest
             AuthFeature::EmailVerification => AuthMessageType::EmailVerification,
             default => null,
         };
-
         if ($supportedType !== $this->type) {
             throw new InvalidArgumentException('Auth delivery feature and message type are incompatible.');
         }
-
         if ($this->invitation !== null && $this->feature !== AuthFeature::Invitations) {
             throw new InvalidArgumentException('Invitation delivery context requires the invitations feature.');
         }
-
-        $this->eventContext = $eventContext ?? ($this->tenant instanceof TenantId
-            ? new AuthEventContext(TenantContextMode::Tenant, $this->tenant)
-            : new AuthEventContext(config('nvl-tenancy.enabled') === true
-                ? TenantContextMode::Unresolved
-                : TenantContextMode::Disabled));
-
-        if (trim($this->messageId) === ''
-            || $this->messageId !== trim($this->messageId)
-            || mb_strlen($this->messageId) > 191
-            || preg_match('/[\x00-\x1F\x7F]/', $this->messageId) === 1
-            || trim($this->recipient) === ''
-            || $this->recipient !== trim($this->recipient)
-            || mb_strlen($this->recipient) > 320
-            || preg_match('/[\x00-\x1F\x7F]/', $this->recipient) === 1) {
+        if (trim($this->messageId) === '' || $this->messageId !== trim($this->messageId) || mb_strlen($this->messageId) > 191 || preg_match('/[\x00-\x1F\x7F]/', $this->messageId) === 1 || trim($this->recipient) === '' || $this->recipient !== trim($this->recipient) || mb_strlen($this->recipient) > 320 || preg_match('/[\x00-\x1F\x7F]/', $this->recipient) === 1) {
             throw new InvalidArgumentException('Auth delivery message and recipient identifiers are required.');
         }
-
         if (! $this->expiresAt->isFuture()) {
             throw new InvalidArgumentException('Auth delivery expiry must be in the future.');
         }
-
-        if ($this->locale !== null
-            && (preg_match('/\A[a-zA-Z]{2,3}(?:[-_][a-zA-Z0-9]{2,8})*\z/', $this->locale) !== 1
-                || mb_strlen($this->locale) > 35)) {
+        if ($this->locale !== null && (preg_match('/\A[a-zA-Z]{2,3}(?:[-_][a-zA-Z0-9]{2,8})*\z/', $this->locale) !== 1 || mb_strlen($this->locale) > 35)) {
             throw new InvalidArgumentException('Auth delivery locale is invalid.');
         }
-
         try {
             $payload = json_encode($this->payload, JSON_THROW_ON_ERROR);
             $metadata = json_encode($this->metadata, JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw new InvalidArgumentException('Auth delivery payloads must be JSON-serializable.', previous: $exception);
         }
-
-        if (strlen($payload) > 32_768 || strlen($metadata) > 16_384) {
+        if (strlen($payload) > 32768 || strlen($metadata) > 16384) {
             throw new InvalidArgumentException('Auth delivery payloads exceed their safe size limit.');
         }
     }
@@ -105,90 +67,6 @@ final readonly class AuthDeliveryRequest
      */
     public function __debugInfo(): array
     {
-        return [
-            'message_id' => $this->messageId,
-            'feature' => $this->feature->value,
-            'type' => $this->type->value,
-            'recipient' => '[REDACTED]',
-            'payload_keys' => array_keys($this->payload),
-            'expires_at' => $this->expiresAt->toIso8601String(),
-            'locale' => $this->locale,
-            'metadata_keys' => array_keys($this->metadata),
-            'subject_type' => $this->subject?->type,
-            'has_invitation' => $this->invitation !== null,
-            'tenant_id' => $this->tenant?->value,
-            'event_context' => $this->eventContext->mode->value,
-        ];
-    }
-
-    /**
-     * Serialize initialized delivery fields, including legacy-shaped instances.
-     *
-     * @return array<string, mixed>
-     */
-    public function __serialize(): array
-    {
-        $data = [
-            'messageId' => $this->messageId,
-            'feature' => $this->feature,
-            'type' => $this->type,
-            'recipient' => $this->recipient,
-            'payload' => $this->payload,
-            'expiresAt' => $this->expiresAt,
-            'locale' => $this->locale,
-            'metadata' => $this->metadata,
-        ];
-
-        if (isset($this->subject)) {
-            $data['subject'] = $this->subject;
-        }
-
-        if (isset($this->invitation)) {
-            $data['invitation'] = $this->invitation;
-        }
-
-        if (isset($this->tenant)) {
-            $data['tenant'] = $this->tenant;
-        }
-
-        if (isset($this->eventContext)) {
-            $data['eventContext'] = $this->eventContext;
-        }
-
-        return $data;
-    }
-
-    /**
-     * Restore context omitted by delivery requests queued before it existed.
-     *
-     * @param  array{
-     *     messageId: string,
-     *     feature: AuthFeature,
-     *     type: AuthMessageType,
-     *     recipient: string,
-     *     payload: array<string, mixed>,
-     *     expiresAt: CarbonImmutable,
-     *     locale: string|null,
-     *     metadata: array<string, mixed>,
-     *     subject?: SubjectReference|null,
-     *     invitation?: InvitationDeliveryData|null,
-     *     tenant?: TenantId|null,
-     *     eventContext?: AuthEventContext|null
-     * }  $data
-     */
-    public function __unserialize(array $data): void
-    {
-        $this->messageId = $data['messageId'];
-        $this->feature = $data['feature'];
-        $this->type = $data['type'];
-        $this->recipient = $data['recipient'];
-        $this->payload = $data['payload'];
-        $this->expiresAt = $data['expiresAt'];
-        $this->locale = $data['locale'];
-        $this->metadata = $data['metadata'];
-        $this->subject = $data['subject'] ?? null;
-        $this->invitation = $data['invitation'] ?? null;
-        $this->tenant = $data['tenant'] ?? null;
-        $this->eventContext = $data['eventContext'] ?? new AuthEventContext(TenantContextMode::Disabled);
+        return ['message_id' => $this->messageId, 'feature' => $this->feature->value, 'type' => $this->type->value, 'recipient' => '[REDACTED]', 'payload_keys' => array_keys($this->payload), 'expires_at' => $this->expiresAt->toIso8601String(), 'locale' => $this->locale, 'metadata_keys' => array_keys($this->metadata), 'subject_type' => $this->subject?->type, 'has_invitation' => $this->invitation !== null];
     }
 }

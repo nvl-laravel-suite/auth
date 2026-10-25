@@ -5,19 +5,16 @@ declare(strict_types=1);
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
-use Nvl\Auth\Actions\Passwords\RequestPasswordResetAction;
-use Nvl\Auth\Actions\Passwords\ResetPasswordAction;
 use Nvl\Auth\Contracts\AuthenticationEligibility;
-use Nvl\Auth\Data\Mutations\RequestPasswordResetData;
-use Nvl\Auth\Data\Mutations\ResetPasswordData;
 use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Services\AuthPasswords;
 
 it('applies replaceable eligibility before reset delivery and credential mutation', function (): void {
     Event::fake([AuthDeliveryRequested::class]);
     $user = $this->user('ineligible@example.test');
-    app(RequestPasswordResetAction::class)->execute(new RequestPasswordResetData($user->email));
+    app(AuthPasswords::class)->requestReset(['identifier' => $user->email]);
     $event = Event::dispatched(AuthDeliveryRequested::class)->first()[0] ?? null;
 
     $this->app->instance(AuthenticationEligibility::class, new class implements AuthenticationEligibility
@@ -28,15 +25,10 @@ it('applies replaceable eligibility before reset delivery and credential mutatio
         }
     });
 
-    expect(fn () => app(ResetPasswordAction::class)->execute(new ResetPasswordData(
-        $user->email,
-        $event->request->payload['token'],
-        'replacement-password',
-        'replacement-password',
-    )))->toThrow(AuthException::class, 'Host policy')
+    expect(fn () => app(AuthPasswords::class)->reset(['identifier' => $user->email, 'token' => $event->request->payload['token'], 'password' => 'replacement-password', 'passwordConfirmation' => 'replacement-password']))->toThrow(AuthException::class, 'Host policy')
         ->and(Hash::check('correct-password', $user->refresh()->password))->toBeTrue();
 
     Event::fake([AuthDeliveryRequested::class]);
-    app(RequestPasswordResetAction::class)->execute(new RequestPasswordResetData($user->email));
+    app(AuthPasswords::class)->requestReset(['identifier' => $user->email]);
     Event::assertNotDispatched(AuthDeliveryRequested::class);
 });

@@ -4,43 +4,27 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
-use Nvl\Auth\Actions\Challenges\ConsumeMagicLinkAction;
-use Nvl\Auth\Actions\Challenges\RequestMagicLinkAction;
-use Nvl\Auth\Actions\Challenges\RequestMagicLinkAuthenticationAction;
-use Nvl\Auth\Actions\Challenges\RequestSecurityCodeAction;
-use Nvl\Auth\Actions\Challenges\VerifySecurityCodeAction;
-use Nvl\Auth\Data\Mutations\ConsumeMagicLinkData;
-use Nvl\Auth\Data\Mutations\RequestMagicLinkData;
-use Nvl\Auth\Data\Mutations\RequestSecurityCodeData;
-use Nvl\Auth\Data\Mutations\VerifySecurityCodeData;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Auth\Http\Middleware\EnsureAuthFeatureAvailable;
-use Nvl\Auth\Http\Middleware\RenderAuthExceptions;
 use Nvl\Auth\Models\Challenge;
+use Nvl\Auth\Services\AuthChallenges;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\Middleware\EnsureAuthFeatureAvailable;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\Middleware\RenderAuthExceptions;
 
 it('issues hashed magic links and consumes them once', function (): void {
     config()->set('nvl-auth.features.magic_links.enabled', true);
     Event::fake([AuthDeliveryRequested::class]);
-    $issued = app(RequestMagicLinkAction::class)->execute(new RequestMagicLinkData('user@example.test'));
+    $issued = app(AuthChallenges::class)->requestMagicLink(['recipient' => 'user@example.test']);
 
-    expect($issued->challenge->getRawOriginal('secret_hash'))->not->toBe($issued->secret)
-        ->and($issued->fallbackCode)->toMatch('/^\d{6}$/')
-        ->and($issued->challenge->getRawOriginal('secondary_secret_hash'))->not->toBe($issued->fallbackCode)
-        ->and($issued->__debugInfo())->toBe([
-            'challenge_id' => $issued->challenge->identifier(),
-            'secret' => '[REDACTED]',
-            'fallback_code' => '[REDACTED]',
-        ]);
+    expect($issued['challenge']->getRawOriginal('secret_hash'))->not->toBe($issued['secret'])
+        ->and($issued['fallbackCode'])->toMatch('/^\d{6}$/')
+        ->and($issued['challenge']->getRawOriginal('secondary_secret_hash'))->not->toBe($issued['fallbackCode'])
+        ->and($issued['challenge']->toArray())->not->toHaveKeys(['secret_hash', 'secondary_secret_hash']);
 
-    $consumed = app(ConsumeMagicLinkAction::class)->execute(new ConsumeMagicLinkData(
-        '',
-        (string) $issued->fallbackCode,
-        $issued->challenge->identifier(),
-    ));
+    $consumed = app(AuthChallenges::class)->consumeMagicLink(['recipient' => '', 'token' => (string) $issued['fallbackCode'], 'challengeId' => $issued['challenge']->identifier()]);
 
     expect($consumed->consumed_at)->not->toBeNull()
-        ->and(fn () => app(ConsumeMagicLinkAction::class)->execute(new ConsumeMagicLinkData('user@example.test', $issued->secret)))
+        ->and(fn () => app(AuthChallenges::class)->consumeMagicLink(['recipient' => 'user@example.test', 'token' => $issued['secret']]))
         ->toThrow(AuthException::class);
     Event::assertDispatched(AuthDeliveryRequested::class);
 });
@@ -50,11 +34,11 @@ it('binds public login links to resolved subjects and stays neutral for unknown 
     Event::fake([AuthDeliveryRequested::class]);
     $user = $this->user();
 
-    $issued = app(RequestMagicLinkAuthenticationAction::class)->execute(new RequestMagicLinkData($user->email));
+    $issued = app(AuthChallenges::class)->requestMagicLinkAuthentication(['recipient' => $user->email]);
 
     expect($issued)->not->toBeNull()
-        ->and($issued?->challenge->subject_id)->toBe((string) $user->getKey())
-        ->and(app(RequestMagicLinkAuthenticationAction::class)->execute(new RequestMagicLinkData('unknown@example.test')))->toBeNull();
+        ->and($issued['challenge']->subject_id)->toBe((string) $user->getKey())
+        ->and(app(AuthChallenges::class)->requestMagicLinkAuthentication(['recipient' => 'unknown@example.test']))->toBeNull();
 
     Event::assertDispatchedTimes(AuthDeliveryRequested::class, 1);
     Event::assertDispatched(
@@ -72,12 +56,12 @@ it('binds public login links to resolved subjects and stays neutral for unknown 
 
 it('scopes numeric codes to their recipient and purpose', function (): void {
     config()->set('nvl-auth.features.security_codes.enabled', true);
-    $issued = app(RequestSecurityCodeAction::class)->execute(new RequestSecurityCodeData('user@example.test', 'login'));
+    $issued = app(AuthChallenges::class)->requestSecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login']);
 
-    expect(fn () => app(VerifySecurityCodeAction::class)->execute(new VerifySecurityCodeData('other@example.test', 'login', $issued->secret)))
+    expect(fn () => app(AuthChallenges::class)->verifySecurityCode(['recipient' => 'other@example.test', 'purpose' => 'login', 'code' => $issued['secret']]))
         ->toThrow(AuthException::class);
 
-    expect(app(VerifySecurityCodeAction::class)->execute(new VerifySecurityCodeData('user@example.test', 'login', $issued->secret))->consumed_at)
+    expect(app(AuthChallenges::class)->verifySecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login', 'code' => $issued['secret']])->consumed_at)
         ->not->toBeNull();
 });
 
@@ -87,7 +71,7 @@ it('keeps generic security-code HTTP proof host-managed and unauthenticated when
     app('router')->aliasMiddleware('nvl.auth.feature', EnsureAuthFeatureAvailable::class);
     Route::prefix('nvl/api/v1/auth')->name('nvl.auth.public.')
         ->middleware(RenderAuthExceptions::class)
-        ->group(dirname(__DIR__, 2).'/routes/public/security_codes.php');
+        ->group(dirname(__DIR__).'/Fixtures/Consumer/routes/public/security_codes.php');
 
     $this->postJson('/nvl/api/v1/auth/security-codes', [
         'recipient' => 'host-managed@example.test',
@@ -108,10 +92,10 @@ it('keeps generic security-code HTTP proof host-managed and unauthenticated when
 
 it('commits failed challenge attempts instead of rolling them back with the response', function (): void {
     config()->set('nvl-auth.features.security_codes.enabled', true);
-    $issued = app(RequestSecurityCodeAction::class)->execute(new RequestSecurityCodeData('user@example.test', 'login'));
-    $wrongCode = $issued->secret === '000000' ? '111111' : '000000';
+    $issued = app(AuthChallenges::class)->requestSecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login']);
+    $wrongCode = $issued['secret'] === '000000' ? '111111' : '000000';
 
-    expect(fn () => app(VerifySecurityCodeAction::class)->execute(new VerifySecurityCodeData('user@example.test', 'login', $wrongCode)))
+    expect(fn () => app(AuthChallenges::class)->verifySecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login', 'code' => $wrongCode]))
         ->toThrow(AuthException::class);
 
     expect(Challenge::query()->sole()->attempts)->toBe(1);
@@ -120,21 +104,21 @@ it('commits failed challenge attempts instead of rolling them back with the resp
 it('keeps one active challenge and caps committed attempts', function (): void {
     config()->set('nvl-auth.features.security_codes.enabled', true);
     config()->set('nvl-auth.features.security_codes.settings.max_attempts', 2);
-    $first = app(RequestSecurityCodeAction::class)->execute(new RequestSecurityCodeData('user@example.test', 'login'));
-    $second = app(RequestSecurityCodeAction::class)->execute(new RequestSecurityCodeData('user@example.test', 'login'));
-    $wrongCode = $second->secret === '000000' ? '111111' : '000000';
+    $first = app(AuthChallenges::class)->requestSecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login']);
+    $second = app(AuthChallenges::class)->requestSecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login']);
+    $wrongCode = $second['secret'] === '000000' ? '111111' : '000000';
 
-    expect($first->challenge->refresh()->revoked_at)->not->toBeNull()
-        ->and($first->challenge->active_key)->toBeNull()
-        ->and($second->challenge->active_key)->not->toBeNull();
+    expect($first['challenge']->refresh()->revoked_at)->not->toBeNull()
+        ->and($first['challenge']->active_key)->toBeNull()
+        ->and($second['challenge']->active_key)->not->toBeNull();
 
     foreach ([1, 2, 3] as $attempt) {
-        expect(fn () => app(VerifySecurityCodeAction::class)->execute(new VerifySecurityCodeData('user@example.test', 'login', $wrongCode)))
+        expect(fn () => app(AuthChallenges::class)->verifySecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login', 'code' => $wrongCode]))
             ->toThrow(AuthException::class);
     }
 
-    expect($second->challenge->refresh()->attempts)->toBe(2)
-        ->and($second->challenge->active_key)->toBeNull()
-        ->and(fn () => app(VerifySecurityCodeAction::class)->execute(new VerifySecurityCodeData('user@example.test', 'login', $second->secret)))
+    expect($second['challenge']->refresh()->attempts)->toBe(2)
+        ->and($second['challenge']->active_key)->toBeNull()
+        ->and(fn () => app(AuthChallenges::class)->verifySecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login', 'code' => $second['secret']]))
         ->toThrow(AuthException::class);
 });

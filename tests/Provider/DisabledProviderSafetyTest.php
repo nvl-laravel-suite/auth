@@ -7,7 +7,6 @@ use Nvl\Auth\Providers\AuthServiceProvider;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Tests\Fixtures\HostPersonalAccessToken;
 use Nvl\Auth\Tests\Fixtures\TestUser;
-use Nvl\Data\Services\TypeScriptSourceRegistry;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -20,14 +19,13 @@ it('remains passive over host integrations and migration inventory when globally
         ->and(config('permission.models.permission'))->toBe(Permission::class)
         ->and(config('permission.table_names.roles'))->toBe('host_roles')
         ->and(Sanctum::personalAccessTokenModel())->toBe(HostPersonalAccessToken::class)
-        ->and(app()->bound(TypeScriptSourceRegistry::class))->toBeTrue()
+        ->and(app()->bound('Nvl\\Data\\Services\\TypeScriptSourceRegistry'))->toBeFalse()
         ->and(app('migrator')->paths())->not->toContain($authMigrationPath);
 
     config()->set('nvl-auth.enabled', true);
     config()->set('nvl-auth.features.api_tokens.enabled', false);
     (new AuthServiceProvider(app()))->boot(
         app(AuthConfiguration::class),
-        app(TypeScriptSourceRegistry::class),
     );
 
     expect(Sanctum::personalAccessTokenModel())->toBe(HostPersonalAccessToken::class);

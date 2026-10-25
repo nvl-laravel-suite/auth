@@ -3,22 +3,13 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Event;
-use Nvl\Auth\Actions\Invitations\AcceptInvitationAction;
-use Nvl\Auth\Actions\Invitations\CreateInvitationAction;
-use Nvl\Auth\Actions\Rbac\ApplyRoleTemplateAction;
-use Nvl\Auth\Actions\Rbac\BootstrapRbacAction;
-use Nvl\Auth\Actions\Rbac\SynchronizePermissionCatalogAction;
-use Nvl\Auth\Actions\Rbac\SynchronizeRbacAction;
-use Nvl\Auth\Actions\Rbac\SynchronizeRoleTemplatesAction;
-use Nvl\Auth\Actions\Users\SyncUserRolesAction;
 use Nvl\Auth\Contracts\SystemMutationAccess;
-use Nvl\Auth\Data\Mutations\ApplyRoleTemplateData;
-use Nvl\Auth\Data\Mutations\StoreInvitationData;
-use Nvl\Auth\Data\Mutations\SyncUserRolesData;
 use Nvl\Auth\Events\RbacAssignmentChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
-use Nvl\Auth\Results\RbacSynchronizationResult;
+use Nvl\Auth\Services\AuthInvitations;
+use Nvl\Auth\Services\AuthPermissions;
+use Nvl\Auth\Services\AuthRoles;
 use Nvl\Auth\Services\DenySystemMutationAccess;
 use Nvl\Auth\Tests\Fixtures\HostRbacPrincipal;
 use Nvl\Auth\Tests\Fixtures\TestPermissionCatalog;
@@ -35,14 +26,11 @@ it('synchronizes spatie catalogs and applies invitation role payloads', function
     $consumer->markEmailAsVerified();
     Event::fake([RbacAssignmentChanged::class]);
 
-    expect(app(SynchronizePermissionCatalogAction::class)->execute($actor))->toBe(2)
-        ->and(app(SynchronizeRoleTemplatesAction::class)->execute($actor))->toBe(1);
+    expect(app(AuthPermissions::class)->synchronizeCatalog($actor))->toBe(2)
+        ->and(app(AuthRoles::class)->synchronizeTemplates($actor))->toBe(1);
 
-    $issued = app(CreateInvitationAction::class)->execute(new StoreInvitationData(
-        recipient: $consumer->email,
-        roles: ['manager'],
-    ), $actor);
-    app(AcceptInvitationAction::class)->execute($issued->token, $consumer);
+    $issued = app(AuthInvitations::class)->create(['recipient' => $consumer->email, 'roles' => ['manager']], $actor);
+    app(AuthInvitations::class)->accept($issued['token'], $consumer);
 
     expect($consumer->fresh()->hasRole('manager'))->toBeTrue()
         ->and($consumer->fresh()->can('users.manage'))->toBeTrue();
@@ -54,7 +42,7 @@ it('synchronizes spatie catalogs and applies invitation role payloads', function
 it('denies actorless synchronization until the host grants system access', function (): void {
     $this->app->singleton(SystemMutationAccess::class, DenySystemMutationAccess::class);
 
-    expect(fn () => app(BootstrapRbacAction::class)->execute(
+    expect(fn () => app(AuthPermissions::class)->bootstrap(
         new SystemMutationContext('Fresh installation', 'denied-install'),
     ))->toThrow(AuthException::class, 'not authorized');
 });
@@ -64,12 +52,12 @@ it('synchronizes the complete RBAC contribution through one atomic use case', fu
     config()->set('nvl-auth.features.rbac.services.permission_catalogs', [TestPermissionCatalog::class]);
     config()->set('nvl-auth.features.rbac.services.role_templates', [TestRoleTemplates::class]);
 
-    $result = app(SynchronizeRbacAction::class)->execute($this->user('manager@example.test'));
+    $result = app(AuthPermissions::class)->synchronize($this->user('manager@example.test'));
 
-    expect($result)->toBeInstanceOf(RbacSynchronizationResult::class)
-        ->and($result->jsonSerialize())->toBe([
-            'permissions_created' => 2,
-            'roles_synchronized' => 1,
+    expect($result)->toBeArray()
+        ->and($result)->toBe([
+            'permissionsCreated' => 2,
+            'rolesSynchronized' => 1,
             'guard' => 'web',
         ]);
 });
@@ -79,21 +67,21 @@ it('bootstraps RBAC without fabricating a management actor', function (): void {
     config()->set('nvl-auth.features.rbac.services.role_templates', [TestRoleTemplates::class]);
     $context = new SystemMutationContext('Fresh installation', 'install-2026-08-10');
 
-    $result = app(BootstrapRbacAction::class)->execute($context);
+    $result = app(AuthPermissions::class)->bootstrap($context);
 
-    expect($result->permissionsCreated)->toBe(2)
-        ->and($result->rolesSynchronized)->toBe(1)
+    expect($result['permissionsCreated'])->toBe(2)
+        ->and($result['rolesSynchronized'])->toBe(1)
         ->and(AuthAudit::query()->where('action', 'rbac.bootstrapped')->exists())->toBeTrue();
 });
 
 it('applies rich template metadata to a caller-selected role name', function (): void {
     config()->set('nvl-auth.features.rbac.services.permission_catalogs', [TestPermissionCatalog::class]);
     config()->set('nvl-auth.features.rbac.services.role_templates', [TestRoleTemplates::class]);
-    app(BootstrapRbacAction::class)->execute(new SystemMutationContext('Test setup', 'template-setup'));
+    app(AuthPermissions::class)->bootstrap(new SystemMutationContext('Test setup', 'template-setup'));
 
-    $role = app(ApplyRoleTemplateAction::class)->execute(
+    $role = app(AuthRoles::class)->applyTemplate(
         $this->user('template.actor@example.test'),
-        new ApplyRoleTemplateData('manager', 'regional-manager'),
+        ['template' => 'manager', 'roleName' => 'regional-manager'],
     );
 
     expect($role->name)->toBe('regional-manager')
@@ -110,7 +98,7 @@ it('assigns host principal RBAC while principal management is disabled', functio
     config()->set('nvl-auth.features.rbac.models.principal', HostRbacPrincipal::class);
     config()->set('nvl-auth.features.rbac.services.permission_catalogs', [TestPermissionCatalog::class]);
     config()->set('nvl-auth.features.rbac.services.role_templates', [TestRoleTemplates::class]);
-    app(BootstrapRbacAction::class)->execute(new SystemMutationContext('Test setup', 'host-rbac-setup'));
+    app(AuthPermissions::class)->bootstrap(new SystemMutationContext('Test setup', 'host-rbac-setup'));
     $principal = HostRbacPrincipal::query()->create([
         'name' => 'Host Principal',
         'email' => 'host-principal@example.test',
@@ -118,10 +106,10 @@ it('assigns host principal RBAC while principal management is disabled', functio
     ]);
     Event::fake([RbacAssignmentChanged::class]);
 
-    $updated = app(SyncUserRolesAction::class)->execute(
+    $updated = app(AuthRoles::class)->syncUserRoles(
         new SystemMutationContext('Candidacy advancement', 'candidate-123'),
         $principal,
-        new SyncUserRolesData(['manager']),
+        ['roles' => ['manager']],
     );
 
     expect($updated->hasRole('manager'))->toBeTrue();

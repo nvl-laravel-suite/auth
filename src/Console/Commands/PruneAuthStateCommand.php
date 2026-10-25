@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Nvl\Auth\Console\Commands;
 
 use Illuminate\Console\Command;
-use Nvl\Auth\Actions\PruneAuthStateAction;
-use Nvl\Support\Tenancy\Contracts\TenantRunner;
-use Nvl\Support\Tenancy\ValueObjects\PlatformOperation;
-use Nvl\Support\Tenancy\ValueObjects\TenantId;
+use Illuminate\Support\Str;
+use Nvl\Auth\Services\AuthMaintenance;
+use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
  * Prunes terminal Auth state on an operator-controlled schedule.
@@ -16,13 +15,7 @@ use Nvl\Support\Tenancy\ValueObjects\TenantId;
 final class PruneAuthStateCommand extends Command
 {
     /** @var string */
-    protected $signature = 'nvl:auth:prune
-        {--dry-run : Count terminal records without deleting them}
-        {--tenant= : Prune one explicit tenant UUID}
-        {--platform : Prune platform-owned and global identity history}
-        {--actor-type=system : Platform operation actor type}
-        {--actor-id=auth-pruner : Platform operation actor identifier}
-        {--purpose=auth.prune : Platform operation purpose}';
+    protected $signature = 'nvl:auth:prune {--dry-run : Count terminal records without deleting them} {--reason=Scheduled Auth retention} {--correlation= : Trace identifier}';
 
     /** @var string */
     protected $description = 'Prune terminal NVL Auth state after its retention window';
@@ -30,33 +23,11 @@ final class PruneAuthStateCommand extends Command
     /**
      * Execute the pruning command.
      */
-    public function handle(PruneAuthStateAction $action, TenantRunner $tenants): int
+    public function handle(AuthMaintenance $action): int
     {
-        $execute = fn (): array => $action->execute((bool) $this->option('dry-run'));
-        if (config('nvl-tenancy.enabled') === true) {
-            $tenant = $this->option('tenant');
-            $platform = (bool) $this->option('platform');
-            $tenantProvided = is_string($tenant) && $tenant !== '';
-            if ($tenantProvided === $platform) {
-                $this->components->error('Tenant-aware pruning requires exactly one of --tenant or --platform.');
-
-                return self::INVALID;
-            }
-            $counts = $platform
-                ? $tenants->platform(new PlatformOperation(
-                    (string) $this->option('purpose'),
-                    (string) $this->option('actor-type'),
-                    (string) $this->option('actor-id'),
-                ), $execute)
-                : $tenants->run(new TenantId((string) $tenant), $execute);
-        } else {
-            $counts = $execute();
-        }
-        $this->table(['State', 'Records'], array_map(
-            static fn (string $name, int $count): array => [$name, $count],
-            array_keys($counts),
-            array_values($counts),
-        ));
+        $execute = fn (): array => $action->prune(new SystemMutationContext((string) $this->option('reason'), (string) ($this->option('correlation') ?: Str::uuid())), (bool) $this->option('dry-run'));
+        $counts = $execute();
+        $this->table(['State', 'Records'], array_map(static fn (string $name, int $count): array => [$name, $count], array_keys($counts), array_values($counts)));
 
         return self::SUCCESS;
     }

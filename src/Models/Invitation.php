@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\InvitationFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\InvitationDeliveryStatus;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\Traits\HasAuthOwnership;
 use Nvl\Support\Ownership\Contracts\Ownable;
 
@@ -17,8 +18,6 @@ use Nvl\Support\Ownership\Contracts\Ownable;
  * Represents one bounded, bearer-token invitation.
  *
  * @property string $token_hash
- * @property string|null $tenant_id
- * @property string $ownership_key
  * @property string|null $active_key
  * @property string $recipient
  * @property string $recipient_hash
@@ -64,8 +63,6 @@ final class Invitation extends AuthModel implements Ownable
 
     /** @var list<string> */
     protected $fillable = [
-        'tenant_id',
-        'ownership_key',
         'token_hash',
         'active_key',
         'recipient',
@@ -117,13 +114,13 @@ final class Invitation extends AuthModel implements Ownable
             'metadata' => 'encrypted:array',
             'resend_count' => 'integer',
             'delivery_status' => InvitationDeliveryStatus::class,
-            'delivery_attempted_at' => 'immutable_datetime',
-            'delivered_at' => 'immutable_datetime',
-            'delivery_failed_at' => 'immutable_datetime',
-            'last_sent_at' => 'immutable_datetime',
-            'expires_at' => 'immutable_datetime',
-            'accepted_at' => 'immutable_datetime',
-            'revoked_at' => 'immutable_datetime',
+            'delivery_attempted_at' => AuthInstantCast::class,
+            'delivered_at' => AuthInstantCast::class,
+            'delivery_failed_at' => AuthInstantCast::class,
+            'last_sent_at' => AuthInstantCast::class,
+            'expires_at' => AuthInstantCast::class,
+            'accepted_at' => AuthInstantCast::class,
+            'revoked_at' => AuthInstantCast::class,
         ];
     }
 

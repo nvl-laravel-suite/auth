@@ -23,8 +23,6 @@ use Nvl\Support\Ownership\Contracts\Ownable;
  * @property string $name
  * @property string $token
  * @property list<string>|null $abilities
- * @property string|null $tenant_id
- * @property string $ownership_key
  *
  * @api
  *
@@ -50,7 +48,7 @@ class PersonalAccessToken extends SanctumPersonalAccessToken implements Ownable
 
     /** @var list<string> */
     protected $fillable = [
-        'name', 'token', 'abilities', 'expires_at', 'tenant_id', 'ownership_key',
+        'name', 'token', 'abilities', 'expires_at',
     ];
 
     /**

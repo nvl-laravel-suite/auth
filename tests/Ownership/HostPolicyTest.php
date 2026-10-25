@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
-use Nvl\Auth\Actions\Rbac\CreateRoleAction;
-use Nvl\Auth\Data\Mutations\StoreRoleData;
 use Nvl\Auth\Models\User;
+use Nvl\Auth\Services\AuthRoles;
 use Nvl\Auth\Services\EloquentRbacPrincipalAccess;
 use Nvl\Auth\Tests\HostPolicyOwnerScopeTestCase;
 use Nvl\Ownership\Contracts\OwnerAccess;
@@ -22,7 +21,7 @@ it('uses a host admission policy without NVL membership or tenant tables', funct
     });
     $user = User::factory()->create();
     app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), $user, function () use ($user): void {
-        $role = app(CreateRoleAction::class)->execute($user, new StoreRoleData('host-editor'));
+        $role = app(AuthRoles::class)->create($user, ['name' => 'host-editor']);
         app(EloquentRbacPrincipalAccess::class)->assign($user, [$role->id], []);
         expect($user->fresh()->hasRole('host-editor'))->toBeTrue();
     });

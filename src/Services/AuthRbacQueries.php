@@ -1,0 +1,72 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Nvl\Auth\Services;
+
+use Illuminate\Container\Container;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Nvl\Auth\Contracts\MembershipPrincipalResolver;
+use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\Permission;
+use Nvl\Auth\Models\Role;
+use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipContext;
+use Nvl\Support\Ownership\Enums\OwnershipContextMode;
+
+/** Supplies canonical native owner role queries and assignment principal reloads. */
+final readonly class AuthRbacQueries
+{
+    /** Native Auth operation. */
+    public function __construct(private AuthModelRegistry $models, private AuthConfiguration $configuration, private OwnershipBoundary $boundary, private MembershipPrincipalResolver $principals, private RbacPrincipalTracker $tracker, private Container $container, private OwnershipContext $ownership) {}
+
+    /** @return Builder<Role> */
+    public function roles(): Builder
+    {
+        $class = $this->models->roleClass();
+        /** @var Builder<Role> $query */
+        $query = config('nvl-auth.ownership.scoped') === true ? $this->container->make(OwnershipBoundary::class)->query($class::query(), 'auth.roles') : $this->boundary->query($class::query(), 'auth.roles');
+
+        return $query->where('guard_name', $this->configuration->string('features.rbac.settings.guard', 'web'));
+    }
+
+    /** Native Auth operation. */
+    public function role(string $id, bool $lock = false): Role
+    {
+        $query = $this->roles()->whereKey($id);
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        return $query->first() ?? throw new AuthException('role_identifier_not_found', 'The tenant role is unavailable.', 404);
+    }
+
+    /** @return Builder<Permission> */
+    public function permissions(): Builder
+    {
+        $class = $this->models->permissionClass();
+
+        return $class::query()->where('guard_name', $this->configuration->string('features.rbac.settings.guard', 'web'));
+    }
+
+    /** Native Auth operation. */
+    public function assertAssignmentPrincipal(Authenticatable $principal): Authenticatable
+    {
+        $reloaded = $this->principals->resolve(SubjectReference::fromAuthenticatable($principal), true);
+        if (config('nvl-auth.ownership.scoped') === true) {
+            if ($this->ownership->snapshot()->mode !== OwnershipContextMode::Central) {
+                $this->container->make(AuthOwnerAdmission::class)->assertAllowed($reloaded);
+            }
+        }
+        if (! $reloaded instanceof Model) {
+            throw AuthException::invalidConfiguration('RBAC assignment principals must be Eloquent models.');
+        }
+        $reloaded->unsetRelation('roles')->unsetRelation('permissions');
+        $this->tracker->track($reloaded);
+
+        return $reloaded;
+    }
+}

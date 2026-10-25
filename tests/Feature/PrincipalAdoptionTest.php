@@ -7,9 +7,10 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Nvl\Auth\Actions\AdoptPrincipalsAction;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Models\User;
+use Nvl\Auth\Services\AuthMaintenance;
+use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
  * @return array<string, mixed>
@@ -124,10 +125,10 @@ it('dry runs and applies a reconciled principal, token, extension, and foreign-k
         'on_delete' => 'restrict',
     ]];
     $manifest['drop_sources'] = true;
-    $action = app(AdoptPrincipalsAction::class);
+    $action = app(AuthMaintenance::class);
 
-    $plan = $action->execute($manifest);
-    $result = $action->execute($manifest, apply: true);
+    $plan = $action->adoptPrincipals($manifest, new SystemMutationContext('Reviewed host adoption', 'principal-adoption-test'));
+    $result = $action->adoptPrincipals($manifest, new SystemMutationContext('Reviewed host adoption', 'principal-adoption-test'), apply: true);
     $user = User::query()->findOrFail($id);
     $foreignKeys = Schema::getForeignKeys('principal_domain_records');
 
@@ -175,7 +176,7 @@ it('rejects duplicate or non-UUID principal identities before writing', function
     $manifest = principalAdoptionManifestForTest('invalid_legacy_users', 1);
     $manifest['principals']['extension_columns'] = [];
 
-    expect(fn () => app(AdoptPrincipalsAction::class)->execute($manifest))
+    expect(fn () => app(AuthMaintenance::class)->adoptPrincipals($manifest, new SystemMutationContext('Reviewed host adoption', 'principal-adoption-test')))
         ->toThrow(InvalidArgumentException::class, 'invalid or duplicated')
         ->and(User::query()->where('email', 'invalid@example.test')->exists())->toBeFalse();
 });
@@ -203,10 +204,10 @@ it('plans and applies pre-migration principal table staging', function (): void 
         'name' => 'staged_domain_records_principal_foreign',
         'on_delete' => 'null',
     ]];
-    $action = app(AdoptPrincipalsAction::class);
+    $action = app(AuthMaintenance::class);
 
-    $plan = $action->execute($manifest, stage: true);
-    $applied = $action->execute($manifest, stage: true, apply: true);
+    $plan = $action->adoptPrincipals($manifest, new SystemMutationContext('Reviewed host adoption', 'principal-adoption-test'), stage: true);
+    $applied = $action->adoptPrincipals($manifest, new SystemMutationContext('Reviewed host adoption', 'principal-adoption-test'), stage: true, apply: true);
 
     expect($plan['foreign_keys_detected'])->toBe(['staged_domain_records_principal_foreign'])
         ->and($applied['foreign_keys_detached'])->toBe(['staged_domain_records_principal_foreign'])
@@ -220,10 +221,10 @@ it('registers the dry-run principal adoption command', function (): void {
 });
 
 it('fails closed for unsafe principal staging and adoption topology', function (): void {
-    $action = app(AdoptPrincipalsAction::class);
+    $action = app(AuthMaintenance::class);
     $manifest = principalAdoptionManifestForTest('missing_source_users', 0);
 
-    expect(fn (): array => $action->execute($manifest, stage: true))
+    expect(fn (): array => $action->adoptPrincipals($manifest, new SystemMutationContext('Reviewed host adoption', 'principal-adoption-test'), stage: true))
         ->toThrow(InvalidArgumentException::class, 'requires at least one table rename');
 
     $manifest['staging'] = [[
@@ -231,7 +232,7 @@ it('fails closed for unsafe principal staging and adoption topology', function (
         'staging_table' => 'staged_users',
     ]];
 
-    expect(fn (): array => $action->execute($manifest, stage: true))
+    expect(fn (): array => $action->adoptPrincipals($manifest, new SystemMutationContext('Reviewed host adoption', 'principal-adoption-test'), stage: true))
         ->toThrow(InvalidArgumentException::class, 'source [missing_source_users] does not exist');
 
     Schema::create('source_users', function (Blueprint $table): void {
@@ -245,23 +246,24 @@ it('fails closed for unsafe principal staging and adoption topology', function (
         'staging_table' => 'staged_users',
     ];
 
-    expect(fn (): array => $action->execute($manifest, stage: true))
+    expect(fn (): array => $action->adoptPrincipals($manifest, new SystemMutationContext('Reviewed host adoption', 'principal-adoption-test'), stage: true))
         ->toThrow(InvalidArgumentException::class, 'target [staged_users] already exists');
 
+    config()->set('database.connections.secondary', config('database.connections.testing'));
     config()->set('nvl-auth.connection', 'secondary');
     $manifest = principalAdoptionManifestForTest('source_users', 0);
     $manifest['connection'] = 'testing';
 
-    expect(fn (): array => $action->execute($manifest))
+    expect(fn (): array => $action->adoptPrincipals($manifest, new SystemMutationContext('Reviewed host adoption', 'principal-adoption-test')))
         ->toThrow(InvalidArgumentException::class, 'same connection');
 });
 
 it('rejects missing, incomplete, or conflicting principal adoption source data', function (): void {
-    $action = app(AdoptPrincipalsAction::class);
+    $action = app(AuthMaintenance::class);
     $manifest = principalAdoptionManifestForTest('missing_source_users', 0);
     $manifest['principals']['extension_columns'] = [];
 
-    expect(fn (): array => $action->execute($manifest))
+    expect(fn (): array => $action->adoptPrincipals($manifest, new SystemMutationContext('Reviewed host adoption', 'principal-adoption-test')))
         ->toThrow(InvalidArgumentException::class, 'source table [missing_source_users] does not exist');
 
     Schema::create('incomplete_source_users', function (Blueprint $table): void {
@@ -270,7 +272,7 @@ it('rejects missing, incomplete, or conflicting principal adoption source data',
     $manifest = principalAdoptionManifestForTest('incomplete_source_users', 0);
     $manifest['principals']['extension_columns'] = [];
 
-    expect(fn (): array => $action->execute($manifest))
+    expect(fn (): array => $action->adoptPrincipals($manifest, new SystemMutationContext('Reviewed host adoption', 'principal-adoption-test')))
         ->toThrow(InvalidArgumentException::class, 'is missing [name]');
 
     Schema::create('empty_source_users', function (Blueprint $table): void {
@@ -290,7 +292,7 @@ it('rejects missing, incomplete, or conflicting principal adoption source data',
     $manifest = principalAdoptionManifestForTest('empty_source_users', 1);
     $manifest['principals']['extension_columns'] = [];
 
-    expect(fn (): array => $action->execute($manifest))
+    expect(fn (): array => $action->adoptPrincipals($manifest, new SystemMutationContext('Reviewed host adoption', 'principal-adoption-test')))
         ->toThrow(InvalidArgumentException::class, 'expected 1 principals but found 0');
 
     $id = (string) Str::uuid();
@@ -308,6 +310,6 @@ it('rejects missing, incomplete, or conflicting principal adoption source data',
         'password' => 'correct-password',
     ]);
 
-    expect(fn (): array => $action->execute($manifest))
+    expect(fn (): array => $action->adoptPrincipals($manifest, new SystemMutationContext('Reviewed host adoption', 'principal-adoption-test')))
         ->toThrow(InvalidArgumentException::class, 'target already contains a source email');
 });

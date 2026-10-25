@@ -18,7 +18,7 @@ it('acquires Socialite identity claims without retaining OAuth credentials', fun
         'refreshToken' => 'must-not-leak-either',
         'email_verified' => true,
     ]));
-    $adapter = new SocialiteIdentityProvider($socialite);
+    $adapter = new SocialiteIdentityProvider($socialite->driver('github'), 'github');
 
     expect($adapter->redirectUrl('github', null, [], []))
         ->toBe('https://socialite.fake/github/authorize');
@@ -41,6 +41,6 @@ it('fails closed when Socialite cannot prove a returned email address', function
         'email_verified' => false,
     ]));
 
-    expect(fn () => (new SocialiteIdentityProvider($socialite))->user('github', null))
+    expect(fn () => (new SocialiteIdentityProvider($socialite->driver('github'), 'github'))->user('github', null))
         ->toThrow(AuthException::class, 'did not prove');
 });

@@ -77,18 +77,10 @@ final readonly class AuthModelRegistry
     public function rbacPrincipalClass(): string
     {
         $configured = config('nvl-auth.features.rbac.models.principal');
-        $configured = is_string($configured) && trim($configured) !== ''
-            ? $configured
-            : $this->userClass();
-
-        if (! is_a($configured, Model::class, true)
-            || ! is_a($configured, Authenticatable::class, true)
-            || ! method_exists($configured, 'roles')) {
-            throw AuthException::invalidConfiguration(
-                'The configured RBAC principal must be an Eloquent Authenticatable model using Spatie Permission HasRoles.',
-            );
+        $configured = is_string($configured) && trim($configured) !== '' ? $configured : $this->userClass();
+        if (! is_a($configured, Model::class, true) || ! is_a($configured, Authenticatable::class, true) || ! method_exists($configured, 'roles')) {
+            throw AuthException::invalidConfiguration('The configured RBAC principal must be an Eloquent Authenticatable model using Spatie Permission HasRoles.');
         }
-
         /** @var class-string<Model&Authenticatable> $configured */
         if (config('nvl-auth.ownership.scoped') === true) {
             $this->identities->register('auth.rbac-principal', $configured);
@@ -104,11 +96,7 @@ final readonly class AuthModelRegistry
      */
     public function personalAccessTokenClass(): string
     {
-        return $this->model(
-            'features.api_tokens.models.personal_access_token',
-            PersonalAccessToken::class,
-            PersonalAccessToken::class,
-        );
+        return $this->model('features.api_tokens.models.personal_access_token', PersonalAccessToken::class, PersonalAccessToken::class);
     }
 
     /**
@@ -123,13 +111,9 @@ final readonly class AuthModelRegistry
     private function model(string $path, string $default, string $base): string
     {
         $configured = config("nvl-auth.{$path}", $default);
-
         if (! is_string($configured) || ! is_a($configured, $base, true)) {
-            throw AuthException::invalidConfiguration(
-                "Auth model [{$path}] must extend [{$base}].",
-            );
+            throw AuthException::invalidConfiguration("Auth model [{$path}] must extend [{$base}].");
         }
-
         if (config('nvl-auth.ownership.scoped') === true) {
             $configured = (new ConfiguredModelResolver)->resolve($configured, $base);
             $this->identities->registerReplacement('auth.models.'.strtolower((new \ReflectionClass($base))->getShortName()), $base, $configured);

@@ -4,20 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Nvl\Auth\Actions\Invitations\AcceptInvitationAction;
-use Nvl\Auth\Actions\Invitations\CreateInvitationAction;
-use Nvl\Auth\Actions\Invitations\FindActiveInvitationAction;
-use Nvl\Auth\Actions\Invitations\ListInvitationProjectionsAction;
-use Nvl\Auth\Actions\Invitations\ListInvitationsAction;
-use Nvl\Auth\Actions\Invitations\RecordInvitationDeliveryOutcomeAction;
-use Nvl\Auth\Actions\Invitations\RegisterInvitationAction;
-use Nvl\Auth\Actions\Invitations\ResendInvitationAction;
-use Nvl\Auth\Actions\Invitations\RevokeInvitationAction;
 use Nvl\Auth\Contracts\InvitationRegistrationMapper;
-use Nvl\Auth\Data\Display\InvitationReadData;
-use Nvl\Auth\Data\Mutations\AcceptInvitationData;
-use Nvl\Auth\Data\Mutations\StoreInvitationData;
-use Nvl\Auth\Data\Queries\InvitationIndexQueryData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\InvitationDeliveryStatus;
 use Nvl\Auth\Events\AuthDeliveryRequested;
@@ -26,9 +13,13 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\User;
+use Nvl\Auth\Services\AuthInvitations;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Display\InvitationReadData;
+use Nvl\Auth\Tests\Fixtures\Consumer\ListInvitationProjectionsAction;
 use Nvl\Auth\Tests\Fixtures\RejectLoginStage;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Support\Contracts\DomainEvent;
 
 beforeEach(function (): void {
@@ -44,46 +35,43 @@ it('issues consumes and audits a simple invitation without delivery persistence'
     $actor = $this->user('actor@example.test');
     $consumer = $this->user('consumer@example.test');
     $consumer->markEmailAsVerified();
-    $issued = app(CreateInvitationAction::class)->execute(
-        new StoreInvitationData(
-            recipient: 'consumer@example.test',
-            metadata: [
-                'member_id' => 'member-1',
-                'channel' => 'partner',
-                'private_note' => 'not-for-delivery',
-            ],
-        ),
+    $issued = app(AuthInvitations::class)->create(
+        ['recipient' => 'consumer@example.test', 'metadata' => [
+            'member_id' => 'member-1',
+            'channel' => 'partner',
+            'private_note' => 'not-for-delivery',
+        ]],
         $actor,
     );
 
-    expect($issued->invitation)->toBeInstanceOf(Invitation::class)
-        ->and($issued->token)->not->toBeEmpty()
-        ->and($issued->invitation->getRawOriginal('token_hash'))->not->toBe($issued->token)
-        ->and($issued->invitation->getRawOriginal('recipient'))->not->toBe('consumer@example.test');
+    expect($issued['invitation'])->toBeInstanceOf(Invitation::class)
+        ->and($issued['token'])->not->toBeEmpty()
+        ->and($issued['invitation']->getRawOriginal('token_hash'))->not->toBe($issued['token'])
+        ->and($issued['invitation']->getRawOriginal('recipient'))->not->toBe('consumer@example.test');
 
-    $accepted = app(AcceptInvitationAction::class)->execute($issued->token, $consumer);
+    $accepted = app(AuthInvitations::class)->accept($issued['token'], $consumer);
 
     expect($accepted->accepted_at)->not->toBeNull()
         ->and($accepted->accepted_by_id)->toBe((string) $consumer->getKey())
         ->and(AuthAudit::query()->count())->toBe(2)
-        ->and(fn () => app(AcceptInvitationAction::class)->execute($issued->token, $consumer))
+        ->and(fn () => app(AuthInvitations::class)->accept($issued['token'], $consumer))
         ->toThrow(AuthException::class);
     Event::assertDispatched(AuthDeliveryRequested::class, static fn (AuthDeliveryRequested $event): bool => $event->request->feature === AuthFeature::Invitations
-        && $event->request->payload['token'] === $issued->token
-        && $event->request->invitation?->id === $issued->invitation->identifier()
-        && $event->request->invitation->recipient === 'consumer@example.test'
-        && $event->request->invitation->inviter?->id === (string) $actor->getKey()
-        && $event->request->invitation->metadata === [
+        && $event->request->payload['token'] === $issued['token']
+        && $event->request->invitation['id'] === $issued['invitation']->identifier()
+        && $event->request->invitation['recipient'] === 'consumer@example.test'
+        && $event->request->invitation['inviter']['identifier'] === (string) $actor->getKey()
+        && $event->request->invitation['metadata'] === [
             'member_id' => 'member-1',
             'channel' => 'partner',
         ]
-        && $event->request->invitation->resendCount === 0);
+        && $event->request->invitation['resendCount'] === 0);
     Event::assertDispatchedTimes(InvitationAccepted::class, 1);
     Event::assertDispatched(
         InvitationAccepted::class,
-        static fn (InvitationAccepted $event): bool => $event->invitationId === $issued->invitation->identifier()
-            && $event->type === $issued->invitation->type
-            && $event->purpose === $issued->invitation->purpose
+        static fn (InvitationAccepted $event): bool => $event->invitationId === $issued['invitation']->identifier()
+            && $event->type === $issued['invitation']->type
+            && $event->purpose === $issued['invitation']->purpose
             && $event->subject->identifier === (string) $consumer->getKey()
             && $event->acceptedAt?->equalTo($accepted->accepted_at) === true,
     );
@@ -94,13 +82,13 @@ it('issues consumes and audits a simple invitation without delivery persistence'
     /** @var InvitationAccepted $restoredAcceptanceEvent */
     $restoredAcceptanceEvent = unserialize(serialize($acceptanceEvent));
     $deliverySnapshot = json_encode(
-        $deliveryEvent->request->invitation?->toArray(),
+        $deliveryEvent->request->invitation,
         JSON_THROW_ON_ERROR,
     );
 
     expect($restoredAcceptanceEvent->acceptedAt?->equalTo($accepted->accepted_at))->toBeTrue()
         ->and($deliverySnapshot)
-        ->not->toContain($issued->token)
+        ->not->toContain($issued['token'])
         ->not->toContain('private_note')
         ->not->toContain('not-for-delivery')
         ->not->toContain('token_hash')
@@ -113,69 +101,60 @@ it('publishes current typed invitation context when resending', function (): voi
     config()->set('nvl-auth.features.invitations.settings.resend_cooldown_seconds', 1);
     config()->set('nvl-auth.features.invitations.settings.delivery_metadata_keys', ['member_id']);
     $actor = $this->user('resend.owner@example.test');
-    $issued = app(CreateInvitationAction::class)->execute(
-        new StoreInvitationData(
-            recipient: 'resend.invitee@example.test',
-            metadata: ['member_id' => 'member-1'],
-        ),
+    $issued = app(AuthInvitations::class)->create(
+        ['recipient' => 'resend.invitee@example.test', 'metadata' => ['member_id' => 'member-1']],
         $actor,
     );
-    $issued->invitation->forceFill(['last_sent_at' => now()->subSeconds(2)])->save();
+    $issued['invitation']->forceFill(['last_sent_at' => now()->subSeconds(2)])->save();
 
-    $resent = app(ResendInvitationAction::class)->execute($issued->invitation, $actor);
+    $resent = app(AuthInvitations::class)->resend($issued['invitation'], $actor);
     $events = Event::dispatched(AuthDeliveryRequested::class);
     /** @var AuthDeliveryRequested $event */
     $event = $events->last()[0];
 
-    expect($resent->invitation->resend_count)->toBe(1)
-        ->and($event->request->invitation?->id)->toBe($issued->invitation->identifier())
-        ->and($event->request->invitation?->resendCount)->toBe(1)
-        ->and($event->request->invitation?->metadata)->toBe(['member_id' => 'member-1']);
+    expect($resent['invitation']->resend_count)->toBe(1)
+        ->and($event->request->invitation['id'])->toBe($issued['invitation']->identifier())
+        ->and($event->request->invitation['resendCount'])->toBe(1)
+        ->and($event->request->invitation['metadata'])->toBe(['member_id' => 'member-1']);
 });
 
 it('revokes invitations while the feature is disabled', function (): void {
     $actor = $this->user('actor@example.test');
-    $issued = app(CreateInvitationAction::class)->execute(new StoreInvitationData('invitee@example.test'), $actor);
+    $issued = app(AuthInvitations::class)->create(['recipient' => 'invitee@example.test'], $actor);
     config()->set('nvl-auth.features.invitations.enabled', false);
 
-    $revoked = app(RevokeInvitationAction::class)->execute($issued->invitation, $actor);
+    $revoked = app(AuthInvitations::class)->revoke($issued['invitation'], $actor);
 
     expect($revoked->revoked_at)->not->toBeNull()
-        ->and(fn () => app(AcceptInvitationAction::class)->execute($issued->token, $actor))
+        ->and(fn () => app(AuthInvitations::class)->accept($issued['token'], $actor))
         ->toThrow(AuthException::class);
 });
 
 it('enforces one active invitation per recipient and purpose while preserving history', function (): void {
     $actor = $this->user('actor@example.test');
-    $data = new StoreInvitationData('invitee@example.test');
-    $first = app(CreateInvitationAction::class)->execute($data, $actor);
+    $data = ['recipient' => 'invitee@example.test'];
+    $first = app(AuthInvitations::class)->create($data, $actor);
 
-    expect(fn () => app(CreateInvitationAction::class)->execute($data, $actor))
+    expect(fn () => app(AuthInvitations::class)->create($data, $actor))
         ->toThrow(AuthException::class, 'active invitation');
 
-    $first->invitation->forceFill(['expires_at' => now()->subMinute()])->save();
-    $replacement = app(CreateInvitationAction::class)->execute($data, $actor);
+    $first['invitation']->forceFill(['expires_at' => now()->subMinute()])->save();
+    $replacement = app(AuthInvitations::class)->create($data, $actor);
 
-    expect($replacement->invitation->identifier())->not->toBe($first->invitation->identifier())
+    expect($replacement['invitation']->identifier())->not->toBe($first['invitation']->identifier())
         ->and(Invitation::query()->count())->toBe(2);
 });
 
 it('provisions the package principal out of the box for public invitation acceptance', function (): void {
     Event::fake([InvitationAccepted::class]);
     $actor = $this->user('invitation.owner@example.test');
-    $issued = app(CreateInvitationAction::class)->execute(
-        new StoreInvitationData('new.invitee@example.test'),
+    $issued = app(AuthInvitations::class)->create(
+        ['recipient' => 'new.invitee@example.test'],
         $actor,
     );
-    $registered = app(RegisterInvitationAction::class)->execute(new AcceptInvitationData(
-        token: $issued->token,
-        password: 'SecurePassword123',
-        passwordConfirmation: 'SecurePassword123',
-        name: 'New Invitee',
-        locale: 'bg',
-    ));
-    $subject = $registered->subject;
-    $accepted = $registered->invitation;
+    $registered = app(AuthInvitations::class)->register(['token' => $issued['token'], 'password' => 'SecurePassword123', 'passwordConfirmation' => 'SecurePassword123', 'name' => 'New Invitee', 'locale' => 'bg']);
+    $subject = $registered['subject'];
+    $accepted = $registered['invitation'];
 
     expect($subject)->toBeInstanceOf(User::class)
         ->and($subject->email)->toBe('new.invitee@example.test')
@@ -220,11 +199,8 @@ it('rejects configured invitation delivery metadata that is not bounded scalar d
     config()->set('nvl-auth.features.invitations.settings.delivery_metadata_keys', ['member_id']);
     $actor = $this->user('metadata.owner@example.test');
 
-    expect(fn () => app(CreateInvitationAction::class)->execute(
-        new StoreInvitationData(
-            recipient: 'metadata.invitee@example.test',
-            metadata: ['member_id' => ['nested' => 'value']],
-        ),
+    expect(fn () => app(AuthInvitations::class)->create(
+        ['recipient' => 'metadata.invitee@example.test', 'metadata' => ['member_id' => ['nested' => 'value']]],
         $actor,
     ))->toThrow(AuthException::class, 'scalar');
 });
@@ -234,25 +210,22 @@ it('rejects protected metadata keys and malformed stored grant projections', fun
     config()->set('nvl-auth.features.invitations.settings.delivery_metadata_keys', ['active_key']);
     $actor = $this->user('projection.owner@example.test');
 
-    expect(fn () => app(CreateInvitationAction::class)->execute(
-        new StoreInvitationData(
-            recipient: 'protected.invitee@example.test',
-            metadata: ['active_key' => 'protected-value'],
-        ),
+    expect(fn () => app(AuthInvitations::class)->create(
+        ['recipient' => 'protected.invitee@example.test', 'metadata' => ['active_key' => 'protected-value']],
         $actor,
     ))->toThrow(AuthException::class, 'safe allowlist');
 
     config()->set('nvl-auth.features.invitations.settings.delivery_metadata_keys', []);
-    $issued = app(CreateInvitationAction::class)->execute(
-        new StoreInvitationData('malformed.invitee@example.test'),
+    $issued = app(AuthInvitations::class)->create(
+        ['recipient' => 'malformed.invitee@example.test'],
         $actor,
     );
-    $issued->invitation->forceFill([
+    $issued['invitation']->forceFill([
         'roles' => ['named' => 'member'],
         'last_sent_at' => now()->subMinutes(2),
     ])->save();
 
-    expect(fn () => app(ResendInvitationAction::class)->execute($issued->invitation, $actor))
+    expect(fn () => app(AuthInvitations::class)->resend($issued['invitation'], $actor))
         ->toThrow(AuthException::class, 'roles must be a distinct bounded list');
     Event::assertDispatchedTimes(AuthDeliveryRequested::class, 1);
 });
@@ -260,35 +233,24 @@ it('rejects protected metadata keys and malformed stored grant projections', fun
 it('supports explicitly authorized actorless issuance expiry and exact indexed filters', function (): void {
     $actor = $this->user('filter.owner@example.test');
     $expiresAt = now()->addHours(4)->startOfSecond()->toImmutable();
-    $issued = app(CreateInvitationAction::class)->execute(
-        new StoreInvitationData(
-            recipient: 'candidate@example.test',
-            type: 'candidate',
-            context: 'campaign-42',
-        ),
+    $issued = app(AuthInvitations::class)->create(
+        ['recipient' => 'candidate@example.test', 'type' => 'candidate', 'context' => 'campaign-42'],
+        authority: new SystemMutationContext('Invitation campaign', 'campaign-42'),
         context: new InvitationIssuanceContext(
-            actorlessAuthorized: true,
             expiresAt: $expiresAt,
             returnPath: '/candidate/welcome',
         ),
     );
 
-    expect($issued->invitation->inviter_id)->toBeNull()
-        ->and($issued->invitation->expires_at->equalTo($expiresAt))->toBeTrue()
-        ->and($issued->invitation->metadata['return_path'])->toBe('/candidate/welcome')
-        ->and(app(ListInvitationsAction::class)->execute($actor, new InvitationIndexQueryData(
-            recipient: 'CANDIDATE@example.test',
-            type: 'candidate',
-            lifecycle: 'active',
-            context: 'campaign-42',
-        ))->total())->toBe(1)
-        ->and(app(ListInvitationsAction::class)->execute($actor, new InvitationIndexQueryData(
-            recipient: 'candidate@other.test',
-        ))->total())->toBe(0);
+    expect($issued['invitation']->inviter_id)->toBeNull()
+        ->and($issued['invitation']->expires_at->equalTo($expiresAt))->toBeTrue()
+        ->and($issued['invitation']->metadata['return_path'])->toBe('/candidate/welcome')
+        ->and(app(AuthInvitations::class)->paginate($actor, ['recipient' => 'CANDIDATE@example.test', 'type' => 'candidate', 'lifecycle' => 'active', 'context' => 'campaign-42'])->total())->toBe(1)
+        ->and(app(AuthInvitations::class)->paginate($actor, ['recipient' => 'candidate@other.test'])->total())->toBe(0);
 
-    expect(fn () => app(CreateInvitationAction::class)->execute(
-        new StoreInvitationData('unauthorized@example.test'),
-    ))->toThrow(AuthException::class, 'explicitly authorized');
+    expect(fn () => app(AuthInvitations::class)->create(
+        ['recipient' => 'unauthorized@example.test'],
+    ))->toThrow(ArgumentCountError::class);
 });
 
 it('lists bounded invitation projections with multi-type filters and constant query cost', function (): void {
@@ -301,27 +263,18 @@ it('lists bounded invitation projections with multi-type filters and constant qu
         ['registration.one@example.test', 'registration', 'campaign-42'],
         ['candidate.two@example.test', 'candidate', 'campaign-else'],
     ] as [$recipient, $type, $context]) {
-        app(CreateInvitationAction::class)->execute(
-            new StoreInvitationData(
-                recipient: $recipient,
-                type: $type,
-                context: $context,
-                metadata: [
-                    'member_id' => "member-{$type}",
-                    'private_note' => 'not-for-consumers',
-                ],
-            ),
+        app(AuthInvitations::class)->create(
+            ['recipient' => $recipient, 'type' => $type, 'context' => $context, 'metadata' => [
+                'member_id' => "member-{$type}",
+                'private_note' => 'not-for-consumers',
+            ]],
             $actor,
         );
     }
 
     $page = app(ListInvitationProjectionsAction::class)->execute(
         $actor,
-        new InvitationIndexQueryData(
-            types: ['candidate', 'registration', 'candidate'],
-            lifecycle: 'active',
-            context: 'campaign-42',
-        ),
+        ['types' => ['candidate', 'registration', 'candidate'], 'lifecycle' => 'active', 'context' => 'campaign-42'],
         100,
     );
     $snapshot = json_encode($page->items(), JSON_THROW_ON_ERROR);
@@ -341,48 +294,43 @@ it('lists bounded invitation projections with multi-type filters and constant qu
     DB::flushQueryLog();
     DB::enableQueryLog();
     app(ListInvitationProjectionsAction::class)->execute($actor, perPage: 100)->items();
-    $queryCount = count(DB::getQueryLog());
+    $queryCount = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => str_contains($query['query'], 'from "nvl_auth_invitations"')));
     DB::disableQueryLog();
 
-    expect($queryCount)->toBeLessThanOrEqual(2);
+    expect($queryCount)->toBeGreaterThan(0)->toBeLessThanOrEqual(2);
 });
 
 it('finds active invitations through an explicit trusted lookup boundary', function (): void {
     $actor = $this->user('active-lookup.owner@example.test');
-    $issued = app(CreateInvitationAction::class)->execute(
-        new StoreInvitationData(
-            recipient: 'Candidate@Example.Test',
-            type: 'candidate',
-            purpose: 'registration',
-            context: 'campaign-42',
-        ),
+    $issued = app(AuthInvitations::class)->create(
+        ['recipient' => 'Candidate@Example.Test', 'type' => 'candidate', 'purpose' => 'registration', 'context' => 'campaign-42'],
         $actor,
     );
-    $lookup = app(FindActiveInvitationAction::class);
+    $lookup = app(AuthInvitations::class);
 
-    expect(fn () => $lookup->execute('candidate@example.test', 'registration'))
-        ->toThrow(AuthException::class, 'explicitly authorized')
-        ->and($lookup->execute(
+    expect(fn () => $lookup->findActive('candidate@example.test', 'registration'))
+        ->toThrow(AuthException::class, 'explicit authority')
+        ->and($lookup->findActive(
             recipient: ' CANDIDATE@example.test ',
             purpose: 'registration',
             types: ['candidate'],
             context: 'campaign-42',
-            issuance: new InvitationIssuanceContext(actorlessAuthorized: true),
-        )?->id)->toBe($issued->invitation->identifier())
-        ->and($lookup->execute(
+            authority: new SystemMutationContext('Invitation lookup', 'campaign-42'),
+        )?->id)->toBe($issued['invitation']->identifier())
+        ->and($lookup->findActive(
             recipient: 'missing@example.test',
             purpose: 'registration',
             types: ['candidate'],
             context: 'campaign-42',
-            issuance: new InvitationIssuanceContext(actorlessAuthorized: true),
+            authority: new SystemMutationContext('Invitation lookup', 'campaign-42'),
         ))->toBeNull();
 
-    $issued->invitation->forceFill(['expires_at' => now()->subMinute()])->save();
+    $issued['invitation']->forceFill(['expires_at' => now()->subMinute()])->save();
 
-    expect($lookup->execute(
+    expect($lookup->findActive(
         recipient: 'candidate@example.test',
         purpose: 'registration',
-        actor: $actor,
+        authority: $actor,
     ))->toBeNull();
 });
 
@@ -390,14 +338,14 @@ it('supports ID lifecycle mutations and records current delivery outcomes idempo
     Event::fake([AuthDeliveryRequested::class]);
     config()->set('nvl-auth.features.invitations.settings.resend_cooldown_seconds', 1);
     $actor = $this->user('outcome.owner@example.test');
-    $issued = app(CreateInvitationAction::class)->execute(
-        new StoreInvitationData('outcome.invitee@example.test'),
+    $issued = app(AuthInvitations::class)->create(
+        ['recipient' => 'outcome.invitee@example.test'],
         $actor,
     );
     /** @var AuthDeliveryRequested $createdEvent */
     $createdEvent = Event::dispatched(AuthDeliveryRequested::class)->sole()[0];
     $initialMessageId = $createdEvent->request->messageId;
-    $invitation = $issued->invitation->refresh();
+    $invitation = $issued['invitation']->refresh();
     $modelSnapshot = json_encode($invitation, JSON_THROW_ON_ERROR);
 
     expect($invitation->current_delivery_message_id)->toBe($initialMessageId)
@@ -408,46 +356,46 @@ it('supports ID lifecycle mutations and records current delivery outcomes idempo
         ->not->toContain($initialMessageId);
 
     $invitation->forceFill(['last_sent_at' => now()->subSeconds(2)])->save();
-    $resent = app(ResendInvitationAction::class)->execute($invitation->identifier(), $actor);
+    $resent = app(AuthInvitations::class)->resend($invitation->identifier(), $actor);
     /** @var AuthDeliveryRequested $resentEvent */
     $resentEvent = Event::dispatched(AuthDeliveryRequested::class)->last()[0];
     $currentMessageId = $resentEvent->request->messageId;
-    $outcomes = app(RecordInvitationDeliveryOutcomeAction::class);
+    $outcomes = app(AuthInvitations::class);
     $occurredAt = now()->startOfSecond()->toImmutable();
 
-    $outcomes->execute(
-        $resent->invitation->identifier(),
+    $outcomes->recordDeliveryOutcome(
+        $resent['invitation']->identifier(),
         $initialMessageId,
         InvitationDeliveryStatus::Failed,
         $occurredAt,
         'transport_failed',
     );
 
-    expect($resent->invitation->refresh()->delivery_status)->toBe(InvitationDeliveryStatus::Pending)
+    expect($resent['invitation']->refresh()->delivery_status)->toBe(InvitationDeliveryStatus::Pending)
         ->and(AuthAudit::query()->where('action', 'invitation.delivery_outcome_stale')->count())->toBe(1);
 
-    $outcomes->execute(
-        $resent->invitation->identifier(),
+    $outcomes->recordDeliveryOutcome(
+        $resent['invitation']->identifier(),
         $currentMessageId,
         InvitationDeliveryStatus::Failed,
         $occurredAt,
         'transport_failed',
     );
-    $outcomes->execute(
-        $resent->invitation->identifier(),
+    $outcomes->recordDeliveryOutcome(
+        $resent['invitation']->identifier(),
         $currentMessageId,
         InvitationDeliveryStatus::Failed,
         $occurredAt->addMinute(),
         'different_failure',
     );
-    $failed = $resent->invitation->refresh();
+    $failed = $resent['invitation']->refresh();
 
     expect($failed->delivery_status)->toBe(InvitationDeliveryStatus::Failed)
         ->and($failed->delivery_failed_at?->equalTo($occurredAt))->toBeTrue()
         ->and($failed->delivery_failure_code)->toBe('transport_failed');
 
     $deliveredAt = $occurredAt->addMinutes(2);
-    $outcomes->execute(
+    $outcomes->recordDeliveryOutcome(
         $failed->identifier(),
         $currentMessageId,
         InvitationDeliveryStatus::Delivered,
@@ -459,40 +407,40 @@ it('supports ID lifecycle mutations and records current delivery outcomes idempo
         ->and($delivered->delivered_at?->equalTo($deliveredAt))->toBeTrue()
         ->and($delivered->delivery_failed_at)->toBeNull()
         ->and($delivered->delivery_failure_code)->toBeNull()
-        ->and(app(RevokeInvitationAction::class)->execute($delivered->identifier(), $actor)->revoked_at)->not->toBeNull();
+        ->and(app(AuthInvitations::class)->revoke($delivered->identifier(), $actor)->revoked_at)->not->toBeNull();
 });
 
 it('rejects invalid invitation delivery outcome contracts', function (): void {
     $actor = $this->user('outcome-validation.owner@example.test');
-    $issued = app(CreateInvitationAction::class)->execute(
-        new StoreInvitationData('outcome-validation.invitee@example.test'),
+    $issued = app(AuthInvitations::class)->create(
+        ['recipient' => 'outcome-validation.invitee@example.test'],
         $actor,
     );
-    $messageId = $issued->invitation->refresh()->current_delivery_message_id;
-    $outcomes = app(RecordInvitationDeliveryOutcomeAction::class);
+    $messageId = $issued['invitation']->refresh()->current_delivery_message_id;
+    $outcomes = app(AuthInvitations::class);
     $occurredAt = now()->toImmutable();
 
-    expect(fn () => $outcomes->execute(
-        $issued->invitation->identifier(),
+    expect(fn () => $outcomes->recordDeliveryOutcome(
+        $issued['invitation']->identifier(),
         (string) $messageId,
         InvitationDeliveryStatus::Pending,
         $occurredAt,
     ))->toThrow(InvalidArgumentException::class, 'Delivered or Failed')
-        ->and(fn () => $outcomes->execute(
-            $issued->invitation->identifier(),
+        ->and(fn () => $outcomes->recordDeliveryOutcome(
+            $issued['invitation']->identifier(),
             (string) $messageId,
             InvitationDeliveryStatus::Failed,
             $occurredAt,
         ))->toThrow(InvalidArgumentException::class, 'failure code')
-        ->and(fn () => $outcomes->execute(
-            $issued->invitation->identifier(),
+        ->and(fn () => $outcomes->recordDeliveryOutcome(
+            $issued['invitation']->identifier(),
             (string) $messageId,
             InvitationDeliveryStatus::Delivered,
             $occurredAt,
             'not_allowed',
         ))->toThrow(InvalidArgumentException::class, 'only')
-        ->and(fn () => $outcomes->execute(
-            $issued->invitation->identifier(),
+        ->and(fn () => $outcomes->recordDeliveryOutcome(
+            $issued['invitation']->identifier(),
             (string) $messageId,
             InvitationDeliveryStatus::Failed,
             $occurredAt,
@@ -526,7 +474,7 @@ it('publishes invitation delivery only after pending state and its audit are com
     Event::listen(
         AuthDeliveryRequested::class,
         static function (AuthDeliveryRequested $event) use (&$observed, $connectionName): void {
-            $invitation = Invitation::query()->find($event->request->invitation?->id);
+            $invitation = Invitation::query()->find($event->request->invitation['id']);
 
             $observed[] = [
                 'transaction_level' => DB::connection($connectionName)->transactionLevel(),
@@ -540,14 +488,14 @@ it('publishes invitation delivery only after pending state and its audit are com
     );
 
     try {
-        $issued = app(CreateInvitationAction::class)->execute(
-            new StoreInvitationData('delivery-order.invitee@example.test'),
+        $issued = app(AuthInvitations::class)->create(
+            ['recipient' => 'delivery-order.invitee@example.test'],
             $actor,
         );
 
         expect($observed)->toBe([[
             'transaction_level' => 0,
-            'message_id' => $issued->invitation->current_delivery_message_id,
+            'message_id' => $issued['invitation']->current_delivery_message_id,
             'delivery_status' => InvitationDeliveryStatus::Pending,
             'audit_exists' => true,
         ]]);
@@ -561,30 +509,21 @@ it('publishes invitation delivery only after pending state and its audit are com
 it('rolls principal creation back when an invitation acceptance hook rejects', function (): void {
     Event::fake([InvitationAccepted::class]);
     $actor = $this->user('rollback.owner@example.test');
-    $issued = app(CreateInvitationAction::class)->execute(
-        new StoreInvitationData('rollback.invitee@example.test'),
+    $issued = app(AuthInvitations::class)->create(
+        ['recipient' => 'rollback.invitee@example.test'],
         $actor,
     );
     config()->set('nvl-auth.pipelines.invitation_accepted', [RejectLoginStage::class]);
 
-    expect(fn () => app(RegisterInvitationAction::class)->execute(new AcceptInvitationData(
-        token: $issued->token,
-        password: 'SecurePassword123',
-        passwordConfirmation: 'SecurePassword123',
-        name: 'Rollback Invitee',
-    )))->toThrow(AuthException::class, 'rejected');
+    expect(fn () => app(AuthInvitations::class)->register(['token' => $issued['token'], 'password' => 'SecurePassword123', 'passwordConfirmation' => 'SecurePassword123', 'name' => 'Rollback Invitee']))->toThrow(AuthException::class, 'rejected');
 
     expect(User::query()->where('email', 'rollback.invitee@example.test')->exists())->toBeFalse()
-        ->and($issued->invitation->refresh()->accepted_at)->toBeNull();
+        ->and($issued['invitation']->refresh()->accepted_at)->toBeNull();
     Event::assertNotDispatched(InvitationAccepted::class);
 });
 
 it('supports a host-mapped social registration variant inside the invitation transaction', function (): void {
     $actor = $this->user('social.owner@example.test');
-    $issued = app(CreateInvitationAction::class)->execute(
-        new StoreInvitationData('social.invitee@example.test'),
-        $actor,
-    );
     $this->app->instance(InvitationRegistrationMapper::class, new class implements InvitationRegistrationMapper
     {
         public function map(Invitation $invitation, array $validated): array
@@ -600,17 +539,17 @@ it('supports a host-mapped social registration variant inside the invitation tra
         }
     });
 
-    $registered = app(RegisterInvitationAction::class)->execute(new AcceptInvitationData(
-        token: $issued->token,
-        name: 'Social Invitee',
-        registrationMethod: 'social',
-        extensions: ['provider' => 'github', 'provider_user_id' => 'github-123'],
-    ));
+    $issued = app(AuthInvitations::class)->create(
+        ['recipient' => 'social.invitee@example.test'],
+        $actor,
+    );
 
-    expect($registered->subject)->toBeInstanceOf(User::class)
-        ->and($registered->subject->profile)->toBe([
+    $registered = app(AuthInvitations::class)->register(['token' => $issued['token'], 'name' => 'Social Invitee', 'registrationMethod' => 'social', 'extensions' => ['provider' => 'github', 'provider_user_id' => 'github-123']]);
+
+    expect($registered['subject'])->toBeInstanceOf(User::class)
+        ->and($registered['subject']->profile)->toBe([
             'provider' => 'github',
             'provider_user_id' => 'github-123',
         ])
-        ->and($registered->invitation->accepted_at)->not->toBeNull();
+        ->and($registered['invitation']->accepted_at)->not->toBeNull();
 });

@@ -1,158 +1,205 @@
-# PHP API
+# Native Auth service API
 
-Actions are the supported PHP use-case API. Resolve them through Laravel's
-container so configured adapters and pipelines are applied.
+Inject the following families from `Nvl\Auth\Services`. Signatures below reflect source. Parameter array shapes and validation are documented with each implementation. There are no operation aliases.
 
-## Authentication and passwords
+## Authentication
 
-- `LoginAction`
-- `LogoutAction`
-- `EstablishAuthenticatedSessionAction`
-- `RequestPasswordResetAction`
-- `ResetPasswordAction`
-- `ConfirmPasswordAction`
-- `UpdatePasswordAction`
-- `RequestEmailVerificationAction`
-- `VerifyEmailAction`
-- `DeleteOwnAccountAction`
+```php
+public function verifyCredentials( #[SensitiveParameter] array $credentials ): Authenticatable;
+```
 
-`AuthenticationEligibility` is invoked after subject resolution and before
-credential, passwordless, social, or password-reset success. Replace it under
-`features.authentication.services.eligibility`. Sparse profile writes use
-`UpdateProfileData::toArray()` semantics; changing email additionally requires
-the replaceable `AccountConfirmation`, clears verification atomically, and
-requests a fresh verification delivery.
+## AuthenticationSessions
 
-## Challenges and invitations
+```php
+public function establishForPurpose(Authenticatable $principal, StatefulGuard $guard, Session $session, AuthenticationPurpose $purpose, AuthenticationRequestContext $requestContext, bool $remember = false): void;
+public function logout(StatefulGuard $guard, Session $session): void;
+```
 
-- `RequestMagicLinkAction`, `ConsumeMagicLinkAction`
-- `RequestSecurityCodeAction`, `VerifySecurityCodeAction`
-- `CreateInvitationAction`, `PreviewInvitationAction`, `AcceptInvitationAction`
-- `RegisterInvitationAction`, `ResendInvitationAction`,
-  `RevokeInvitationAction`, `ListInvitationsAction`
-- value-only `ListInvitationProjectionsAction` and
-  `FindActiveInvitationAction`
-- `RecordInvitationDeliveryOutcomeAction`
+## AuthChallenges
 
-`IssueChallengeAction`, `ConsumeChallengeAction`, and `ConsumeChallengeByIdAction`
-are internal challenge steps. Migrate direct calls to the complete
-`RequestMagicLinkAction`/`ConsumeMagicLinkAction` or
-`RequestSecurityCodeAction`/`VerifySecurityCodeAction` workflow so eligibility,
-challenge state, delivery, and single-use checks stay together.
+```php
+public function consume(AuthFeature $feature, AuthMessageType $messageType, string $recipient, string $purpose, string $secret): Challenge;
+public function consumeById(AuthFeature $feature, AuthMessageType $messageType, string $challengeId, string $purpose, string $secret): Challenge;
+public function consumeMagicLink(array $data, string $purpose = 'login'): Challenge;
+public function requestMagicLink(array $data, ?SubjectReference $subject = null, array $payload = [], ?string $locale = null): array;
+public function requestMagicLinkAuthentication(array $data, ?string $locale = null): ?array;
+public function requestSecurityCode(array $data, ?SubjectReference $subject = null, array $payload = [], ?string $locale = null): array;
+public function requestSecurityCodeAuthentication(array $data, ?string $locale = null): ?array;
+public function verifySecurityCode(array $data): Challenge;
+public function verifySecurityCodeAuthentication(array $data, StatefulGuard $guard, Session $session): Challenge;
+```
 
-Magic links contain one opaque token and one numeric fallback code for the same
-single-use challenge. Token-only callbacks carry `challengeId` and the chosen
-credential; legacy recipient-bound consumption remains supported.
+## AuthPasswords
 
-Pass trusted `InvitationIssuanceContext` from host orchestration for explicitly
-authorized actorless issuance, a bounded expiry override, or a post-accept
-return path. Public request input must never construct this context.
-`InvitationIndexQueryData` supports exact normalized recipient, one type or a
-bounded list of types, purpose, lifecycle, expiry, and exact host-context
-filters. Recipient substring search is intentionally unavailable because
-recipients are encrypted at rest. New management consumers should prefer
-`ListInvitationProjectionsAction`, which returns `InvitationReadData` instead of
-models. `FindActiveInvitationAction` requires a management actor or an explicit
-trusted actorless issuance context and returns the same value-only projection.
-Resend and revoke Actions accept either the compatibility model or its ID and
-authorize the locked authoritative row.
+```php
+public function requestReset(array $data, ?string $locale = null): void;
+public function reset( #[SensitiveParameter] array $data ): void;
+public function update( Authenticatable&CanResetPassword $subject, #[SensitiveParameter] array $data ): void;
+```
 
-Invitation delivery requests carry a bounded `InvitationDeliveryData`
-projection. Hosts report the current request outcome through
-`RecordInvitationDeliveryOutcomeAction` using the request `messageId`, a
-Delivered/Failed status, and only a stable safe failure code. Stale resend
-callbacks cannot overwrite the current state.
-The built-in registration mapper handles password registration. A host mapper
-may admit `registrationMethod=social` and consume only bounded `extensions`
-after its provider proof has succeeded; the atomic Action and acceptance hooks
-remain unchanged.
+## AuthEmailVerification
 
-Issuance Results redact plaintext secrets from debug output. Callers must avoid
-logging or caching the returned secret.
+```php
+public function verify(Authenticatable&MustVerifyEmail $subject): bool;
+```
 
-## Authenticators
+## AuthInvitations
 
-- TOTP: start, confirm, verify, revoke
-- passkeys: begin/finish registration, begin/finish authentication, revoke
-- recovery codes: regenerate, consume, revoke
-- social identities: start/complete authorization, link, revoke
+```php
+public function create(array $data, Authenticatable|SystemMutationContext $authority, ?InvitationIssuanceContext $context = null): array;
+public function findActive(string $recipient, string $purpose, ?array $types = null, ?string $context = null, Authenticatable|SystemMutationContext|null $authority = null): ?Invitation;
+public function paginate(Authenticatable $actor, array $filters = [], int $perPage = 25): LengthAwarePaginator;
+public function preview(string $token): Invitation;
+public function recordDeliveryOutcome(string $invitationId, string $messageId, InvitationDeliveryStatus $status, CarbonImmutable $occurredAt, ?string $failureCode = null): void;
+public function register(array $data, ?Authenticatable $authenticatedRecipient = null): array;
+public function resend(Invitation|string $invitation, Authenticatable|SystemMutationContext $authority, ?string $locale = null, ?InvitationIssuanceContext $context = null): array;
+public function revoke(Invitation|string $invitation, Authenticatable $actor): Invitation;
+```
 
-## Clients and sessions
+## AuthUsers
 
-- client create/list/show/update/activate/deactivate/delete/start
-- client-session record/touch/end
+```php
+public function create(Authenticatable $actor, array $data): User;
+public function deleteOwnAccount(Authenticatable $subject, array $data, StatefulGuard $guard, Session $session): bool;
+public function delete(Authenticatable|SystemMutationContext $authority, User|string $user): bool;
+public function restore(Authenticatable|SystemMutationContext $authority, User|string $user): User;
+public function setActive(Authenticatable|SystemMutationContext $authority, User|string $user, array $data): User;
+public function updateProfile(Authenticatable $subject, array $data): User;
+public function update(Authenticatable $actor, User|string $user, array $data): User;
+```
 
-Client-session Actions correlate a host Laravel session ID by hash. They never
-authenticate a request.
+## AuthUserReader
 
-## API tokens and RBAC
+```php
+public function profile(Authenticatable $subject): User;
+public function find(Authenticatable $actor, User|string $user): User;
+public function suggest(Authenticatable $actor, string $search, ?int $limit = null): Collection;
+```
 
-- API token list/create/update/rotate/revoke/revoke-all
-- atomic complete RBAC synchronization, plus granular permission-catalog and
-  role-template synchronization Actions
-- bootstrap-safe `BootstrapRbacAction(SystemMutationContext)` with a typed
-  `RbacSynchronizationResult`
-- DTO-based host-principal role and direct-permission synchronization through
-  replaceable `RbacPrincipalAccess`
-- rich role-template listing/application with caller-selected target role names
+## AuthClients
 
-Provider adapters remain authoritative. The package does not expose a duplicate
-token or role model. The Sanctum adapter exposes only tokens carrying its
-configured package namespace.
+```php
+public function delete(Authenticatable $actor, AuthClient $client): void;
+public function endSession(AuthClientSession $session, string $reason = 'logout'): AuthClientSession;
+public function paginate(Authenticatable $actor, int $perPage = 25): LengthAwarePaginator;
+public function recordSession(AuthClient $client, string $sessionId, ?Authenticatable $subject = null, ?string $ipAddress = null, ?string $userAgent = null, array $metadata = []): AuthClientSession;
+public function setActive(Authenticatable $actor, AuthClient $client, bool $active): AuthClient;
+public function find(Authenticatable $actor, AuthClient $client): AuthClient;
+public function start(array $data): array;
+public function touchSession(string $clientId, string $sessionId): AuthClientSession;
+public function update(Authenticatable $actor, AuthClient $client, array $data): AuthClient;
+```
 
-## Audit and cleanup
+## AuthMemberships
 
-- `ListAuthAuditsAction`, `ShowAuthAuditAction`
-- Run `nvl:auth:prune` for retention cleanup; `PruneAuthStateAction` is internal.
+```php
+public function enroll(Authenticatable|SystemMutationContext $authority, SubjectReference $subject, array $roles = [], array $permissions = []): OwnerMembership;
+public function setStatus(Authenticatable|SystemMutationContext $authority, Membership|string $membership, MembershipStatus $status, int $expectedRevision): OwnerMembership;
+public function transfer(Authenticatable|SystemMutationContext $authority, Membership|string $membership, string $recipientId, int $expectedRevision): OwnerMembership;
+public function assertPrincipalCanBeDisabled(SubjectReference $subject): void;
+public function lock(bool $prepare = false): void;
+public function find(Authenticatable $actor, Membership|string $membership): OwnerMembership;
+public function paginate(Authenticatable $actor, ?string $search = null, int $perPage = 25): LengthAwarePaginator;
+public function revoke(Authenticatable|SystemMutationContext $authority, Membership|string $membership, int $expectedRevision): OwnerMembership;
+public function own(Authenticatable $subject): Collection;
+```
 
-The `AuthAuditRecorder` contract is used after successful or failed package
-transitions. Configure a host implementation under
-`features.audit.services.recorder` to retain an existing audit schema. When
-audit is enabled it may record containment work even while functional ingress
-is off.
+## AuthAuditReader
 
-## Contracts
+```php
+public function find(Authenticatable $actor, AuthAudit $audit): AuthAudit;
+```
 
-Public extension contracts are in `Nvl\Auth\Contracts`:
+## AuthMaintenance
 
-- subject-reference, login-identifier, invitation, and social resolvers;
-- authentication eligibility, account confirmation, and invitation
-  registration mapping;
-- password updater;
-- passkey ceremony;
-- social identity and API-token provider adapters;
-- API-token ability provider;
-- permission and role catalog providers;
-- management and denied-by-default system-mutation access;
-- RBAC principal access and principal-session containment;
-- browser-session, successful-login metadata, audit-recorder, and audit-context adapters;
-- pipeline stage.
+```php
+public function prune(Authenticatable|SystemMutationContext $authority, bool $dryRun = false): array;
+```
 
-## Admission
+## AuthTokens
 
-Use `FeatureGate::allows(AuthFeature, FeatureOperation)` for UI/capability checks
-and `assertAllowed` for an explicit failure. Transport input never decides
-feature availability. `AuthException` provides a stable error code and HTTP
-status for package routes.
+```php
+public function all(Authenticatable $subject): array;
+public function revokeAll(Authenticatable $subject): int;
+public function revoke(Authenticatable $subject, string $tokenId): bool;
+public function rotate( Authenticatable $subject, string $tokenId, array $data, ): IssuedApiToken;
+public function update( Authenticatable $subject, string $tokenId, array $data, ): array;
+```
 
-## Events
+## AuthRoles
 
-- `AuthDeliveryRequested(AuthDeliveryRequest)`
-- `RbacAssignmentChanged` for every package-owned initial, invitation, role-sync,
-  and direct-permission-sync assignment
-- `AuthAuditRecorded(auditId)`
-- `AuthenticationAttempted(identifierName, identifier)`
-- `AuthenticationRejected(identifierName, identifier, reason, ?SubjectReference)`
-- `UserAuthenticated(SubjectReference)`
-- `UserLoggedOut(?SubjectReference)`
+```php
+public function update(Authenticatable $actor, Role|string $role, array $data): Role;
+public function delete(Authenticatable $actor, Role|string $role): bool;
+public function duplicate(Authenticatable $actor, Role|string $role, string $name, ?string $displayName = null): Role;
+public function addPermissions(Authenticatable $actor, Role|string $role, array $permissionIdentifiers): Role;
+public function syncPermissions(Authenticatable $actor, Role|string $role, array $permissionIdentifiers): Role;
+public function applyTemplate(Authenticatable $actor, array $data): Role;
+public function synchronizeTemplates(Authenticatable $actor): int;
+public function syncUserRoles(Authenticatable|SystemMutationContext $authority, Authenticatable|string $user, array $data): Authenticatable;
+```
 
-## Tenant APIs
+## AuthPermissions
 
-Membership Actions list the authenticated principal's own memberships and offer
-authorized tenant enrollment, status, revocation, ownership transfer, and RBAC
-grant management. They derive tenant identity from verified context or invitation
-proof rather than mutation DTOs. `TenantBoundApiTokenManager` binds issue, list,
-update, rotate, revoke, and admission to the active tenant and a live membership.
-`TenantAuthenticationIntents` supplies one-use session-bound intent for OAuth,
-passwordless, passkey, and invitation entry without replacing Socialite state.
-Global principal administration always requires explicit platform context.
+```php
+public function createWithRoles(Authenticatable $actor, array $data, array $roleIdentifiers = []): Permission;
+public function update(Authenticatable $actor, Permission|string $permission, array $data): Permission;
+public function delete(Authenticatable $actor, Permission|string $permission): bool;
+public function synchronizeCatalog(Authenticatable $actor): int;
+public function syncUserPermissions(Authenticatable|SystemMutationContext $authority, Authenticatable|string $user, array $data): Authenticatable;
+public function synchronize(Authenticatable $actor): array;
+public function bootstrap(SystemMutationContext $context): array;
+```
+
+## AuthRbacReader
+
+```php
+public function permissionCatalog(Authenticatable $actor, array $data): LengthAwarePaginator;
+public function permissionGroups(Authenticatable $actor): Collection;
+public function permissionOptions(Authenticatable $actor, ?string $search = null, ?string $group = null, ?int $limit = null): Collection;
+public function permissions(Authenticatable $actor, ?string $search = null, ?string $group = null, int $perPage = 25): LengthAwarePaginator;
+public function roleCatalog(Authenticatable $actor, array $data): LengthAwarePaginator;
+public function roleHierarchy(Authenticatable $actor): array;
+public function roleOptions(Authenticatable $actor, ?string $search = null, ?int $limit = null): Collection;
+public function roleTemplates(Authenticatable $actor): array;
+public function roles(Authenticatable $actor, ?string $search = null, int $perPage = 25): LengthAwarePaginator;
+public function resolvePermissions(Authenticatable $actor, array $identifiers): Collection;
+public function resolveRoles(Authenticatable $actor, array $identifiers): Collection;
+public function permission(Authenticatable $actor, Permission|string $permission): Permission;
+public function analytics(Authenticatable $actor): array;
+public function role(Authenticatable $actor, Role|string $role): Role;
+public function roleAnalytics(Authenticatable $actor, Role|string $role): array;
+public function suggestPermissions(Authenticatable $actor, ?string $search = null, ?string $group = null, ?int $limit = null): Collection;
+public function suggestRoles(Authenticatable $actor, ?string $search = null, ?int $limit = null): Collection;
+```
+
+## AuthSecondFactor
+
+```php
+public function confirmEnrollment( Authenticatable $subject, TotpCredential $credential, #[SensitiveParameter] array $data, ): TotpCredential;
+public function verify( Authenticatable $subject, #[SensitiveParameter] array $data, ): TotpCredential;
+public function revoke( Authenticatable $subject, TotpCredential $credential, ): TotpCredential;
+public function state(Authenticatable $subject): array;
+public function regenerateRecoveryCodes(Authenticatable $subject): GeneratedRecoveryCodes;
+public function consumeRecoveryCode( Authenticatable $subject, #[SensitiveParameter] array $data, ): RecoveryCode;
+public function revokeRecoveryCodes(Authenticatable $subject): int;
+```
+
+## AuthPasskeys
+
+```php
+public function beginRegistration(Authenticatable $subject): PasskeyCeremonyOptions;
+public function finishAuthentication( array $data, ?OwnerReference $requestedOwner = null, ?string $sessionBinding = null, ): array;
+public function finishRegistration( Authenticatable $subject, array $data, ): Passkey;
+public function revoke(Authenticatable $subject, Passkey $passkey): Passkey;
+```
+
+## AuthSocialIdentities
+
+```php
+public function completeAuthorization(string $provider, ?Authenticatable $subject = null): SocialIdentity;
+public function link(Authenticatable $subject, ExternalIdentity $identity): SocialIdentity;
+public function revoke(Authenticatable $subject, SocialIdentity $identity): SocialIdentity;
+```
+
+`AuthenticationSessions::establishForPurpose` is an internal orchestration seam for proved passwordless/social authentication. Its explicit AuthenticationPurpose and bounded AuthenticationRequestContext select the correct eligibility policy once; it is not an HTTP input selector.

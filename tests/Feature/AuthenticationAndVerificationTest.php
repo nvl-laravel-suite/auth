@@ -4,25 +4,20 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
-use Nvl\Auth\Actions\Audit\ShowAuthAuditAction;
-use Nvl\Auth\Actions\Authentication\EstablishAuthenticatedSessionAction;
-use Nvl\Auth\Actions\Authentication\LoginAction;
-use Nvl\Auth\Actions\Authentication\LogoutAction;
-use Nvl\Auth\Actions\Passwords\ConfirmPasswordAction;
 use Nvl\Auth\Contracts\AuthAuditContextProvider;
-use Nvl\Auth\Data\Mutations\ConfirmPasswordData;
-use Nvl\Auth\Data\Mutations\LoginData;
 use Nvl\Auth\Events\AuthenticationAttempted;
 use Nvl\Auth\Events\AuthenticationRejected;
 use Nvl\Auth\Events\UserAuthenticated;
 use Nvl\Auth\Events\UserLoggedOut;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
+use Nvl\Auth\Services\AuthAuditReader;
 use Nvl\Auth\Services\AuthAuditRecorder;
+use Nvl\Auth\Services\Authentication;
+use Nvl\Auth\Services\AuthenticationSessions;
+use Nvl\Auth\Services\AuthPasswords;
 use Nvl\Auth\Tests\Fixtures\HostAuditRecorder;
 use Nvl\Auth\Tests\Fixtures\RejectLoginStage;
-use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
-use Nvl\Auth\ValueObjects\SubjectReference;
 
 it('logs in and out through the configured Laravel stateful guard', function (): void {
     $user = $this->user();
@@ -31,17 +26,14 @@ it('logs in and out through the configured Laravel stateful guard', function ():
         UserAuthenticated::class,
         UserLoggedOut::class,
     ]);
-    $authenticated = app(LoginAction::class)->execute(
-        new LoginData($user->email, 'correct-password'),
-        new AuthenticationRequestContext(ipAddress: '203.0.113.10'),
-    );
+    $authenticated = app(Authentication::class)->login(['identifier' => $user->email, 'password' => 'correct-password'], ['ipAddress' => '203.0.113.10'], auth()->guard('web'), app('session')->driver());
 
     expect($authenticated->getAuthIdentifier())->toBe($user->getAuthIdentifier())
         ->and(Auth::guard('web')->check())->toBeTrue()
         ->and($user->refresh()->last_login_ip)->toBe('203.0.113.10')
         ->and(AuthAudit::query()->where('action', 'authentication.succeeded')->exists())->toBeTrue();
 
-    app(LogoutAction::class)->execute();
+    app(AuthenticationSessions::class)->logout(auth()->guard('web'), app('session')->driver());
 
     expect(Auth::guard('web')->check())->toBeFalse();
     Event::assertDispatched(AuthenticationAttempted::class);
@@ -54,7 +46,7 @@ it('emits a transport-neutral rejection event and records through a host audit a
     $this->app->instance(Nvl\Auth\Contracts\AuthAuditRecorder::class, $recorder);
     Event::fake([AuthenticationAttempted::class, AuthenticationRejected::class]);
 
-    expect(fn () => app(LoginAction::class)->execute(new LoginData('missing@example.test', 'wrong-password')))
+    expect(fn () => app(Authentication::class)->login(['identifier' => 'missing@example.test', 'password' => 'wrong-password'], [], auth()->guard('web'), app('session')->driver()))
         ->toThrow(AuthException::class, 'invalid');
 
     expect($recorder->facts)->toHaveCount(1)
@@ -100,10 +92,10 @@ it('confirms the current password through Laravel session authority', function (
     $request = app('request');
     $request->setLaravelSession(app('session')->driver());
 
-    expect(fn () => app(ConfirmPasswordAction::class)->execute($user, new ConfirmPasswordData('wrong-password')))
+    expect(fn () => app(AuthPasswords::class)->confirm($user, ['password' => 'wrong-password'], app('session')->driver()))
         ->toThrow(AuthException::class, 'invalid');
 
-    app(ConfirmPasswordAction::class)->execute($user, new ConfirmPasswordData('correct-password'));
+    app(AuthPasswords::class)->confirm($user, ['password' => 'correct-password'], app('session')->driver());
 
     expect($request->session()->get('auth.password_confirmed_at'))->toBeInt()
         ->and(AuthAudit::query()->where('action', 'password.confirmed')->exists())->toBeTrue();
@@ -114,7 +106,7 @@ it('runs the login pipeline after credential resolution and logs out rejected su
     RejectLoginStage::$subject = null;
     config()->set('nvl-auth.pipelines.login', [RejectLoginStage::class]);
 
-    expect(fn () => app(LoginAction::class)->execute(new LoginData($user->email, 'correct-password')))
+    expect(fn () => app(Authentication::class)->login(['identifier' => $user->email, 'password' => 'correct-password'], [], auth()->guard('web'), app('session')->driver()))
         ->toThrow(AuthException::class, 'rejected');
 
     expect(RejectLoginStage::$subject?->identifier)->toBe((string) $user->getKey())
@@ -127,9 +119,7 @@ it('applies shared eligibility and rejection semantics to passwordless sessions'
     $user->forceFill(['is_active' => false])->save();
     Event::fake([AuthenticationRejected::class]);
 
-    expect(fn () => app(EstablishAuthenticatedSessionAction::class)->execute(
-        SubjectReference::fromAuthenticatable($user),
-    ))->toThrow(AuthException::class, 'cannot be completed');
+    expect(fn () => app(AuthenticationSessions::class)->establish($user, auth()->guard('web'), app('session')->driver()))->toThrow(AuthException::class, 'cannot be completed');
 
     expect(Auth::guard('web')->check())->toBeFalse()
         ->and($user->refresh()->last_login_at)->toBeNull()
@@ -139,9 +129,9 @@ it('applies shared eligibility and rejection semantics to passwordless sessions'
 
 it('authorizes audit detail access with decrypted metadata', function (): void {
     $user = $this->user();
-    app(LoginAction::class)->execute(new LoginData($user->email, 'correct-password'));
+    app(Authentication::class)->login(['identifier' => $user->email, 'password' => 'correct-password'], [], auth()->guard('web'), app('session')->driver());
     $audit = AuthAudit::query()->where('action', 'authentication.succeeded')->sole();
 
-    expect(app(ShowAuthAuditAction::class)->execute($user, $audit)->is($audit))->toBeTrue()
+    expect(app(AuthAuditReader::class)->find($user, $audit)->is($audit))->toBeTrue()
         ->and($audit->metadata)->toBeArray();
 });

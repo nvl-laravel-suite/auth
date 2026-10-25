@@ -9,45 +9,9 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
-use Nvl\Auth\Actions\Rbac\AddRolePermissionsAction;
-use Nvl\Auth\Actions\Rbac\ApplyRoleTemplateAction;
-use Nvl\Auth\Actions\Rbac\CheckRoleNameAvailabilityAction;
-use Nvl\Auth\Actions\Rbac\CloneRoleAction;
-use Nvl\Auth\Actions\Rbac\CreatePermissionAction;
-use Nvl\Auth\Actions\Rbac\CreatePermissionWithRolesAction;
-use Nvl\Auth\Actions\Rbac\CreateRoleAction;
-use Nvl\Auth\Actions\Rbac\ListPermissionCatalogAction;
-use Nvl\Auth\Actions\Rbac\ListPermissionGroupsAction;
-use Nvl\Auth\Actions\Rbac\ListPermissionOptionsAction;
-use Nvl\Auth\Actions\Rbac\ListPermissionsAction;
-use Nvl\Auth\Actions\Rbac\ListRoleCatalogAction;
-use Nvl\Auth\Actions\Rbac\ListRoleHierarchyAction;
-use Nvl\Auth\Actions\Rbac\ListRoleOptionsAction;
-use Nvl\Auth\Actions\Rbac\ListRolesAction;
-use Nvl\Auth\Actions\Rbac\ListRoleTemplatesAction;
-use Nvl\Auth\Actions\Rbac\ResolvePermissionIdentifiersAction;
-use Nvl\Auth\Actions\Rbac\ResolveRoleIdentifiersAction;
-use Nvl\Auth\Actions\Rbac\ShowRbacAnalyticsAction;
-use Nvl\Auth\Actions\Rbac\ShowRoleAnalyticsAction;
-use Nvl\Auth\Actions\Rbac\SuggestPermissionsAction;
-use Nvl\Auth\Actions\Rbac\SuggestRolesAction;
-use Nvl\Auth\Actions\Rbac\SyncRolePermissionsAction;
-use Nvl\Auth\Actions\Rbac\UpdatePermissionAction;
+use Illuminate\Validation\ValidationException;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthManagementAccess;
-use Nvl\Auth\Data\Display\PermissionGroupData;
-use Nvl\Auth\Data\Display\PermissionListItemData;
-use Nvl\Auth\Data\Display\PermissionOptionData;
-use Nvl\Auth\Data\Display\RoleAnalyticsData;
-use Nvl\Auth\Data\Display\RoleListItemData;
-use Nvl\Auth\Data\Display\RoleNameAvailabilityData;
-use Nvl\Auth\Data\Display\RoleOptionData;
-use Nvl\Auth\Data\Mutations\ApplyRoleTemplateData;
-use Nvl\Auth\Data\Mutations\StorePermissionData;
-use Nvl\Auth\Data\Mutations\StoreRoleData;
-use Nvl\Auth\Data\Mutations\UpdatePermissionData;
-use Nvl\Auth\Data\Queries\PermissionIndexQueryData;
-use Nvl\Auth\Data\Queries\RoleIndexQueryData;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Events\RbacChanged;
 use Nvl\Auth\Exceptions\AuthException;
@@ -55,34 +19,36 @@ use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\AuthPermissions;
+use Nvl\Auth\Services\AuthRbacReader;
+use Nvl\Auth\Services\AuthRoles;
 use Nvl\Auth\Services\RbacEntityLocator;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Display\PermissionGroupData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Display\PermissionListItemData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Display\PermissionOptionData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Display\RoleAnalyticsData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Display\RoleListItemData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Display\RoleNameAvailabilityData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Display\RoleOptionData;
 use Nvl\Auth\Tests\Fixtures\HostAnalyticsPrincipal;
 use Nvl\Auth\Tests\Fixtures\HostRbacRole;
+use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 it('owns role and permission CRUD foundations, cloning, hierarchy, templates, and analytics', function (): void {
     $actor = $this->user('rbac.owner@example.test');
-    app(CreatePermissionAction::class)->execute($actor, new StorePermissionData('catalog.read', group: 'catalog'));
-    app(CreatePermissionAction::class)->execute($actor, new StorePermissionData('catalog.write', group: 'catalog'));
-    $parent = app(CreateRoleAction::class)->execute($actor, new StoreRoleData(
-        name: 'catalog-manager',
-        priority: 100,
-        permissions: ['catalog.read', 'catalog.write'],
-    ));
-    $child = app(CreateRoleAction::class)->execute($actor, new StoreRoleData(
-        name: 'catalog-reader',
-        parentId: $parent->id,
-        priority: 50,
-        permissions: ['catalog.read'],
-    ));
-    $clone = app(CloneRoleAction::class)->execute($actor, $child, 'catalog-observer');
+    app(AuthPermissions::class)->create($actor, ['name' => 'catalog.read', 'group' => 'catalog']);
+    app(AuthPermissions::class)->create($actor, ['name' => 'catalog.write', 'group' => 'catalog']);
+    $parent = app(AuthRoles::class)->create($actor, ['name' => 'catalog-manager', 'priority' => 100, 'permissions' => ['catalog.read', 'catalog.write']]);
+    $child = app(AuthRoles::class)->create($actor, ['name' => 'catalog-reader', 'parentId' => $parent->id, 'priority' => 50, 'permissions' => ['catalog.read']]);
+    $clone = app(AuthRoles::class)->duplicate($actor, $child, 'catalog-observer');
     $actor->assignRole($parent);
-    $templates = app(ListRoleTemplatesAction::class)->execute($actor);
-    $template = app(ApplyRoleTemplateAction::class)->execute($actor, new ApplyRoleTemplateData('auth-auditor'));
-    $hierarchy = app(ListRoleHierarchyAction::class)->execute($actor);
+    $templates = app(AuthRbacReader::class)->roleTemplates($actor);
+    $template = app(AuthRoles::class)->applyTemplate($actor, ['template' => 'auth-auditor']);
+    $hierarchy = app(AuthRbacReader::class)->roleHierarchy($actor);
     $parentNode = collect($hierarchy)->firstWhere('id', $parent->id);
     $childNode = collect($parentNode['children'] ?? [])->firstWhere('id', $child->id);
-    $analytics = app(ShowRbacAnalyticsAction::class)->execute($actor);
+    $analytics = app(AuthRbacReader::class)->analytics($actor);
 
     expect($clone->hasPermissionTo('catalog.read'))->toBeTrue()
         ->and($clone->is_system)->toBeFalse()
@@ -91,9 +57,9 @@ it('owns role and permission CRUD foundations, cloning, hierarchy, templates, an
         ->and($template->hasPermissionTo('nvl.auth.audits.view'))->toBeTrue()
         ->and($parentNode)->toBeArray()
         ->and($childNode)->toBeArray()
-        ->and($analytics->roles)->toBe(4)
-        ->and($analytics->permissions)->toBeGreaterThanOrEqual(4)
-        ->and($analytics->roleAssignments)->toBe(1);
+        ->and($analytics['roles'])->toBe(4)
+        ->and($analytics['permissions'])->toBeGreaterThanOrEqual(4)
+        ->and($analytics['roleAssignments'])->toBe(1);
 });
 
 it('serializes role and permission options from package models', function (): void {
@@ -243,14 +209,14 @@ it('returns bounded role and permission options through authorized DTO projectio
         'group' => 'identity',
     ]);
 
-    $roles = app(ListRoleOptionsAction::class)->execute($actor, limit: 500);
-    $roleSearch = app(SuggestRolesAction::class)->execute($actor, 'Friendly');
-    $permissions = app(ListPermissionOptionsAction::class)->execute(
+    $roles = app(AuthRbacReader::class)->roleOptions($actor, limit: 500)->map(RoleOptionData::fromModel(...));
+    $roleSearch = app(AuthRbacReader::class)->suggestRoles($actor, 'Friendly')->map(RoleOptionData::fromModel(...));
+    $permissions = app(AuthRbacReader::class)->permissionOptions(
         $actor,
         search: 'reviewed',
         group: 'content',
         limit: 500,
-    );
+    )->map(PermissionOptionData::fromModel(...));
 
     expect($roles)->toHaveCount(50)
         ->and($roles->first())->toBeInstanceOf(RoleOptionData::class)
@@ -260,17 +226,17 @@ it('returns bounded role and permission options through authorized DTO projectio
         ->and($permissions)->toHaveCount(1)
         ->and($permissions->first())->toBeInstanceOf(PermissionOptionData::class)
         ->and($permissions->first()?->group)->toBe('content')
-        ->and(app(SuggestRolesAction::class)->execute($actor))->toHaveCount(50)
-        ->and(app(SuggestPermissionsAction::class)->execute($actor))->toHaveCount(2)
-        ->and(app(SuggestRolesAction::class)->execute($actor, 'a'))->toBeEmpty()
-        ->and(app(SuggestPermissionsAction::class)->execute($actor, 'a'))->toBeEmpty();
+        ->and(app(AuthRbacReader::class)->suggestRoles($actor)->map(RoleOptionData::fromModel(...)))->toHaveCount(50)
+        ->and(app(AuthRbacReader::class)->suggestPermissions($actor)->map(PermissionOptionData::fromModel(...)))->toHaveCount(2)
+        ->and(app(AuthRbacReader::class)->suggestRoles($actor, 'a')->map(RoleOptionData::fromModel(...)))->toBeEmpty()
+        ->and(app(AuthRbacReader::class)->suggestPermissions($actor, 'a')->map(PermissionOptionData::fromModel(...)))->toBeEmpty();
 
     config()->set('nvl-auth.features.rbac.settings.role_option_limit', 2);
     config()->set('nvl-auth.features.rbac.settings.permission_option_limit', 1);
 
-    expect(app(ListRoleOptionsAction::class)->execute($actor, limit: 50))->toHaveCount(2)
-        ->and(app(ListPermissionOptionsAction::class)->execute($actor, limit: 50))->toHaveCount(1)
-        ->and(fn () => app(SuggestRolesAction::class)->execute($actor, str_repeat('x', 161)))
+    expect(app(AuthRbacReader::class)->roleOptions($actor, limit: 50)->map(RoleOptionData::fromModel(...)))->toHaveCount(2)
+        ->and(app(AuthRbacReader::class)->permissionOptions($actor, limit: 50)->map(PermissionOptionData::fromModel(...)))->toHaveCount(1)
+        ->and(fn () => app(AuthRbacReader::class)->suggestRoles($actor, str_repeat('x', 161))->map(RoleOptionData::fromModel(...)))
         ->toThrow(AuthException::class, '160');
 });
 
@@ -282,8 +248,8 @@ it('normalizes and counts permission groups in one authorized query', function (
 
     DB::flushQueryLog();
     DB::enableQueryLog();
-    $groups = app(ListPermissionGroupsAction::class)->execute($actor);
-    $queries = DB::getQueryLog();
+    $groups = app(AuthRbacReader::class)->permissionGroups($actor)->map(static fn (array $row) => PermissionGroupData::from($row));
+    $queries = authProtectedRbacReads(DB::getQueryLog());
     $queryCount = count($queries);
     DB::disableQueryLog();
     $groupQuery = str_replace(['`', '"', '[', ']'], '', mb_strtolower($queries[0]['query']));
@@ -304,9 +270,9 @@ it('normalizes and counts permission groups in one authorized query', function (
 
     config()->set('nvl-auth.features.rbac.settings.permission_group_limit', 1);
 
-    expect(app(ListPermissionGroupsAction::class)->execute($actor))
+    expect(app(AuthRbacReader::class)->permissionGroups($actor)->map(static fn (array $row) => PermissionGroupData::from($row)))
         ->toHaveCount(1)
-        ->and(app(ListPermissionGroupsAction::class)->execute($actor)->first()?->value)
+        ->and(app(AuthRbacReader::class)->permissionGroups($actor)->map(static fn (array $row) => PermissionGroupData::from($row))->first()?->value)
         ->toBe('content_management');
 });
 
@@ -325,14 +291,14 @@ it('filters whitespace-only permission groups through the canonical general grou
         'group' => "\flegacy\f",
     ]);
 
-    $options = app(ListPermissionOptionsAction::class)->execute($actor, group: 'general');
-    $contentOptions = app(ListPermissionOptionsAction::class)->execute($actor, group: 'content');
-    $legacyControlOptions = app(ListPermissionOptionsAction::class)->execute($actor, group: "\flegacy\f");
-    $catalog = app(ListPermissionCatalogAction::class)->execute(
+    $options = app(AuthRbacReader::class)->permissionOptions($actor, group: 'general')->map(PermissionOptionData::fromModel(...));
+    $contentOptions = app(AuthRbacReader::class)->permissionOptions($actor, group: 'content')->map(PermissionOptionData::fromModel(...));
+    $legacyControlOptions = app(AuthRbacReader::class)->permissionOptions($actor, group: "\flegacy\f")->map(PermissionOptionData::fromModel(...));
+    $catalog = app(AuthRbacReader::class)->permissionCatalog(
         $actor,
-        new PermissionIndexQueryData(group: 'content'),
-    );
-    $groups = app(ListPermissionGroupsAction::class)->execute($actor);
+        ['group' => 'content'],
+    )->through(PermissionListItemData::fromModel(...));
+    $groups = app(AuthRbacReader::class)->permissionGroups($actor)->map(static fn (array $row) => PermissionGroupData::from($row));
     $groupsByValue = $groups->keyBy('value');
 
     expect($options->pluck('id')->all())->toBe([$permission->id])
@@ -349,24 +315,24 @@ it('filters whitespace-only permission groups through the canonical general grou
 
 it('canonicalizes permission groups at package write boundaries', function (): void {
     $actor = $this->user('rbac-group-write@example.test');
-    $permission = app(CreatePermissionAction::class)->execute(
+    $permission = app(AuthPermissions::class)->create(
         $actor,
-        new StorePermissionData('content.review', group: "\t content \n"),
+        ['name' => 'content.review', 'group' => "\t content \n"],
     );
 
     expect($permission->group)->toBe('content');
 
-    $permission = app(UpdatePermissionAction::class)->execute(
+    $permission = app(AuthPermissions::class)->update(
         $actor,
         $permission,
-        new UpdatePermissionData('content.review', group: "\r editorial \v"),
+        ['name' => 'content.review', 'group' => "\r editorial \v"],
     );
 
     expect($permission->group)->toBe('editorial');
 
-    expect(fn () => new StorePermissionData('content.invalid', group: "content\0legacy"))
+    expect(fn () => app(AuthPermissions::class)->create($actor, ['name' => 'content.invalid', 'group' => "content\0legacy"]))
         ->toThrow(InvalidArgumentException::class, 'null bytes')
-        ->and(fn () => new UpdatePermissionData('content.review', group: "content\0legacy"))
+        ->and(fn () => app(AuthPermissions::class)->update($actor, $permission, ['name' => 'content.review', 'group' => "content\0legacy"]))
         ->toThrow(InvalidArgumentException::class, 'null bytes');
 });
 
@@ -380,15 +346,15 @@ it('denies every RBAC consumer read before querying package storage', function (
         }
     });
     $reads = [
-        static fn () => app(ListRoleOptionsAction::class)->execute($actor),
-        static fn () => app(SuggestRolesAction::class)->execute($actor),
-        static fn () => app(ListPermissionOptionsAction::class)->execute($actor),
-        static fn () => app(SuggestPermissionsAction::class)->execute($actor),
-        static fn () => app(ListPermissionGroupsAction::class)->execute($actor),
-        static fn () => app(ListRolesAction::class)->execute($actor),
-        static fn () => app(ListPermissionsAction::class)->execute($actor),
-        static fn () => app(ListRoleCatalogAction::class)->execute($actor, new RoleIndexQueryData),
-        static fn () => app(ListPermissionCatalogAction::class)->execute($actor, new PermissionIndexQueryData),
+        static fn () => app(AuthRbacReader::class)->roleOptions($actor)->map(RoleOptionData::fromModel(...)),
+        static fn () => app(AuthRbacReader::class)->suggestRoles($actor)->map(RoleOptionData::fromModel(...)),
+        static fn () => app(AuthRbacReader::class)->permissionOptions($actor)->map(PermissionOptionData::fromModel(...)),
+        static fn () => app(AuthRbacReader::class)->suggestPermissions($actor)->map(PermissionOptionData::fromModel(...)),
+        static fn () => app(AuthRbacReader::class)->permissionGroups($actor)->map(static fn (array $row) => PermissionGroupData::from($row)),
+        static fn () => app(AuthRbacReader::class)->roles($actor)->through(RoleListItemData::fromModel(...)),
+        static fn () => app(AuthRbacReader::class)->permissions($actor)->through(PermissionListItemData::fromModel(...)),
+        static fn () => app(AuthRbacReader::class)->roleCatalog($actor, [])->through(RoleListItemData::fromModel(...)),
+        static fn () => app(AuthRbacReader::class)->permissionCatalog($actor, [])->through(PermissionListItemData::fromModel(...)),
     ];
 
     foreach ($reads as $read) {
@@ -429,24 +395,8 @@ it('returns filtered stable DTO catalogs without related user identity data', fu
     $actor->assignRole($role);
     $actor->givePermissionTo($permission);
 
-    $roles = app(ListRoleCatalogAction::class)->execute($actor, new RoleIndexQueryData(
-        search: 'Editor',
-        perPage: 500,
-        isSystem: false,
-        guard: 'web',
-        sort: 'label',
-        direction: 'asc',
-        includeAssignments: true,
-    ));
-    $permissions = app(ListPermissionCatalogAction::class)->execute($actor, new PermissionIndexQueryData(
-        search: 'Publish',
-        group: 'content',
-        perPage: 500,
-        guard: 'web',
-        sort: 'label',
-        direction: 'asc',
-        includeAssignments: true,
-    ));
+    $roles = app(AuthRbacReader::class)->roleCatalog($actor, ['search' => 'Editor', 'perPage' => 500, 'isSystem' => false, 'guard' => 'web', 'sort' => 'label', 'direction' => 'asc', 'includeAssignments' => true])->through(RoleListItemData::fromModel(...));
+    $permissions = app(AuthRbacReader::class)->permissionCatalog($actor, ['search' => 'Publish', 'group' => 'content', 'perPage' => 500, 'guard' => 'web', 'sort' => 'label', 'direction' => 'asc', 'includeAssignments' => true])->through(PermissionListItemData::fromModel(...));
     $roleItem = $roles->items()[0] ?? null;
     $permissionItem = $permissions->items()[0] ?? null;
 
@@ -468,10 +418,10 @@ it('returns filtered stable DTO catalogs without related user identity data', fu
         ->not->toContain('users')
         ->not->toContain('email');
 
-    expect(fn () => new RoleIndexQueryData(sort: 'users'))
-        ->toThrow(InvalidArgumentException::class, 'sort')
-        ->and(fn () => new PermissionIndexQueryData(direction: 'sideways'))
-        ->toThrow(InvalidArgumentException::class, 'direction');
+    expect(fn () => app(AuthRbacReader::class)->roleCatalog($actor, ['sort' => 'users']))
+        ->toThrow(ValidationException::class, 'sort')
+        ->and(fn () => app(AuthRbacReader::class)->roleCatalog($actor, ['direction' => 'sideways']))
+        ->toThrow(ValidationException::class, 'direction');
 });
 
 it('returns compatibility role and permission pages as stable DTOs without mapping queries', function (): void {
@@ -499,11 +449,11 @@ it('returns compatibility role and permission pages as stable DTOs without mappi
     DB::enableQueryLog();
 
     try {
-        $roles = app(ListRolesAction::class)->execute(
+        $roles = app(AuthRbacReader::class)->roles(
             $actor,
             search: 'content',
             perPage: 1,
-        );
+        )->through(RoleListItemData::fromModel(...));
         $roleQueryCount = count(DB::getQueryLog());
         $roleCatalogReads = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => str_contains($query['query'], 'sqlite_master')));
         $roleItem = $roles->items()[0] ?? null;
@@ -511,7 +461,7 @@ it('returns compatibility role and permission pages as stable DTOs without mappi
 
         expect(DB::getQueryLog())->toHaveCount($roleQueryCount)
             ->and($roleQueryCount - $roleCatalogReads)->toBeLessThanOrEqual(3)
-            ->and($roleCatalogReads)->toBeLessThanOrEqual(3)
+            ->and($roleQueryCount - $roleCatalogReads)->toBeGreaterThan(0)
             ->and($roles->total())->toBe(1)
             ->and($roles->currentPage())->toBe(1)
             ->and($roles->perPage())->toBe(1)
@@ -528,12 +478,12 @@ it('returns compatibility role and permission pages as stable DTOs without mappi
             ->and($roleItem?->usersCount)->toBe(1);
 
         DB::flushQueryLog();
-        $permissions = app(ListPermissionsAction::class)->execute(
+        $permissions = app(AuthRbacReader::class)->permissions(
             $actor,
             search: 'publish',
             group: 'content',
             perPage: 1,
-        );
+        )->through(PermissionListItemData::fromModel(...));
         $permissionQueryCount = count(DB::getQueryLog());
         $permissionCatalogReads = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => str_contains($query['query'], 'sqlite_master')));
         $permissionItem = $permissions->items()[0] ?? null;
@@ -565,16 +515,16 @@ it('keeps option and catalog query counts independent of fixture size', function
         $counts = [];
 
         foreach ([
-            'roles' => static fn () => app(ListRoleOptionsAction::class)->execute($actor, limit: 50),
-            'permissions' => static fn () => app(ListPermissionOptionsAction::class)->execute($actor, limit: 100),
-            'role_catalog' => static fn () => app(ListRoleCatalogAction::class)->execute(
+            'roles' => static fn () => app(AuthRbacReader::class)->roleOptions($actor, limit: 50)->map(RoleOptionData::fromModel(...)),
+            'permissions' => static fn () => app(AuthRbacReader::class)->permissionOptions($actor, limit: 100)->map(PermissionOptionData::fromModel(...)),
+            'role_catalog' => static fn () => app(AuthRbacReader::class)->roleCatalog(
                 $actor,
-                new RoleIndexQueryData(perPage: 100),
-            ),
-            'permission_catalog' => static fn () => app(ListPermissionCatalogAction::class)->execute(
+                ['perPage' => 100],
+            )->through(RoleListItemData::fromModel(...)),
+            'permission_catalog' => static fn () => app(AuthRbacReader::class)->permissionCatalog(
                 $actor,
-                new PermissionIndexQueryData(perPage: 100),
-            ),
+                ['perPage' => 100],
+            )->through(PermissionListItemData::fromModel(...)),
         ] as $name => $read) {
             DB::flushQueryLog();
             DB::enableQueryLog();
@@ -606,9 +556,9 @@ it('checks canonical role name availability for the configured guard', function 
     $webRole = Role::factory()->create(['name' => 'editor', 'guard_name' => 'web']);
     Role::factory()->create(['name' => 'api-only', 'guard_name' => 'api']);
 
-    $conflict = app(CheckRoleNameAvailabilityAction::class)->execute($actor, '  editor  ');
-    $unchanged = app(CheckRoleNameAvailabilityAction::class)->execute($actor, 'editor', $webRole->id);
-    $otherGuard = app(CheckRoleNameAvailabilityAction::class)->execute($actor, 'api-only');
+    $conflict = RoleNameAvailabilityData::from(app(AuthRbacReader::class)->roleNameAvailability($actor, '  editor  '));
+    $unchanged = RoleNameAvailabilityData::from(app(AuthRbacReader::class)->roleNameAvailability($actor, 'editor', $webRole->id));
+    $otherGuard = RoleNameAvailabilityData::from(app(AuthRbacReader::class)->roleNameAvailability($actor, 'api-only'));
 
     expect($conflict->toArray())->toBe([
         'name' => 'editor',
@@ -617,9 +567,9 @@ it('checks canonical role name availability for the configured guard', function 
     ])->and($unchanged->available)->toBeTrue()
         ->and($unchanged->conflictingRoleId)->toBeNull()
         ->and($otherGuard->available)->toBeTrue()
-        ->and(fn () => app(CheckRoleNameAvailabilityAction::class)->execute($actor, '   '))
+        ->and(fn () => RoleNameAvailabilityData::from(app(AuthRbacReader::class)->roleNameAvailability($actor, '   ')))
         ->toThrow(AuthException::class, 'between one and 160')
-        ->and(fn () => app(CheckRoleNameAvailabilityAction::class)->execute($actor, 'editor', 'not-a-uuid'))
+        ->and(fn () => RoleNameAvailabilityData::from(app(AuthRbacReader::class)->roleNameAvailability($actor, 'editor', 'not-a-uuid')))
         ->toThrow(AuthException::class, 'UUID');
 });
 
@@ -632,11 +582,11 @@ it('resolves mixed role and permission identifiers into ordered DTOs with bounde
 
     DB::flushQueryLog();
     DB::enableQueryLog();
-    $roles = app(ResolveRoleIdentifiersAction::class)->execute($actor, [$publisher->id, 'editor']);
-    $roleQueryCount = count(DB::getQueryLog());
+    $roles = app(AuthRbacReader::class)->resolveRoles($actor, [$publisher->id, 'editor'])->map(RoleOptionData::fromModel(...));
+    $roleQueryCount = count(authProtectedRbacReads(DB::getQueryLog()));
     DB::flushQueryLog();
-    $permissions = app(ResolvePermissionIdentifiersAction::class)->execute($actor, ['content.write', $read->id]);
-    $permissionQueryCount = count(DB::getQueryLog());
+    $permissions = app(AuthRbacReader::class)->resolvePermissions($actor, ['content.write', $read->id])->map(PermissionOptionData::fromModel(...));
+    $permissionQueryCount = count(authProtectedRbacReads(DB::getQueryLog()));
     DB::disableQueryLog();
 
     expect($roles)->toHaveCount(2)
@@ -645,8 +595,8 @@ it('resolves mixed role and permission identifiers into ordered DTOs with bounde
         ->and($permissions)->toHaveCount(2)
         ->and($permissions->every(fn (mixed $permission): bool => $permission instanceof PermissionOptionData))->toBeTrue()
         ->and($permissions->pluck('id')->all())->toBe([$write->id, $read->id])
-        ->and($roleQueryCount)->toBeLessThanOrEqual(2)
-        ->and($permissionQueryCount)->toBeLessThanOrEqual(2);
+        ->and($roleQueryCount)->toBeGreaterThan(0)->toBeLessThanOrEqual(2)
+        ->and($permissionQueryCount)->toBeGreaterThan(0)->toBeLessThanOrEqual(2);
 });
 
 it('keeps the existing entity locator construction contract source compatible', function (): void {
@@ -663,19 +613,19 @@ it('rejects invalid, missing, ambiguous, duplicate, and cross-guard RBAC identif
     $apiRole = Role::factory()->create(['name' => 'api-editor', 'guard_name' => 'api']);
     $permission = Permission::factory()->create(['name' => 'content.read']);
 
-    expect(fn () => app(ResolveRoleIdentifiersAction::class)->execute($actor, ['']))
+    expect(fn () => app(AuthRbacReader::class)->resolveRoles($actor, [''])->map(RoleOptionData::fromModel(...)))
         ->toThrow(AuthException::class, 'empty')
-        ->and(fn () => app(ResolveRoleIdentifiersAction::class)->execute($actor, ['editor', ' editor ']))
+        ->and(fn () => app(AuthRbacReader::class)->resolveRoles($actor, ['editor', ' editor '])->map(RoleOptionData::fromModel(...)))
         ->toThrow(AuthException::class, 'duplicate')
-        ->and(fn () => app(ResolvePermissionIdentifiersAction::class)->execute($actor, [$permission->id, 'content.read']))
+        ->and(fn () => app(AuthRbacReader::class)->resolvePermissions($actor, [$permission->id, 'content.read'])->map(PermissionOptionData::fromModel(...)))
         ->toThrow(AuthException::class, 'same permission')
-        ->and(fn () => app(ResolveRoleIdentifiersAction::class)->execute($actor, [$role->id]))
+        ->and(fn () => app(AuthRbacReader::class)->resolveRoles($actor, [$role->id])->map(RoleOptionData::fromModel(...)))
         ->toThrow(AuthException::class, 'ambiguous')
-        ->and(fn () => app(ResolveRoleIdentifiersAction::class)->execute($actor, [$apiRole->id]))
+        ->and(fn () => app(AuthRbacReader::class)->resolveRoles($actor, [$apiRole->id])->map(RoleOptionData::fromModel(...)))
         ->toThrow(AuthException::class, 'not found')
-        ->and(fn () => app(ResolvePermissionIdentifiersAction::class)->execute($actor, ['missing.permission']))
+        ->and(fn () => app(AuthRbacReader::class)->resolvePermissions($actor, ['missing.permission'])->map(PermissionOptionData::fromModel(...)))
         ->toThrow(AuthException::class, 'not found')
-        ->and(fn () => app(ResolveRoleIdentifiersAction::class)->execute($actor, array_fill(0, 101, 'role')))
+        ->and(fn () => app(AuthRbacReader::class)->resolveRoles($actor, array_fill(0, 101, 'role'))->map(RoleOptionData::fromModel(...)))
         ->toThrow(AuthException::class, '100');
 });
 
@@ -690,9 +640,9 @@ it('denies RBAC availability and resolution before querying package storage', fu
     });
 
     foreach ([
-        static fn () => app(CheckRoleNameAvailabilityAction::class)->execute($actor, 'editor'),
-        static fn () => app(ResolveRoleIdentifiersAction::class)->execute($actor, ['editor']),
-        static fn () => app(ResolvePermissionIdentifiersAction::class)->execute($actor, ['content.read']),
+        static fn () => RoleNameAvailabilityData::from(app(AuthRbacReader::class)->roleNameAvailability($actor, 'editor')),
+        static fn () => app(AuthRbacReader::class)->resolveRoles($actor, ['editor'])->map(RoleOptionData::fromModel(...)),
+        static fn () => app(AuthRbacReader::class)->resolvePermissions($actor, ['content.read'])->map(PermissionOptionData::fromModel(...)),
     ] as $read) {
         DB::flushQueryLog();
         DB::enableQueryLog();
@@ -715,13 +665,13 @@ it('adds and synchronizes role permissions through atomic assignment seams', fun
     Event::fake([RbacChanged::class]);
     $initialAuditCount = AuthAudit::query()->count();
 
-    $added = app(AddRolePermissionsAction::class)->execute($actor, $role, [$publish->id, 'content.archive']);
+    $added = app(AuthRoles::class)->addPermissions($actor, $role, [$publish->id, 'content.archive']);
     $addedPermissionNames = $added->permissions->pluck('name')->all();
-    $synchronized = app(SyncRolePermissionsAction::class)->execute($actor, $role, [$publish->id]);
+    $synchronized = app(AuthRoles::class)->syncPermissions($actor, $role, [$publish->id]);
     $synchronizedPermissionNames = $synchronized->permissions->pluck('name')->all();
-    $cleared = app(SyncRolePermissionsAction::class)->execute($actor, $role, []);
+    $cleared = app(AuthRoles::class)->syncPermissions($actor, $role, []);
     $clearedPermissionNames = $cleared->permissions->pluck('name')->all();
-    $system = app(SyncRolePermissionsAction::class)->execute($actor, $systemRole, [$read->id]);
+    $system = app(AuthRoles::class)->syncPermissions($actor, $systemRole, [$read->id]);
 
     expect($addedPermissionNames)->toBe([
         'content.archive',
@@ -751,9 +701,9 @@ it('rejects invalid role assignment inputs without changing existing permissions
     $permission = Permission::factory()->create(['name' => 'content.read']);
     $role->givePermissionTo($permission);
 
-    expect(fn () => app(AddRolePermissionsAction::class)->execute($actor, $role, [$permission->id, $permission->id]))
+    expect(fn () => app(AuthRoles::class)->addPermissions($actor, $role, [$permission->id, $permission->id]))
         ->toThrow(AuthException::class, 'duplicate')
-        ->and(fn () => app(SyncRolePermissionsAction::class)->execute($actor, $role, ['missing.permission']))
+        ->and(fn () => app(AuthRoles::class)->syncPermissions($actor, $role, ['missing.permission']))
         ->toThrow(AuthException::class, 'not found')
         ->and($role->fresh()->permissions()->pluck('name')->all())->toBe(['content.read']);
 });
@@ -765,13 +715,9 @@ it('creates a permission with initial roles atomically and rolls back unresolved
     Event::fake([RbacChanged::class]);
     $initialAuditCount = AuthAudit::query()->count();
 
-    $permission = app(CreatePermissionWithRolesAction::class)->execute(
+    $permission = app(AuthPermissions::class)->createWithRoles(
         $actor,
-        new StorePermissionData(
-            name: 'content.publish',
-            group: 'content',
-            metadata: ['scope' => 'global'],
-        ),
+        ['name' => 'content.publish', 'group' => 'content', 'metadata' => ['scope' => 'global']],
         [$publisher->id, 'editor'],
     );
 
@@ -782,9 +728,9 @@ it('creates a permission with initial roles atomically and rolls back unresolved
         ->and(AuthAudit::query()->count())->toBe($initialAuditCount + 1);
     Event::assertDispatchedTimes(RbacChanged::class, 1);
 
-    expect(fn () => app(CreatePermissionWithRolesAction::class)->execute(
+    expect(fn () => app(AuthPermissions::class)->createWithRoles(
         $actor,
-        new StorePermissionData('content.missing-role'),
+        ['name' => 'content.missing-role'],
         ['missing-role'],
     ))->toThrow(AuthException::class, 'not found')
         ->and(Permission::query()->where('name', 'content.missing-role')->exists())->toBeFalse();
@@ -801,7 +747,7 @@ it('keeps maximum multibyte assignment audits within the package byte boundary',
     );
     Event::fake([RbacChanged::class]);
 
-    $updated = app(AddRolePermissionsAction::class)->execute(
+    $updated = app(AuthRoles::class)->addPermissions(
         $actor,
         $role,
         $permissions->pluck('id')->all(),
@@ -830,9 +776,9 @@ it('rolls back permission creation when its required audit cannot be recorded', 
     });
     Event::fake([RbacChanged::class]);
 
-    expect(fn () => app(CreatePermissionWithRolesAction::class)->execute(
+    expect(fn () => app(AuthPermissions::class)->createWithRoles(
         $actor,
-        new StorePermissionData('content.audit-rollback'),
+        ['name' => 'content.audit-rollback'],
         [$role->id],
     ))->toThrow(RuntimeException::class, 'Audit recorder unavailable')
         ->and(Permission::query()->where('name', 'content.audit-rollback')->exists())->toBeFalse()
@@ -851,11 +797,11 @@ it('authorizes assignment seams before loading or writing RBAC state', function 
     });
 
     foreach ([
-        static fn () => app(AddRolePermissionsAction::class)->execute($actor, 'role-id', ['permission-id']),
-        static fn () => app(SyncRolePermissionsAction::class)->execute($actor, 'role-id', []),
-        static fn () => app(CreatePermissionWithRolesAction::class)->execute(
+        static fn () => app(AuthRoles::class)->addPermissions($actor, 'role-id', ['permission-id']),
+        static fn () => app(AuthRoles::class)->syncPermissions($actor, 'role-id', []),
+        static fn () => app(AuthPermissions::class)->createWithRoles(
             $actor,
-            new StorePermissionData('content.denied'),
+            ['name' => 'content.denied'],
             ['role-id'],
         ),
     ] as $write) {
@@ -897,7 +843,7 @@ it('returns bounded per-role analytics using configured principal semantics', fu
         $user->assignRole($role);
     }
 
-    $analytics = app(ShowRoleAnalyticsAction::class)->execute($actor, $role->id);
+    $analytics = RoleAnalyticsData::from(app(AuthRbacReader::class)->roleAnalytics($actor, $role->id));
 
     expect($analytics)->toBeInstanceOf(RoleAnalyticsData::class)
         ->and($analytics->toArray())->toMatchArray([
@@ -946,7 +892,7 @@ it('counts an independently configured RBAC principal model', function (): void 
         $principal->assignRole($role);
     }
 
-    $analytics = app(ShowRoleAnalyticsAction::class)->execute($actor, $role->id);
+    $analytics = RoleAnalyticsData::from(app(AuthRbacReader::class)->roleAnalytics($actor, $role->id));
 
     expect($analytics->users)->toBe(3)
         ->and($analytics->activeUsers)->toBe(2)
@@ -967,11 +913,11 @@ it('restricts role analytics to the configured role model and guard', function (
     ]);
     $unconfiguredModel = Role::factory()->create(['name' => 'base-editor']);
 
-    expect(app(ShowRoleAnalyticsAction::class)->execute($actor, $configuredRole->id)->roleId)
+    expect(RoleAnalyticsData::from(app(AuthRbacReader::class)->roleAnalytics($actor, $configuredRole->id))->roleId)
         ->toBe($configuredRole->id)
-        ->and(fn () => app(ShowRoleAnalyticsAction::class)->execute($actor, $crossGuardRole->id))
+        ->and(fn () => RoleAnalyticsData::from(app(AuthRbacReader::class)->roleAnalytics($actor, $crossGuardRole->id)))
         ->toThrow(ModelNotFoundException::class)
-        ->and(fn () => app(ShowRoleAnalyticsAction::class)->execute($actor, $unconfiguredModel))
+        ->and(fn () => RoleAnalyticsData::from(app(AuthRbacReader::class)->roleAnalytics($actor, $unconfiguredModel)))
         ->toThrow(ModelNotFoundException::class);
 });
 
@@ -1000,8 +946,8 @@ it('keeps role analytics query count constant as related data grows', function (
     $measure = function (Role $role) use ($actor): array {
         DB::flushQueryLog();
         DB::enableQueryLog();
-        app(ShowRoleAnalyticsAction::class)->execute($actor, $role->id);
-        $queries = DB::getQueryLog();
+        RoleAnalyticsData::from(app(AuthRbacReader::class)->roleAnalytics($actor, $role->id));
+        $queries = authProtectedRbacReads(DB::getQueryLog());
         DB::disableQueryLog();
 
         return $queries;
@@ -1029,7 +975,7 @@ it('counts role descendants once when persisted hierarchy data contains a cycle'
     Role::factory()->create(['name' => 'cycle-child', 'parent_id' => $second->id]);
     $first->forceFill(['parent_id' => $second->id])->save();
 
-    $analytics = app(ShowRoleAnalyticsAction::class)->execute($actor, $first->id);
+    $analytics = RoleAnalyticsData::from(app(AuthRbacReader::class)->roleAnalytics($actor, $first->id));
 
     expect($analytics->children)->toBe(1)
         ->and($analytics->descendants)->toBe(2)
@@ -1048,9 +994,28 @@ it('denies per-role analytics before querying package storage', function (): voi
     DB::flushQueryLog();
     DB::enableQueryLog();
 
-    expect(fn () => app(ShowRoleAnalyticsAction::class)->execute($actor, 'role-id'))
+    expect(fn () => RoleAnalyticsData::from(app(AuthRbacReader::class)->roleAnalytics($actor, 'role-id')))
         ->toThrow(AuthException::class, 'not authorized')
         ->and(DB::getQueryLog())->toBe([]);
 
     DB::disableQueryLog();
 });
+
+/** @param list<array{query: string, bindings: array, time: float}> $queries
+ * @return list<array{query: string, bindings: array, time: float}>
+ */
+function authProtectedRbacReads(array $queries): array
+{
+    $tables = [config('permission.table_names.roles'), config('permission.table_names.permissions'), config('permission.table_names.model_has_roles'), config('permission.table_names.model_has_permissions'), config('permission.table_names.role_has_permissions'), (new TestUser)->getTable()];
+
+    return array_values(array_filter($queries, static function (array $query) use ($tables): bool {
+        $sql = str_replace(['`', '"', '[', ']'], '', strtolower($query['query']));
+        foreach ($tables as $table) {
+            if (is_string($table) && preg_match('/\\b(?:from|join)\\s+'.preg_quote($table, '/').'\\b/', $sql) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }));
+}

@@ -66,17 +66,17 @@ final readonly class RbacSynchronizer
             }
 
             $mutation = $template->toMutation(parentId: $parentId);
-            $role = $roleClass::findOrCreate($mutation->name, $guard);
+            $role = $roleClass::findOrCreate($mutation['name'], $guard);
 
             if ($role instanceof Role) {
-                $attributes = $mutation->except('permissions')->toModelPatch();
+                $attributes = ['name' => $mutation['name'], 'display_name' => $mutation['displayName'], 'description' => $mutation['description'], 'parent_id' => $mutation['parentId'], 'priority' => $mutation['priority'], 'system' => $mutation['system'], 'metadata' => $mutation['metadata']];
                 $attributes['is_system'] = $attributes['system'];
                 unset($attributes['system']);
                 $role->fill($attributes)->save();
             }
             $permissionModels = [];
 
-            foreach ($mutation->permissions as $permission) {
+            foreach ($mutation['permissions'] as $permission) {
                 $permissionModels[] = $permissionClass::findOrCreate($permission, $guard);
             }
 

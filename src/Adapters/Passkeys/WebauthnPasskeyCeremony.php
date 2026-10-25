@@ -65,6 +65,9 @@ final class WebauthnPasskeyCeremony implements PasskeyCeremony
         private readonly AuthConfiguration $configuration,
         private readonly Repository $applicationConfiguration,
     ) {
+        if (! class_exists(AuthenticatorAssertionResponseValidator::class) || ! class_exists(WebauthnSerializerFactory::class)) {
+            throw AuthException::invalidConfiguration('Passkeys require web-auth/webauthn-lib and its serializer dependencies.');
+        }
         $attestationStatements = new AttestationStatementSupportManager([
             new NoneAttestationStatementSupport,
         ]);

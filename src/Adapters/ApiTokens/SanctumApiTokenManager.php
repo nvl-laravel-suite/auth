@@ -17,47 +17,40 @@ use Laravel\Sanctum\NewAccessToken;
 use Laravel\Sanctum\PersonalAccessToken;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\OwnerBoundApiTokenManager;
-use Nvl\Auth\Contracts\TenantBoundApiTokenManager;
-use Nvl\Auth\Data\Mutations\ApiTokenData;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Results\IssuedApiToken;
 use Nvl\Auth\Services\AuthConfiguration;
-use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
 use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use Nvl\Support\Ownership\ValueObjects\OwnerReference;
-use Nvl\Support\Tenancy\ValueObjects\TenantId;
 
 /**
  * Manages personal access tokens directly in Sanctum's authoritative table.
  */
-final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiTokenManager, TenantBoundApiTokenManager
+final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiTokenManager
 {
     /**
      * Create the namespaced Sanctum adapter.
      */
-    public function __construct(
-        private readonly AuthConfiguration $configuration,
-        private readonly OwnershipBoundary $boundary,
-    ) {}
+    public function __construct(private readonly AuthConfiguration $configuration, private readonly OwnershipBoundary $boundary) {}
 
     /**
      * List subject-owned Sanctum tokens.
+     *
+     * @return list<array{id: string, name: string, abilities: list<string>, lastUsedAt: CarbonImmutable|null, expiresAt: CarbonImmutable|null, createdAt: CarbonImmutable}>
      */
     public function list(Authenticatable $subject): array
     {
         $model = $this->subject($subject);
 
-        return array_values($this->managedTokens($model)
-            ->get()
-            ->map(fn (PersonalAccessToken $token): ApiTokenSnapshot => $this->snapshot($token))
-            ->sortByDesc(static fn (ApiTokenSnapshot $token): int => $token->createdAt->getTimestamp())
-            ->all());
+        return array_values($this->managedTokens($model)->get()->map(fn (PersonalAccessToken $token): array => $this->snapshot($token))->sortByDesc(static fn (array $token): int => $token['createdAt']->getTimestamp())->all());
     }
 
     /**
      * Issue one Sanctum token.
+     *
+     * @param  array{name: string, abilities: list<string>, expiresAt: CarbonImmutable|null}  $data
      */
-    public function create(Authenticatable $subject, ApiTokenData $data): IssuedApiToken
+    public function create(Authenticatable $subject, array $data): IssuedApiToken
     {
         $model = $this->subject($subject);
         $connection = $this->tokens($model)->getModel()->getConnectionName();
@@ -66,31 +59,24 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
             $created = $this->createToken($model, $data);
             $created->accessToken->forceFill($this->boundary->attributes('auth.tokens'))->save();
 
-            return new IssuedApiToken(
-                $this->snapshot($created->accessToken->refresh()),
-                $created->plainTextToken,
-            );
+            return new IssuedApiToken($this->snapshot($created->accessToken->refresh()), $created->plainTextToken);
         }, 3);
     }
 
     /**
      * Update one subject-owned Sanctum token.
+     *
+     * @param  array{name: string, abilities: list<string>, expiresAt: CarbonImmutable|null}  $data
+     * @return array{id: string, name: string, abilities: list<string>, lastUsedAt: CarbonImmutable|null, expiresAt: CarbonImmutable|null, createdAt: CarbonImmutable}
      */
-    public function update(
-        Authenticatable $subject,
-        string $tokenId,
-        ApiTokenData $data,
-    ): ApiTokenSnapshot {
+    public function update(Authenticatable $subject, string $tokenId, array $data): array
+    {
         $model = $this->subject($subject);
         $connection = $this->tokens($model)->getModel()->getConnectionName();
 
-        return DB::connection($connection)->transaction(function () use ($data, $model, $tokenId): ApiTokenSnapshot {
+        return DB::connection($connection)->transaction(function () use ($data, $model, $tokenId): array {
             $token = $this->token($model, $tokenId, true);
-            $token->forceFill([
-                'name' => $this->managedName($data->name),
-                'abilities' => $data->abilities,
-                'expires_at' => $data->expiresAt,
-            ])->save();
+            $token->forceFill(['name' => $this->managedName($data['name']), 'abilities' => $data['abilities'], 'expires_at' => $data['expiresAt']])->save();
 
             return $this->snapshot($token->refresh());
         }, 3);
@@ -98,12 +84,11 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
 
     /**
      * Issue the replacement before deleting the old token in one connection transaction.
+     *
+     * @param  array{name: string, abilities: list<string>, expiresAt: CarbonImmutable|null}  $data
      */
-    public function rotate(
-        Authenticatable $subject,
-        string $tokenId,
-        ApiTokenData $data,
-    ): IssuedApiToken {
+    public function rotate(Authenticatable $subject, string $tokenId, array $data): IssuedApiToken
+    {
         $model = $this->subject($subject);
         $connection = $this->tokens($model)->getModel()->getConnectionName();
 
@@ -132,7 +117,6 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
     public function revokeAll(Authenticatable $subject): int
     {
         $deleted = $this->managedTokens($this->subject($subject))->delete();
-
         if (! is_int($deleted)) {
             throw AuthException::invalidConfiguration('Sanctum returned an invalid revoked-token count.');
         }
@@ -145,33 +129,13 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
     {
         $model = $this->subject($subject);
         $token = $this->tokens($model)->getModel();
-        $row = $token->getConnection()->table($token->getTable())->useWritePdo()->where($token->getKeyName(), $tokenId)
-            ->where('tokenable_type', $model->getMorphClass())->where('tokenable_id', $model->getKey())
-            ->whereRaw('name LIKE ?', [$this->namespace().':%'])->first();
-        if ($row === null || ! is_string($row->owner_reference ?? null)
-            || ($row->expires_at !== null && (! is_string($row->expires_at) || CarbonImmutable::parse($row->expires_at)->isPast()))) {
+        $row = $token->getConnection()->table($token->getTable())->useWritePdo()->where($token->getKeyName(), $tokenId)->where('tokenable_type', $model->getMorphClass())->where('tokenable_id', $model->getKey())->whereRaw('name LIKE ?', [$this->namespace().':%'])->first();
+        if ($row === null || ! is_string($row->owner_reference ?? null) || $row->expires_at !== null && (! is_string($row->expires_at) || CarbonImmutable::parse($row->expires_at)->isPast())) {
             return null;
         }
         $reference = OwnerReference::fromJson($row->owner_reference);
 
         return $row->owner_scope_key === $reference->scopeKey() ? $reference : null;
-    }
-
-    /** Resolve exact persisted token ownership without accepting an ambient tenant. */
-    public function tenantForToken(Authenticatable $subject, string $tokenId): ?TenantId
-    {
-        $model = $this->subject($subject);
-        $token = $this->tokens($model)
-            ->whereRaw('name LIKE ?', [$this->namespace().':%'])
-            ->whereKey($tokenId)
-            ->first();
-        $tenantId = $token?->getAttribute('tenant_id');
-        $ownershipKey = $token?->getAttribute('ownership_key');
-        if (! is_string($tenantId) || $ownershipKey !== 'tenant:'.$tenantId) {
-            return null;
-        }
-
-        return new TenantId($tenantId);
     }
 
     /**
@@ -182,13 +146,8 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
         if (! class_exists(PersonalAccessToken::class)) {
             throw AuthException::invalidConfiguration('API tokens require laravel/sanctum.');
         }
-
-        if (! $subject instanceof Model
-            || (! $subject instanceof HasApiTokensContract
-                && ! in_array(HasApiTokens::class, class_uses_recursive($subject), true))) {
-            throw AuthException::invalidConfiguration(
-                'The host authenticatable must use Sanctum HasApiTokens.',
-            );
+        if (! $subject instanceof Model || ! $subject instanceof HasApiTokensContract && ! in_array(HasApiTokens::class, class_uses_recursive($subject), true)) {
+            throw AuthException::invalidConfiguration('The host authenticatable must use Sanctum HasApiTokens.');
         }
 
         return $subject;
@@ -200,13 +159,10 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
     private function token(Model $subject, string $tokenId, bool $lock = false): PersonalAccessToken
     {
         $query = $this->managedTokens($subject)->whereKey($tokenId);
-
         if ($lock) {
             $query->lockForUpdate();
         }
-
         $token = $query->first();
-
         if (! $token instanceof PersonalAccessToken) {
             throw new AuthException('api_token_unavailable', 'The API token is unavailable.', 404);
         }
@@ -223,7 +179,6 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
     {
         $method = new \ReflectionMethod($subject, 'tokens');
         $tokens = $method->invoke($subject);
-
         if (! $tokens instanceof MorphMany) {
             throw AuthException::invalidConfiguration('Sanctum HasApiTokens returned an invalid token relationship.');
         }
@@ -245,17 +200,13 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
 
     /**
      * Invoke Sanctum token issuance for contract- or trait-based hosts.
+     *
+     * @param  array{name: string, abilities: list<string>, expiresAt: CarbonImmutable|null}  $data
      */
-    private function createToken(Model $subject, ApiTokenData $data): NewAccessToken
+    private function createToken(Model $subject, array $data): NewAccessToken
     {
         $method = new \ReflectionMethod($subject, 'createToken');
-        $created = $method->invoke(
-            $subject,
-            $this->managedName($data->name),
-            $data->abilities,
-            $data->expiresAt,
-        );
-
+        $created = $method->invoke($subject, $this->managedName($data['name']), $data['abilities'], $data['expiresAt']);
         if (! $created instanceof NewAccessToken) {
             throw AuthException::invalidConfiguration('Sanctum HasApiTokens returned an invalid issued token.');
         }
@@ -265,39 +216,24 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
 
     /**
      * Convert Sanctum metadata into the package's provider-neutral snapshot.
+     *
+     * @return array{id: string, name: string, abilities: list<string>, lastUsedAt: CarbonImmutable|null, expiresAt: CarbonImmutable|null, createdAt: CarbonImmutable}
      */
-    private function snapshot(PersonalAccessToken $token): ApiTokenSnapshot
+    private function snapshot(PersonalAccessToken $token): array
     {
         $createdAt = $this->date($token->getAttribute('created_at'));
-
         if (! $createdAt instanceof CarbonImmutable) {
             throw AuthException::invalidConfiguration('Sanctum token timestamps are unavailable.');
         }
-
         $rawAbilities = $token->getAttribute('abilities');
-        $abilities = is_array($rawAbilities)
-            ? array_values(array_filter($rawAbilities, 'is_string'))
-            : [];
+        $abilities = is_array($rawAbilities) ? array_values(array_filter($rawAbilities, 'is_string')) : [];
         $identifier = $token->getKey();
         $name = $token->getAttribute('name');
-
-        if ((! is_string($identifier) && ! is_int($identifier))
-            || ! is_string($name)
-            || ! str_starts_with($name, $this->namespace().':')) {
+        if (! is_string($identifier) && ! is_int($identifier) || ! is_string($name) || ! str_starts_with($name, $this->namespace().':')) {
             throw AuthException::invalidConfiguration('Sanctum token identity metadata is unavailable.');
         }
 
-        return new ApiTokenSnapshot(
-            id: (string) $identifier,
-            name: substr($name, strlen($this->namespace()) + 1),
-            abilities: $abilities,
-            lastUsedAt: $this->date($token->getAttribute('last_used_at')),
-            expiresAt: $this->date($token->getAttribute('expires_at')),
-            createdAt: $createdAt,
-            tenantId: config('nvl-tenancy.enabled') === true
-                ? (is_string($token->getAttribute('tenant_id')) ? $token->getAttribute('tenant_id') : null)
-                : null,
-        );
+        return ['id' => (string) $identifier, 'name' => substr($name, strlen($this->namespace()) + 1), 'abilities' => $abilities, 'lastUsedAt' => $this->date($token->getAttribute('last_used_at')), 'expiresAt' => $this->date($token->getAttribute('expires_at')), 'createdAt' => $createdAt];
     }
 
     /**
@@ -305,9 +241,7 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
      */
     private function date(mixed $value): ?CarbonImmutable
     {
-        return $value instanceof DateTimeInterface
-            ? CarbonImmutable::instance($value)
-            : null;
+        return $value instanceof DateTimeInterface ? CarbonImmutable::instance($value) : null;
     }
 
     /**
@@ -316,11 +250,8 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
     private function namespace(): string
     {
         $namespace = $this->configuration->string('features.api_tokens.settings.namespace', 'nvl-auth');
-
         if (preg_match('/\A[a-z0-9][a-z0-9_.-]{0,39}\z/', $namespace) !== 1) {
-            throw AuthException::invalidConfiguration(
-                'Auth API-token namespace must be a lowercase identifier no longer than 40 characters.',
-            );
+            throw AuthException::invalidConfiguration('Auth API-token namespace must be a lowercase identifier no longer than 40 characters.');
         }
 
         return $namespace;

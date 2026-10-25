@@ -10,7 +10,9 @@ use Nvl\Ownership\Services\OwnershipDatabaseConstraints;
 use Nvl\Support\Ownership\Exceptions\OwnershipConfigurationInvalid;
 use Nvl\Support\Ownership\Services\OwnershipResourceRegistry;
 
-/** Creates additive optional owner storage; historical tenant records remain untouched. @internal */
+/** Creates additive optional owner storage; historical tenant records remain untouched.
+ * @internal
+ */
 final readonly class AuthOwnerSchema
 {
     /** Retain the native database constraint capability. */
@@ -20,6 +22,9 @@ final readonly class AuthOwnerSchema
     public function prepare(OwnershipResourceRegistry $resources): void
     {
         foreach (['auth.memberships', 'auth.membership_locks', 'auth.authentication_intents'] as $key) {
+            if (! isset($resources->all()[$key])) {
+                continue;
+            }
             $definition = $resources->get($key);
             if ($definition->ownership->strategy === 'unscoped') {
                 continue;
@@ -55,28 +60,33 @@ final readonly class AuthOwnerSchema
     /** Prepare partitioned RBAC uniqueness while retaining historical rows. */
     public function prepareTeams(OwnershipResourceRegistry $resources): void
     {
-        $roleModel = new ($resources->get('auth.roles')->model);
-        $schema = $roleModel->getConnection()->getSchemaBuilder();
-        foreach ([AuthTables::ModelHasRoles => 'role_id', AuthTables::ModelHasPermissions => 'permission_id'] as $logical => $foreign) {
-            $name = AuthTables::get($logical);
-            if (! $schema->hasColumn($name, 'owner_scope_key')) {
-                $schema->table($name, static fn (Blueprint $table) => $table->string('owner_scope_key', 191)->nullable());
-            }
-            foreach ($schema->getIndexes($name) as $index) {
-                if ($index['primary'] && ! in_array('owner_scope_key', $index['columns'], true)) {
-                    $schema->table($name, static fn (Blueprint $table) => $table->dropPrimary($index['name']));
+        if (isset($resources->all()['auth.roles'])) {
+            $roleModel = new ($resources->get('auth.roles')->model);
+            $schema = $roleModel->getConnection()->getSchemaBuilder();
+            foreach ([AuthTables::ModelHasRoles => 'role_id', AuthTables::ModelHasPermissions => 'permission_id'] as $logical => $foreign) {
+                $name = AuthTables::get($logical);
+                if (! $schema->hasColumn($name, 'owner_scope_key')) {
+                    $schema->table($name, static fn (Blueprint $table) => $table->string('owner_scope_key', 191)->nullable());
                 }
-            }
-            $columns = ['owner_scope_key', $foreign, 'model_id', 'model_type'];
-            $exists = false;
-            foreach ($schema->getIndexes($name) as $index) {
-                $exists = $exists || ($index['unique'] && $index['columns'] === $columns);
-            }
-            if (! $exists) {
-                $schema->table($name, static fn (Blueprint $table) => $table->unique($columns, 'auth_owner_pivot_'.substr(hash('sha256', $name), 0, 20)));
+                foreach ($schema->getIndexes($name) as $index) {
+                    if ($index['primary'] && ! in_array('owner_scope_key', $index['columns'], true)) {
+                        $schema->table($name, static fn (Blueprint $table) => $table->dropPrimary($index['name']));
+                    }
+                }
+                $columns = ['owner_scope_key', $foreign, 'model_id', 'model_type'];
+                $exists = false;
+                foreach ($schema->getIndexes($name) as $index) {
+                    $exists = $exists || ($index['unique'] && $index['columns'] === $columns);
+                }
+                if (! $exists) {
+                    $schema->table($name, static fn (Blueprint $table) => $table->unique($columns, 'auth_owner_pivot_'.substr(hash('sha256', $name), 0, 20)));
+                }
             }
         }
         foreach (['auth.memberships' => ['owner_scope_key', 'subject_type', 'subject_id'], 'auth.membership_locks' => ['owner_scope_key'], 'auth.roles' => ['owner_scope_key', 'name', 'guard_name']] as $key => $columns) {
+            if (! isset($resources->all()[$key])) {
+                continue;
+            }
             $definition = $resources->get($key);
             if ($definition->ownership->strategy === 'unscoped') {
                 continue;
@@ -99,6 +109,9 @@ final readonly class AuthOwnerSchema
     /** Reject unmapped historical assignments and cross-partition hierarchy edges before activation. */
     public function verifyTeams(OwnershipResourceRegistry $resources): void
     {
+        if (! isset($resources->all()['auth.roles'])) {
+            return;
+        }
         $role = new ($resources->get('auth.roles')->model);
         $connection = $role->getConnection();
         foreach ([AuthTables::ModelHasRoles, AuthTables::ModelHasPermissions] as $logical) {
@@ -122,6 +135,9 @@ final readonly class AuthOwnerSchema
     /** Enforce partition validity, immutability and role references on every supported source. */
     public function constrainTeams(OwnershipResourceRegistry $resources): void
     {
+        if (! isset($resources->all()['auth.roles'])) {
+            return;
+        }
         $this->verifyTeams($resources);
         $role = new ($resources->get('auth.roles')->model);
         $connection = $role->getConnection();

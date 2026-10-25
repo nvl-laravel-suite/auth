@@ -1,0 +1,75 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Display;
+
+use Nvl\Auth\Models\Permission;
+use Spatie\LaravelData\Attributes\MapOutputName;
+use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Mappers\CamelCaseMapper;
+
+/**
+ * Minimal permission identity for bounded consumer selectors and resolution results.
+ *
+ * @api
+ */
+#[MapOutputName(CamelCaseMapper::class)]
+final class PermissionOptionData extends Data
+{
+    public readonly string $label;
+
+    public readonly string $group;
+
+    /**
+     * Create a permission option projection.
+     */
+    public function __construct(
+        public readonly string $id,
+        public readonly string $name,
+        string $label,
+        public readonly ?string $description,
+        string $group,
+    ) {
+        $label = trim($label);
+        $this->label = $label !== '' ? $label : $name;
+        $this->group = self::normalizeGroup($group);
+    }
+
+    /**
+     * Build a permission option from an already selected package model row.
+     *
+     * @internal
+     */
+    public static function fromModel(Permission $permission): self
+    {
+        return new self(
+            id: $permission->id,
+            name: $permission->name,
+            label: $permission->display_name ?? '',
+            description: $permission->description,
+            group: $permission->group ?? '',
+        );
+    }
+
+    /**
+     * Normalize the uncategorized permission group.
+     */
+    public static function normalizeGroup(?string $group): string
+    {
+        return self::normalizeNullableGroup($group) ?? 'general';
+    }
+
+    /**
+     * Normalize a nullable group at package input and persistence boundaries.
+     */
+    public static function normalizeNullableGroup(?string $group): ?string
+    {
+        $group = trim(
+            str_replace(["\t", "\n", "\v", "\r"], '', (string) $group),
+            ' ',
+        );
+
+        return $group !== '' ? $group : null;
+    }
+}

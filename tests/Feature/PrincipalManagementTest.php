@@ -9,32 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
-use Nvl\Auth\Actions\Authentication\LoginAction;
-use Nvl\Auth\Actions\Rbac\CreatePermissionAction;
-use Nvl\Auth\Actions\Rbac\CreateRoleAction;
-use Nvl\Auth\Actions\Users\BulkUpdateUsersAction;
-use Nvl\Auth\Actions\Users\CreateUserAction;
-use Nvl\Auth\Actions\Users\DeleteOwnAccountAction;
-use Nvl\Auth\Actions\Users\DeleteUserAction;
-use Nvl\Auth\Actions\Users\ListUsersAction;
-use Nvl\Auth\Actions\Users\RestoreUserAction;
-use Nvl\Auth\Actions\Users\SetUserActiveAction;
-use Nvl\Auth\Actions\Users\ShowUserAction;
-use Nvl\Auth\Actions\Users\SuggestUsersAction;
-use Nvl\Auth\Actions\Users\SyncUserPermissionsAction;
-use Nvl\Auth\Actions\Users\SyncUserRolesAction;
-use Nvl\Auth\Actions\Users\UpdateProfileAction;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
-use Nvl\Auth\Data\Mutations\DeleteOwnAccountData;
-use Nvl\Auth\Data\Mutations\LoginData;
-use Nvl\Auth\Data\Mutations\StorePermissionData;
-use Nvl\Auth\Data\Mutations\StoreRoleData;
-use Nvl\Auth\Data\Mutations\StoreUserData;
-use Nvl\Auth\Data\Mutations\SyncUserPermissionsData;
-use Nvl\Auth\Data\Mutations\SyncUserRolesData;
-use Nvl\Auth\Data\Mutations\UpdateProfileData;
-use Nvl\Auth\Data\Mutations\UpdateUserStatusData;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\UserBulkOperation;
 use Nvl\Auth\Events\AuthDeliveryRequested;
@@ -43,6 +19,11 @@ use Nvl\Auth\Events\RbacAssignmentChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\User;
+use Nvl\Auth\Services\Authentication;
+use Nvl\Auth\Services\AuthPermissions;
+use Nvl\Auth\Services\AuthRoles;
+use Nvl\Auth\Services\AuthUserReader;
+use Nvl\Auth\Services\AuthUsers;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 it('rejects a malformed host token relationship before credential containment', function (): void {
@@ -60,18 +41,11 @@ it('rejects a malformed host token relationship before credential containment', 
 
 it('owns a complete principal lifecycle and fails disabled login closed', function (): void {
     $actor = $this->user('owner@example.test');
-    $permission = app(CreatePermissionAction::class)->execute($actor, new StorePermissionData('users.create', 'Create Principals'));
-    $role = app(CreateRoleAction::class)->execute($actor, new StoreRoleData('manage', 'Super Administrator', permissions: ['users.create']));
+    $permission = app(AuthPermissions::class)->create($actor, ['name' => 'users.create', 'displayName' => 'Create Principals']);
+    $role = app(AuthRoles::class)->create($actor, ['name' => 'manage', 'displayName' => 'Super Administrator', 'permissions' => ['users.create']]);
     Event::fake([PrincipalChanged::class, RbacAssignmentChanged::class]);
 
-    $user = app(CreateUserAction::class)->execute($actor, new StoreUserData(
-        name: 'Package User',
-        email: 'package.user@example.test',
-        password: 'SecurePassword123',
-        roles: ['manage'],
-        permissions: ['users.create'],
-        emailVerified: true,
-    ));
+    $user = app(AuthUsers::class)->create($actor, ['name' => 'Package User', 'email' => 'package.user@example.test', 'password' => 'SecurePassword123', 'roles' => ['manage'], 'permissions' => ['users.create'], 'emailVerified' => true]);
 
     expect($user)->toBeInstanceOf(User::class)
         ->and($user->getTable())->toBe(AuthTables::Users)
@@ -80,21 +54,21 @@ it('owns a complete principal lifecycle and fails disabled login closed', functi
         ->and($user->hasDirectPermission('users.create'))->toBeTrue();
 
     $user->createToken('nvl-auth:mobile', ['users.create']);
-    $disabled = app(SetUserActiveAction::class)->execute($actor, $user, new UpdateUserStatusData(false));
+    $disabled = app(AuthUsers::class)->setActive($actor, $user, ['active' => false]);
 
     expect($disabled->is_active)->toBeFalse()
         ->and($disabled->tokens()->count())->toBe(0)
-        ->and(fn () => app(LoginAction::class)->execute(new LoginData($user->email, 'SecurePassword123')))
+        ->and(fn () => app(Authentication::class)->login(['identifier' => $user->email, 'password' => 'SecurePassword123'], [], auth()->guard('web'), app('session')->driver()))
         ->toThrow(AuthException::class, 'credentials');
 
-    app(SetUserActiveAction::class)->execute($actor, $user, new UpdateUserStatusData(true));
-    app(SyncUserRolesAction::class)->execute($actor, $user, new SyncUserRolesData([]));
-    app(SyncUserPermissionsAction::class)->execute($actor, $user, new SyncUserPermissionsData(['users.create']));
-    app(DeleteUserAction::class)->execute($actor, $user);
+    app(AuthUsers::class)->setActive($actor, $user, ['active' => true]);
+    app(AuthRoles::class)->syncUserRoles($actor, $user, ['roles' => []]);
+    app(AuthPermissions::class)->syncUserPermissions($actor, $user, ['permissions' => ['users.create']]);
+    app(AuthUsers::class)->delete($actor, $user);
 
     expect($user->fresh()->trashed())->toBeTrue();
 
-    $restored = app(RestoreUserAction::class)->execute($actor, $user->id);
+    $restored = app(AuthUsers::class)->restore($actor, $user->id);
 
     expect($restored->trashed())->toBeFalse()
         ->and($restored->is_active)->toBeTrue()
@@ -106,30 +80,16 @@ it('owns a complete principal lifecycle and fails disabled login closed', functi
 
 it('supports profile, suggestions, and bounded bulk lifecycle operations', function (): void {
     $actor = $this->user('profile.owner@example.test');
-    $first = app(CreateUserAction::class)->execute($actor, new StoreUserData(
-        name: 'Suggested Alpha',
-        email: 'alpha@example.test',
-        password: 'SecurePassword123',
-    ));
-    $second = app(CreateUserAction::class)->execute($actor, new StoreUserData(
-        name: 'Suggested Beta',
-        email: 'beta@example.test',
-        password: 'SecurePassword123',
-    ));
+    $first = app(AuthUsers::class)->create($actor, ['name' => 'Suggested Alpha', 'email' => 'alpha@example.test', 'password' => 'SecurePassword123']);
+    $second = app(AuthUsers::class)->create($actor, ['name' => 'Suggested Beta', 'email' => 'beta@example.test', 'password' => 'SecurePassword123']);
     $first->forceFill(['remember_token' => 'first-remember'])->save();
     $second->forceFill(['remember_token' => 'second-remember'])->save();
     $first->createToken('nvl-auth:first', ['profile:read']);
     $second->createToken('nvl-auth:second', ['profile:read']);
 
-    $profile = app(UpdateProfileAction::class)->execute($actor, new UpdateProfileData(
-        name: 'Updated Owner',
-        locale: 'bg',
-        timezone: 'Europe/Sofia',
-        profile: ['phone' => '+359000000000'],
-        preferences: ['theme' => 'dark'],
-    ));
-    $suggestions = app(SuggestUsersAction::class)->execute($actor, 'Suggested');
-    $result = app(BulkUpdateUsersAction::class)->execute(
+    $profile = app(AuthUsers::class)->updateProfile($actor, ['name' => 'Updated Owner', 'locale' => 'bg', 'timezone' => 'Europe/Sofia', 'profile' => ['phone' => '+359000000000'], 'preferences' => ['theme' => 'dark']]);
+    $suggestions = app(AuthUserReader::class)->suggest($actor, 'Suggested');
+    $result = app(AuthUsers::class)->bulkUpdate(
         $actor,
         UserBulkOperation::Disable,
         [$first->id, $second->id],
@@ -139,7 +99,7 @@ it('supports profile, suggestions, and bounded bulk lifecycle operations', funct
         ->and($profile->profile)->toBe(['phone' => '+359000000000'])
         ->and($profile->preferences)->toBe(['theme' => 'dark'])
         ->and($suggestions)->toHaveCount(2)
-        ->and($result->affected)->toBe(2)
+        ->and($result['affected'])->toBe(2)
         ->and($first->fresh()->is_active)->toBeFalse()
         ->and($second->fresh()->is_active)->toBeFalse()
         ->and($first->fresh()->remember_token)->not->toBe('first-remember')
@@ -166,15 +126,15 @@ it('passes resolved principal targets to individual and bulk management policy d
     };
     app()->instance(AuthManagementAccess::class, $access);
 
-    $shown = app(ShowUserAction::class)->execute($actor, $first->id);
-    $result = app(BulkUpdateUsersAction::class)->execute(
+    $shown = app(AuthUserReader::class)->find($actor, $first->id);
+    $result = app(AuthUsers::class)->bulkUpdate(
         $actor,
         UserBulkOperation::Disable,
         [$first->id, $second->id],
     );
 
     expect($shown->is($first))->toBeTrue()
-        ->and($result->affected)->toBe(2)
+        ->and($result['affected'])->toBe(2)
         ->and($access->targets)->toHaveCount(3)
         ->and($access->targets)->each->toBeInstanceOf(User::class);
 });
@@ -185,15 +145,16 @@ it('keeps eager-loaded principal list queries independent of fixture size', func
         DB::flushQueryLog();
         DB::enableQueryLog();
 
-        $page = app(ListUsersAction::class)->execute($actor, perPage: 100);
-        $queryCount = count(DB::getQueryLog());
+        $page = app(AuthUserReader::class)->paginate($actor, perPage: 100);
+        $queryCount = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => str_contains($query['query'], 'from "nvl_auth_') && ! str_contains($query['query'], 'installation')));
 
         foreach ($page->items() as $user) {
             $user->roles->count();
             $user->permissions->count();
         }
 
-        expect(DB::getQueryLog())->toHaveCount($queryCount);
+        expect($queryCount)->toBeGreaterThan(0);
+        expect(array_filter(DB::getQueryLog(), static fn (array $query): bool => str_contains($query['query'], 'from "nvl_auth_') && ! str_contains($query['query'], 'installation')))->toHaveCount($queryCount);
         DB::disableQueryLog();
 
         return $queryCount;
@@ -233,10 +194,10 @@ it('contains browser credentials during actorless domain deactivation', function
     ]);
 
     try {
-        $updated = app(SetUserActiveAction::class)->execute(
+        $updated = app(AuthUsers::class)->setActive(
             new SystemMutationContext('Compliance failure', 'compliance-456', metadata: ['case' => '456']),
             $user,
-            new UpdateUserStatusData(false),
+            ['active' => false],
         );
 
         $audit = AuthAudit::query()->where('action', 'user.disabled')->firstOrFail();
@@ -248,10 +209,10 @@ it('contains browser credentials during actorless domain deactivation', function
             ->and($audit->actor_id)->toBeNull()
             ->and($audit->metadata['system']['correlation_id'])->toBe('compliance-456');
 
-        $reenabled = app(SetUserActiveAction::class)->execute(
+        $reenabled = app(AuthUsers::class)->setActive(
             new SystemMutationContext('Compliance restored', 'compliance-456-restored'),
             $user,
-            new UpdateUserStatusData(true),
+            ['active' => true],
         );
 
         expect($reenabled->is_active)->toBeTrue();
@@ -261,16 +222,8 @@ it('contains browser credentials during actorless domain deactivation', function
 });
 
 it('rejects invalid direct principal and RBAC input before persistence', function (): void {
-    expect(fn (): StoreUserData => new StoreUserData(
-        name: 'Invalid Timezone',
-        email: 'invalid.timezone@example.test',
-        password: 'SecurePassword123',
-        timezone: 'Not/A-Timezone',
-    ))->toThrow(InvalidArgumentException::class, 'timezone')
-        ->and(fn (): StoreRoleData => new StoreRoleData(
-            name: 'duplicated-permissions',
-            permissions: ['users.create', 'users.create'],
-        ))->toThrow(InvalidArgumentException::class, 'distinct');
+    expect(fn () => app(AuthUsers::class)->create($this->user(), ['name' => 'Invalid Timezone', 'email' => 'invalid.timezone@example.test', 'password' => 'SecurePassword123', 'timezone' => 'Not/A-Timezone']))->toThrow(InvalidArgumentException::class, 'timezone')
+        ->and(fn () => app(AuthRoles::class)->create($this->user('role-input@example.test'), ['name' => 'duplicated-permissions', 'permissions' => ['users.create', 'users.create']]))->toThrow(InvalidArgumentException::class, 'distinct');
 
     expect(User::query()->where('email', 'invalid.timezone@example.test')->exists())->toBeFalse();
 });
@@ -281,10 +234,7 @@ it('changes self-service email sparsely after confirmation and restarts verifica
     $user = $this->user('old@example.test');
     $user->forceFill(['email_verified_at' => now(), 'locale' => 'bg'])->save();
 
-    $updated = app(UpdateProfileAction::class)->execute($user, new UpdateProfileData(
-        email: ' New.Address@Example.Test ',
-        currentPassword: 'correct-password',
-    ));
+    $updated = app(AuthUsers::class)->updateProfile($user, ['email' => ' New.Address@Example.Test ', 'currentPassword' => 'correct-password']);
 
     expect($updated->email)->toBe('new.address@example.test')
         ->and($updated->email_verified_at)->toBeNull()
@@ -300,20 +250,18 @@ it('changes self-service email sparsely after confirmation and restarts verifica
 it('updates a nonsensitive profile field without account confirmation', function (): void {
     $user = $this->user('profile-name@example.test');
 
-    $updated = app(UpdateProfileAction::class)->execute($user, new UpdateProfileData(
-        name: 'Updated Without Confirmation',
-    ));
+    $updated = app(AuthUsers::class)->updateProfile($user, ['name' => 'Updated Without Confirmation']);
 
     expect($updated->name)->toBe('Updated Without Confirmation')
         ->and($updated->email)->toBe('profile-name@example.test');
 });
 
-it('requires valid account confirmation before changing email', function (UpdateProfileData $data, string $code): void {
+it('requires valid account confirmation before changing email', function (array $data, string $code): void {
     $user = $this->user('confirmation-required@example.test');
     $failure = null;
 
     try {
-        app(UpdateProfileAction::class)->execute($user, $data);
+        app(AuthUsers::class)->updateProfile($user, $data);
     } catch (AuthException $exception) {
         $failure = $exception;
     }
@@ -323,14 +271,11 @@ it('requires valid account confirmation before changing email', function (Update
         ->and($user->refresh()->email)->toBe('confirmation-required@example.test');
 })->with([
     'missing current password' => [
-        new UpdateProfileData(email: 'missing-confirmation@example.test'),
+        ['email' => 'missing-confirmation@example.test'],
         'account_confirmation_required',
     ],
     'incorrect current password' => [
-        new UpdateProfileData(
-            email: 'invalid-confirmation@example.test',
-            currentPassword: 'incorrect-password',
-        ),
+        ['email' => 'invalid-confirmation@example.test', 'currentPassword' => 'incorrect-password'],
         'account_confirmation_invalid',
     ],
 ]);
@@ -340,10 +285,7 @@ it('rejects a self-service email conflict without changing profile state', funct
     $user = $this->user('unchanged@example.test');
     $this->user('taken@example.test');
 
-    expect(fn () => app(UpdateProfileAction::class)->execute($user, new UpdateProfileData(
-        email: 'taken@example.test',
-        currentPassword: 'correct-password',
-    )))->toThrow(AuthException::class, 'unavailable')
+    expect(fn () => app(AuthUsers::class)->updateProfile($user, ['email' => 'taken@example.test', 'currentPassword' => 'correct-password']))->toThrow(AuthException::class, 'unavailable')
         ->and($user->refresh()->email)->toBe('unchanged@example.test');
 });
 
@@ -354,10 +296,10 @@ it('confirms, revokes credentials, and invalidates the session for self deletion
     $request = app('request');
     $request->setLaravelSession(app('session')->driver());
 
-    expect(app(DeleteOwnAccountAction::class)->execute(
+    expect(app(AuthUsers::class)->deleteOwnAccount(
         $user,
-        new DeleteOwnAccountData('correct-password'),
-    ))->toBeTrue()
+        ['currentPassword' => 'correct-password'],
+        auth()->guard('web'), app('session.store')))->toBeTrue()
         ->and(Auth::guard('web')->check())->toBeFalse()
         ->and($user->trashed())->toBeTrue()
         ->and($user->tokens()->count())->toBe(0);

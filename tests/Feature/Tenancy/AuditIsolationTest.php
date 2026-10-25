@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
-use Nvl\Auth\Actions\Audit\ListAuthAuditsAction;
-use Nvl\Auth\Actions\Audit\ShowAuthAuditAction;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\TenantAwareAuthActivityBridge;
 use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
+use Nvl\Auth\Services\AuthAuditReader;
 use Nvl\Auth\Services\CentralIdentityAuditRecorder;
 use Nvl\Auth\Services\DisabledTenantAwareAuthActivityBridge;
 use Nvl\Auth\Tests\Fixtures\AuthTenancyScenario;
@@ -56,12 +55,12 @@ it('isolates tenant audit reads and keeps central identity facts platform-owned'
         actor: $actor,
     );
 
-    $rows = $scenario->run($scenario->a(), fn () => app(ListAuthAuditsAction::class)->execute($actor));
+    $rows = $scenario->run($scenario->a(), fn () => app(AuthAuditReader::class)->paginate($actor));
     expect($rows)->toHaveCount(0)
         ->and(AuthAudit::query()->where('action', 'authentication.succeeded')->value('ownership_key'))->toBe('platform')
         ->and(fn () => $scenario->run(
             $scenario->a(),
-            fn () => app(ShowAuthAuditAction::class)->execute($actor, $foreign),
+            fn () => app(AuthAuditReader::class)->find($actor, $foreign),
         ))->toThrow(ModelNotFoundException::class);
 });
 

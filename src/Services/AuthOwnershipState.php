@@ -11,17 +11,15 @@ use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
 use Nvl\Support\Ownership\Services\OwnershipResourceRegistry;
 use Nvl\Support\Ownership\Services\PersistedOwnershipStorage;
 
-/** Prevents mutable flags or a cold unscoped boot from declassifying adopted Auth storage. @internal */
+/** Prevents mutable flags or a cold unscoped boot from declassifying adopted Auth storage.
+ * @internal
+ */
 final class AuthOwnershipState
 {
     private const string ColumnMetadataCatalog = 'information_schema.columns';
 
     /** Create a request-scoped guard over immutable declarations and actual source identities. */
-    public function __construct(
-        private readonly OwnershipResourceRegistry $resources,
-        private readonly PersistedOwnershipStorage $storage,
-        private readonly OwnershipMaintenanceState $maintenance,
-    ) {}
+    public function __construct(private readonly OwnershipResourceRegistry $resources, private readonly PersistedOwnershipStorage $storage, private readonly OwnershipMaintenanceState $maintenance) {}
 
     /** Validate immutable native selection without querying storage for metadata-only operations. */
     public function configured(): bool
@@ -29,14 +27,11 @@ final class AuthOwnershipState
         if ($this->maintenance->active()) {
             throw new OwnershipViolation('Ordinary Auth operations are unavailable inside adoption callbacks.');
         }
-        $compiled = $this->resources->get('auth.roles')->ownership->strategy !== 'unscoped';
-        if (config('nvl-auth.ownership.scoped') !== $compiled
-            || ($compiled && config('nvl-ownership.enabled') !== true)) {
+        $compiled = $this->resources->get('auth.invitations')->ownership->strategy !== 'unscoped';
+        if (config('nvl-auth.ownership.scoped') !== $compiled || $compiled && config('nvl-ownership.enabled') !== true) {
             throw new OwnershipConfigurationInvalid('Auth ownership selection or its enforcing runtime changed.');
         }
-
-        if ($compiled && (($this->resources->get('auth.memberships')->ownership->strategy !== 'unscoped')
-            !== (config('nvl-auth.features.memberships.enabled') === true))) {
+        if ($compiled && (isset($this->resources->all()['auth.memberships']) && $this->resources->get('auth.memberships')->ownership->strategy !== 'unscoped') !== (config('nvl-auth.features.memberships.enabled') === true)) {
             throw new OwnershipConfigurationInvalid('The adopted Auth membership adapter cannot be changed by a runtime feature flag.');
         }
 

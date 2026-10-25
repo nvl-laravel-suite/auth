@@ -21,28 +21,20 @@ final class RoleHierarchy
         if ($parent === null) {
             return;
         }
-
-        if ($parent->id === $role->id || $parent->guard_name !== $role->guard_name
-            || (config('nvl-tenancy.enabled') === true && $parent->tenant_id !== $role->tenant_id)) {
+        if ($parent->id === $role->id || $parent->guard_name !== $role->guard_name) {
             throw new AuthException('invalid_role_parent', 'The selected role parent is invalid.', 422);
         }
-
         $ancestor = $parent;
         $visited = [];
-
         while ($ancestor->parent_id !== null) {
             if (isset($visited[$ancestor->id])) {
                 throw new AuthException('role_hierarchy_cycle', 'The persisted role hierarchy contains a cycle.', 422);
             }
-
             $visited[$ancestor->id] = true;
-
             if ($ancestor->parent_id === $role->id) {
                 throw new AuthException('role_hierarchy_cycle', 'Role hierarchy cycles are not allowed.', 422);
             }
-
             $ancestor = $ancestor->parent()->first();
-
             if (! $ancestor instanceof Role) {
                 break;
             }
@@ -72,21 +64,12 @@ final class RoleHierarchy
     private function children(Collection $grouped, string $parent, array $visited): array
     {
         $nodes = [];
-
         foreach ($grouped->get($parent, collect()) as $role) {
             if (isset($visited[$role->id])) {
                 continue;
             }
-
             $branch = [...$visited, $role->id => true];
-            $nodes[] = [
-                'id' => $role->id,
-                'name' => $role->name,
-                'display_name' => $role->display_name,
-                'priority' => $role->priority,
-                'user_count' => (int) ($role->users_count ?? 0),
-                'children' => $this->children($grouped, $role->id, $branch),
-            ];
+            $nodes[] = ['id' => $role->id, 'name' => $role->name, 'display_name' => $role->display_name, 'priority' => $role->priority, 'user_count' => (int) ($role->users_count ?? 0), 'children' => $this->children($grouped, $role->id, $branch)];
         }
 
         return $nodes;

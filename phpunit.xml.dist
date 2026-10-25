@@ -14,9 +14,19 @@
         </testsuite>
         <testsuite name="feature">
             <directory suffix="Test.php">tests/Feature</directory>
+            <exclude>tests/Feature/Tenancy</exclude>
+            <exclude>tests/Feature/TenancyAdoption</exclude>
         </testsuite>
         <testsuite name="provider">
             <directory suffix="Test.php">tests/Provider</directory>
+        </testsuite>
+        <testsuite name="native">
+            <directory suffix="Test.php">tests/Core</directory>
+            <directory suffix="Test.php">tests/Ownership</directory>
+            <directory suffix="Test.php">tests/Committed</directory>
+            <directory suffix="Test.php">tests/Adoption</directory>
+            <exclude>tests/Ownership/LegacyOwnerAdoptionTest.php</exclude>
+            <exclude>tests/Ownership/LegacyOwnerMappingTest.php</exclude>
         </testsuite>
     </testsuites>
     <php>

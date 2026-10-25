@@ -65,7 +65,6 @@ final class AuthConfigureCommand extends Command
         }
 
         try {
-            /** @var array<mixed> $enabled */
             /** @var array<mixed> $disabled */
             $featureOverrides = $this->featureOverrides($enabled, $disabled);
             $path = $this->resolvePath($application, $filesystem, $this->option('path'));
@@ -194,7 +193,6 @@ use Nvl\Auth\Services\ConfiguredPolicyAuthManagementAccess;
 
 return [
     'ownership' => [
-        'http' => 'host',
         'delivery' => 'host',
     ],
 
@@ -206,12 +204,6 @@ return [
 %s
     ],
 
-    'routes' => [
-        'enabled' => false,
-        'public' => ['enabled' => false],
-        'account' => ['enabled' => false],
-        'management' => ['enabled' => false],
-    ],
 ];
 
 PHP,

@@ -6,6 +6,7 @@ namespace Nvl\Auth\Models;
 
 use Carbon\CarbonImmutable;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Support\Ownership\Contracts\Ownable;
 use Nvl\Support\Ownership\Traits\HasOwnership;
 use Nvl\Support\Ownership\ValueObjects\OwnershipDefinition;
@@ -45,6 +46,6 @@ final class OwnerAuthenticationIntent extends AuthModel implements Ownable
     /** @return array<string,string> */
     protected function casts(): array
     {
-        return ['payload' => 'encrypted:array', 'expires_at' => 'immutable_datetime', 'consumed_at' => 'immutable_datetime'];
+        return ['payload' => 'encrypted:array', 'expires_at' => AuthInstantCast::class, 'consumed_at' => AuthInstantCast::class];
     }
 }

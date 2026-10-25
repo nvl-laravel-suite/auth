@@ -2,21 +2,12 @@
 
 declare(strict_types=1);
 
-use Nvl\Auth\Actions\Rbac\BootstrapRbacAction;
-use Nvl\Auth\Actions\Rbac\CreatePermissionAction;
-use Nvl\Auth\Actions\Rbac\CreatePermissionWithRolesAction;
-use Nvl\Auth\Actions\Rbac\CreateRoleAction;
-use Nvl\Auth\Actions\Rbac\DeletePermissionAction;
-use Nvl\Auth\Actions\Rbac\ShowPermissionAction;
-use Nvl\Auth\Actions\Rbac\SynchronizePermissionCatalogAction;
-use Nvl\Auth\Actions\Rbac\SynchronizeRbacAction;
-use Nvl\Auth\Actions\Rbac\UpdatePermissionAction;
-use Nvl\Auth\Data\Mutations\StorePermissionData;
-use Nvl\Auth\Data\Mutations\StoreRoleData;
-use Nvl\Auth\Data\Mutations\UpdatePermissionData;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\AuthPermissions;
+use Nvl\Auth\Services\AuthRbacReader;
+use Nvl\Auth\Services\AuthRoles;
 use Nvl\Auth\Services\EloquentRbacPrincipalAccess;
 use Nvl\Auth\Services\RbacEntityLocator;
 use Nvl\Auth\Tests\Fixtures\AuthTenancyScenario;
@@ -32,15 +23,12 @@ it('projects global vocabulary roles only from the active tenant', function (): 
     $scenario->member($scenario->b(), $reference, true);
     $permission = $scenario->platform(fn () => Permission::query()->create(['name' => 'catalog.read', 'guard_name' => 'web']));
     foreach ([$scenario->a(), $scenario->b()] as $tenant) {
-        $scenario->run($tenant, fn () => app(CreateRoleAction::class)->execute($actor, new StoreRoleData(
-            name: 'reader',
-            permissions: ['catalog.read'],
-        )));
+        $scenario->run($tenant, fn () => app(AuthRoles::class)->create($actor, ['name' => 'reader', 'permissions' => ['catalog.read']]));
     }
 
     foreach ([$scenario->a(), $scenario->b()] as $tenant) {
         $scenario->run($tenant, function () use ($actor, $permission, $tenant): void {
-            $projection = app(ShowPermissionAction::class)->execute($actor, $permission->id);
+            $projection = app(AuthRbacReader::class)->permission($actor, $permission->id);
             expect($projection->roles)->toHaveCount(1)
                 ->and($projection->roles->sole()->tenant_id)->toBe($tenant->value);
         });
@@ -70,10 +58,10 @@ it('rejects every platform permission vocabulary mutation from a permissive tena
 
     $scenario->run($scenario->a(), function () use ($actor, $deleted, $updated): void {
         foreach ([
-            fn () => app(CreatePermissionAction::class)->execute($actor, new StorePermissionData('catalog.create')),
-            fn () => app(UpdatePermissionAction::class)->execute($actor, $updated, new UpdatePermissionData('catalog.updated')),
-            fn () => app(DeletePermissionAction::class)->execute($actor, $deleted),
-            fn () => app(SynchronizePermissionCatalogAction::class)->execute($actor),
+            fn () => app(AuthPermissions::class)->create($actor, ['name' => 'catalog.create']),
+            fn () => app(AuthPermissions::class)->update($actor, $updated, ['name' => 'catalog.updated']),
+            fn () => app(AuthPermissions::class)->delete($actor, $deleted),
+            fn () => app(AuthPermissions::class)->synchronizeCatalog($actor),
         ] as $operation) {
             expect($operation)->toThrow(TenantBoundaryViolation::class);
         }
@@ -91,9 +79,9 @@ it('rejects legacy mixed RBAC entry points whenever tenancy is enabled', functio
 
     $scenario->run($scenario->a(), function () use ($actor): void {
         foreach ([
-            fn () => app(BootstrapRbacAction::class)->execute(new SystemMutationContext('test', 'mixed-bootstrap', $actor)),
-            fn () => app(SynchronizeRbacAction::class)->execute($actor),
-            fn () => app(CreatePermissionWithRolesAction::class)->execute($actor, new StorePermissionData('catalog.mixed')),
+            fn () => app(AuthPermissions::class)->bootstrap(new SystemMutationContext('test', 'mixed-bootstrap', $actor)),
+            fn () => app(AuthPermissions::class)->synchronize($actor),
+            fn () => app(AuthPermissions::class)->createWithRoles($actor, ['name' => 'catalog.mixed']),
         ] as $operation) {
             try {
                 $operation();

@@ -9,14 +9,13 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\ChallengeFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\Traits\HasAuthOwnership;
 use Nvl\Support\Ownership\Contracts\Ownable;
 
 /**
  * Stores one hashed magic-link, verification, or security-code challenge.
  *
- * @property string|null $tenant_id
- * @property string|null $ownership_key
  * @property string $type
  * @property string $purpose
  * @property string|null $subject_type
@@ -52,8 +51,6 @@ final class Challenge extends AuthModel implements Ownable
 
     /** @var list<string> */
     protected $fillable = [
-        'tenant_id',
-        'ownership_key',
         'type',
         'purpose',
         'subject_type',
@@ -84,9 +81,9 @@ final class Challenge extends AuthModel implements Ownable
             'payload' => 'encrypted:array',
             'attempts' => 'integer',
             'max_attempts' => 'integer',
-            'expires_at' => 'immutable_datetime',
-            'consumed_at' => 'immutable_datetime',
-            'revoked_at' => 'immutable_datetime',
+            'expires_at' => AuthInstantCast::class,
+            'consumed_at' => AuthInstantCast::class,
+            'revoked_at' => AuthInstantCast::class,
         ];
     }
 

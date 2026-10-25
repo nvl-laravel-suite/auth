@@ -12,16 +12,15 @@ use Nvl\Auth\Models\OwnerMembership;
 use Nvl\Auth\Models\OwnerMembershipLock;
 use Nvl\Auth\Models\PersonalAccessToken;
 use Nvl\Auth\Models\Role;
-use Nvl\Auth\Models\TenantAuthenticationIntent;
-use Nvl\Auth\Models\TenantMembership;
-use Nvl\Auth\Models\TenantMembershipLock;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Support\Models\ConfiguredModelResolver;
 use Nvl\Support\Ownership\Services\OwnershipResourceRegistry;
 use Nvl\Support\Ownership\ValueObjects\OwnershipDefinition;
 use Nvl\Support\Ownership\ValueObjects\OwnershipResourceDefinition;
 
-/** Declares the optional owned Auth graph while keeping global credentials and vocabulary global. @internal */
+/** Declares the optional owned Auth graph while keeping global credentials and vocabulary global.
+ * @internal
+ */
 final readonly class AuthResourceRegistrar
 {
     public function __construct(private AuthModelRegistry $models) {}
@@ -32,22 +31,22 @@ final readonly class AuthResourceRegistrar
         $memberships = $owned && config('nvl-auth.features.memberships.enabled') === true;
         if ($owned) {
             $this->models->userClass();
-            $this->models->rbacPrincipalClass();
+            if (config('nvl-auth.features.rbac.enabled') === true) {
+                $this->models->rbacPrincipalClass();
+            }
             $resolver = new ConfiguredModelResolver;
-            foreach ([[$this->models->roleClass(), Role::class], [$this->models->personalAccessTokenClass(), PersonalAccessToken::class], ...($memberships ? [[$this->models->ownerMembershipClass(), OwnerMembership::class]] : [])] as [$class, $base]) {
+            foreach ([...(class_exists(\Spatie\Permission\Models\Role::class) && is_string(config('permission.table_names.roles')) ? [[$this->models->roleClass(), Role::class]] : []), ...(class_exists(\Laravel\Sanctum\PersonalAccessToken::class) ? [[$this->models->personalAccessTokenClass(), PersonalAccessToken::class]] : []), ...($memberships ? [[$this->models->ownerMembershipClass(), OwnerMembership::class]] : [])] as [$class, $base]) {
                 $resolver->assertOwnershipCapabilities(new $class, new $base);
             }
         }
         foreach ([
-            'auth.memberships' => [$memberships ? $this->models->ownerMembershipClass() : TenantMembership::class, $memberships, false],
-            'auth.membership_locks' => [$memberships ? OwnerMembershipLock::class : TenantMembershipLock::class, $memberships, false],
-            'auth.authentication_intents' => [$owned ? OwnerAuthenticationIntent::class : TenantAuthenticationIntent::class, $owned, false],
-            'auth.roles' => [$this->models->roleClass(), $owned, true],
+            ...($memberships ? ['auth.memberships' => [$this->models->ownerMembershipClass(), true, false], 'auth.membership_locks' => [OwnerMembershipLock::class, true, false]] : []),
+            ...($owned ? ['auth.authentication_intents' => [OwnerAuthenticationIntent::class, true, false]] : []),
+            ...(class_exists(\Spatie\Permission\Models\Role::class) && is_string(config('permission.table_names.roles')) ? ['auth.roles' => [$this->models->roleClass(), $owned, true], 'auth.permissions' => [$this->models->permissionClass(), false, true]] : []),
             'auth.invitations' => [Invitation::class, $owned, true],
-            'auth.tokens' => [$this->models->personalAccessTokenClass(), $owned, true],
+            ...(class_exists(\Laravel\Sanctum\PersonalAccessToken::class) ? ['auth.tokens' => [$this->models->personalAccessTokenClass(), $owned, true]] : []),
             'auth.challenges' => [Challenge::class, $owned, true],
             'auth.audits' => [AuthAudit::class, $owned, true],
-            'auth.permissions' => [$this->models->permissionClass(), false, true],
         ] as $key => [$model, $captured, $central]) {
             $immutable = match ($key) {
                 'auth.memberships' => ['subject_type', 'subject_id'],

@@ -16,8 +16,6 @@ use Nvl\Support\Ownership\Contracts\Ownable;
  * Stores one simple, queryable Auth audit fact and bounded metadata.
  *
  * @property string $action
- * @property string|null $tenant_id
- * @property string|null $ownership_key
  * @property string $outcome
  * @property string|null $subject_type
  * @property string|null $subject_id
@@ -49,8 +47,6 @@ final class AuthAudit extends AuthModel implements Ownable
 
     /** @var list<string> */
     protected $fillable = [
-        'tenant_id',
-        'ownership_key',
         'action',
         'outcome',
         'subject_type',

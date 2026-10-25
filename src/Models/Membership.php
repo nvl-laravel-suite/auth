@@ -7,14 +7,13 @@ namespace Nvl\Auth\Models;
 use Nvl\Auth\Enums\MembershipStatus;
 
 /**
- * Supplies neutral membership identity and lifecycle to native ownership and the legacy adapter.
+ * Supplies neutral membership identity and lifecycle to native ownership.
  *
  * @property string $subject_type
  * @property string $subject_id
  * @property MembershipStatus $status
  * @property bool $is_owner
  * @property int $revision
- * @property string|null $tenant_id
  *
  * @api
  */

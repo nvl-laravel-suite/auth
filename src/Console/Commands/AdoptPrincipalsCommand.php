@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Nvl\Auth\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use JsonException;
-use Nvl\Auth\Actions\AdoptPrincipalsAction;
+use Nvl\Auth\Services\AuthMaintenance;
+use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /** Plans or applies manifest-driven legacy principal adoption. */
 final class AdoptPrincipalsCommand extends Command
@@ -17,12 +19,14 @@ final class AdoptPrincipalsCommand extends Command
         {manifest : Absolute or application-relative JSON manifest path}
         {--stage : Rename canonical-name legacy tables before package schema installation}
         {--apply : Apply the validated stage or import plan}
-        {--format=text : Output text or json}';
+        {--format=text : Output text or json}
+        {--reason=Explicit principal adoption}
+        {--correlation= : Trace identifier}';
 
     /** @var string */
     protected $description = 'Plan, stage, or apply a reconciled legacy principal adoption';
 
-    public function handle(AdoptPrincipalsAction $adopt): int
+    public function handle(AuthMaintenance $adopt): int
     {
         $format = $this->option('format');
 
@@ -69,8 +73,9 @@ final class AdoptPrincipalsCommand extends Command
         }
 
         /** @var array<array-key, mixed> $decoded */
-        $result = $adopt->execute(
+        $result = $adopt->adoptPrincipals(
             $decoded,
+            new SystemMutationContext((string) $this->option('reason'), (string) ($this->option('correlation') ?: Str::uuid())),
             stage: (bool) $this->option('stage'),
             apply: (bool) $this->option('apply'),
         );

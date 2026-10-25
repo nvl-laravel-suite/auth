@@ -27,16 +27,10 @@ enum AuthResponseCode: string implements ResponseCode
     case AuthenticationRequired = 'authentication_required';
     case Forbidden = 'forbidden';
     case ApiTokenAbilityForbidden = 'api_token_ability_forbidden';
-    case TenantContextRequired = 'tenant_context_required';
     case SystemMutationForbidden = 'system_mutation_forbidden';
-    case TenantMembershipRequired = 'tenant_membership_required';
     case VerificationInvalid = 'verification_invalid';
     case RecoveryCodeInvalid = 'recovery_code_invalid';
-    case TenantAuthenticationIntentInputInvalid = 'tenant_authentication_intent_input_invalid';
-    case TenantAuthenticationIntentUnavailable = 'tenant_authentication_intent_unavailable';
-    case TenantAuthenticationIntentInvalid = 'tenant_authentication_intent_invalid';
     case InvalidAuditMetadata = 'invalid_audit_metadata';
-    case TenantAuditContextRequired = 'tenant_audit_context_required';
     case CredentialsInvalid = 'credentials_invalid';
     case MembershipPrincipalUnavailable = 'membership_principal_unavailable';
     case MembershipPrincipalIneligible = 'membership_principal_ineligible';
@@ -87,7 +81,6 @@ enum AuthResponseCode: string implements ResponseCode
     case MembershipOwnershipInvalid = 'membership_ownership_invalid';
     case RbacMixedContextOperation = 'rbac_mixed_context_operation';
     case AccountConfirmationInvalid = 'account_confirmation_invalid';
-    case TenantTokenInvalid = 'tenant_token_invalid';
     case MembershipLastOwner = 'membership_last_owner';
     case MembershipUnavailable = 'membership_unavailable';
     case PrincipalUnavailable = 'principal_unavailable';
@@ -165,7 +158,6 @@ enum AuthResponseCode: string implements ResponseCode
     case ClientDeactivated = 'client_deactivated';
     case SocialAuthorizationStarted = 'social_authorization_started';
     case SocialAuthenticated = 'social_authenticated';
-    case TenantAuthenticationIntentCompleted = 'tenant_authentication_intent_completed';
     case MembershipsListed = 'memberships_listed';
     case MembershipShown = 'membership_shown';
     case MembershipEnrolled = 'membership_enrolled';

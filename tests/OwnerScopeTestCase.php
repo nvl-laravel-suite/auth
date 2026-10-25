@@ -10,12 +10,11 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Laravel\Sanctum\SanctumServiceProvider;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\SystemMutationAccess;
-use Nvl\Auth\Models\User;
 use Nvl\Auth\Providers\AuthServiceProvider;
 use Nvl\Auth\Tests\Fixtures\AllowAllManagementAccess;
 use Nvl\Auth\Tests\Fixtures\AllowAllSystemMutationAccess;
 use Nvl\Auth\Tests\Fixtures\AuthTestMaintenanceMode;
-use Nvl\Data\Providers\DataServiceProvider;
+use Nvl\Auth\Tests\Fixtures\TestUser as User;
 use Nvl\Ownership\Contracts\OwnershipAdoptionAccess;
 use Nvl\Ownership\Services\OwnershipAdoptionCoordinator;
 use Nvl\Ownership\Tests\OwnershipTestCase;
@@ -45,7 +44,7 @@ abstract class OwnerScopeTestCase extends OwnershipTestCase
 
     protected function getPackageProviders($app): array
     {
-        return [...parent::getPackageProviders($app), LocaleServiceProvider::class, PermissionServiceProvider::class, SanctumServiceProvider::class, LaravelDataServiceProvider::class, DataServiceProvider::class, AuthServiceProvider::class];
+        return [...parent::getPackageProviders($app), LocaleServiceProvider::class, PermissionServiceProvider::class, SanctumServiceProvider::class, LaravelDataServiceProvider::class, AuthServiceProvider::class];
     }
 
     protected function defineEnvironment($app): void
@@ -66,6 +65,7 @@ abstract class OwnerScopeTestCase extends OwnershipTestCase
             'nvl-auth.features.rbac.models.principal' => User::class,
             'nvl-auth.features.principal_management.models.user' => User::class,
             'auth.providers.users.model' => User::class,
+            'auth.passwords.users.table' => 'nvl_auth_password_reset_tokens',
             'nvl-ownership.system_operations' => ['auth-membership-bootstrap'],
         ]);
     }

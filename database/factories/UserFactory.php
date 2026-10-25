@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Nvl\Auth\Models\User;
+use Nvl\Auth\Services\AuthModelRegistry;
 
 /**
  * Builds package-owned principals for consumers and package tests.
@@ -20,6 +21,12 @@ final class UserFactory extends Factory
 {
     /** @var class-string<User> */
     protected $model = User::class;
+
+    /** @return class-string<User> */
+    public function modelName(): string
+    {
+        return app(AuthModelRegistry::class)->userClass();
+    }
 
     /**
      * Define a conventional enabled principal.

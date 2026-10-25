@@ -45,7 +45,6 @@ final class ListAuthFeaturesCommand extends Command
                 'configured' => $configuration->featureEnabled($definition->feature),
                 'effective' => $features->allows($definition->feature, FeatureOperation::Read),
                 'dependencies' => array_map(static fn ($dependency): string => $dependency->value, $definition->dependencies),
-                'routes' => $definition->routeFamilies,
             ];
         }
 
@@ -56,13 +55,12 @@ final class ListAuthFeaturesCommand extends Command
         }
 
         $this->table(
-            ['Feature', 'Configured', 'Effective', 'Dependencies', 'Route surfaces'],
+            ['Feature', 'Configured', 'Effective', 'Dependencies'],
             array_map(static fn (array $row): array => [
                 $row['feature'],
                 $row['configured'] ? 'yes' : 'no',
                 $row['effective'] ? 'yes' : 'no',
                 implode(', ', $row['dependencies']),
-                implode(', ', array_keys($row['routes'])),
             ], $rows),
         );
 

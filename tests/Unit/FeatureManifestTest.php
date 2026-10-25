@@ -55,79 +55,30 @@ it('requires audit before admitting membership mutations', function (): void {
     $this->fail('Membership admission did not report its missing audit dependency.');
 });
 
-it('keeps configuration and route files aligned with the closed feature manifest', function (): void {
+it('keeps native feature contracts and consumer route fixtures aligned', function (): void {
     $configuration = require dirname(__DIR__, 2).'/config/nvl-auth.php';
-    $expectedFeatures = array_map(
-        static fn (AuthFeature $feature): string => $feature->value,
-        AuthFeature::cases(),
-    );
-
-    expect(array_keys($configuration['features']))->toBe($expectedFeatures);
-
-    foreach ($configuration['features'] as $feature => $settings) {
-        expect($settings)->toBeArray()
-            ->and(array_keys($settings))->each->toBeIn(['enabled', 'routes', 'services', 'models', 'settings'])
-            ->and($settings['enabled'])->toBeBool()
-            ->and($settings['routes'])->toBeArray()
-            ->and($settings['settings'])->toBeArray();
-
-        foreach ($settings['routes'] as $surface => $routeSettings) {
-            expect($surface)->toBeIn(['public', 'account', 'management'])
-                ->and($routeSettings)->toBeArray()
-                ->and($routeSettings['enabled'])->toBeBool();
-        }
+    expect(array_keys($configuration['features']))->toBe(array_map(static fn (AuthFeature $feature): string => $feature->value, AuthFeature::cases()));
+    foreach ($configuration['features'] as $settings) {
+        expect($settings['enabled'])->toBeBool()->and($settings['settings'])->toBeArray()->and($settings)->not->toHaveKey('routes');
     }
-
-    foreach (app(FeatureManifest::class)->definitions() as $definition) {
+    foreach (app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class)->definitions() as $definition) {
         foreach ($definition->routeFamilies as $surface => $family) {
-            $path = dirname(__DIR__, 2)."/routes/{$surface}/{$family}.php";
-            $contents = file_get_contents($path);
-
+            $contents = file_get_contents(dirname(__DIR__)."/Fixtures/Consumer/routes/{$surface}/{$family}.php");
             expect($contents)->toBeString();
-            preg_match_all("/->name\\('([^']+)'\\)/", (string) $contents, $routeNames);
-
+            preg_match_all("/->name\\('([^']+)'\\)/", $contents, $routeNames);
             expect($routeNames[1] ?? [])->toBe($definition->routeNames[$surface]);
         }
-
-        if (array_key_exists('management', $definition->routeFamilies)
-            || $definition->feature === AuthFeature::Memberships) {
-            expect($definition->managementAbilities, $definition->feature->value)->not->toBeEmpty();
-        } else {
-            expect($definition->managementAbilities, $definition->feature->value)->toBeEmpty();
-        }
+        $native = app(FeatureManifest::class)->definitions()[$definition->feature->value];
+        expect($native->operations)->toBe($definition->operations)->and($native->managementAbilities)->toBe($definition->managementAbilities);
     }
 });
 
-it('keeps feature admission as the first statement of every public Action', function (): void {
-    $directory = dirname(__DIR__, 2).'/src/Actions';
-    $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory));
-    $mixedRbacBoundaries = [
-        'BootstrapRbacAction.php',
-        'CreatePermissionWithRolesAction.php',
-        'SynchronizeRbacAction.php',
-    ];
-
-    foreach ($files as $file) {
-        if (! $file->isFile() || $file->getExtension() !== 'php') {
-            continue;
-        }
-
-        $contents = file_get_contents($file->getPathname());
-
-        expect($contents)->toBeString();
-        preg_match(
-            '/public function execute[\\s\\S]*?\\)\\s*:\\s*[^\\{]+\\{\\s*(?<first>[^\\r\\n]+)/',
-            (string) $contents,
-            $method,
-        );
-
-        $expectedFirstStatement = in_array($file->getFilename(), $mixedRbacBoundaries, true)
-            ? '$this->operations->rejectMixedRbacOperation();'
-            : '$this->features->assertAllowed(';
-
-        expect($method['first'] ?? null, $file->getFilename())
-            ->toStartWith($expectedFirstStatement);
+it('exposes native operation families without duplicate execute contracts', function (): void {
+    foreach (['Authentication', 'AuthenticationSessions', 'AuthChallenges', 'AuthPasswords', 'AuthEmailVerification', 'AuthInvitations', 'AuthUsers', 'AuthUserReader', 'AuthClients', 'AuthMemberships', 'AuthAuditReader', 'AuthMaintenance', 'AuthTokens', 'AuthRoles', 'AuthPermissions', 'AuthRbacReader', 'AuthSecondFactor', 'AuthPasskeys', 'AuthSocialIdentities'] as $family) {
+        $reflection = new ReflectionClass('Nvl\\Auth\\Services\\'.$family);
+        expect($reflection->hasMethod('execute'))->toBeFalse()->and($reflection->getMethods(ReflectionMethod::IS_PUBLIC))->not->toBeEmpty();
     }
+    expect(glob(dirname(__DIR__, 2).'/src/Actions/*/*.php'))->toBe([]);
 });
 
 it('rejects the former scalar feature configuration with an actionable error', function (): void {
@@ -138,7 +89,7 @@ it('rejects the former scalar feature configuration with an actionable error', f
 });
 
 it('keeps Actions and Services independent from HTTP transport classes', function (): void {
-    foreach (['Actions', 'Services'] as $layer) {
+    foreach (['Services'] as $layer) {
         $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(
             dirname(__DIR__, 2)."/src/{$layer}",
         ));

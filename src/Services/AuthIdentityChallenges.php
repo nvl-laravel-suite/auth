@@ -19,6 +19,7 @@ use Nvl\Support\Ownership\Services\OwnershipScope;
  */
 final readonly class AuthIdentityChallenges
 {
+    /** Native Auth operation. */
     public function __construct(private OwnershipReadiness $readiness) {}
 
     /** @return Builder<Challenge> */
@@ -57,8 +58,7 @@ final readonly class AuthIdentityChallenges
         $this->readiness->assertActive('auth.challenges');
         $changes = $challenge->getDirty();
         $allowed = ['active_key', 'attempts', 'consumed_at', 'revoked_at', 'payload', 'updated_at'];
-        if (! $challenge->exists || array_diff(array_keys($changes), $allowed) !== []
-            || $challenge->getTable() !== (new Challenge)->getTable() || $challenge->getConnection() !== (new Challenge)->getConnection()) {
+        if (! $challenge->exists || array_diff(array_keys($changes), $allowed) !== [] || $challenge->getTable() !== (new Challenge)->getTable() || $challenge->getConnection() !== (new Challenge)->getConnection()) {
             throw new OwnershipViolation('Credential challenge state cannot change its identity or ownership.');
         }
 

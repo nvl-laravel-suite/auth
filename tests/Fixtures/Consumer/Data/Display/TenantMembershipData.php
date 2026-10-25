@@ -1,0 +1,32 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Display;
+
+use Nvl\Auth\Enums\MembershipStatus;
+use Nvl\Support\Ownership\ValueObjects\OwnerReference;
+use Spatie\LaravelData\Data;
+use Spatie\TypeScriptTransformer\Attributes\LiteralTypeScriptType;
+
+/**
+ * Exposes only tenant-safe membership and allowlisted principal identity fields.
+ *
+ * @api
+ */
+final class TenantMembershipData extends Data
+{
+    public function __construct(
+        public readonly string $id,
+        public readonly ?string $tenantId,
+        public readonly string $subjectType,
+        public readonly string $subjectId,
+        public readonly MembershipStatus $status,
+        public readonly bool $owner,
+        public readonly int $revision,
+        public readonly ?string $name = null,
+        public readonly ?string $email = null,
+        #[LiteralTypeScriptType("{ version: 1; type: string; storage: string; keyType: 'int' | 'string'; key: string } | null")]
+        public readonly ?OwnerReference $ownerReference = null,
+    ) {}
+}

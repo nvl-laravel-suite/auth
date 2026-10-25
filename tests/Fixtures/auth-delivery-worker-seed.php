@@ -12,10 +12,12 @@ use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Events\AuthDeliveryRequested;
-use Nvl\Auth\Tests\Fixtures\AuthTenancyScenario;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
-use Nvl\Tenancy\Services\TenantRunner;
-use Nvl\Tenancy\ValueObjects\TenantId;
+use Nvl\Ownership\Services\OwnershipRunner;
+use Nvl\Ownership\Tests\Fixtures\Actor;
+use Nvl\Ownership\Tests\Fixtures\Company;
+use Nvl\Support\Ownership\Contracts\OwnershipContext;
+use Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope;
 
 require $argv[1].'/vendor/autoload.php';
 $app = require $argv[1].'/bootstrap/app.php';
@@ -34,7 +36,7 @@ Schema::create('jobs', static function (Blueprint $table): void {
 });
 Schema::create('nvl_auth_test_delivery_receipts', static function (Blueprint $table): void {
     $table->id();
-    $table->uuid('tenant_id');
+    $table->string('owner_key');
     $table->string('message_id');
     $table->unsignedTinyInteger('attempt');
 });
@@ -52,8 +54,18 @@ Schema::create('nvl_auth_test_worker_scopes', static function (Blueprint $table)
     $table->string('mode');
 });
 
-foreach ([AuthTenancyScenario::A => 'delivery-a', AuthTenancyScenario::B => 'delivery-b'] as $tenant => $message) {
-    app(TenantRunner::class)->run(new TenantId($tenant), static function () use ($message, $tenant): void {
+Schema::create('ownership_test_companies', static function (Blueprint $table): void {
+    $table->id();
+    $table->boolean('active');
+});
+Schema::create('ownership_test_actors', static function (Blueprint $table): void {
+    $table->id();
+    $table->string('name');
+});
+$actor = Actor::query()->create(['id' => 1, 'name' => 'Operator']);
+foreach ([7 => 'delivery-a', 8 => 'delivery-b'] as $key => $message) {
+    $owner = Company::query()->create(['id' => $key, 'active' => true]);
+    app(OwnershipRunner::class)->run($owner, $actor, static function () use ($message): void {
         Event::dispatch(new AuthDeliveryRequested(new AuthDeliveryRequest(
             messageId: $message,
             feature: AuthFeature::Invitations,
@@ -61,8 +73,7 @@ foreach ([AuthTenancyScenario::A => 'delivery-a', AuthTenancyScenario::B => 'del
             recipient: $message.'@example.test',
             payload: [],
             expiresAt: CarbonImmutable::now()->addHour(),
-            tenant: new TenantId($tenant),
-        )));
+        ), OwnershipJobEnvelope::capture(app(OwnershipContext::class))));
     });
 }
 

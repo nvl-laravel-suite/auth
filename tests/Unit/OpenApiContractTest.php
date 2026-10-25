@@ -11,12 +11,12 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
-use Nvl\Auth\Services\FeatureManifest;
 use Nvl\Auth\Services\RbacConsumerLimits;
 use Nvl\Auth\Services\RbacPermissionGroupExpressions;
+use Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest;
 
 it('keeps OpenAPI operations and feature metadata identical to the manifest', function (): void {
-    $contents = file_get_contents(dirname(__DIR__, 2).'/docs/openapi.json');
+    $contents = file_get_contents(dirname(__DIR__).'/Fixtures/Consumer/docs/openapi.json');
 
     if (! is_string($contents)) {
         throw new RuntimeException('OpenAPI document is unavailable.');

@@ -15,8 +15,6 @@ use Nvl\Auth\Tests\Fixtures\AllowAllManagementAccess;
 use Nvl\Auth\Tests\Fixtures\AllowAllSystemMutationAccess;
 use Nvl\Auth\Tests\Fixtures\TestSubjectResolver;
 use Nvl\Auth\Tests\Fixtures\TestUser;
-use Nvl\Data\Providers\DataServiceProvider;
-use Nvl\Data\Services\TypeScriptSourceRegistry;
 use Nvl\Support\Providers\LocaleServiceProvider;
 use Nvl\Support\Providers\SupportServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
@@ -44,7 +42,6 @@ abstract class CommittedDeliveryTestCase extends Orchestra
             PermissionServiceProvider::class,
             SanctumServiceProvider::class,
             LaravelDataServiceProvider::class,
-            DataServiceProvider::class,
             AuthServiceProvider::class,
         ];
     }
@@ -61,7 +58,7 @@ abstract class CommittedDeliveryTestCase extends Orchestra
         $app['config']->set('auth.defaults.passwords', 'users');
         $app['config']->set('auth.guards.web', ['driver' => 'session', 'provider' => 'users']);
         $app['config']->set('auth.providers.users', ['driver' => 'eloquent', 'model' => TestUser::class]);
-        $app['config']->set('auth.passwords.users', ['provider' => 'users', 'table' => 'password_reset_tokens', 'expire' => 60, 'throttle' => 0]);
+        $app['config']->set('auth.passwords.users', ['provider' => 'users', 'table' => 'nvl_auth_password_reset_tokens', 'expire' => 60, 'throttle' => 0]);
         $app['config']->set('nvl-auth.features.principal_management.models.user', TestUser::class);
 
         $app['config']->set('nvl-auth.migrations.install_all', true);
@@ -84,7 +81,7 @@ abstract class CommittedDeliveryTestCase extends Orchestra
             'nvl-auth.adoption.password_broker' => ['enabled' => true, 'broker' => 'users'],
             'nvl-auth.adoption.spatie_storage.enabled' => true,
         ]);
-        (new AuthServiceProvider($this->app))->boot($this->app->make(AuthConfiguration::class), $this->app->make(TypeScriptSourceRegistry::class));
+        (new AuthServiceProvider($this->app))->boot($this->app->make(AuthConfiguration::class));
         $this->app->make(PermissionRegistrar::class);
 
         $this->app->singleton(AuthManagementAccess::class, AllowAllManagementAccess::class);

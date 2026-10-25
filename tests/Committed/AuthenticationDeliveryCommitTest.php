@@ -5,31 +5,15 @@ declare(strict_types=1);
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
-use Nvl\Auth\Actions\Authentication\RequestEmailVerificationAction;
-use Nvl\Auth\Actions\Authentication\VerifyEmailAction;
-use Nvl\Auth\Actions\Invitations\CreateInvitationAction;
-use Nvl\Auth\Actions\Passwords\RequestPasswordResetAction;
-use Nvl\Auth\Actions\Passwords\ResetPasswordAction;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
-use Nvl\Auth\Data\Mutations\RequestPasswordResetData;
-use Nvl\Auth\Data\Mutations\ResetPasswordData;
-use Nvl\Auth\Data\Mutations\StoreInvitationData;
 use Nvl\Auth\Events\AuthDeliveryRequested;
-use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Services\AuthCommittedAudit;
-use Nvl\Auth\Services\AuthConfiguration;
-use Nvl\Auth\Services\FeatureGate;
-use Nvl\Auth\Services\ManagementAuthorizer;
-use Nvl\Auth\Services\OpaqueTokenFactory;
-use Nvl\Auth\Services\SecretHasher;
-use Nvl\Auth\Services\TenantMembershipAssignments;
+use Nvl\Auth\Services\AuthEmailVerification;
+use Nvl\Auth\Services\AuthInvitations;
+use Nvl\Auth\Services\AuthPasswords;
 use Nvl\Auth\Tests\CommittedDeliveryTestCase;
-use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Support\Events\DomainEventDispatcher;
-use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
-use Nvl\Support\Ownership\Contracts\OwnershipContext;
-use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
+use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 uses(CommittedDeliveryTestCase::class);
 
@@ -42,7 +26,7 @@ it('emits verification data without sending and marks the host email verified', 
     $connection->beginTransaction();
 
     try {
-        app(RequestEmailVerificationAction::class)->execute($user, 'en');
+        app(AuthEmailVerification::class)->request($user, 'en');
         Event::assertNotDispatched(AuthDeliveryRequested::class);
         $connection->commit();
     } finally {
@@ -56,9 +40,9 @@ it('emits verification data without sending and marks the host email verified', 
             && $event->request->payload['subject_id'] === (string) $user->getKey();
     });
 
-    expect(app(VerifyEmailAction::class)->execute($user))->toBeTrue()
+    expect(app(AuthEmailVerification::class)->verify($user))->toBeTrue()
         ->and($user->refresh()->hasVerifiedEmail())->toBeTrue()
-        ->and(app(VerifyEmailAction::class)->execute($user))->toBeFalse();
+        ->and(app(AuthEmailVerification::class)->verify($user))->toBeFalse();
 });
 
 it('uses laravel password broker storage and emits delivery instead of notifications', function (): void {
@@ -68,7 +52,7 @@ it('uses laravel password broker storage and emits delivery instead of notificat
     expect($connection->transactionLevel())->toBe(0);
     $connection->beginTransaction();
     try {
-        app(RequestPasswordResetAction::class)->execute(new RequestPasswordResetData($user->email));
+        app(AuthPasswords::class)->requestReset(['identifier' => $user->email]);
         Event::assertNotDispatched(AuthDeliveryRequested::class);
         $connection->commit();
     } finally {
@@ -81,13 +65,8 @@ it('uses laravel password broker storage and emits delivery instead of notificat
     expect($event)->toBeInstanceOf(AuthDeliveryRequested::class)
         ->and($event->request->payload['token'])->toBeString();
 
-    app(ResetPasswordAction::class)->execute(
-        new ResetPasswordData(
-            $user->email,
-            $event->request->payload['token'],
-            'new-secure-password',
-            'new-secure-password',
-        )
+    app(AuthPasswords::class)->reset(
+        ['identifier' => $user->email, 'token' => $event->request->payload['token'], 'password' => 'new-secure-password', 'passwordConfirmation' => 'new-secure-password']
     );
 
     expect(Hash::check('new-secure-password', $user->refresh()->password))->toBeTrue();
@@ -117,31 +96,17 @@ it('uses the original directly supplied invitation audit recorder after the owni
     };
     $adapterRecorder = clone $originalRecorder;
     $adapter = app(AuthCommittedAudit::class)->withRecorder($adapterRecorder);
-    $action = new CreateInvitationAction(
-        features: app(FeatureGate::class),
-        configuration: app(AuthConfiguration::class),
-        tokens: app(OpaqueTokenFactory::class),
-        hasher: app(SecretHasher::class),
-        authorization: app(ManagementAuthorizer::class),
-        pipeline: app(AuthPipeline::class),
-        audits: $originalRecorder,
-        boundary: app(OwnershipBoundary::class),
-        ownerContext: app(OwnershipContext::class),
-        membershipAccess: app(TenantMembershipAccess::class),
-        assignments: app(TenantMembershipAssignments::class),
-        committedAudits: $adapter,
-        domainEvents: app(DomainEventDispatcher::class),
-    );
+    $action = app()->makeWith(AuthInvitations::class, ['audits' => $originalRecorder, 'committedAudits' => $adapter]);
     $connection = app('db')->connection();
     expect($connection->transactionLevel())->toBe(0);
     $connection->beginTransaction();
 
     try {
-        $issued = $action->execute(
-            new StoreInvitationData('direct-recorder@example.test'),
-            context: new InvitationIssuanceContext(actorlessAuthorized: true),
+        $issued = $action->create(
+            ['recipient' => 'direct-recorder@example.test'],
+            authority: new SystemMutationContext('Explicit commit test', 'direct-recorder'),
         );
-        expect($issued->invitation->getConnection())->toBe($connection)
+        expect($issued['invitation']->getConnection())->toBe($connection)
             ->and($originalRecorder->actions)->toBe([])
             ->and($adapterRecorder->actions)->toBe([]);
         Event::assertNotDispatched(AuthDeliveryRequested::class);

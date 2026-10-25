@@ -14,7 +14,6 @@ use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Providers\AuthServiceProvider;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthTenantMembershipAccess;
-use Nvl\Data\Services\TypeScriptSourceRegistry;
 use Nvl\Support\Providers\TenantServiceProvider;
 use Nvl\Support\Tenancy\Contracts\TenantMembershipAccess;
 use Nvl\Support\Tenancy\ValueObjects\TenantId;
@@ -99,6 +98,6 @@ final class MembershipBindingScenario
         $consumer->make('config')->set('nvl-auth.adoption.spatie_storage.enabled', false);
         $consumer->instance(HttpKernelContract::class, $origin->make(HttpKernelContract::class));
         $consumer->instance(MembershipPrincipalResolver::class, $origin->make(MembershipPrincipalResolver::class));
-        (new AuthServiceProvider($consumer))->boot($consumer->make(AuthConfiguration::class), $consumer->make(TypeScriptSourceRegistry::class));
+        (new AuthServiceProvider($consumer))->boot($consumer->make(AuthConfiguration::class));
     }
 }

@@ -160,7 +160,7 @@ it('renders an embedded application overlay and writes only after explicit confi
         $contents = $preview['contents'] ?? '';
 
         expect($contents)
-            ->toContain("'http' => 'host'", "'delivery' => 'host'")
+            ->toContain("'delivery' => 'host'")->not->toContain("'routes'", "'http'")
             ->toContain("'enabled' => false", TestUser::class)
             ->toContain("'invitations' => ['enabled' => true]")
             ->toContain("'audit' => ['enabled' => false]")
@@ -257,7 +257,6 @@ it('reports Auth integration state and configuration drift without scalar secret
 
     expect($report)->toHaveKeys([
         'features',
-        'route_ownership',
         'models',
         'adapters',
         'management',

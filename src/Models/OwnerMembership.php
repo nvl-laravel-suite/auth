@@ -32,7 +32,7 @@ class OwnerMembership extends Membership implements Ownable
 
     use HasOwnership;
 
-    protected $table = AuthTables::OwnerMemberships;
+    protected $table = AuthTables::AuthMemberships;
 
     protected $fillable = ['subject_type', 'subject_id', 'status', 'is_owner', 'revision'];
 

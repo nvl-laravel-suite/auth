@@ -32,25 +32,11 @@ final readonly class AuthConfiguration
     public function featureEnabled(AuthFeature $feature): bool
     {
         $value = $this->get("features.{$feature->value}.enabled");
-
         if (! is_bool($value)) {
-            throw AuthException::invalidConfiguration(
-                "Auth feature [{$feature->value}] must define a boolean [enabled] flag.",
-            );
+            throw AuthException::invalidConfiguration("Auth feature [{$feature->value}] must define a boolean [enabled] flag.");
         }
 
         return $value;
-    }
-
-    /**
-     * Determine whether a feature-owned route surface is enabled.
-     */
-    public function featureRoutesEnabled(AuthFeature $feature, string $surface): bool
-    {
-        return $this->boolean(
-            "features.{$feature->value}.routes.{$surface}.enabled",
-            false,
-        );
     }
 
     /**
@@ -67,11 +53,8 @@ final readonly class AuthConfiguration
     public function boolean(string $path, bool $default = false): bool
     {
         $value = $this->get($path, $default);
-
         if (! is_bool($value)) {
-            throw AuthException::invalidConfiguration(
-                "Auth configuration [{$path}] must be boolean.",
-            );
+            throw AuthException::invalidConfiguration("Auth configuration [{$path}] must be boolean.");
         }
 
         return $value;
@@ -83,11 +66,8 @@ final readonly class AuthConfiguration
     public function string(string $path, ?string $default = null): string
     {
         $value = $this->get($path, $default);
-
         if (! is_string($value) || trim($value) === '') {
-            throw AuthException::invalidConfiguration(
-                "Auth configuration [{$path}] must be a non-empty string.",
-            );
+            throw AuthException::invalidConfiguration("Auth configuration [{$path}] must be a non-empty string.");
         }
 
         return trim($value);
@@ -99,11 +79,8 @@ final readonly class AuthConfiguration
     public function positiveInteger(string $path, int $default): int
     {
         $value = $this->get($path, $default);
-
         if (! is_int($value) || $value < 1) {
-            throw AuthException::invalidConfiguration(
-                "Auth configuration [{$path}] must be a positive integer.",
-            );
+            throw AuthException::invalidConfiguration("Auth configuration [{$path}] must be a positive integer.");
         }
 
         return $value;
@@ -115,11 +92,8 @@ final readonly class AuthConfiguration
     public function integerBetween(string $path, int $default, int $minimum, int $maximum): int
     {
         $value = $this->get($path, $default);
-
         if (! is_int($value) || $value < $minimum || $value > $maximum) {
-            throw AuthException::invalidConfiguration(
-                "Auth configuration [{$path}] must be an integer between {$minimum} and {$maximum}.",
-            );
+            throw AuthException::invalidConfiguration("Auth configuration [{$path}] must be an integer between {$minimum} and {$maximum}.");
         }
 
         return $value;

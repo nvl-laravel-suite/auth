@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 use Carbon\CarbonImmutable;
 use Nvl\Auth\Contracts\RoleTemplateProvider;
-use Nvl\Auth\Data\Mutations\AcceptInvitationData;
-use Nvl\Auth\Data\Mutations\ApplyRoleTemplateData;
-use Nvl\Auth\Data\Mutations\ConsumeMagicLinkData;
-use Nvl\Auth\Data\Mutations\DeleteOwnAccountData;
-use Nvl\Auth\Data\Mutations\StoreInvitationData;
-use Nvl\Auth\Data\Mutations\SyncUserPermissionsData;
-use Nvl\Auth\Data\Mutations\SyncUserRolesData;
-use Nvl\Auth\Data\Queries\InvitationIndexQueryData;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\ConfiguredPrincipalAttributeMapper;
 use Nvl\Auth\Services\RoleTemplateRegistry;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\AcceptInvitationData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\ApplyRoleTemplateData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\ConsumeMagicLinkData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\DeleteOwnAccountData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\StoreInvitationData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\SyncUserPermissionsData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\SyncUserRolesData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Queries\InvitationIndexQueryData;
 use Nvl\Auth\ValueObjects\ExternalIdentity;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 use Nvl\Auth\ValueObjects\RoleTemplate;
@@ -84,7 +84,7 @@ it('normalizes bounded multi-type invitation filters', function (): void {
 it('rejects malformed role, invitation, and assignment consumer mutations', function (): void {
     $invalidMutations = [
         [static fn (): ApplyRoleTemplateData => new ApplyRoleTemplateData(''), 'Role template keys'],
-        [static fn (): ApplyRoleTemplateData => new ApplyRoleTemplateData('member', ''), 'Target role names'],
+        [static fn (): ApplyRoleTemplateData => new ApplyRoleTemplateData('member', roleName: ''), 'Target role names'],
         [static fn (): StoreInvitationData => new StoreInvitationData(''), 'Invitation recipients'],
         [static fn (): StoreInvitationData => new StoreInvitationData('user@example.test', type: ''), 'type or purpose'],
         [static fn (): StoreInvitationData => new StoreInvitationData('user@example.test', context: ''), 'Invitation contexts'],
@@ -106,7 +106,7 @@ it('rejects malformed role, invitation, and assignment consumer mutations', func
     config()->set('nvl-auth.tables.permissions', 'consumer_permissions');
     config()->set('nvl-auth.tables.roles', 'consumer_roles');
 
-    expect(new ApplyRoleTemplateData('member', 'consumer-member'))->toBeInstanceOf(ApplyRoleTemplateData::class)
+    expect(new ApplyRoleTemplateData(template: 'member', roleName: 'consumer-member'))->toBeInstanceOf(ApplyRoleTemplateData::class)
         ->and(StoreInvitationData::rules())->toHaveKeys(['recipient', 'roles', 'permissions', 'metadata'])
         ->and(StoreInvitationData::rules()['roles'])->toContain('max:100')
         ->and(StoreInvitationData::rules()['permissions'])->toContain('max:250')
@@ -130,7 +130,7 @@ it('validates and serializes role templates and system mutation contexts', funct
         metadata: ['source' => 'installer'],
     );
 
-    expect($mutation->name)->toBe('regional-support')
+    expect($mutation['name'])->toBe('regional-support')
         ->and($template->toArray())->toMatchArray([
             'key' => 'support-manager',
             'roleName' => 'support-manager',
@@ -178,7 +178,6 @@ it('validates external identities and trusted invitation issuance policy', funct
         emailVerificationSource: 'provider-claim',
     ))->toBeInstanceOf(ExternalIdentity::class)
         ->and(new InvitationIssuanceContext(
-            actorlessAuthorized: true,
             expiresAt: CarbonImmutable::now()->addDay(),
             returnPath: '/account/welcome',
         ))->toBeInstanceOf(InvitationIssuanceContext::class);

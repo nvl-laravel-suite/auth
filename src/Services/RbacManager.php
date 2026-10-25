@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\RbacPrincipalAccess;
@@ -13,7 +14,7 @@ use Nvl\Auth\Events\RbacAssignmentChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Support\Events\DomainEventDispatcher;
-use Nvl\Support\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Ownership\Contracts\OwnershipContext;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
@@ -28,8 +29,8 @@ final readonly class RbacManager
         private FeatureGate $features,
         private AuthModelRegistry $models,
         private RbacPrincipalAccess $principals,
-        private PermissionRegistrar $registrar,
-        private TenantContext $tenantContext,
+        private Container $rbacContainer,
+        private OwnershipContext $ownership,
         private DomainEventDispatcher $domainEvents,
     ) {}
 
@@ -66,13 +67,13 @@ final readonly class RbacManager
 
         DB::connection($this->principals->connectionName($subject))->transaction(function () use ($subject, $roles, $permissions): void {
             $this->principals->assign($subject, $roles, $permissions);
-            $this->registrar->forgetCachedPermissions();
+            $this->registrar()->forgetCachedPermissions();
             $this->domainEvents->dispatch(new RbacAssignmentChanged(
                 $this->principals->identifier($subject),
                 'assigned',
                 $roles,
                 $permissions,
-                context: AuthEventContext::capture($this->tenantContext),
+                context: AuthEventContext::capture($this->ownership),
             ), DB::connection($this->principals->connectionName($subject)));
         });
     }
@@ -88,14 +89,14 @@ final readonly class RbacManager
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
         DB::connection($this->principals->connectionName($subject))->transaction(function () use ($subject, $roles, $metadata): void {
             $this->principals->syncRoles($subject, $roles);
-            $this->registrar->forgetCachedPermissions();
+            $this->registrar()->forgetCachedPermissions();
             $this->domainEvents->dispatch(new RbacAssignmentChanged(
                 $this->principals->identifier($subject),
                 'roles_synchronized',
                 $roles,
                 [],
                 $metadata,
-                AuthEventContext::capture($this->tenantContext),
+                AuthEventContext::capture($this->ownership),
             ), DB::connection($this->principals->connectionName($subject)));
         });
     }
@@ -111,14 +112,14 @@ final readonly class RbacManager
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
         DB::connection($this->principals->connectionName($subject))->transaction(function () use ($subject, $permissions, $metadata): void {
             $this->principals->syncPermissions($subject, $permissions);
-            $this->registrar->forgetCachedPermissions();
+            $this->registrar()->forgetCachedPermissions();
             $this->domainEvents->dispatch(new RbacAssignmentChanged(
                 $this->principals->identifier($subject),
                 'permissions_synchronized',
                 [],
                 $permissions,
                 $metadata,
-                AuthEventContext::capture($this->tenantContext),
+                AuthEventContext::capture($this->ownership),
             ), DB::connection($this->principals->connectionName($subject)));
         });
     }
@@ -131,5 +132,14 @@ final readonly class RbacManager
     public function refresh(Authenticatable $subject, array $relations = []): Authenticatable
     {
         return $this->principals->refresh($subject, $relations);
+    }
+
+    private function registrar(): PermissionRegistrar
+    {
+        if (! class_exists(PermissionRegistrar::class)) {
+            throw AuthException::invalidConfiguration('RBAC requires spatie/laravel-permission.');
+        }
+
+        return $this->rbacContainer->make(PermissionRegistrar::class);
     }
 }

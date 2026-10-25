@@ -263,7 +263,7 @@ it('fails readiness for invalid pipelines and management abilities without packa
     $this->app->singleton(AuthManagementAccess::class, LaravelGateAuthManagementAccess::class);
 
     $this->artisan('nvl:auth:doctor')
-        ->expectsOutputToContain('Management routes require package RBAC or Laravel Gate authorization for [nvl.auth.clients.viewAny].')
+        ->expectsOutputToContain('Management operations require package RBAC or Laravel Gate authorization for [nvl.auth.clients.viewAny].')
         ->assertFailed();
 });
 
@@ -297,41 +297,12 @@ it('rejects a configured policy model from the wrong management group', function
         ->assertFailed();
 });
 
-it('reports missing host route evidence and conflicting package route ownership', function (): void {
-    config()->set('nvl-auth.ownership.http', 'host');
-    config()->set('nvl-auth.ownership.host_routes', []);
-
-    $this->artisan('nvl:auth:doctor')
-        ->expectsOutputToContain('Host-owned Auth flow [authentication.public] has no registered route evidence.')
-        ->assertSuccessful();
-    $this->artisan('nvl:auth:doctor', ['--strict' => true])->assertFailed();
-
-    config()->set('nvl-auth.ownership.service_only', [
-        'authentication.public',
-        'authentication.account',
-        'principal_management.account',
-        'principal_management.management',
-        'password.public',
-        'password.account',
-        'sessions.public',
-        'api_tokens.account',
-        'rbac.management',
-        'audit.management',
-    ]);
-    $this->artisan('nvl:auth:doctor', ['--strict' => true])
-        ->doesntExpectOutputToContain('has no registered route evidence')
-        ->assertSuccessful();
-
-    config()->set('nvl-auth.routes.enabled', true);
-    config()->set('nvl-auth.routes.public.enabled', true);
-    config()->set('nvl-auth.features.authentication.routes.public.enabled', true);
-    config()->set('nvl-auth.ownership.host_routes', [
-        'authentication.public' => ['fixture.auth.login'],
-    ]);
-    Route::get('/fixture-auth-login', static fn (): string => 'login')
-        ->name('fixture.auth.login');
-
-    $this->artisan('nvl:auth:doctor')
-        ->expectsOutputToContain('Auth flow [authentication.public] is owned by both package and host routes.')
-        ->assertFailed();
+it('keeps host route choices outside native service readiness', function (): void {
+    Artisan::call('nvl:auth:doctor', ['--strict' => true, '--format' => 'json']);
+    $baseline = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+    config(['nvl-auth.ownership.host_routes' => [], 'nvl-auth.routes.enabled' => true]);
+    Artisan::call('nvl:auth:doctor', ['--strict' => true, '--format' => 'json']);
+    expect(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR))->toBe($baseline);
+    Route::get('/fixture-auth-login', static fn (): string => 'login')->name('fixture.auth.login');
+    $this->artisan('nvl:auth:doctor', ['--format' => 'json'])->doesntExpectOutputToContain('route evidence')->assertSuccessful();
 });

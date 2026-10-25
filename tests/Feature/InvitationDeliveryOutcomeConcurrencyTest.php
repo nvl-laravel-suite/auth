@@ -5,9 +5,9 @@ declare(strict_types=1);
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Nvl\Auth\Actions\Invitations\RecordInvitationDeliveryOutcomeAction;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\InvitationDeliveryStatus;
+use Nvl\Auth\Services\AuthInvitations;
 
 /**
  * Return why the process-level delivery-outcome race cannot run here.
@@ -221,7 +221,7 @@ it('records one result when duplicate delivery outcomes race', function (): void
 
     try {
         $worker = static function () use ($invitationId, $messageId, $occurredAt): array {
-            app(RecordInvitationDeliveryOutcomeAction::class)->execute(
+            app(AuthInvitations::class)->recordDeliveryOutcome(
                 $invitationId,
                 $messageId,
                 InvitationDeliveryStatus::Failed,

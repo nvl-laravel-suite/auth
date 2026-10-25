@@ -44,7 +44,7 @@ final readonly class LaravelPrincipalSessionContainment implements PrincipalSess
         }
 
         if (method_exists($principal, 'tokens')) {
-            $tokens = $principal->tokens();
+            $tokens = (new \ReflectionMethod($principal, 'tokens'))->invoke($principal);
             if (! $tokens instanceof MorphMany) {
                 throw AuthException::invalidConfiguration('Session containment requires a Sanctum token relationship.');
             }

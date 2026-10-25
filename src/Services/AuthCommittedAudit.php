@@ -18,6 +18,7 @@ use Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope;
 /** Captures native audit ownership while keeping host recorders after the source commit. */
 final readonly class AuthCommittedAudit
 {
+    /** Native Auth operation. */
     public function __construct(private RecorderContract $recorder, private ConnectionCommitCallbacks $commits, private AuthOwnershipState $state, private OwnershipContext $context, private OwnershipQueueContext $queue) {}
 
     /**
@@ -31,15 +32,8 @@ final readonly class AuthCommittedAudit
     }
 
     /** @param array<string, mixed> $metadata */
-    public function record(
-        Connection $connection,
-        string $action,
-        string $outcome = 'success',
-        ?SubjectReference $subject = null,
-        ?Authenticatable $actor = null,
-        ?string $clientId = null,
-        array $metadata = [],
-    ): void {
+    public function record(Connection $connection, string $action, string $outcome = 'success', ?SubjectReference $subject = null, ?Authenticatable $actor = null, ?string $clientId = null, array $metadata = []): void
+    {
         if ($this->state->configured() && $this->recorder instanceof AuthAuditRecorder) {
             if ((new AuthAudit)->getConnection() !== $connection) {
                 throw AuthException::invalidConfiguration('Native audit facts must share their owning source transaction.');
@@ -49,9 +43,7 @@ final readonly class AuthCommittedAudit
             return;
         }
         $envelope = $this->state->configured() ? OwnershipJobEnvelope::capture($this->context) : null;
-        $callback = $this->recorder instanceof AuthAuditRecorder
-            ? $this->recorder->prepare($action, $outcome, $subject, $actor, $clientId, $metadata)
-            : fn () => $this->recorder->record($action, $outcome, $subject, $actor, $clientId, $metadata);
+        $callback = $this->recorder instanceof AuthAuditRecorder ? $this->recorder->prepare($action, $outcome, $subject, $actor, $clientId, $metadata) : fn () => $this->recorder->record($action, $outcome, $subject, $actor, $clientId, $metadata);
         $this->commits->afterCommit($connection, function () use ($callback, $envelope): void {
             if ($envelope !== null) {
                 $this->queue->run($envelope, $callback);

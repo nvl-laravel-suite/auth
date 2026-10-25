@@ -4,19 +4,11 @@ declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Nvl\Auth\Actions\Authentication\LoginAction;
-use Nvl\Auth\Actions\Users\CreateUserAction;
-use Nvl\Auth\Actions\Users\SetUserActiveAction;
-use Nvl\Auth\Actions\Users\UpdateProfileAction;
-use Nvl\Auth\Actions\Users\UpdateUserAction;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
-use Nvl\Auth\Data\Mutations\LoginData;
-use Nvl\Auth\Data\Mutations\StoreUserData;
-use Nvl\Auth\Data\Mutations\UpdateProfileData;
-use Nvl\Auth\Data\Mutations\UpdateUserData;
-use Nvl\Auth\Data\Mutations\UpdateUserStatusData;
 use Nvl\Auth\Enums\PrincipalAttribute;
+use Nvl\Auth\Services\Authentication;
 use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\AuthUsers;
 use Nvl\Auth\Tests\Fixtures\MappedPrincipal;
 use Nvl\Auth\Tests\Fixtures\MappedPrincipalProfile;
 
@@ -125,45 +117,25 @@ it('maps package principal mutations without shadowing a host profile relationsh
         'auth_email' => 'mapped.owner@example.test',
         'password' => 'SecurePassword123',
     ]);
-    $user = app(CreateUserAction::class)->execute($actor, new StoreUserData(
-        name: 'Mapped User',
-        email: 'mapped.user@example.test',
-        password: 'SecurePassword123',
-        profile: ['phone' => '+359000000000'],
-        preferences: ['theme' => 'dark'],
-    ));
+    $user = app(AuthUsers::class)->create($actor, ['name' => 'Mapped User', 'email' => 'mapped.user@example.test', 'password' => 'SecurePassword123', 'profile' => ['phone' => '+359000000000'], 'preferences' => ['theme' => 'dark']]);
     MappedPrincipalProfile::query()->create([
         'user_id' => $user->getKey(),
         'label' => 'Domain profile',
     ]);
 
-    $updated = app(UpdateProfileAction::class)->execute($user, new UpdateProfileData(
-        name: 'Mapped Updated',
-        locale: 'bg',
-        timezone: 'Europe/Sofia',
-        profile: ['phone' => '+359111111111'],
-        preferences: ['theme' => 'light'],
-    ));
-    $updated = app(UpdateUserAction::class)->execute(
+    $updated = app(AuthUsers::class)->updateProfile($user, ['name' => 'Mapped Updated', 'locale' => 'bg', 'timezone' => 'Europe/Sofia', 'profile' => ['phone' => '+359111111111'], 'preferences' => ['theme' => 'light']]);
+    $updated = app(AuthUsers::class)->update(
         $actor,
         $updated,
-        UpdateUserData::validateForUpdate([
-            'name' => 'Sparse Update',
-        ], (string) $updated->getKey()),
+        ['name' => 'Sparse Update'],
     );
-    $updated = app(UpdateProfileAction::class)->execute(
+    $updated = app(AuthUsers::class)->updateProfile(
         $updated,
-        UpdateProfileData::validateAndCreate([
-            'preferences' => ['theme' => 'system'],
-        ]),
+        ['preferences' => ['theme' => 'system']],
     );
-    app(SetUserActiveAction::class)->execute($actor, $updated, new UpdateUserStatusData(false));
+    app(AuthUsers::class)->setActive($actor, $updated, ['active' => false]);
     $attributes = app(PrincipalAttributeMapper::class);
-    $authenticated = app(LoginAction::class)->execute(new LoginData(
-        identifier: 'mapped.owner@example.test',
-        password: 'SecurePassword123',
-        remember: false,
-    ));
+    $authenticated = app(Authentication::class)->login(['identifier' => 'mapped.owner@example.test', 'password' => 'SecurePassword123'], ['remember' => false], auth()->guard('web'), app('session')->driver());
 
     expect($updated->fresh()->profile)->toBeInstanceOf(MappedPrincipalProfile::class)
         ->and($updated->getAttribute('auth_profile'))->toBe(['phone' => '+359111111111'])

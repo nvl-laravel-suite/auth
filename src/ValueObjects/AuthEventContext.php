@@ -5,41 +5,32 @@ declare(strict_types=1);
 namespace Nvl\Auth\ValueObjects;
 
 use InvalidArgumentException;
-use Nvl\Support\Tenancy\Contracts\TenantContext;
-use Nvl\Support\Tenancy\Enums\TenantContextMode;
-use Nvl\Support\Tenancy\ValueObjects\TenantContextSnapshot;
-use Nvl\Support\Tenancy\ValueObjects\TenantId;
-use Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope;
+use Nvl\Support\Ownership\Contracts\OwnershipContext;
+use Nvl\Support\Ownership\Enums\OwnershipContextMode;
+use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 
-/** Captures immutable Auth event ownership before context can change.
- *
+/** Immutable event classification; carries no actor or queued execution authority.
  * @api
  */
 final readonly class AuthEventContext
 {
-    public function __construct(
-        public TenantContextMode $mode,
-        public ?TenantId $tenantId = null,
-    ) {
-        if (($this->mode === TenantContextMode::Tenant) !== ($this->tenantId instanceof TenantId)) {
-            throw new InvalidArgumentException('Only tenant Auth event context may carry a tenant identifier.');
+    public function __construct(public OwnershipContextMode $mode, public ?OwnerReference $owner = null)
+    {
+        if (($mode === OwnershipContextMode::Owner) !== ($owner !== null)) {
+            throw new InvalidArgumentException('Only owned Auth facts may carry an owner reference.');
         }
     }
 
-    public static function capture(TenantContext $context): self
+    public static function capture(OwnershipContext $context): self
     {
         $snapshot = $context->snapshot();
 
-        return new self($snapshot->mode, $snapshot->tenantId);
+        return new self($snapshot->mode, $snapshot->owner);
     }
 
-    public static function platform(): self
+    /** Classify a closed global identity operation without granting central authority. */
+    public static function centralIdentity(): self
     {
-        return new self(TenantContextMode::Platform);
-    }
-
-    public function envelope(): TenantJobEnvelope
-    {
-        return new TenantJobEnvelope(new TenantContextSnapshot($this->mode, $this->tenantId));
+        return new self(OwnershipContextMode::Central);
     }
 }

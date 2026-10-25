@@ -15,42 +15,12 @@ use RuntimeException;
 final readonly class AuthSchemaManager
 {
     /** @var array<string, list<string>> */
-    private const array REQUIRED_COLUMNS = [
-        AuthTables::Invitations => [
-            'context_hash',
-            'current_delivery_message_id',
-            'delivery_status',
-            'delivery_attempted_at',
-            'delivered_at',
-            'delivery_failed_at',
-            'delivery_failure_code',
-        ],
-        AuthTables::Challenges => ['secondary_secret_hash'],
-    ];
+    private const array REQUIRED_COLUMNS = [AuthTables::Invitations => ['context_hash', 'current_delivery_message_id', 'delivery_status', 'delivery_attempted_at', 'delivered_at', 'delivery_failed_at', 'delivery_failure_code'], AuthTables::Challenges => ['secondary_secret_hash']];
 
     /** @var array<string, list<string>> */
-    private const array REQUIRED_INDEXES = [
-        AuthTables::Invitations => [
-            'nvl_auth_invitations_context_hash_index',
-            'nvl_auth_invitations_delivery_status_index',
-        ],
-        AuthTables::Challenges => ['nvl_auth_challenges_secondary_secret_hash_unique'],
-    ];
+    private const array REQUIRED_INDEXES = [AuthTables::Invitations => ['nvl_auth_invitations_context_hash_index', 'nvl_auth_invitations_delivery_status_index'], AuthTables::Challenges => ['nvl_auth_challenges_secondary_secret_hash_unique']];
 
-    /** @var array<string, list<string>> */
-    private const array TENANCY_COLUMNS = [
-        AuthTables::TenantMemberships => ['id', 'tenant_id', 'subject_type', 'subject_id', 'status', 'is_owner', 'revision', 'created_at', 'updated_at'],
-        AuthTables::TenantMembershipLocks => ['tenant_id', 'created_at', 'updated_at'],
-        AuthTables::TenantAuthenticationIntents => ['id', 'tenant_id', 'purpose', 'nonce_hash', 'session_binding_hash', 'subject_type', 'subject_id', 'payload', 'expires_at', 'consumed_at', 'created_at', 'updated_at'],
-        AuthTables::Roles => ['tenant_id'],
-        AuthTables::ModelHasRoles => ['tenant_id'],
-        AuthTables::ModelHasPermissions => ['tenant_id'],
-        AuthTables::Invitations => ['tenant_id', 'ownership_key'],
-        AuthTables::PersonalAccessTokens => ['tenant_id', 'ownership_key'],
-        AuthTables::Challenges => ['tenant_id', 'ownership_key'],
-        AuthTables::Audits => ['tenant_id', 'ownership_key'],
-    ];
-
+    /** Native Auth operation. */
     public function __construct(private AuthConfiguration $configuration) {}
 
     /**
@@ -62,63 +32,30 @@ final readonly class AuthSchemaManager
     {
         $required = $this->requiredTables();
         $schema = Schema::connection($this->connectionName());
-        $existing = array_values(array_filter(
-            $required,
-            static fn (string $table): bool => $schema->hasTable($table),
-        ));
+        $existing = array_values(array_filter($required, static fn (string $table): bool => $schema->hasTable($table)));
         $missing = array_values(array_diff($required, $existing));
         $outdated = $this->outdatedTables($schema, $required);
         $missingIndexes = $this->missingIndexes($schema, $required);
         $requiresRepair = $missing !== [] || $outdated !== [] || $missingIndexes !== [];
-
-        if ($apply && config('nvl-tenancy.enabled') === true && $this->tenancySchemaMissing($schema, $required)) {
-            throw new RuntimeException(
-                'Auth tenancy schema is adopted only through the reviewed nvl:tenancy:adopt workflow.',
-            );
-        }
-
         if ($apply && $requiresRepair && ! $this->configuration->boolean('migrations.enabled', true)) {
-            throw new RuntimeException(
-                'Auth schema apply is unavailable while migrations are host-owned. '
-                .'Update and run the published host migrations, then rerun the schema plan.',
-            );
+            throw new RuntimeException('Auth schema apply is unavailable while migrations are host-owned. '.'Update and run the published host migrations, then rerun the schema plan.');
         }
-
         if ($apply && $this->configuration->boolean('migrations.enabled', true)) {
             if ($missing !== []) {
                 $this->migration('2026_08_01_000000_nvl_auth_create_nvl_auth_identity_tables.php')->up();
                 $this->migration('2026_08_02_000000_nvl_auth_create_nvl_auth_tables.php')->up();
             }
-
             $this->migration('2026_08_12_000000_nvl_auth_add_auth_delivery_context_columns.php')->up();
             $this->migration('2026_08_28_000000_nvl_auth_add_invitation_delivery_outcomes.php')->up();
         }
-
-        $remaining = array_values(array_filter(
-            $required,
-            static fn (string $table): bool => ! $schema->hasTable($table),
-        ));
+        $remaining = array_values(array_filter($required, static fn (string $table): bool => ! $schema->hasTable($table)));
         $remainingOutdated = $this->outdatedTables($schema, $required);
         $remainingIndexes = $this->missingIndexes($schema, $required);
-
         if ($apply && ($remaining !== [] || $remainingOutdated !== [] || $remainingIndexes !== [])) {
-            throw new RuntimeException(sprintf(
-                'Auth schema installation remains incomplete: tables [%s], columns [%s], indexes [%s].',
-                implode(', ', $remaining),
-                $this->formatRequirements($remainingOutdated),
-                $this->formatRequirements($remainingIndexes),
-            ));
+            throw new RuntimeException(sprintf('Auth schema installation remains incomplete: tables [%s], columns [%s], indexes [%s].', implode(', ', $remaining), $this->formatRequirements($remainingOutdated), $this->formatRequirements($remainingIndexes)));
         }
 
-        return [
-            'mode' => $apply ? 'apply' : 'plan',
-            'required' => $required,
-            'existing' => $existing,
-            'missing' => $missing,
-            'outdated' => $outdated,
-            'missing_indexes' => $missingIndexes,
-            'created' => $apply ? $missing : [],
-        ];
+        return ['mode' => $apply ? 'apply' : 'plan', 'required' => $required, 'existing' => $existing, 'missing' => $missing, 'outdated' => $outdated, 'missing_indexes' => $missingIndexes, 'created' => $apply ? $missing : []];
     }
 
     /**
@@ -130,52 +67,18 @@ final readonly class AuthSchemaManager
     private function outdatedTables(Builder $schema, array $required): array
     {
         $outdated = [];
-
         $requirements = self::REQUIRED_COLUMNS;
-        if (config('nvl-tenancy.enabled') === true) {
-            foreach (self::TENANCY_COLUMNS as $table => $columns) {
-                $requirements[$table] = array_values(array_unique(array_merge(
-                    $requirements[$table] ?? [],
-                    $columns,
-                )));
-            }
-        }
-
         foreach ($requirements as $table => $columns) {
             if (! in_array($table, $required, true) || ! $schema->hasTable($table)) {
                 continue;
             }
-
-            $missing = array_values(array_filter(
-                $columns,
-                static fn (string $column): bool => ! $schema->hasColumn($table, $column),
-            ));
-
+            $missing = array_values(array_filter($columns, static fn (string $column): bool => ! $schema->hasColumn($table, $column)));
             if ($missing !== []) {
                 $outdated[$table] = $missing;
             }
         }
 
         return $outdated;
-    }
-
-    /**
-     * Report whether the independently adopted Auth tenant schema is absent.
-     *
-     * @param  list<string>  $required
-     */
-    private function tenancySchemaMissing(Builder $schema, array $required): bool
-    {
-        foreach (self::TENANCY_COLUMNS as $table => $columns) {
-            if (! in_array($table, $required, true)) {
-                continue;
-            }
-            if (! $schema->hasTable($table) || ! $schema->hasColumns($table, $columns)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**
@@ -187,17 +90,11 @@ final readonly class AuthSchemaManager
     private function missingIndexes(Builder $schema, array $required): array
     {
         $missingIndexes = [];
-
         foreach (self::REQUIRED_INDEXES as $table => $indexes) {
             if (! in_array($table, $required, true) || ! $schema->hasTable($table)) {
                 continue;
             }
-
-            $missing = array_values(array_filter(
-                $indexes,
-                static fn (string $index): bool => ! $schema->hasIndex($table, $index),
-            ));
-
+            $missing = array_values(array_filter($indexes, static fn (string $index): bool => ! $schema->hasIndex($table, $index)));
             if ($missing !== []) {
                 $missingIndexes[$table] = $missing;
             }
@@ -214,7 +111,6 @@ final readonly class AuthSchemaManager
     private function formatRequirements(array $requirements): string
     {
         $formatted = [];
-
         foreach ($requirements as $table => $items) {
             $formatted[] = $table.':'.implode('|', $items);
         }
@@ -230,69 +126,44 @@ final readonly class AuthSchemaManager
     public function requiredTables(): array
     {
         $tables = [];
-
         if ($this->enabled(AuthFeature::PrincipalManagement)) {
             $tables[] = $this->table('users', AuthTables::get(AuthTables::Users));
         }
-
-        if ($this->enabled(AuthFeature::Memberships) && config('nvl-tenancy.enabled') === true) {
-            $tables[] = AuthTables::get(AuthTables::TenantMemberships);
-            $tables[] = AuthTables::get(AuthTables::TenantMembershipLocks);
-            $tables[] = AuthTables::get(AuthTables::TenantAuthenticationIntents);
-        }
-
         if ($this->enabled(AuthFeature::Password)) {
             $tables[] = $this->table('password_reset_tokens', AuthTables::get(AuthTables::PasswordResetTokens));
         }
-
         if ($this->enabled(AuthFeature::Rbac)) {
-            foreach ([
-                'permissions' => AuthTables::get(AuthTables::Permissions),
-                'roles' => AuthTables::get(AuthTables::Roles),
-                'model_has_permissions' => AuthTables::get(AuthTables::ModelHasPermissions),
-                'model_has_roles' => AuthTables::get(AuthTables::ModelHasRoles),
-                'role_has_permissions' => AuthTables::get(AuthTables::RoleHasPermissions),
-            ] as $key => $default) {
+            foreach (['permissions' => AuthTables::get(AuthTables::Permissions), 'roles' => AuthTables::get(AuthTables::Roles), 'model_has_permissions' => AuthTables::get(AuthTables::ModelHasPermissions), 'model_has_roles' => AuthTables::get(AuthTables::ModelHasRoles), 'role_has_permissions' => AuthTables::get(AuthTables::RoleHasPermissions)] as $key => $default) {
                 $tables[] = $this->table($key, $default);
             }
         }
-
         if ($this->enabled(AuthFeature::ApiTokens)) {
             $tables[] = $this->table('personal_access_tokens', AuthTables::get(AuthTables::PersonalAccessTokens));
         }
-
         if ($this->enabled(AuthFeature::Clients) || $this->enabled(AuthFeature::Audit)) {
             $tables[] = AuthTables::get(AuthTables::Clients);
         }
-
         if ($this->enabled(AuthFeature::Clients)) {
             $tables[] = AuthTables::get(AuthTables::ClientSessions);
         }
-
         if ($this->enabled(AuthFeature::Invitations)) {
             $tables[] = AuthTables::get(AuthTables::Invitations);
         }
-
         if ($this->enabled(AuthFeature::MagicLinks) || $this->enabled(AuthFeature::SecurityCodes)) {
             $tables[] = AuthTables::get(AuthTables::Challenges);
         }
-
         if ($this->enabled(AuthFeature::Totp)) {
             $tables[] = AuthTables::get(AuthTables::TotpCredentials);
         }
-
         if ($this->enabled(AuthFeature::Passkeys)) {
             $tables[] = AuthTables::get(AuthTables::Passkeys);
         }
-
         if ($this->enabled(AuthFeature::RecoveryCodes)) {
             $tables[] = AuthTables::get(AuthTables::RecoveryCodes);
         }
-
         if ($this->enabled(AuthFeature::SocialIdentities)) {
             $tables[] = AuthTables::get(AuthTables::SocialIdentities);
         }
-
         if ($this->enabled(AuthFeature::Audit)) {
             $tables[] = AuthTables::get(AuthTables::Audits);
         }
@@ -300,29 +171,30 @@ final readonly class AuthSchemaManager
         return array_values(array_unique($tables));
     }
 
+    /** Native Auth operation. */
     private function enabled(AuthFeature $feature): bool
     {
         return $this->configuration->featureEnabled($feature);
     }
 
+    /** Native Auth operation. */
     private function table(string $key, string $default): string
     {
         return $this->configuration->string("tables.{$key}", $default);
     }
 
+    /** Native Auth operation. */
     private function connectionName(): ?string
     {
         $connection = $this->configuration->get('connection');
 
-        return is_string($connection) && trim($connection) !== ''
-            ? trim($connection)
-            : null;
+        return is_string($connection) && trim($connection) !== '' ? trim($connection) : null;
     }
 
+    /** Native Auth operation. */
     private function migration(string $filename): AuthSchemaMigration
     {
         $migration = require dirname(__DIR__, 2).'/database/migrations/'.$filename;
-
         if (! $migration instanceof AuthSchemaMigration) {
             throw new RuntimeException("Auth schema migration [{$filename}] is invalid.");
         }

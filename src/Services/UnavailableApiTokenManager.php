@@ -4,38 +4,46 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\Contracts\ApiTokenManager;
-use Nvl\Auth\Data\Mutations\ApiTokenData;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Results\IssuedApiToken;
-use Nvl\Auth\ValueObjects\ApiTokenSnapshot;
 
 /**
  * Fails closed until the host configures an API-token provider adapter.
  */
 final class UnavailableApiTokenManager implements ApiTokenManager
 {
-    /** {@inheritDoc} */
+    /** {@inheritDoc}
+     * @return list<array{id: string, name: string, abilities: list<string>, lastUsedAt: CarbonImmutable|null, expiresAt: CarbonImmutable|null, createdAt: CarbonImmutable}>
+     */
     public function list(Authenticatable $subject): array
     {
         throw $this->unavailable();
     }
 
-    /** {@inheritDoc} */
-    public function create(Authenticatable $subject, ApiTokenData $data): IssuedApiToken
+    /** {@inheritDoc}
+     * @param  array{name: string, abilities: list<string>, expiresAt: CarbonImmutable|null}  $data
+     */
+    public function create(Authenticatable $subject, array $data): IssuedApiToken
     {
         throw $this->unavailable();
     }
 
-    /** {@inheritDoc} */
-    public function update(Authenticatable $subject, string $tokenId, ApiTokenData $data): ApiTokenSnapshot
+    /** {@inheritDoc}
+     * @param  array{name: string, abilities: list<string>, expiresAt: CarbonImmutable|null}  $data
+     * @return array{id: string, name: string, abilities: list<string>, lastUsedAt: CarbonImmutable|null, expiresAt: CarbonImmutable|null, createdAt: CarbonImmutable}
+     */
+    public function update(Authenticatable $subject, string $tokenId, array $data): array
     {
         throw $this->unavailable();
     }
 
-    /** {@inheritDoc} */
-    public function rotate(Authenticatable $subject, string $tokenId, ApiTokenData $data): IssuedApiToken
+    /** {@inheritDoc}
+     * @param  array{name: string, abilities: list<string>, expiresAt: CarbonImmutable|null}  $data
+     */
+    public function rotate(Authenticatable $subject, string $tokenId, array $data): IssuedApiToken
     {
         throw $this->unavailable();
     }
@@ -57,8 +65,6 @@ final class UnavailableApiTokenManager implements ApiTokenManager
      */
     private function unavailable(): AuthException
     {
-        return AuthException::invalidConfiguration(
-            'API tokens require a configured ApiTokenManager such as SanctumApiTokenManager.',
-        );
+        return AuthException::invalidConfiguration('API tokens require a configured ApiTokenManager such as SanctumApiTokenManager.');
     }
 }

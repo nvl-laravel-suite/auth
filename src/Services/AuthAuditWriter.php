@@ -16,28 +16,17 @@ use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Ownership\Contracts\OwnershipReadiness;
-use Nvl\Support\Tenancy\Enums\TenantContextMode;
+use Nvl\Support\Ownership\Enums\OwnershipContextMode;
 
 /** Persists an Auth audit against an already-captured ownership context. */
 final readonly class AuthAuditWriter
 {
-    public function __construct(
-        private AuthConfiguration $configuration,
-        private AuthAuditContextProvider $request,
-        private DomainEventDispatcher $domainEvents,
-        private OwnershipReadiness $readiness,
-    ) {}
+    /** Native Auth operation. */
+    public function __construct(private AuthConfiguration $configuration, private AuthAuditContextProvider $request, private DomainEventDispatcher $domainEvents, private OwnershipReadiness $readiness) {}
 
     /** @param array<string, mixed> $metadata */
-    public function write(
-        AuthEventContext $context,
-        string $action,
-        string $outcome,
-        ?SubjectReference $subject,
-        ?Authenticatable $actor,
-        ?string $clientId,
-        array $metadata,
-    ): ?AuthAudit {
+    public function write(AuthEventContext $context, string $action, string $outcome, ?SubjectReference $subject, ?Authenticatable $actor, ?string $clientId, array $metadata): ?AuthAudit
+    {
         if (! $this->configuration->featureEnabled(AuthFeature::Audit)) {
             return null;
         }
@@ -51,30 +40,13 @@ final readonly class AuthAuditWriter
         } catch (JsonException $exception) {
             throw new AuthException('invalid_audit_metadata', 'Auth audit metadata must be JSON-serializable.', 500, previous: $exception);
         }
-        if (strlen($encoded) > 32_768) {
+        if (strlen($encoded) > 32768) {
             throw new AuthException('invalid_audit_metadata', 'Auth audit metadata exceeds 32 KiB.', 500);
         }
-        $actorReference = $actor instanceof Authenticatable
-            ? SubjectReference::fromAuthenticatable($actor)
-            : null;
+        $actorReference = $actor instanceof Authenticatable ? SubjectReference::fromAuthenticatable($actor) : null;
 
         return (new AuthAudit)->getConnection()->transaction(function () use ($context, $action, $outcome, $subject, $actorReference, $clientId, $metadata): AuthAudit {
-            $audit = $this->persist($context, [
-                ...$this->ownership($context),
-                'action' => $action,
-                'outcome' => $outcome,
-                'subject_type' => $subject?->type,
-                'subject_id' => $subject?->identifier,
-                'actor_type' => $actorReference?->type,
-                'actor_id' => $actorReference?->identifier,
-                'client_id' => $clientId,
-                'ip_address' => $this->configuration->boolean('features.audit.settings.capture_ip', true)
-                    ? $this->bounded($this->request->ipAddress(), 64) : null,
-                'user_agent' => $this->configuration->boolean('features.audit.settings.capture_user_agent', true)
-                    ? $this->bounded($this->request->userAgent(), 1_024) : null,
-                'request_id' => $this->bounded($this->request->requestId(), 128),
-                'metadata' => $metadata,
-            ]);
+            $audit = $this->persist($context, ['action' => $action, 'outcome' => $outcome, 'subject_type' => $subject?->type, 'subject_id' => $subject?->identifier, 'actor_type' => $actorReference?->type, 'actor_id' => $actorReference?->identifier, 'client_id' => $clientId, 'ip_address' => $this->configuration->boolean('features.audit.settings.capture_ip', true) ? $this->bounded($this->request->ipAddress(), 64) : null, 'user_agent' => $this->configuration->boolean('features.audit.settings.capture_user_agent', true) ? $this->bounded($this->request->userAgent(), 1024) : null, 'request_id' => $this->bounded($this->request->requestId(), 128), 'metadata' => $metadata]);
             $this->domainEvents->dispatch(new AuthAuditRecorded($audit->identifier()), $audit->getConnection());
 
             return $audit;
@@ -86,13 +58,12 @@ final readonly class AuthAuditWriter
      */
     private function persist(AuthEventContext $context, array $attributes): AuthAudit
     {
-        if (config('nvl-auth.ownership.scoped') !== true || $context->mode !== TenantContextMode::Platform) {
+        if (config('nvl-auth.ownership.scoped') !== true || $context->mode !== OwnershipContextMode::Central) {
             return AuthAudit::query()->create($attributes);
         }
         $action = $attributes['action'] ?? null;
         $allowed = ['authentication.', 'session.', 'client.', 'password.', 'magic_link.', 'magic_links.', 'security_code.', 'security_codes.', 'email_verification.', 'profile.', 'account.', 'totp.', 'passkey.', 'recovery_code.', 'social_identity.', 'membership.discovery'];
-        if (! is_string($action) || ($attributes['client_id'] ?? null) !== null
-            || ! array_any($allowed, static fn (string $prefix): bool => str_starts_with($action, $prefix))) {
+        if (! is_string($action) || ($attributes['client_id'] ?? null) !== null || ! array_any($allowed, static fn (string $prefix): bool => str_starts_with($action, $prefix))) {
             throw AuthException::invalidConfiguration('Only the closed central identity audit families can use this writer.');
         }
         $this->readiness->assertActive('auth.audits');
@@ -103,23 +74,7 @@ final readonly class AuthAuditWriter
         return $record->newFromBuilder($record->getAttributes());
     }
 
-    /** @return array{tenant_id?: string|null, ownership_key?: string} */
-    private function ownership(AuthEventContext $context): array
-    {
-        if (config('nvl-tenancy.enabled') !== true) {
-            return [];
-        }
-
-        return match ($context->mode) {
-            TenantContextMode::Tenant => [
-                'tenant_id' => $context->tenantId?->value,
-                'ownership_key' => 'tenant:'.$context->tenantId?->value,
-            ],
-            TenantContextMode::Platform => ['tenant_id' => null, 'ownership_key' => 'platform'],
-            default => throw new AuthException('tenant_audit_context_required', 'Tenant audit ownership is required.', 500),
-        };
-    }
-
+    /** Native Auth operation. */
     private function bounded(?string $value, int $maximumBytes): ?string
     {
         return $value === null ? null : substr($value, 0, $maximumBytes);

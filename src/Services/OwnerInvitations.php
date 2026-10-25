@@ -14,7 +14,6 @@ use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Contracts\OwnerBoundApiTokenManager;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
-use Nvl\Auth\Data\Mutations\AcceptInvitationData;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\PrincipalAttribute;
@@ -22,7 +21,6 @@ use Nvl\Auth\Events\InvitationAccepted;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Pipelines\AuthPipeline;
-use Nvl\Auth\Results\InvitationRegistrationResult;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Ownership\Contracts\OwnerAvailability;
@@ -41,24 +39,8 @@ use Nvl\Support\Ownership\ValueObjects\OwnerReference;
  */
 final readonly class OwnerInvitations
 {
-    public function __construct(
-        private Container $container,
-        private SecretHasher $hasher,
-        private FeatureGate $features,
-        private OwnershipReadiness $readiness,
-        private OwnershipBoundary $boundary,
-        private InvitationRecipientProof $proof,
-        private MembershipPrincipalResolver $principals,
-        private OwnerMemberships $memberships,
-        private AuthModelRegistry $models,
-        private ManagementAuthorizer $authorization,
-        private AuthPipeline $pipeline,
-        private AuthCommittedAudit $audits,
-        private DomainEventDispatcher $events,
-        private ApiTokenManager $tokens,
-        private InvitationSubjectResolver $subjects,
-        private PrincipalAttributeMapper $attributes,
-    ) {}
+    /** Native Auth operation. */
+    public function __construct(private Container $container, private SecretHasher $hasher, private FeatureGate $features, private OwnershipReadiness $readiness, private OwnershipBoundary $boundary, private InvitationRecipientProof $proof, private MembershipPrincipalResolver $principals, private AuthMemberships $memberships, private AuthModelRegistry $models, private ManagementAuthorizer $authorization, private AuthPipeline $pipeline, private AuthCommittedAudit $audits, private DomainEventDispatcher $events, private ApiTokenManager $tokens, private InvitationSubjectResolver $subjects, private PrincipalAttributeMapper $attributes) {}
 
     /** Return only public invitation context to its bearer, without entering any owner. */
     public function preview(string $token): Invitation
@@ -72,17 +54,27 @@ final readonly class OwnerInvitations
     /** Consume a delegation for an existing authenticated principal. */
     public function accept(string $token, Authenticatable $subject): Invitation
     {
-        return $this->consume($token, $subject)->invitation;
+        return $this->consume($token, $subject)['invitation'];
     }
 
-    /** Create an explicitly invited identity and its membership in the same actual transaction. */
-    public function register(AcceptInvitationData $data, ?Authenticatable $subject = null): InvitationRegistrationResult
+    /** Create an explicitly invited identity and its membership in the same actual transaction.
+     * @param  array<string, mixed>  $data
+     * @return array{invitation: Invitation, subject: Authenticatable}
+     */
+    public function register(array $data, ?Authenticatable $subject = null): array
     {
-        return $this->consume($data->token, $subject, $data);
+        if (! is_string($data['token'] ?? null)) {
+            throw new \InvalidArgumentException('Invitation token must be a string.');
+        }
+
+        return $this->consume($data['token'], $subject, $data);
     }
 
-    /** Consume only the fixed registration/acceptance capability; no caller-supplied callback is admitted. */
-    private function consume(string $token, ?Authenticatable $subject, ?AcceptInvitationData $registration = null): InvitationRegistrationResult
+    /** Consume only the fixed registration/acceptance capability; no caller-supplied callback is admitted.
+     * @param  array<string, mixed>|null  $registration
+     * @return array{invitation: Invitation, subject: Authenticatable}
+     */
+    private function consume(string $token, ?Authenticatable $subject, ?array $registration = null): array
     {
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Use);
         [$candidate, $reference] = $this->bootstrap($token);
@@ -102,20 +94,19 @@ final readonly class OwnerInvitations
         $issuer = $this->principals->resolve($issuerReference);
         $owner = $this->container->make(OwnerIdentityResolver::class)->resolve($reference);
 
-        return $this->container->make(OwnershipRunner::class)->run($owner, $issuer, function () use ($token, $subject, $issuer, $issuerReference, $registration): InvitationRegistrationResult {
+        return $this->container->make(OwnershipRunner::class)->run($owner, $issuer, function () use ($token, $subject, $issuer, $issuerReference, $registration): array {
             $model = new Invitation;
-            $membership = new ($this->models->ownerMembershipClass());
-            $principal = new ($this->models->rbacPrincipalClass());
+            $membership = new ($this->models->ownerMembershipClass())();
+            $principal = new ($this->models->rbacPrincipalClass())();
             if ($model->getConnection() !== $membership->getConnection() || $model->getConnection() !== $principal->getConnection()) {
                 throw AuthException::invalidConfiguration('Invitation, membership and principal storage must share the actual source transaction.');
             }
             $this->authorization->authorize($issuer, 'nvl.auth.invitations.create');
 
-            return $model->getConnection()->transaction(function () use ($model, $token, $subject, $issuer, $issuerReference, $registration): InvitationRegistrationResult {
+            return $model->getConnection()->transaction(function () use ($model, $token, $subject, $issuer, $issuerReference, $registration): array {
                 $this->memberships->lock();
                 $fresh = $this->boundary->query(Invitation::query(), 'auth.invitations')->where('token_hash', $this->hasher->hash('invitation-token', $token))->lockForUpdate()->first();
-                if (! $fresh instanceof Invitation || ! $fresh->isUsable()
-                    || $fresh->inviter_type !== $issuerReference->type || $fresh->inviter_id !== $issuerReference->identifier) {
+                if (! $fresh instanceof Invitation || ! $fresh->isUsable() || $fresh->inviter_type !== $issuerReference->type || $fresh->inviter_id !== $issuerReference->identifier) {
                     throw $this->invalid();
                 }
                 if ($registration !== null) {
@@ -127,20 +118,22 @@ final readonly class OwnerInvitations
                 $this->principals->resolve($recipient, true);
                 $this->authorization->authorize($issuer, 'nvl.auth.invitations.create', $fresh);
 
-                return $this->pipeline->run('invitation_accepted', new AuthPipelineContext('invitation_accepted', ['invitation_id' => $fresh->identifier()], $recipient), function () use ($fresh, $recipient, $subject, $issuer, $model): InvitationRegistrationResult {
+                return $this->pipeline->run('invitation_accepted', new AuthPipelineContext('invitation_accepted', ['invitation_id' => $fresh->identifier()], $recipient), function () use ($fresh, $recipient, $subject, $issuer, $model): array {
                     $membership = $this->memberships->enroll($issuer, $recipient, $fresh->roles ?? [], $fresh->permissions ?? []);
                     $fresh->forceFill(['active_key' => null, 'accepted_by_type' => $recipient->type, 'accepted_by_id' => $recipient->identifier, 'accepted_at' => now()])->save();
                     $this->audits->record($model->getConnection(), 'invitation.accepted', subject: $recipient, actor: $subject, metadata: ['invitation_id' => $fresh->identifier(), 'membership_id' => $membership->identifier()]);
                     $this->events->dispatch(new InvitationAccepted($fresh->identifier(), $fresh->type, $fresh->purpose, $recipient, $fresh->accepted_at), $model->getConnection());
 
-                    return new InvitationRegistrationResult($fresh, $subject);
+                    return ['invitation' => $fresh, 'subject' => $subject];
                 });
             }, 3);
         });
     }
 
-    /** Reuse an existing identity only after authenticated mailbox proof; never overwrite its credentials. */
-    private function resolveSubject(Invitation $invitation, AcceptInvitationData $data, ?Authenticatable $authenticated): Authenticatable
+    /** Reuse an existing identity only after authenticated mailbox proof; never overwrite its credentials.
+     * @param  array<string, mixed>  $data
+     */
+    private function resolveSubject(Invitation $invitation, array $data, ?Authenticatable $authenticated): Authenticatable
     {
         $class = $this->models->userClass();
         $email = $this->attributes->column(PrincipalAttribute::Email);
@@ -156,11 +149,8 @@ final readonly class OwnerInvitations
 
             return $existing;
         }
-        $created = $this->subjects->resolve($invitation, $data->toRegistrationArray());
-        if (! $created instanceof Model || ! $created instanceof $class || ! $created->exists
-            || $created->getConnection() !== $invitation->getConnection()
-            || ! is_string($created->getAttribute($email))
-            || mb_strtolower(trim($created->getAttribute($email))) !== mb_strtolower(trim($invitation->recipient))) {
+        $created = $this->subjects->resolve($invitation, array_diff_key($data, ['token' => true]) + ['password_confirmation' => $data['passwordConfirmation'] ?? null]);
+        if (! $created instanceof Model || ! $created instanceof $class || ! $created->exists || $created->getConnection() !== $invitation->getConnection() || ! is_string($created->getAttribute($email)) || mb_strtolower(trim($created->getAttribute($email))) !== mb_strtolower(trim($invitation->recipient))) {
             throw AuthException::invalidConfiguration('The invitation resolver must persist the canonical invited identity on the same source.');
         }
 
@@ -204,12 +194,12 @@ final readonly class OwnerInvitations
             return;
         }
         $id = $token instanceof Model ? $token->getKey() : null;
-        if ((! is_string($id) && ! is_int($id)) || ! $this->tokens instanceof OwnerBoundApiTokenManager
-            || $this->tokens->ownerForToken($subject, (string) $id) != $owner) {
+        if (! is_string($id) && ! is_int($id) || ! $this->tokens instanceof OwnerBoundApiTokenManager || $this->tokens->ownerForToken($subject, (string) $id) != $owner) {
             throw new AuthException('owner_token_invalid', 'The credential cannot accept an invitation for this owner.', 403);
         }
     }
 
+    /** Native Auth operation. */
     private function invalid(): AuthException
     {
         return new AuthException('invitation_invalid', 'The invitation is invalid or expired.', 410);

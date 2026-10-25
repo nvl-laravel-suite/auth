@@ -11,11 +11,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\Pivot;
-use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Database\Query\Grammars\PostgresGrammar;
 use Nvl\Auth\Database\Factories\PermissionFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
-use Nvl\Auth\Relations\TextCastColumnComparison;
 use Nvl\Auth\Services\AuthOwnershipState;
 use Nvl\Auth\Services\OwnerRbacRelations;
 use Nvl\Support\Config\PackageStorage;
@@ -51,15 +48,7 @@ class Permission extends SpatiePermission
     protected $keyType = 'string';
 
     /** @var list<string> */
-    protected $fillable = [
-        'name',
-        'guard_name',
-        'display_name',
-        'description',
-        'group',
-        'is_system',
-        'metadata',
-    ];
+    protected $fillable = ['name', 'guard_name', 'display_name', 'description', 'group', 'is_system', 'metadata'];
 
     /** @var array<string, mixed> */
     protected $attributes = ['is_system' => false];
@@ -71,9 +60,7 @@ class Permission extends SpatiePermission
     {
         $configured = config('nvl-auth.tables.permissions');
 
-        return is_string($configured) && trim($configured) !== ''
-            ? trim($configured)
-            : self::TABLE;
+        return is_string($configured) && trim($configured) !== '' ? trim($configured) : self::TABLE;
     }
 
     /**
@@ -84,36 +71,14 @@ class Permission extends SpatiePermission
         return PackageStorage::connectionName($this->connection ?? PackageStorage::connection('auth') ?? parent::getConnectionName());
     }
 
-    /** Constrain direct inverse assignments to the active team and membership. */
     /** @return BelongsToMany<covariant Model, $this, covariant Pivot> */
     public function users(): BelongsToMany
     {
         if (Container::getInstance()->make(AuthOwnershipState::class)->native()) {
             return Container::getInstance()->make(OwnerRbacRelations::class)->users($this, 'permission');
         }
-        if (config('nvl-tenancy.enabled') !== true) {
-            return parent::users();
-        }
-        $tenant = getPermissionsTeamId();
-        $relation = parent::users()->wherePivot('tenant_id', $tenant);
-        $principal = $relation->getRelated();
 
-        return $relation->whereExists(static function (QueryBuilder $query) use ($principal, $tenant): void {
-            $principalKey = $principal->qualifyColumn($principal->getKeyName());
-            $query->selectRaw('1')->from(AuthTables::get(AuthTables::TenantMemberships));
-            if ($query->getGrammar() instanceof PostgresGrammar) {
-                $query->whereRaw(new TextCastColumnComparison(
-                    $query->getGrammar()->wrap(AuthTables::get(AuthTables::TenantMemberships).'.subject_id'),
-                    $query->getGrammar()->wrap($principalKey),
-                ));
-            } else {
-                $query->whereColumn(AuthTables::get(AuthTables::TenantMemberships).'.subject_id', $principalKey);
-            }
-            $query
-                ->where(AuthTables::get(AuthTables::TenantMemberships).'.subject_type', $principal->getMorphClass())
-                ->where(AuthTables::get(AuthTables::TenantMemberships).'.tenant_id', $tenant)
-                ->where(AuthTables::get(AuthTables::TenantMemberships).'.status', 'active');
-        });
+        return parent::users();
     }
 
     /**
@@ -123,10 +88,7 @@ class Permission extends SpatiePermission
      */
     protected function casts(): array
     {
-        return [
-            'is_system' => 'boolean',
-            'metadata' => 'array',
-        ];
+        return ['is_system' => 'boolean', 'metadata' => 'array'];
     }
 
     /** Return the runtime package fixture factory.
