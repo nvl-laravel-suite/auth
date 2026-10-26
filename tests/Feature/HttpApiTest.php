@@ -11,6 +11,7 @@ use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest;
 use Nvl\Auth\Tests\Fixtures\Consumer\RouteServiceProvider;
 
 it('serves the authorized client and audit management lifecycle', function (): void {
@@ -23,7 +24,7 @@ it('serves the authorized client and audit management lifecycle', function (): v
     (new RouteServiceProvider(app()))->boot(
         app(Router::class),
         app(AuthConfiguration::class),
-        app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class),
+        app(FeatureManifest::class),
         app(FeatureGate::class),
     );
     Route::getRoutes()->refreshNameLookups();
@@ -67,7 +68,7 @@ it('timeboxes known and unknown account requests while keeping responses neutral
     (new RouteServiceProvider(app()))->boot(
         app(Router::class),
         app(AuthConfiguration::class),
-        app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class),
+        app(FeatureManifest::class),
         app(FeatureGate::class),
     );
     $user = $this->user();
@@ -106,7 +107,7 @@ it('rejects oversized magic-link purposes identically for known and unknown acco
     (new RouteServiceProvider(app()))->boot(
         app(Router::class),
         app(AuthConfiguration::class),
-        app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class),
+        app(FeatureManifest::class),
         app(FeatureGate::class),
     );
     $user = $this->user();

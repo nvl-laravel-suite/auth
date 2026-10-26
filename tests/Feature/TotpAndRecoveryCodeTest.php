@@ -11,6 +11,7 @@ use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthSecondFactor;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest;
 use Nvl\Auth\Tests\Fixtures\Consumer\RouteServiceProvider;
 use PragmaRX\Google2FA\Google2FA;
 
@@ -103,7 +104,7 @@ it('exposes totp state only for the authenticated subject with private read-only
     config()->set('nvl-auth.routes.account.enabled', true);
     config()->set('nvl-auth.features.totp.routes.account.enabled', true);
     app()->instance('routes.cached', false);
-    (new RouteServiceProvider(app()))->boot(app(Router::class), app(AuthConfiguration::class), app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class), app(FeatureGate::class));
+    (new RouteServiceProvider(app()))->boot(app(Router::class), app(AuthConfiguration::class), app(FeatureManifest::class), app(FeatureGate::class));
     $user = $this->user();
     $other = $this->user('other-http@example.test');
     TotpCredential::factory()->forSubject($other)->state(['subject_type' => $other->getMorphClass()])->create();
@@ -155,7 +156,7 @@ it('uses the configured auth guard for totp state without falling back to a diff
         'auth.guards.security' => ['driver' => 'session', 'provider' => 'users'],
     ]);
     app()->instance('routes.cached', false);
-    (new RouteServiceProvider(app()))->boot(app(Router::class), app(AuthConfiguration::class), app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class), app(FeatureGate::class));
+    (new RouteServiceProvider(app()))->boot(app(Router::class), app(AuthConfiguration::class), app(FeatureManifest::class), app(FeatureGate::class));
     $web = $this->user('web-guard@example.test');
     $security = $this->user('security-guard@example.test');
     TotpCredential::factory()->forSubject($security)->state(['subject_type' => $security->getMorphClass()])->create();

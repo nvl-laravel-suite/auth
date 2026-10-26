@@ -6,6 +6,7 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Route;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest;
 use Nvl\Auth\Tests\Fixtures\Consumer\RouteServiceProvider;
 
 it('serves configurable principal profile and RBAC APIs without Inertia', function (): void {
@@ -19,7 +20,7 @@ it('serves configurable principal profile and RBAC APIs without Inertia', functi
     (new RouteServiceProvider(app()))->boot(
         app(Router::class),
         app(AuthConfiguration::class),
-        app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class),
+        app(FeatureManifest::class),
         app(FeatureGate::class),
     );
     Route::getRoutes()->refreshNameLookups();

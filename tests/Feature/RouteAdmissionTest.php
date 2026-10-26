@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Route;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
+use Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest;
 use Nvl\Auth\Tests\Fixtures\Consumer\RouteServiceProvider;
 
 it('registers a route only when global surface and feature switches are enabled', function (): void {
@@ -20,7 +21,7 @@ it('registers a route only when global surface and feature switches are enabled'
     $provider->boot(
         app(Router::class),
         app(AuthConfiguration::class),
-        app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class),
+        app(FeatureManifest::class),
         app(FeatureGate::class),
     );
     Route::getRoutes()->refreshNameLookups();
@@ -37,7 +38,7 @@ it('fails stale registered routes closed after a feature is disabled', function 
     $provider->boot(
         app(Router::class),
         app(AuthConfiguration::class),
-        app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class),
+        app(FeatureManifest::class),
         app(FeatureGate::class),
     );
     config()->set('nvl-auth.features.authentication.enabled', false);
@@ -66,7 +67,7 @@ it('does not register browser authentication families without session dependenci
     $provider->boot(
         app(Router::class),
         app(AuthConfiguration::class),
-        app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class),
+        app(FeatureManifest::class),
         app(FeatureGate::class),
     );
     Route::getRoutes()->refreshNameLookups();
@@ -84,7 +85,7 @@ it('rejects stale model-bound routes before authentication or database binding',
     $provider->boot(
         app(Router::class),
         app(AuthConfiguration::class),
-        app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class),
+        app(FeatureManifest::class),
         app(FeatureGate::class),
     );
     config()->set('nvl-auth.features.clients.enabled', false);
@@ -115,7 +116,7 @@ it('keeps the all-enabled route inventory identical to the canonical manifest', 
         }
     }
 
-    $manifest = app(Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest::class);
+    $manifest = app(FeatureManifest::class);
     (new RouteServiceProvider(app()))->boot(
         app(Router::class),
         app(AuthConfiguration::class),
