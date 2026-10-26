@@ -21,7 +21,9 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Events\ConnectionCommitCallbacks;
 use Nvl\Support\Events\DomainEventDispatcher;
 
-/** Complete native AuthEmailVerification operations.
+/**
+ * Complete native AuthEmailVerification operations.
+ *
  * @api
  */
 final readonly class AuthEmailVerification

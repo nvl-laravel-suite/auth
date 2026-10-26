@@ -12,6 +12,8 @@ use Nvl\Auth\Models\Invitation;
 
 /**
  * Maps package registration fields to the configured principal schema.
+ *
+ * @internal
  */
 final readonly class PackageInvitationRegistrationMapper implements InvitationRegistrationMapper
 {

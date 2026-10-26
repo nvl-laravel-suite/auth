@@ -10,6 +10,8 @@ use Nvl\Auth\ValueObjects\RoleTemplate;
 
 /**
  * Merges host role templates deterministically.
+ *
+ * @internal
  */
 final readonly class RoleTemplateRegistry
 {

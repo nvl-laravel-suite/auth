@@ -21,7 +21,7 @@ final class MembershipController extends AuthenticatedController
 {
     public function index(Request $request, AuthMemberships $action): JsonResponse
     {
-        $query = MembershipIndexQueryData::validateAndCreate(AuthRequestInput::aliased($request->query(), ['per_page' => ['perPage']]));
+        $query = MembershipIndexQueryData::validateAndCreate(AuthRequestInput::aliased($request->query(), ['per_page' => ['per_page']]));
 
         return response()->json([
             'data' => $action->paginate($this->subject($request), $query->search, $query->perPage ?? 25),
@@ -57,7 +57,7 @@ final class MembershipController extends AuthenticatedController
 
     public function status(Request $request, string $membership, AuthMemberships $action): JsonResponse
     {
-        $data = UpdateMembershipStatusData::validateAndCreate(AuthRequestInput::aliased($request->all(), ['expected_revision' => ['expectedRevision']]));
+        $data = UpdateMembershipStatusData::validateAndCreate(AuthRequestInput::aliased($request->all(), ['expected_revision' => ['expected_revision']]));
 
         return response()->json([
             'data' => $action->setStatus($this->subject($request), $membership, $data->status, $data->expectedRevision),
@@ -67,7 +67,7 @@ final class MembershipController extends AuthenticatedController
 
     public function destroy(Request $request, string $membership, AuthMemberships $action): JsonResponse
     {
-        $data = MembershipRevisionData::validateAndCreate(AuthRequestInput::aliased($request->all(), ['expected_revision' => ['expectedRevision']]));
+        $data = MembershipRevisionData::validateAndCreate(AuthRequestInput::aliased($request->all(), ['expected_revision' => ['expected_revision']]));
         $action->revoke($this->subject($request), $membership, $data->expectedRevision);
 
         return response()->json(['data' => null, 'code' => 'membership_revoked', 'message' => trans('nvl-auth::responsecode.membership_revoked')]);
@@ -77,7 +77,7 @@ final class MembershipController extends AuthenticatedController
     {
         $data = TransferMembershipOwnershipData::validateAndCreate(AuthRequestInput::aliased($request->all(), [
             'recipient_membership_id' => ['recipientMembershipId'],
-            'expected_revision' => ['expectedRevision'],
+            'expected_revision' => ['expected_revision'],
         ]));
 
         return response()->json([

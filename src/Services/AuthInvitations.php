@@ -38,7 +38,9 @@ use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use Nvl\Support\Ownership\Contracts\OwnershipContext;
 
-/** Complete native AuthInvitations operations.
+/**
+ * Complete native AuthInvitations operations.
+ *
  * @api
  */
 final readonly class AuthInvitations
@@ -204,7 +206,7 @@ final readonly class AuthInvitations
             default => null,
         };
 
-        return $query->latest()->paginate($filters['perPage'] ?? max(1, min($perPage, 100)));
+        return $query->latest()->paginate($filters['per_page'] ?? max(1, min($perPage, 100)));
     }
 
     /**
@@ -632,11 +634,11 @@ final readonly class AuthInvitations
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{recipient: string|null, type: string|null, purpose: string|null, lifecycle: string|null, expiresAfter: string|null, expiresBefore: string|null, context: string|null, perPage: int|null, types: array<array-key, mixed>|null}
+     * @return array{recipient: string|null, type: string|null, purpose: string|null, lifecycle: string|null, expiresAfter: string|null, expiresBefore: string|null, context: string|null, per_page: int|null, types: array<array-key, mixed>|null}
      */
     private function validateInvitationIndexQuery(array $data): array
     {
-        if (array_diff(array_keys($data), ['recipient', 'type', 'purpose', 'lifecycle', 'expiresAfter', 'expiresBefore', 'context', 'perPage', 'types']) !== []) {
+        if (array_diff(array_keys($data), ['recipient', 'type', 'purpose', 'lifecycle', 'expiresAfter', 'expiresBefore', 'context', 'per_page', 'types']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');
         }
         if (! array_key_exists('recipient', $data)) {
@@ -681,11 +683,11 @@ final readonly class AuthInvitations
         if (! ($data['context'] === null || is_string($data['context']))) {
             throw new InvalidArgumentException('Invalid Auth input [context].');
         }
-        if (! array_key_exists('perPage', $data)) {
-            $data['perPage'] = null;
+        if (! array_key_exists('per_page', $data)) {
+            $data['per_page'] = null;
         }
-        if (! ($data['perPage'] === null || is_int($data['perPage']))) {
-            throw new InvalidArgumentException('Invalid Auth input [perPage].');
+        if (! ($data['per_page'] === null || is_int($data['per_page']))) {
+            throw new InvalidArgumentException('Invalid Auth input [per_page].');
         }
         if (! array_key_exists('types', $data)) {
             $data['types'] = null;
@@ -694,7 +696,7 @@ final readonly class AuthInvitations
             throw new InvalidArgumentException('Invalid Auth input [types].');
         }
         $data['types'] = self::validateInvitationIndexQueryNormalizeTypes($data['types']);
-        Validator::make($data, ['recipient' => ['nullable', 'sometimes', 'email:rfc', 'max:320'], 'type' => ['nullable', 'sometimes', 'string', 'max:80'], 'types' => ['nullable', 'sometimes', 'array', 'max:20'], 'types.*' => ['string', 'distinct', 'max:80'], 'purpose' => ['nullable', 'sometimes', 'string', 'max:120'], 'lifecycle' => ['nullable', 'sometimes', 'in:active,accepted,revoked,expired'], 'expiresAfter' => ['nullable', 'sometimes', 'date'], 'expiresBefore' => ['nullable', 'sometimes', 'date', 'after:expiresAfter'], 'context' => ['nullable', 'sometimes', 'string', 'max:191'], 'perPage' => ['nullable', 'sometimes', 'integer', 'between:1,100']])->validate();
+        Validator::make($data, ['recipient' => ['nullable', 'sometimes', 'email:rfc', 'max:320'], 'type' => ['nullable', 'sometimes', 'string', 'max:80'], 'types' => ['nullable', 'sometimes', 'array', 'max:20'], 'types.*' => ['string', 'distinct', 'max:80'], 'purpose' => ['nullable', 'sometimes', 'string', 'max:120'], 'lifecycle' => ['nullable', 'sometimes', 'in:active,accepted,revoked,expired'], 'expiresAfter' => ['nullable', 'sometimes', 'date'], 'expiresBefore' => ['nullable', 'sometimes', 'date', 'after:expiresAfter'], 'context' => ['nullable', 'sometimes', 'string', 'max:191'], 'per_page' => ['nullable', 'sometimes', 'integer', 'between:1,100']])->validate();
 
         return $data;
     }

@@ -416,7 +416,8 @@ class User extends Authenticatable implements CanResetPasswordContract, HasLocal
             : ($attribute === PrincipalAttribute::Active ? 'is_active' : $attribute->value);
     }
 
-    /** Return the runtime package fixture factory.
+    /**
+     * Return the runtime package fixture factory.
      *
      * @internal
      */

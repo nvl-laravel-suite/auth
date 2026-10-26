@@ -15,7 +15,11 @@ use Nvl\Auth\Models\Role;
 use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use Nvl\Support\Ownership\Contracts\OwnershipContext;
 
-/** Validates canonical tenant roles and fixed vocabulary permissions before assignment. */
+/**
+ * Validates canonical tenant roles and fixed vocabulary permissions before assignment.
+ *
+ * @internal
+ */
 final readonly class OwnerMembershipAssignments
 {
     public function __construct(private OwnershipBoundary $boundary,

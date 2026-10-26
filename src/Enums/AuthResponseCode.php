@@ -6,7 +6,9 @@ namespace Nvl\Auth\Enums;
 
 use Nvl\Support\Contracts\ResponseCode;
 
-/** Stable public response codes for Auth.
+/**
+ * Stable public response codes for Auth.
+ *
  * @api
  */
 enum AuthResponseCode: string implements ResponseCode

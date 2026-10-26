@@ -11,7 +11,9 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 
-/** Complete native AuthAuditReader operations.
+/**
+ * Complete native AuthAuditReader operations.
+ *
  * @api
  */
 final readonly class AuthAuditReader

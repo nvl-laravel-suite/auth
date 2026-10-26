@@ -11,6 +11,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
  * Fails closed when reference-based login has no host resolver.
+ *
+ * @internal
  */
 final class UnavailableAuthSubjectResolver implements AuthSubjectResolver
 {

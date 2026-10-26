@@ -12,7 +12,11 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
-/** Requires a canonical principal with a verified address matching the invitation. */
+/**
+ * Requires a canonical principal with a verified address matching the invitation.
+ *
+ * @internal
+ */
 final readonly class VerifiedInvitationRecipientProof implements InvitationRecipientProof
 {
     public function __construct(private MembershipPrincipalResolver $principals) {}

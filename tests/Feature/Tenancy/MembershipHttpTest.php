@@ -52,7 +52,7 @@ it('admits tenant management before lookup and hides foreign membership identifi
 
     $this->actingAs($owner)
         ->withHeader('X-Test-Tenant', $scenario->a()->value)
-        ->getJson(route('nvl.auth.management.memberships.index', ['perPage' => 0]))
+        ->getJson(route('nvl.auth.management.memberships.index', ['per_page' => 0]))
         ->assertUnprocessable()
         ->assertJsonValidationErrors('per_page');
 
@@ -60,7 +60,7 @@ it('admits tenant management before lookup and hides foreign membership identifi
         ->withHeader('X-Test-Tenant', $scenario->a()->value)
         ->patchJson(route('nvl.auth.management.memberships.status', ['membership' => $foreign->id]), [
             'status' => 'invalid',
-            'expectedRevision' => 1,
+            'expected_revision' => 1,
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('status');

@@ -11,7 +11,9 @@ use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
 use Nvl\Support\Ownership\Services\OwnershipResourceRegistry;
 use Nvl\Support\Ownership\Services\PersistedOwnershipStorage;
 
-/** Prevents mutable flags or a cold unscoped boot from declassifying adopted Auth storage.
+/**
+ * Prevents mutable flags or a cold unscoped boot from declassifying adopted Auth storage.
+ *
  * @internal
  */
 final class AuthOwnershipState

@@ -9,7 +9,9 @@ use Nvl\Support\Contracts\DomainEvent;
 use Nvl\Support\Ownership\Contracts\OwnershipQueuedJob;
 use Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope;
 
-/** Requests host delivery after the source commit with immutable native admission facts.
+/**
+ * Requests host delivery after the source commit with immutable native admission facts.
+ *
  * @api
  */
 final readonly class AuthDeliveryRequested implements DomainEvent, OwnershipQueuedJob

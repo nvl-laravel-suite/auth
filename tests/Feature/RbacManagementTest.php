@@ -395,8 +395,8 @@ it('returns filtered stable DTO catalogs without related user identity data', fu
     $actor->assignRole($role);
     $actor->givePermissionTo($permission);
 
-    $roles = app(AuthRbacReader::class)->roleCatalog($actor, ['search' => 'Editor', 'perPage' => 500, 'isSystem' => false, 'guard' => 'web', 'sort' => 'label', 'direction' => 'asc', 'includeAssignments' => true])->through(RoleListItemData::fromModel(...));
-    $permissions = app(AuthRbacReader::class)->permissionCatalog($actor, ['search' => 'Publish', 'group' => 'content', 'perPage' => 500, 'guard' => 'web', 'sort' => 'label', 'direction' => 'asc', 'includeAssignments' => true])->through(PermissionListItemData::fromModel(...));
+    $roles = app(AuthRbacReader::class)->roleCatalog($actor, ['search' => 'Editor', 'per_page' => 500, 'isSystem' => false, 'guard' => 'web', 'sort' => 'label', 'direction' => 'asc', 'includeAssignments' => true])->through(RoleListItemData::fromModel(...));
+    $permissions = app(AuthRbacReader::class)->permissionCatalog($actor, ['search' => 'Publish', 'group' => 'content', 'per_page' => 500, 'guard' => 'web', 'sort' => 'label', 'direction' => 'asc', 'includeAssignments' => true])->through(PermissionListItemData::fromModel(...));
     $roleItem = $roles->items()[0] ?? null;
     $permissionItem = $permissions->items()[0] ?? null;
 
@@ -519,11 +519,11 @@ it('keeps option and catalog query counts independent of fixture size', function
             'permissions' => static fn () => app(AuthRbacReader::class)->permissionOptions($actor, limit: 100)->map(PermissionOptionData::fromModel(...)),
             'role_catalog' => static fn () => app(AuthRbacReader::class)->roleCatalog(
                 $actor,
-                ['perPage' => 100],
+                ['per_page' => 100],
             )->through(RoleListItemData::fromModel(...)),
             'permission_catalog' => static fn () => app(AuthRbacReader::class)->permissionCatalog(
                 $actor,
-                ['perPage' => 100],
+                ['per_page' => 100],
             )->through(PermissionListItemData::fromModel(...)),
         ] as $name => $read) {
             DB::flushQueryLog();

@@ -12,6 +12,8 @@ use ReflectionMethod;
 
 /**
  * Applies RBAC to a configured Eloquent principal without requiring package principal management.
+ *
+ * @internal
  */
 final readonly class EloquentRbacPrincipalAccess implements RbacPrincipalAccess
 {

@@ -9,6 +9,8 @@ use Nvl\Auth\ValueObjects\RoleTemplate;
 
 /**
  * Provides safe package role templates without auto-assigning any principal.
+ *
+ * @internal
  */
 final readonly class PackageRoleTemplates implements RoleTemplateProvider
 {

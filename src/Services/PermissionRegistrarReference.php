@@ -7,7 +7,11 @@ namespace Nvl\Auth\Services;
 use Spatie\Permission\PermissionRegistrar;
 use WeakReference;
 
-/** Carries an existing registrar without retaining scoped readiness or model state. */
+/**
+ * Carries an existing registrar without retaining scoped readiness or model state.
+ *
+ * @internal
+ */
 final class PermissionRegistrarReference
 {
     /** @var WeakReference<PermissionRegistrar>|null */

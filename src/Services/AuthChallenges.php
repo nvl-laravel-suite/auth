@@ -27,7 +27,9 @@ use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Events\DomainEventDispatcher;
 
-/** Complete native AuthChallenges operations.
+/**
+ * Complete native AuthChallenges operations.
+ *
  * @api
  */
 final readonly class AuthChallenges

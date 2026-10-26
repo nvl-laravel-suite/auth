@@ -18,7 +18,9 @@ use Nvl\Support\Ownership\Services\OwnershipResourceRegistry;
 use Nvl\Support\Ownership\ValueObjects\OwnershipDefinition;
 use Nvl\Support\Ownership\ValueObjects\OwnershipResourceDefinition;
 
-/** Declares the optional owned Auth graph while keeping global credentials and vocabulary global.
+/**
+ * Declares the optional owned Auth graph while keeping global credentials and vocabulary global.
+ *
  * @internal
  */
 final readonly class AuthResourceRegistrar

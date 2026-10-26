@@ -60,10 +60,10 @@ it('serves configurable principal profile and RBAC APIs without Inertia', functi
     $this->getJson('/nvl/api/v1/auth/users?search=API%20User')
         ->assertOk()
         ->assertJsonPath('data.total', 1);
-    $this->getJson('/nvl/api/v1/auth/users?perPage=1')
+    $this->getJson('/nvl/api/v1/auth/users?per_page=1')
         ->assertOk()
         ->assertJsonPath('data.per_page', 1);
-    $this->getJson('/nvl/api/v1/auth/roles?perPage=1')
+    $this->getJson('/nvl/api/v1/auth/roles?per_page=1')
         ->assertOk()
         ->assertJsonPath('data.per_page', 1);
     $this->putJson("/nvl/api/v1/auth/permissions/{$permissionId}", [
@@ -97,9 +97,9 @@ it('serves configurable principal profile and RBAC APIs without Inertia', functi
         ->assertOk()
         ->assertJsonPath('data.roles', 1);
 
-    $this->getJson('/nvl/api/v1/auth/users?perPage=0')
+    $this->getJson('/nvl/api/v1/auth/users?per_page=0')
         ->assertUnprocessable()
-        ->assertJsonValidationErrors('perPage');
+        ->assertJsonValidationErrors('per_page');
 
     $this->postJson("/nvl/api/v1/auth/roles/{$roleId}/clone", ['name' => 'publisher-copy', 'display_name' => 'Publisher copy'])
         ->assertCreated()

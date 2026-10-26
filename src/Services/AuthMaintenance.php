@@ -37,7 +37,9 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
 use RuntimeException;
 use stdClass;
 
-/** Complete native AuthMaintenance operations.
+/**
+ * Complete native AuthMaintenance operations.
+ *
  * @api
  */
 final readonly class AuthMaintenance

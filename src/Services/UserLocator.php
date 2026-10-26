@@ -11,6 +11,8 @@ use Nvl\Auth\Models\User;
 
 /**
  * Resolves configured package principals consistently, including restoration flows.
+ *
+ * @internal
  */
 final readonly class UserLocator
 {

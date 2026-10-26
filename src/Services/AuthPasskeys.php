@@ -25,7 +25,9 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 use Throwable;
 
-/** Complete native AuthPasskeys operations.
+/**
+ * Complete native AuthPasskeys operations.
+ *
  * @api
  */
 final readonly class AuthPasskeys

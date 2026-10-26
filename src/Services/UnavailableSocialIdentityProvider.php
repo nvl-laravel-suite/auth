@@ -10,6 +10,8 @@ use Nvl\Auth\ValueObjects\ExternalIdentity;
 
 /**
  * Fails closed until the host configures an external identity adapter.
+ *
+ * @internal
  */
 final class UnavailableSocialIdentityProvider implements SocialIdentityProvider
 {

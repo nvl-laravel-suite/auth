@@ -36,7 +36,9 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Support\Events\DomainEventDispatcher;
 
-/** Complete native AuthUsers operations.
+/**
+ * Complete native AuthUsers operations.
+ *
  * @api
  */
 final readonly class AuthUsers

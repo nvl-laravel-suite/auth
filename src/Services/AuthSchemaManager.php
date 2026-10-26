@@ -11,7 +11,11 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use RuntimeException;
 
-/** Plans and installs only schema required by currently enabled Auth features. */
+/**
+ * Plans and installs only schema required by currently enabled Auth features.
+ *
+ * @internal
+ */
 final readonly class AuthSchemaManager
 {
     /** @var array<string, list<string>> */

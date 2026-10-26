@@ -59,7 +59,8 @@ final class RecoveryCode extends AuthModel
         ];
     }
 
-    /** Return the runtime package fixture factory.
+    /**
+     * Return the runtime package fixture factory.
      *
      * @internal
      */

@@ -18,7 +18,11 @@ use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Ownership\Contracts\OwnershipReadiness;
 use Nvl\Support\Ownership\Enums\OwnershipContextMode;
 
-/** Persists an Auth audit against an already-captured ownership context. */
+/**
+ * Persists an Auth audit against an already-captured ownership context.
+ *
+ * @internal
+ */
 final readonly class AuthAuditWriter
 {
     /** Native Auth operation. */

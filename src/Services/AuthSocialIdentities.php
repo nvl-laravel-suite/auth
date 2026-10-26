@@ -19,7 +19,9 @@ use Nvl\Auth\ValueObjects\ExternalIdentity;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Throwable;
 
-/** Complete native AuthSocialIdentities operations.
+/**
+ * Complete native AuthSocialIdentities operations.
+ *
  * @api
  */
 final readonly class AuthSocialIdentities

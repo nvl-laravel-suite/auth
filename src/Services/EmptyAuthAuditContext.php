@@ -6,7 +6,11 @@ namespace Nvl\Auth\Services;
 
 use Nvl\Auth\Contracts\AuthAuditContextProvider;
 
-/** Empty audit metadata until a host explicitly supplies its bounded context. */
+/**
+ * Empty audit metadata until a host explicitly supplies its bounded context.
+ *
+ * @internal
+ */
 final readonly class EmptyAuthAuditContext implements AuthAuditContextProvider
 {
     public function ipAddress(): ?string

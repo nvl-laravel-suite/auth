@@ -9,6 +9,8 @@ use Nvl\Auth\Exceptions\AuthException;
 
 /**
  * Bounds untrusted browser input before invoking a WebAuthn ceremony adapter.
+ *
+ * @internal
  */
 final class PasskeyInputValidator
 {

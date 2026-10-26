@@ -8,6 +8,8 @@ use Nvl\Auth\Contracts\PermissionCatalogProvider;
 
 /**
  * Contributes every package-owned management ability to Spatie Permission.
+ *
+ * @internal
  */
 final readonly class PackagePermissionCatalog implements PermissionCatalogProvider
 {

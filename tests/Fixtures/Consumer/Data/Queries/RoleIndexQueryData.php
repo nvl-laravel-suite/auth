@@ -28,7 +28,7 @@ final class RoleIndexQueryData extends Data
 
     public function __construct(
         public readonly ?string $search = null,
-        public readonly ?int $perPage = null,
+        #[MapInputName('per_page')] #[MapOutputName('per_page')] public readonly ?int $perPage = null,
         #[TypeScriptOptional]
         public readonly ?bool $isSystem = null,
         #[TypeScriptOptional]
@@ -54,7 +54,7 @@ final class RoleIndexQueryData extends Data
     {
         return [
             'search' => ['sometimes', 'string', 'max:160'],
-            'perPage' => ['sometimes', 'integer', 'between:1,100'],
+            'per_page' => ['sometimes', 'integer', 'between:1,100'],
             'isSystem' => ['sometimes', 'boolean'],
             'guard' => ['sometimes', 'string', 'max:120'],
             'sort' => ['sometimes', 'string', 'in:name,label,priority,created_at'],

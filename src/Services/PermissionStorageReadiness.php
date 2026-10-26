@@ -11,7 +11,11 @@ use Nvl\Ownership\Services\OwnershipDatabaseConstraints;
 use Nvl\Support\Ownership\Contracts\OwnershipReadiness;
 use Throwable;
 
-/** Memoizes adopted permission storage readiness for one request or job scope. */
+/**
+ * Memoizes adopted permission storage readiness for one request or job scope.
+ *
+ * @internal
+ */
 final class PermissionStorageReadiness
 {
     private ?bool $teams = null;

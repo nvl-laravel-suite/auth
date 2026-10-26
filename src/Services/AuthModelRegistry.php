@@ -17,6 +17,8 @@ use Nvl\Support\OwnerRegistry;
 
 /**
  * Resolves validated, host-extensible package model classes.
+ *
+ * @internal
  */
 final readonly class AuthModelRegistry
 {

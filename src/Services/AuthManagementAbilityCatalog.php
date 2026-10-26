@@ -16,6 +16,8 @@ use Nvl\Auth\Models\User;
 
 /**
  * Defines the closed mapping surface for host-owned management policies.
+ *
+ * @internal
  */
 final class AuthManagementAbilityCatalog
 {

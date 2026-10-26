@@ -35,7 +35,9 @@ use Nvl\Support\Events\ConnectionCommitCallbacks;
 use Nvl\Support\Events\DomainEventDispatcher;
 use SensitiveParameter;
 
-/** Complete native AuthPasswords operations.
+/**
+ * Complete native AuthPasswords operations.
+ *
  * @api
  */
 final readonly class AuthPasswords

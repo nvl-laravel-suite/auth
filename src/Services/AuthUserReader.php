@@ -17,7 +17,9 @@ use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\User;
 
-/** Complete native AuthUserReader operations.
+/**
+ * Complete native AuthUserReader operations.
+ *
  * @api
  */
 final readonly class AuthUserReader

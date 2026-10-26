@@ -29,7 +29,7 @@ final class PermissionIndexQueryData extends Data
     public function __construct(
         public readonly ?string $search = null,
         public readonly ?string $group = null,
-        public readonly ?int $perPage = null,
+        #[MapInputName('per_page')] #[MapOutputName('per_page')] public readonly ?int $perPage = null,
         #[TypeScriptOptional]
         public readonly ?string $guard = null,
         #[TypeScriptOptional]
@@ -54,7 +54,7 @@ final class PermissionIndexQueryData extends Data
         return [
             'search' => ['sometimes', 'string', 'max:160'],
             'group' => ['sometimes', 'string', 'max:120'],
-            'perPage' => ['sometimes', 'integer', 'between:1,100'],
+            'per_page' => ['sometimes', 'integer', 'between:1,100'],
             'guard' => ['sometimes', 'string', 'max:120'],
             'sort' => ['sometimes', 'string', 'in:name,label,group,created_at'],
             'direction' => ['sometimes', 'string', 'in:asc,desc'],

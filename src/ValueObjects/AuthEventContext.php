@@ -9,7 +9,9 @@ use Nvl\Support\Ownership\Contracts\OwnershipContext;
 use Nvl\Support\Ownership\Enums\OwnershipContextMode;
 use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 
-/** Immutable event classification; carries no actor or queued execution authority.
+/**
+ * Immutable event classification; carries no actor or queued execution authority.
+ *
  * @api
  */
 final readonly class AuthEventContext

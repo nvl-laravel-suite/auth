@@ -134,7 +134,8 @@ final class Invitation extends AuthModel implements Ownable
             && $this->expires_at->isFuture();
     }
 
-    /** Return the runtime package fixture factory.
+    /**
+     * Return the runtime package fixture factory.
      *
      * @internal
      */

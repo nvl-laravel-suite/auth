@@ -16,7 +16,9 @@ use Nvl\Ownership\Contracts\OwnerAccess;
 use Nvl\Ownership\Services\OwnerIdentityResolver;
 use Nvl\Support\Ownership\Exceptions\OwnershipException;
 
-/** Verifies owner selection after global authentication without entering a privileged execution scope.
+/**
+ * Verifies owner selection after global authentication without entering a privileged execution scope.
+ *
  * @internal
  */
 final readonly class OwnerAuthenticationSelection

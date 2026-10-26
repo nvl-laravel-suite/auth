@@ -12,6 +12,8 @@ use SensitiveParameter;
 
 /**
  * Confirms sensitive account mutations with the subject's current password.
+ *
+ * @internal
  */
 final readonly class PasswordAccountConfirmation implements AccountConfirmation
 {

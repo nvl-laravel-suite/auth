@@ -8,6 +8,8 @@ use Nvl\Auth\Exceptions\AuthException;
 
 /**
  * Produces purpose-separated blind indexes for package secrets and identifiers.
+ *
+ * @internal
  */
 final readonly class SecretHasher
 {

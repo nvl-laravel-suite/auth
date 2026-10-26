@@ -9,7 +9,11 @@ use Nvl\Support\Ownership\Contracts\OwnershipQueueContext;
 use Nvl\Support\Ownership\Enums\OwnershipContextMode;
 use Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope;
 
-/** Capture source-time admission for queued delivery without inferring a host principal. */
+/**
+ * Capture source-time admission for queued delivery without inferring a host principal.
+ *
+ * @internal
+ */
 final readonly class AuthDeliveryContext
 {
     /** Native Auth operation. */

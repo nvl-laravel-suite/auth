@@ -12,6 +12,8 @@ use Nvl\Auth\Results\IssuedApiToken;
 
 /**
  * Fails closed until the host configures an API-token provider adapter.
+ *
+ * @internal
  */
 final class UnavailableApiTokenManager implements ApiTokenManager
 {

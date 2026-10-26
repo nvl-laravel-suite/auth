@@ -6,6 +6,8 @@ namespace Nvl\Auth\Services;
 
 /**
  * Generates high-entropy URL-safe bearer tokens.
+ *
+ * @internal
  */
 final class OpaqueTokenFactory
 {

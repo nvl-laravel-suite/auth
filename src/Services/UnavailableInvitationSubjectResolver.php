@@ -11,6 +11,8 @@ use Nvl\Auth\Models\Invitation;
 
 /**
  * Fails closed until the host supplies invitation registration behavior.
+ *
+ * @internal
  */
 final class UnavailableInvitationSubjectResolver implements InvitationSubjectResolver
 {

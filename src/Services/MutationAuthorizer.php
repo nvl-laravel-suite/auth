@@ -11,6 +11,8 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
  * Authorizes either a human management actor or a trusted system context.
+ *
+ * @internal
  */
 final readonly class MutationAuthorizer
 {

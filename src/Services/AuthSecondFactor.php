@@ -22,7 +22,9 @@ use Nvl\Auth\Results\TotpEnrollment;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use SensitiveParameter;
 
-/** Complete native AuthSecondFactor operations.
+/**
+ * Complete native AuthSecondFactor operations.
+ *
  * @api
  */
 final readonly class AuthSecondFactor

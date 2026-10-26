@@ -11,7 +11,11 @@ use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
-/** Resolves membership principals through the independently configured RBAC model. */
+/**
+ * Resolves membership principals through the independently configured RBAC model.
+ *
+ * @internal
+ */
 final readonly class EloquentMembershipPrincipalResolver implements MembershipPrincipalResolver
 {
     public function __construct(private AuthModelRegistry $models, private Container $container) {}

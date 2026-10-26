@@ -16,7 +16,9 @@ use Nvl\Support\Ownership\Contracts\OwnershipContext;
 use Nvl\Support\Ownership\Contracts\OwnershipReadiness;
 use Nvl\Support\Ownership\Enums\OwnershipContextMode;
 
-/** Builds native inverse RBAC queries without exposing another owner's assignments.
+/**
+ * Builds native inverse RBAC queries without exposing another owner's assignments.
+ *
  * @internal
  */
 final readonly class OwnerRbacRelations

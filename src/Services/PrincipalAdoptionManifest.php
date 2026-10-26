@@ -12,7 +12,11 @@ use Nvl\Auth\ValueObjects\LegacyPrincipalMapping;
 use Nvl\Auth\ValueObjects\LegacyPrincipalTableStage;
 use Nvl\Auth\ValueObjects\PrincipalAdoptionPlan;
 
-/** Validates the complete legacy-to-package principal adoption manifest. */
+/**
+ * Validates the complete legacy-to-package principal adoption manifest.
+ *
+ * @internal
+ */
 final class PrincipalAdoptionManifest
 {
     /**

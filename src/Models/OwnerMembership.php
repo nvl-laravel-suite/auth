@@ -13,7 +13,9 @@ use Nvl\Support\Ownership\Exceptions\OwnershipConfigurationInvalid;
 use Nvl\Support\Ownership\Traits\HasOwnership;
 use Nvl\Support\Ownership\ValueObjects\OwnershipDefinition;
 
-/** One principal's optional membership in a canonical native owner.
+/**
+ * One principal's optional membership in a canonical native owner.
+ *
  * @property string $subject_type
  * @property string $subject_id
  * @property MembershipStatus $status
@@ -56,7 +58,9 @@ class OwnerMembership extends Membership implements Ownable
         return ['status' => MembershipStatus::class, 'is_owner' => 'boolean', 'revision' => 'integer'];
     }
 
-    /** Return the ownership-native fixture factory.
+    /**
+     * Return the ownership-native fixture factory.
+     *
      * @internal
      */
     protected static function newFactory(): OwnerMembershipFactory

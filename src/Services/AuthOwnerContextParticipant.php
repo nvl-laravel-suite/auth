@@ -13,7 +13,9 @@ use Nvl\Support\Ownership\ValueObjects\OwnershipSnapshot;
 use Spatie\Permission\PermissionRegistrar;
 use Throwable;
 
-/** Installs the complete verified owner identity as the temporary RBAC team.
+/**
+ * Installs the complete verified owner identity as the temporary RBAC team.
+ *
  * @internal
  */
 final readonly class AuthOwnerContextParticipant implements OwnershipContextParticipant

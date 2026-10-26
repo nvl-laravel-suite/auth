@@ -35,7 +35,7 @@ final class InvitationIndexQueryData extends Data
         public readonly ?string $expiresAfter = null,
         public readonly ?string $expiresBefore = null,
         public readonly ?string $context = null,
-        public readonly ?int $perPage = null,
+        #[MapInputName('per_page')] #[MapOutputName('per_page')] public readonly ?int $perPage = null,
         ?array $types = null,
     ) {
         $this->types = self::normalizeTypes($types);
@@ -54,7 +54,7 @@ final class InvitationIndexQueryData extends Data
             'expiresAfter' => ['sometimes', 'date'],
             'expiresBefore' => ['sometimes', 'date', 'after:expiresAfter'],
             'context' => ['sometimes', 'string', 'max:191'],
-            'perPage' => ['sometimes', 'integer', 'between:1,100'],
+            'per_page' => ['sometimes', 'integer', 'between:1,100'],
         ];
     }
 

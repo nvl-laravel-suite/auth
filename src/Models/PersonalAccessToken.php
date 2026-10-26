@@ -71,7 +71,8 @@ class PersonalAccessToken extends SanctumPersonalAccessToken implements Ownable
         return PackageStorage::connectionName($this->connection ?? PackageStorage::connection('auth') ?? parent::getConnectionName());
     }
 
-    /** Return the runtime package fixture factory.
+    /**
+     * Return the runtime package fixture factory.
      *
      * @internal
      */

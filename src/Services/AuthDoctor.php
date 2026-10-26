@@ -38,6 +38,8 @@ use Throwable;
 
 /**
  * Validates schema ownership and enabled integration readiness.
+ *
+ * @internal
  */
 final class AuthDoctor
 {

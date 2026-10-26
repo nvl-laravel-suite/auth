@@ -12,6 +12,8 @@ use Nvl\Auth\Models\User;
 
 /**
  * Enforces the package principal activation and lock policy at login time.
+ *
+ * @internal
  */
 final class PrincipalEligibility implements AuthenticationEligibility
 {

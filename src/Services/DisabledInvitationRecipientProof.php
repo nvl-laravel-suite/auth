@@ -9,7 +9,11 @@ use Nvl\Auth\Contracts\InvitationRecipientProof;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
 
-/** Refuses tenant invitation acceptance until recipient proof is configured. */
+/**
+ * Refuses tenant invitation acceptance until recipient proof is configured.
+ *
+ * @internal
+ */
 final readonly class DisabledInvitationRecipientProof implements InvitationRecipientProof
 {
     public function assertMatches(Invitation $invitation, Authenticatable $subject): void

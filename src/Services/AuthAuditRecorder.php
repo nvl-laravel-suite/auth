@@ -19,6 +19,8 @@ use Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope;
 
 /**
  * Records package audit facts when the audit feature is enabled.
+ *
+ * @internal
  */
 final readonly class AuthAuditRecorder implements AuthAuditRecorderContract
 {

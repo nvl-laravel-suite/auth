@@ -68,7 +68,8 @@ final class SocialIdentity extends AuthModel
         ];
     }
 
-    /** Return the runtime package fixture factory.
+    /**
+     * Return the runtime package fixture factory.
      *
      * @internal
      */

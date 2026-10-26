@@ -10,7 +10,9 @@ use Nvl\Ownership\Services\OwnershipDatabaseConstraints;
 use Nvl\Support\Ownership\Exceptions\OwnershipConfigurationInvalid;
 use Nvl\Support\Ownership\Services\OwnershipResourceRegistry;
 
-/** Creates additive optional owner storage; historical tenant records remain untouched.
+/**
+ * Creates additive optional owner storage; historical tenant records remain untouched.
+ *
  * @internal
  */
 final readonly class AuthOwnerSchema

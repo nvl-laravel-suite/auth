@@ -10,6 +10,8 @@ use Nvl\Auth\Exceptions\AuthException;
 
 /**
  * Reads and validates the package's canonical configuration tree.
+ *
+ * @internal
  */
 final readonly class AuthConfiguration
 {

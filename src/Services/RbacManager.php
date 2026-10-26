@@ -19,6 +19,8 @@ use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Applies package RBAC payloads through Spatie Permission's configured model trait.
+ *
+ * @internal
  */
 final readonly class RbacManager
 {

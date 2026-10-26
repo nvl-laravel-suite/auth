@@ -17,6 +17,8 @@ use Nvl\Auth\Models\User;
  *
  * The caller owns the transaction so provisioning and invitation consumption
  * remain one atomic operation.
+ *
+ * @internal
  */
 final readonly class PackageInvitationSubjectResolver implements InvitationSubjectResolver
 {

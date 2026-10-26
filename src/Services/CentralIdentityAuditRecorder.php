@@ -11,7 +11,11 @@ use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
-/** Writes only closed, global identity audit families with platform ownership. */
+/**
+ * Writes only closed, global identity audit families with platform ownership.
+ *
+ * @internal
+ */
 final readonly class CentralIdentityAuditRecorder
 {
     public function __construct(private AuthAuditWriter $writer) {}

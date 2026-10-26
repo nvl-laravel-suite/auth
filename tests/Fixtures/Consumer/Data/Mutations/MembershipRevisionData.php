@@ -15,7 +15,7 @@ use Spatie\LaravelData\Mappers\SnakeCaseMapper;
 #[MapOutputName(CamelCaseMapper::class)]
 final class MembershipRevisionData extends Data
 {
-    public function __construct(public readonly int $expectedRevision) {}
+    public function __construct(#[MapInputName('expected_revision')] #[MapOutputName('expected_revision')] public readonly int $expectedRevision) {}
 
     /** @return array<string, list<string>> */
     public static function rules(): array

@@ -10,6 +10,8 @@ use Nvl\Auth\Contracts\AuthManagementAccess;
 
 /**
  * Uses host-defined Laravel Gate abilities for Auth management access.
+ *
+ * @internal
  */
 final readonly class LaravelGateAuthManagementAccess implements AuthManagementAccess
 {

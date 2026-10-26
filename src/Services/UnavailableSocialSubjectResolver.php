@@ -11,6 +11,8 @@ use Nvl\Auth\ValueObjects\ExternalIdentity;
 
 /**
  * Fails closed when social login has no host subject resolver.
+ *
+ * @internal
  */
 final class UnavailableSocialSubjectResolver implements SocialSubjectResolver
 {

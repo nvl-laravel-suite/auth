@@ -15,7 +15,11 @@ use Nvl\Support\Ownership\Contracts\OwnershipContext;
 use Nvl\Support\Ownership\Enums\OwnershipContextMode;
 use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
 
-/** Separates narrow central identity work from privileged platform administration. */
+/**
+ * Separates narrow central identity work from privileged platform administration.
+ *
+ * @internal
+ */
 final readonly class AuthOperationBoundary
 {
     /** Native Auth operation. */

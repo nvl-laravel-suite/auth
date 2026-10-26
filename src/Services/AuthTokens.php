@@ -17,7 +17,9 @@ use Nvl\Auth\Results\IssuedApiToken;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
-/** Complete native AuthTokens operations.
+/**
+ * Complete native AuthTokens operations.
+ *
  * @api
  */
 final readonly class AuthTokens

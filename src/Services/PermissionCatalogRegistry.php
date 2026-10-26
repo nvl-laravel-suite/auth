@@ -8,6 +8,8 @@ use Nvl\Auth\Contracts\PermissionCatalogProvider;
 
 /**
  * Merges host permission catalogs deterministically.
+ *
+ * @internal
  */
 final readonly class PermissionCatalogRegistry
 {

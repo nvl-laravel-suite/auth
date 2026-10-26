@@ -13,6 +13,8 @@ use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 
 /**
  * Stores package User login timestamps and optional client addresses.
+ *
+ * @internal
  */
 final class EloquentSuccessfulLoginMetadataRecorder implements SuccessfulLoginMetadataRecorder
 {

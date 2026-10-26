@@ -17,7 +17,11 @@ use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use Nvl\Support\Ownership\Contracts\OwnershipContext;
 use Nvl\Support\Ownership\Enums\OwnershipContextMode;
 
-/** Supplies canonical native owner role queries and assignment principal reloads. */
+/**
+ * Supplies canonical native owner role queries and assignment principal reloads.
+ *
+ * @internal
+ */
 final readonly class AuthRbacQueries
 {
     /** Native Auth operation. */

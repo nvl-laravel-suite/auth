@@ -13,6 +13,8 @@ use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
 
 /**
  * Applies the host's business authorization contract consistently.
+ *
+ * @internal
  */
 final readonly class ManagementAuthorizer
 {

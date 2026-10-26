@@ -945,7 +945,6 @@
             "kind": "class",
             "file": "src/Models/AuthAudit.php",
             "methods": [
-                "bootHasOwnership",
                 "client",
                 "delete",
                 "fresh",
@@ -1037,7 +1036,6 @@
             "kind": "class",
             "file": "src/Models/Challenge.php",
             "methods": [
-                "bootHasOwnership",
                 "delete",
                 "fresh",
                 "getConnectionName",
@@ -1078,7 +1076,6 @@
             "kind": "class",
             "file": "src/Models/Invitation.php",
             "methods": [
-                "bootHasOwnership",
                 "delete",
                 "fresh",
                 "getConnectionName",
@@ -1149,7 +1146,6 @@
             "kind": "class",
             "file": "src/Models/OwnerMembership.php",
             "methods": [
-                "bootHasOwnership",
                 "delete",
                 "fresh",
                 "getConnectionName",
@@ -1232,7 +1228,6 @@
             "kind": "class",
             "file": "src/Models/PersonalAccessToken.php",
             "methods": [
-                "bootHasOwnership",
                 "delete",
                 "fresh",
                 "getConnectionName",
@@ -1283,7 +1278,6 @@
             "kind": "class",
             "file": "src/Models/Role.php",
             "methods": [
-                "bootHasOwnership",
                 "children",
                 "delete",
                 "fresh",

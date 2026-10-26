@@ -9,7 +9,11 @@ use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\User;
 
-/** Resolves the validated canonical-to-physical principal field map. */
+/**
+ * Resolves the validated canonical-to-physical principal field map.
+ *
+ * @internal
+ */
 final class ConfiguredPrincipalAttributeMapper implements PrincipalAttributeMapper
 {
     /** @var array<string, string>|null */

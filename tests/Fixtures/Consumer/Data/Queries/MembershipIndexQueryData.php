@@ -17,7 +17,7 @@ final class MembershipIndexQueryData extends Data
 {
     public function __construct(
         public readonly ?string $search = null,
-        public readonly ?int $perPage = null,
+        #[MapInputName('per_page')] #[MapOutputName('per_page')] public readonly ?int $perPage = null,
     ) {}
 
     /** @return array<string, list<string>> */

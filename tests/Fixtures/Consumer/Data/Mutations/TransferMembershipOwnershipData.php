@@ -20,7 +20,7 @@ use Spatie\LaravelData\Mappers\SnakeCaseMapper;
 #[MapOutputName(CamelCaseMapper::class)]
 final class TransferMembershipOwnershipData extends Data
 {
-    public function __construct(public readonly string $recipientMembershipId, public readonly int $expectedRevision)
+    public function __construct(public readonly string $recipientMembershipId, #[MapInputName('expected_revision')] #[MapOutputName('expected_revision')] public readonly int $expectedRevision)
     {
         if (! preg_match('/^[0-9a-f-]{36}$/i', $this->recipientMembershipId) || $this->expectedRevision < 1) {
             throw new InvalidArgumentException('Ownership transfer input is invalid.');

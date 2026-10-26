@@ -12,7 +12,9 @@ use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 
-/** Binds an owner intent to encrypted protocol state and an explicit host session binding.
+/**
+ * Binds an owner intent to encrypted protocol state and an explicit host session binding.
+ *
  * @internal
  */
 final readonly class OwnerAuthenticationChallengeIntents

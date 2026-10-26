@@ -9,6 +9,8 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
  * Denies actorless mutations until the host explicitly supplies trust policy.
+ *
+ * @internal
  */
 final readonly class DenySystemMutationAccess implements SystemMutationAccess
 {

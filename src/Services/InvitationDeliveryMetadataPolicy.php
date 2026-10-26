@@ -9,6 +9,8 @@ use Nvl\Auth\Models\Invitation;
 
 /**
  * Projects explicitly allowed, bounded invitation data for delivery listeners.
+ *
+ * @internal
  */
 final readonly class InvitationDeliveryMetadataPolicy
 {

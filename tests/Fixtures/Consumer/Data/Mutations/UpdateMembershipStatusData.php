@@ -22,7 +22,7 @@ use Spatie\LaravelData\Mappers\SnakeCaseMapper;
 #[MapOutputName(CamelCaseMapper::class)]
 final class UpdateMembershipStatusData extends Data
 {
-    public function __construct(public readonly MembershipStatus $status, public readonly int $expectedRevision)
+    public function __construct(public readonly MembershipStatus $status, #[MapInputName('expected_revision')] #[MapOutputName('expected_revision')] public readonly int $expectedRevision)
     {
         if ($this->expectedRevision < 1) {
             throw new InvalidArgumentException('Membership revision must be positive.');

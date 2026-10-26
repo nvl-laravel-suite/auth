@@ -91,7 +91,8 @@ class Permission extends SpatiePermission
         return ['is_system' => 'boolean', 'metadata' => 'array'];
     }
 
-    /** Return the runtime package fixture factory.
+    /**
+     * Return the runtime package fixture factory.
      *
      * @internal
      */

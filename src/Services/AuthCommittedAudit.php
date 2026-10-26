@@ -15,7 +15,11 @@ use Nvl\Support\Ownership\Contracts\OwnershipContext;
 use Nvl\Support\Ownership\Contracts\OwnershipQueueContext;
 use Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope;
 
-/** Captures native audit ownership while keeping host recorders after the source commit. */
+/**
+ * Captures native audit ownership while keeping host recorders after the source commit.
+ *
+ * @internal
+ */
 final readonly class AuthCommittedAudit
 {
     /** Native Auth operation. */

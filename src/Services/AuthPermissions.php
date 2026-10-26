@@ -21,7 +21,9 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Support\Events\DomainEventDispatcher;
 use Spatie\Permission\PermissionRegistrar;
 
-/** Complete native AuthPermissions operations.
+/**
+ * Complete native AuthPermissions operations.
+ *
  * @api
  */
 final readonly class AuthPermissions

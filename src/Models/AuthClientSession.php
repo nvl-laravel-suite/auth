@@ -85,7 +85,8 @@ final class AuthClientSession extends AuthModel
         return $this->belongsTo(AuthClient::class, 'client_id');
     }
 
-    /** Return the runtime package fixture factory.
+    /**
+     * Return the runtime package fixture factory.
      *
      * @internal
      */

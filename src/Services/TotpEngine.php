@@ -13,6 +13,8 @@ use SensitiveParameter;
 
 /**
  * Generates interoperable TOTP material and rejects replayed timesteps.
+ *
+ * @internal
  */
 final readonly class TotpEngine
 {

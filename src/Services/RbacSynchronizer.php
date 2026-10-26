@@ -10,6 +10,8 @@ use Nvl\Auth\Models\Role;
 
 /**
  * Applies contributed permission catalogs and role templates to Spatie storage.
+ *
+ * @internal
  */
 final readonly class RbacSynchronizer
 {

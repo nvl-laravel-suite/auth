@@ -22,7 +22,9 @@ use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
-/** Complete native AuthClients operations.
+/**
+ * Complete native AuthClients operations.
+ *
  * @api
  */
 final readonly class AuthClients

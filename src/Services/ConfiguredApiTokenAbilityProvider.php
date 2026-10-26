@@ -10,6 +10,8 @@ use Nvl\Auth\Exceptions\AuthException;
 
 /**
  * Supplies the static ability catalog from package configuration.
+ *
+ * @internal
  */
 final readonly class ConfiguredApiTokenAbilityProvider implements ApiTokenAbilityProvider
 {

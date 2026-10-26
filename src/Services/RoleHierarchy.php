@@ -10,6 +10,8 @@ use Nvl\Auth\Models\Role;
 
 /**
  * Validates role parent changes and renders a deterministic hierarchy.
+ *
+ * @internal
  */
 final class RoleHierarchy
 {

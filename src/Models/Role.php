@@ -117,7 +117,8 @@ class Role extends SpatieRole implements Ownable
         return ['priority' => 'integer', 'is_system' => 'boolean', 'metadata' => 'array'];
     }
 
-    /** Return the runtime package fixture factory.
+    /**
+     * Return the runtime package fixture factory.
      *
      * @internal
      */

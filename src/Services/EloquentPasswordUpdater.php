@@ -13,6 +13,8 @@ use Nvl\Auth\Exceptions\AuthException;
 
 /**
  * Updates conventional Eloquent authenticatable passwords through Laravel hashing.
+ *
+ * @internal
  */
 final readonly class EloquentPasswordUpdater implements PasswordUpdater
 {

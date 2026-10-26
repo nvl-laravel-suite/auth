@@ -22,7 +22,9 @@ use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
 use stdClass;
 
-/** Complete native AuthRbacReader operations.
+/**
+ * Complete native AuthRbacReader operations.
+ *
  * @api
  */
 final readonly class AuthRbacReader
@@ -90,7 +92,7 @@ final readonly class AuthRbacReader
             $query->where('guard_name', $guard);
         }
         $this->permissionCatalogApplyOrdering($query, $data);
-        $paginator = $query->paginate(max(1, min($data['perPage'] ?? 25, 100)));
+        $paginator = $query->paginate(max(1, min($data['per_page'] ?? 25, 100)));
 
         return $paginator;
     }
@@ -251,7 +253,7 @@ final readonly class AuthRbacReader
             $query->where('guard_name', $guard);
         }
         $this->roleCatalogApplyOrdering($query, $data);
-        $paginator = $query->paginate(max(1, min($data['perPage'] ?? 25, 100)));
+        $paginator = $query->paginate(max(1, min($data['per_page'] ?? 25, 100)));
 
         return $paginator;
     }
@@ -584,11 +586,11 @@ final readonly class AuthRbacReader
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{search: string|null, group: string|null, perPage: int|null, guard: string|null, sort: string|null, direction: string|null, includeAssignments: bool}
+     * @return array{search: string|null, group: string|null, per_page: int|null, guard: string|null, sort: string|null, direction: string|null, includeAssignments: bool}
      */
     private function validatePermissionIndexQuery(array $data): array
     {
-        if (array_diff(array_keys($data), ['search', 'group', 'perPage', 'guard', 'sort', 'direction', 'includeAssignments']) !== []) {
+        if (array_diff(array_keys($data), ['search', 'group', 'per_page', 'guard', 'sort', 'direction', 'includeAssignments']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');
         }
         if (! array_key_exists('search', $data)) {
@@ -603,11 +605,11 @@ final readonly class AuthRbacReader
         if (! ($data['group'] === null || is_string($data['group']))) {
             throw new InvalidArgumentException('Invalid Auth input [group].');
         }
-        if (! array_key_exists('perPage', $data)) {
-            $data['perPage'] = null;
+        if (! array_key_exists('per_page', $data)) {
+            $data['per_page'] = null;
         }
-        if (! ($data['perPage'] === null || is_int($data['perPage']))) {
-            throw new InvalidArgumentException('Invalid Auth input [perPage].');
+        if (! ($data['per_page'] === null || is_int($data['per_page']))) {
+            throw new InvalidArgumentException('Invalid Auth input [per_page].');
         }
         if (! array_key_exists('guard', $data)) {
             $data['guard'] = null;
@@ -633,7 +635,7 @@ final readonly class AuthRbacReader
         if (! is_bool($data['includeAssignments'] ?? null)) {
             throw new InvalidArgumentException('Invalid Auth input [includeAssignments].');
         }
-        Validator::make($data, ['search' => ['nullable', 'sometimes', 'string', 'max:160'], 'group' => ['nullable', 'sometimes', 'string', 'max:120'], 'perPage' => ['nullable', 'sometimes', 'integer'], 'guard' => ['nullable', 'sometimes', 'string', 'max:120'], 'sort' => ['nullable', 'sometimes', 'string', 'in:name,label,group,created_at'], 'direction' => ['nullable', 'sometimes', 'string', 'in:asc,desc'], 'includeAssignments' => ['sometimes', 'boolean']])->validate();
+        Validator::make($data, ['search' => ['nullable', 'sometimes', 'string', 'max:160'], 'group' => ['nullable', 'sometimes', 'string', 'max:120'], 'per_page' => ['nullable', 'sometimes', 'integer'], 'guard' => ['nullable', 'sometimes', 'string', 'max:120'], 'sort' => ['nullable', 'sometimes', 'string', 'in:name,label,group,created_at'], 'direction' => ['nullable', 'sometimes', 'string', 'in:asc,desc'], 'includeAssignments' => ['sometimes', 'boolean']])->validate();
         if ($data['sort'] !== null && ! in_array($data['sort'], ['name', 'label', 'group', 'created_at'], true)) {
             throw new InvalidArgumentException('The permission catalog sort is not supported.');
         }
@@ -646,11 +648,11 @@ final readonly class AuthRbacReader
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{search: string|null, perPage: int|null, isSystem: bool|null, guard: string|null, sort: string|null, direction: string|null, includeAssignments: bool}
+     * @return array{search: string|null, per_page: int|null, isSystem: bool|null, guard: string|null, sort: string|null, direction: string|null, includeAssignments: bool}
      */
     private function validateRoleIndexQuery(array $data): array
     {
-        if (array_diff(array_keys($data), ['search', 'perPage', 'isSystem', 'guard', 'sort', 'direction', 'includeAssignments']) !== []) {
+        if (array_diff(array_keys($data), ['search', 'per_page', 'isSystem', 'guard', 'sort', 'direction', 'includeAssignments']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');
         }
         if (! array_key_exists('search', $data)) {
@@ -659,11 +661,11 @@ final readonly class AuthRbacReader
         if (! ($data['search'] === null || is_string($data['search']))) {
             throw new InvalidArgumentException('Invalid Auth input [search].');
         }
-        if (! array_key_exists('perPage', $data)) {
-            $data['perPage'] = null;
+        if (! array_key_exists('per_page', $data)) {
+            $data['per_page'] = null;
         }
-        if (! ($data['perPage'] === null || is_int($data['perPage']))) {
-            throw new InvalidArgumentException('Invalid Auth input [perPage].');
+        if (! ($data['per_page'] === null || is_int($data['per_page']))) {
+            throw new InvalidArgumentException('Invalid Auth input [per_page].');
         }
         if (! array_key_exists('isSystem', $data)) {
             $data['isSystem'] = null;
@@ -695,7 +697,7 @@ final readonly class AuthRbacReader
         if (! is_bool($data['includeAssignments'] ?? null)) {
             throw new InvalidArgumentException('Invalid Auth input [includeAssignments].');
         }
-        Validator::make($data, ['search' => ['nullable', 'sometimes', 'string', 'max:160'], 'perPage' => ['nullable', 'sometimes', 'integer'], 'isSystem' => ['nullable', 'sometimes', 'boolean'], 'guard' => ['nullable', 'sometimes', 'string', 'max:120'], 'sort' => ['nullable', 'sometimes', 'string', 'in:name,label,priority,created_at'], 'direction' => ['nullable', 'sometimes', 'string', 'in:asc,desc'], 'includeAssignments' => ['sometimes', 'boolean']])->validate();
+        Validator::make($data, ['search' => ['nullable', 'sometimes', 'string', 'max:160'], 'per_page' => ['nullable', 'sometimes', 'integer'], 'isSystem' => ['nullable', 'sometimes', 'boolean'], 'guard' => ['nullable', 'sometimes', 'string', 'max:120'], 'sort' => ['nullable', 'sometimes', 'string', 'in:name,label,priority,created_at'], 'direction' => ['nullable', 'sometimes', 'string', 'in:asc,desc'], 'includeAssignments' => ['sometimes', 'boolean']])->validate();
         if ($data['sort'] !== null && ! in_array($data['sort'], ['name', 'label', 'priority', 'created_at'], true)) {
             throw new InvalidArgumentException('The role catalog sort is not supported.');
         }

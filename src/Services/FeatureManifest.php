@@ -11,6 +11,8 @@ use Nvl\Auth\ValueObjects\FeatureDefinition;
 
 /**
  * Provides the closed, authoritative catalog of package capabilities.
+ *
+ * @internal
  */
 final class FeatureManifest
 {

@@ -12,6 +12,8 @@ use Nvl\Auth\Contracts\AuthManagementAccess;
 
 /**
  * Maps package management aliases to explicit host policy methods.
+ *
+ * @internal
  */
 final readonly class ConfiguredPolicyAuthManagementAccess implements AuthManagementAccess
 {

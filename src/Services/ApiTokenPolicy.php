@@ -11,6 +11,8 @@ use Nvl\Auth\Exceptions\AuthException;
 
 /**
  * Enforces the host's API-token ability catalog.
+ *
+ * @internal
  */
 final readonly class ApiTokenPolicy
 {

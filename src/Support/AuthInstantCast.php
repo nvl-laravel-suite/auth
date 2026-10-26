@@ -10,7 +10,9 @@ use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 
-/** Stores Auth instants as UTC seconds independently of the host timezone.
+/**
+ * Stores Auth instants as UTC seconds independently of the host timezone.
+ *
  * @implements CastsAttributes<CarbonImmutable, DateTimeInterface|string>
  *
  * @internal

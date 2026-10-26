@@ -58,7 +58,7 @@ it('exposes complete consumer validation rules and invitation registration data'
             'lifecycle',
             'expiresAfter',
             'expiresBefore',
-            'perPage',
+            'per_page',
         ]);
 });
 

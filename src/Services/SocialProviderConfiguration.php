@@ -8,6 +8,8 @@ use Nvl\Auth\Exceptions\AuthException;
 
 /**
  * Validates the allowlisted social provider configuration.
+ *
+ * @internal
  */
 final readonly class SocialProviderConfiguration
 {

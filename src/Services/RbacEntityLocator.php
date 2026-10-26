@@ -14,6 +14,8 @@ use Nvl\Auth\Models\Role;
 
 /**
  * Resolves configured package RBAC entities without controller-owned queries.
+ *
+ * @internal
  */
 final readonly class RbacEntityLocator
 {

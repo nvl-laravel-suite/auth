@@ -10,7 +10,11 @@ use Nvl\Auth\Exceptions\AuthException;
 use Spatie\Permission\PermissionRegistrar;
 use WeakReference;
 
-/** Tracks retained RBAC principals so context changes cannot reuse loaded relations. */
+/**
+ * Tracks retained RBAC principals so context changes cannot reuse loaded relations.
+ *
+ * @internal
+ */
 final class RbacPrincipalTracker
 {
     /** @var array<int, WeakReference<Model>> */
