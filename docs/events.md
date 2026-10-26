@@ -113,3 +113,5 @@ Guard logout completed.
 | `schemaVersion` | `int` |
 
 Source audit/delivery callbacks wait for the outer source commit; rollback emits no committed mutation fact. The durable committed-audit delivery protocol retains retry behavior. Framework Verified and PasswordReset remain Laravel events. Attempts/rejections and repeated delivery observations are not a cross-request exactly-once protocol.
+
+See the machine-readable [event catalog](../resources/event-catalog.json) for the native payload schema.
