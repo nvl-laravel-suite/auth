@@ -945,243 +945,483 @@
             "kind": "class",
             "file": "src/Models/AuthAudit.php",
             "methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "bootHasOwnership",
+                "client",
+                "delete",
+                "fresh",
+                "getConnectionName",
+                "identifier",
+                "newQueryForRestoration",
+                "ownershipDefinition",
+                "refresh",
+                "refreshForUpdate",
+                "save"
             ],
-            "properties": [],
-            "constants": []
+            "properties": [
+                "action",
+                "actor_id",
+                "actor_type",
+                "client_id",
+                "created_at",
+                "id",
+                "ip_address",
+                "metadata",
+                "outcome",
+                "owner_reference",
+                "owner_scope_key",
+                "request_id",
+                "subject_id",
+                "subject_type",
+                "updated_at",
+                "user_agent"
+            ],
+            "constants": [
+                "TABLE"
+            ]
         },
         "Nvl\\Auth\\Models\\AuthClient": {
             "kind": "class",
             "file": "src/Models/AuthClient.php",
             "methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "getConnectionName",
+                "identifier",
+                "sessions"
             ],
-            "properties": [],
-            "constants": []
+            "properties": [
+                "allowed_flows",
+                "allowed_origins",
+                "base_url",
+                "created_at",
+                "id",
+                "is_active",
+                "last_used_at",
+                "metadata",
+                "name",
+                "return_paths",
+                "surface",
+                "updated_at"
+            ],
+            "constants": [
+                "TABLE"
+            ]
         },
         "Nvl\\Auth\\Models\\AuthClientSession": {
             "kind": "class",
             "file": "src/Models/AuthClientSession.php",
             "methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "client",
+                "getConnectionName",
+                "identifier"
             ],
-            "properties": [],
-            "constants": []
+            "properties": [
+                "authenticated_at",
+                "client_id",
+                "created_at",
+                "end_reason",
+                "ended_at",
+                "id",
+                "ip_address",
+                "last_seen_at",
+                "metadata",
+                "session_id_hash",
+                "subject_id",
+                "subject_type",
+                "updated_at",
+                "user_agent"
+            ],
+            "constants": [
+                "TABLE"
+            ]
         },
         "Nvl\\Auth\\Models\\Challenge": {
             "kind": "class",
             "file": "src/Models/Challenge.php",
             "methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "bootHasOwnership",
+                "delete",
+                "fresh",
+                "getConnectionName",
+                "identifier",
+                "isUsable",
+                "newQueryForRestoration",
+                "ownershipDefinition",
+                "refresh",
+                "refreshForUpdate",
+                "save"
             ],
-            "properties": [],
-            "constants": []
+            "properties": [
+                "active_key",
+                "attempts",
+                "consumed_at",
+                "created_at",
+                "expires_at",
+                "id",
+                "max_attempts",
+                "owner_reference",
+                "owner_scope_key",
+                "payload",
+                "purpose",
+                "recipient_hash",
+                "revoked_at",
+                "secondary_secret_hash",
+                "secret_hash",
+                "subject_id",
+                "subject_type",
+                "type",
+                "updated_at"
+            ],
+            "constants": [
+                "TABLE"
+            ]
         },
         "Nvl\\Auth\\Models\\Invitation": {
             "kind": "class",
             "file": "src/Models/Invitation.php",
             "methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "bootHasOwnership",
+                "delete",
+                "fresh",
+                "getConnectionName",
+                "identifier",
+                "isUsable",
+                "newQueryForRestoration",
+                "ownershipDefinition",
+                "refresh",
+                "refreshForUpdate",
+                "save"
             ],
-            "properties": [],
-            "constants": []
+            "properties": [
+                "accepted_at",
+                "accepted_by_id",
+                "accepted_by_type",
+                "active_key",
+                "context_hash",
+                "created_at",
+                "current_delivery_message_id",
+                "delivered_at",
+                "delivery_attempted_at",
+                "delivery_failed_at",
+                "delivery_failure_code",
+                "delivery_status",
+                "expires_at",
+                "id",
+                "inviter_id",
+                "inviter_type",
+                "last_sent_at",
+                "metadata",
+                "owner_reference",
+                "owner_scope_key",
+                "permissions",
+                "purpose",
+                "recipient",
+                "recipient_hash",
+                "resend_count",
+                "revoked_at",
+                "roles",
+                "token_hash",
+                "type",
+                "updated_at"
+            ],
+            "constants": [
+                "TABLE"
+            ]
         },
         "Nvl\\Auth\\Models\\Membership": {
             "kind": "class",
             "file": "src/Models/Membership.php",
             "methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "getConnectionName",
+                "identifier"
             ],
-            "properties": [],
+            "properties": [
+                "created_at",
+                "id",
+                "is_owner",
+                "revision",
+                "status",
+                "subject_id",
+                "subject_type",
+                "updated_at"
+            ],
             "constants": []
         },
         "Nvl\\Auth\\Models\\OwnerMembership": {
             "kind": "class",
             "file": "src/Models/OwnerMembership.php",
             "methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "bootHasOwnership",
+                "delete",
+                "fresh",
+                "getConnectionName",
+                "getTable",
+                "identifier",
+                "newQueryForRestoration",
+                "ownershipDefinition",
+                "refresh",
+                "refreshForUpdate",
+                "save"
             ],
-            "properties": [],
+            "properties": [
+                "created_at",
+                "id",
+                "is_owner",
+                "owner_reference",
+                "owner_scope_key",
+                "revision",
+                "status",
+                "subject_id",
+                "subject_type",
+                "updated_at"
+            ],
             "constants": []
         },
         "Nvl\\Auth\\Models\\Passkey": {
             "kind": "class",
             "file": "src/Models/Passkey.php",
             "methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "getConnectionName",
+                "identifier"
             ],
-            "properties": [],
-            "constants": []
+            "properties": [
+                "backed_up",
+                "backup_eligible",
+                "created_at",
+                "credential_id",
+                "credential_id_hash",
+                "id",
+                "last_used_at",
+                "name",
+                "public_key",
+                "revoked_at",
+                "signature_counter",
+                "subject_id",
+                "subject_type",
+                "transports",
+                "updated_at",
+                "user_handle"
+            ],
+            "constants": [
+                "TABLE"
+            ]
         },
         "Nvl\\Auth\\Models\\Permission": {
             "kind": "class",
             "file": "src/Models/Permission.php",
             "methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "getConnectionName",
+                "getTable",
+                "users"
             ],
-            "properties": [],
-            "constants": []
+            "properties": [
+                "description",
+                "display_name",
+                "group",
+                "guard_name",
+                "id",
+                "is_system",
+                "metadata",
+                "name",
+                "roles_count",
+                "users_count"
+            ],
+            "constants": [
+                "TABLE"
+            ]
         },
         "Nvl\\Auth\\Models\\PersonalAccessToken": {
             "kind": "class",
             "file": "src/Models/PersonalAccessToken.php",
             "methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "bootHasOwnership",
+                "delete",
+                "fresh",
+                "getConnectionName",
+                "getTable",
+                "newQueryForRestoration",
+                "ownershipDefinition",
+                "refresh",
+                "refreshForUpdate",
+                "save"
             ],
             "properties": [
-                "id"
+                "abilities",
+                "id",
+                "name",
+                "owner_reference",
+                "owner_scope_key",
+                "token",
+                "tokenable_id",
+                "tokenable_type"
             ],
-            "constants": []
+            "constants": [
+                "TABLE"
+            ]
         },
         "Nvl\\Auth\\Models\\RecoveryCode": {
             "kind": "class",
             "file": "src/Models/RecoveryCode.php",
             "methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "getConnectionName",
+                "identifier"
             ],
-            "properties": [],
-            "constants": []
+            "properties": [
+                "batch_id",
+                "code_hash",
+                "created_at",
+                "id",
+                "revoked_at",
+                "subject_id",
+                "subject_type",
+                "updated_at",
+                "used_at"
+            ],
+            "constants": [
+                "TABLE"
+            ]
         },
         "Nvl\\Auth\\Models\\Role": {
             "kind": "class",
             "file": "src/Models/Role.php",
             "methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "bootHasOwnership",
+                "children",
+                "delete",
+                "fresh",
+                "getConnectionName",
+                "getTable",
+                "newQueryForRestoration",
+                "ownershipDefinition",
+                "parent",
+                "refresh",
+                "refreshForUpdate",
+                "save",
+                "users"
             ],
-            "properties": [],
-            "constants": []
+            "properties": [
+                "description",
+                "display_name",
+                "guard_name",
+                "id",
+                "is_system",
+                "metadata",
+                "name",
+                "owner_reference",
+                "owner_scope_key",
+                "parent_id",
+                "permissions_count",
+                "priority",
+                "users_count"
+            ],
+            "constants": [
+                "TABLE"
+            ]
         },
         "Nvl\\Auth\\Models\\SocialIdentity": {
             "kind": "class",
             "file": "src/Models/SocialIdentity.php",
             "methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "getConnectionName",
+                "identifier"
             ],
-            "properties": [],
-            "constants": []
+            "properties": [
+                "created_at",
+                "email",
+                "id",
+                "last_used_at",
+                "profile",
+                "provider",
+                "provider_user_id",
+                "provider_user_id_hash",
+                "revoked_at",
+                "subject_id",
+                "subject_type",
+                "updated_at"
+            ],
+            "constants": [
+                "TABLE"
+            ]
         },
         "Nvl\\Auth\\Models\\TotpCredential": {
             "kind": "class",
             "file": "src/Models/TotpCredential.php",
             "methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "getConnectionName",
+                "identifier"
             ],
-            "properties": [],
-            "constants": []
+            "properties": [
+                "algorithm",
+                "allowed_drift",
+                "confirmed_at",
+                "created_at",
+                "digits",
+                "id",
+                "last_accepted_timestep",
+                "last_used_at",
+                "name",
+                "period",
+                "revoked_at",
+                "secret",
+                "subject_id",
+                "subject_type",
+                "updated_at"
+            ],
+            "constants": [
+                "TABLE"
+            ]
         },
         "Nvl\\Auth\\Models\\User": {
             "kind": "class",
             "file": "src/Models/User.php",
             "methods": [
-                "getKey",
+                "__construct",
+                "acceptedInvitations",
+                "authAudits",
+                "authChallenges",
+                "authClientSessions",
+                "getAuthPasswordName",
+                "getConnectionName",
+                "getCreatedAtColumn",
+                "getDeletedAtColumn",
+                "getEmailForPasswordReset",
+                "getEmailForVerification",
+                "getFillable",
+                "getHidden",
                 "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "getRememberTokenName",
+                "getTable",
+                "getUpdatedAtColumn",
+                "hasVerifiedEmail",
+                "isAuthenticationAllowed",
+                "markEmailAsVerified",
+                "passkeys",
+                "performedAuthAudits",
+                "preferredLocale",
+                "recoveryCodes",
+                "scopeAuthenticationAllowed",
+                "sentInvitations",
+                "socialIdentities",
+                "totpCredentials"
             ],
-            "properties": [],
-            "constants": []
+            "properties": [
+                "deleted_at",
+                "email",
+                "email_verified_at",
+                "id",
+                "is_active",
+                "last_login_at",
+                "last_login_ip",
+                "locale",
+                "locked_until",
+                "name",
+                "password",
+                "preferences",
+                "profile",
+                "remember_token",
+                "timezone"
+            ],
+            "constants": [
+                "TABLE"
+            ]
         },
         "Nvl\\Auth\\Ownership\\AuthOwnerAccess": {
             "kind": "class",
@@ -1767,297 +2007,5 @@
             ],
             "constants": []
         }
-    },
-    "models": {
-        "Nvl\\Auth\\Models\\AuthAudit": {
-            "read": [],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": []
-        },
-        "Nvl\\Auth\\Models\\AuthClient": {
-            "read": [],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": []
-        },
-        "Nvl\\Auth\\Models\\AuthClientSession": {
-            "read": [],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": []
-        },
-        "Nvl\\Auth\\Models\\Challenge": {
-            "read": [],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": []
-        },
-        "Nvl\\Auth\\Models\\Invitation": {
-            "read": [],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": []
-        },
-        "Nvl\\Auth\\Models\\Membership": {
-            "read": [],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": []
-        },
-        "Nvl\\Auth\\Models\\OwnerMembership": {
-            "read": [],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": []
-        },
-        "Nvl\\Auth\\Models\\Passkey": {
-            "read": [],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": []
-        },
-        "Nvl\\Auth\\Models\\Permission": {
-            "read": [],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": []
-        },
-        "Nvl\\Auth\\Models\\PersonalAccessToken": {
-            "read": [
-                "id"
-            ],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": []
-        },
-        "Nvl\\Auth\\Models\\RecoveryCode": {
-            "read": [],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": []
-        },
-        "Nvl\\Auth\\Models\\Role": {
-            "read": [],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": []
-        },
-        "Nvl\\Auth\\Models\\SocialIdentity": {
-            "read": [],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": []
-        },
-        "Nvl\\Auth\\Models\\TotpCredential": {
-            "read": [],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": []
-        },
-        "Nvl\\Auth\\Models\\User": {
-            "read": [],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": [
-                "acceptedInvitations",
-                "authAudits",
-                "authChallenges",
-                "authClientSessions",
-                "passkeys",
-                "performedAuthAudits",
-                "permissions",
-                "recoveryCodes",
-                "roles",
-                "sentInvitations",
-                "socialIdentities",
-                "teams",
-                "tokens",
-                "totpCredentials"
-            ],
-            "host_subclasses": true,
-            "capability_methods": [
-                "assignRole",
-                "bootHasPermissions",
-                "bootHasRoles",
-                "collectPermissions",
-                "collectRoles",
-                "convertToPermissionModels",
-                "createToken",
-                "detachPermissions",
-                "detachRoles",
-                "filterPermission",
-                "forgetCachedPermissions",
-                "forgetWildcardPermissionIndex",
-                "getAllPermissions",
-                "getArrayableRelations",
-                "getDirectPermissions",
-                "getPermissionNames",
-                "getPermissionsViaRoles",
-                "getRelations",
-                "getRoleNames",
-                "getStoredPermission",
-                "getStoredRole",
-                "givePermissionTo",
-                "jsonSerialize",
-                "relationsToArray",
-                "removeRole",
-                "revokePermissionTo",
-                "scopePermission",
-                "scopeRole",
-                "scopeTeam",
-                "scopeWithoutPermission",
-                "scopeWithoutRole",
-                "scopeWithoutTeam",
-                "syncPermissions",
-                "syncRoles",
-                "toArray",
-                "toJson",
-                "toPrettyJson"
-            ]
-        }
-    },
-    "capability_relations": {},
-    "tables": {
-        "audits": "nvl_auth_audits",
-        "challenges": "nvl_auth_challenges",
-        "client_sessions": "nvl_auth_client_sessions",
-        "clients": "nvl_auth_clients",
-        "invitations": "nvl_auth_invitations",
-        "model_has_permissions": "nvl_auth_model_has_permissions",
-        "model_has_roles": "nvl_auth_model_has_roles",
-        "passkeys": "nvl_auth_passkeys",
-        "password_reset_tokens": "nvl_auth_password_reset_tokens",
-        "permissions": "nvl_auth_permissions",
-        "personal_access_tokens": "nvl_auth_personal_access_tokens",
-        "recovery_codes": "nvl_auth_recovery_codes",
-        "role_has_permissions": "nvl_auth_role_has_permissions",
-        "roles": "nvl_auth_roles",
-        "social_identities": "nvl_auth_social_identities",
-        "tenant_authentication_intents": "nvl_auth_tenant_authentication_intents",
-        "tenant_membership_locks": "nvl_auth_tenant_membership_locks",
-        "tenant_memberships": "nvl_auth_tenant_memberships",
-        "totp_credentials": "nvl_auth_totp_credentials",
-        "users": "nvl_auth_users"
     }
 }

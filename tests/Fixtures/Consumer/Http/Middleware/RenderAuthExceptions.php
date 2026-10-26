@@ -9,7 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as LaravelResponse;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Support\Http\PackageExceptionPayload;
+use Nvl\Auth\Tests\Fixtures\ConsumerSupport\PackageExceptionPayload;
 use Symfony\Component\HttpFoundation\Response;
 
 /**

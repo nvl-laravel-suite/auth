@@ -19,7 +19,7 @@
         "ext-mbstring": "*",
         "laravel/framework": "^13.0",
         "nesbot/carbon": "^2.72 || ^3.0",
-        "nvl/core": "^6.0",
+        "nvl/core": "^7.0",
         "php": "^8.4"
     },
     "require-dev": {
@@ -30,7 +30,7 @@
         "laravel/sanctum": "^4.3",
         "laravel/socialite": "^5.29",
         "mockery/mockery": "^1.6",
-        "nvl/ownership": "^6.0",
+        "nvl/ownership": "^7.0",
         "orchestra/testbench": "^11.0",
         "paragonie/constant_time_encoding": "^2.6 || ^3.0",
         "pestphp/pest": "^4.0",
@@ -86,7 +86,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "6.x-dev"
+            "dev-main": "7.x-dev"
         },
         "laravel": {
             "providers": [
@@ -118,15 +118,16 @@
             "/**/.gitattributes",
             "/.gitignore",
             "/**/.gitignore",
-            "/**/.gitkeep"
+            "/**/.gitkeep",
+            ".DS_Store"
         ]
     },
     "minimum-stability": "stable",
     "prefer-stable": true,
     "conflict": {
-        "nvl/activity": "<6.0 || >=7.0",
-        "nvl/mail-notifications": "<6.0 || >=7.0",
-        "nvl/ownership": "<6.0 || >=7.0"
+        "nvl/activity": "<7.0 || >=8.0",
+        "nvl/mail-notifications": "<7.0 || >=8.0",
+        "nvl/ownership": "<7.0 || >=8.0"
     },
     "homepage": "https://github.com/nvl-laravel-suite/auth",
     "authors": [

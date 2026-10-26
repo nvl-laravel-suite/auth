@@ -39,8 +39,7 @@
             "producers": [
                 {
                     "path": "packages/nvl/auth/src/Services/AuthAuditWriter.php",
-                    "connection": "$audit->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\AuthAuditRecorded($audit->identifier())"
+                    "trigger": "Audit row persisted."
                 }
             ],
             "security_notes": [
@@ -61,7 +60,7 @@
                 {
                     "name": "ownership",
                     "type": "Nvl\\Support\\Ownership\\ValueObjects\\OwnershipJobEnvelope",
-                    "visibility": "private",
+                    "visibility": "public",
                     "required": true
                 },
                 {
@@ -89,33 +88,23 @@
             "producers": [
                 {
                     "path": "packages/nvl/auth/src/Services/AuthChallenges.php",
-                    "connection": "$challenge->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\AuthDeliveryRequested(new \\Nvl\\Auth\\ValueObjects\\AuthDeliveryRequest(messageId: (string) \\Illuminate\\Support\\Str::uuid(), feature: $feature, type: $messageType, recipient: $normalizedRecipient, payload: [...$payload, 'challenge_id' => $challenge->identifier(), 'secret' => $secret, 'code' => $fallbackCode, 'purpose' => $purpose], expiresAt: $expiresAt, locale: $locale, metadata: ['challenge_id' => $challenge->identifier(), ...$metadata], subject: $subject), $this->deliveryContext->capture(true))"
+                    "trigger": "Host delivery capability requested."
                 },
                 {
                     "path": "packages/nvl/auth/src/Services/AuthEmailVerification.php",
-                    "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit())->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\AuthDeliveryRequested(new \\Nvl\\Auth\\ValueObjects\\AuthDeliveryRequest(messageId: (string) \\Illuminate\\Support\\Str::uuid(), feature: \\Nvl\\Auth\\Enums\\AuthFeature::EmailVerification, type: \\Nvl\\Auth\\Enums\\AuthMessageType::EmailVerification, recipient: $subject->getEmailForVerification(), payload: ['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'email_hash' => sha1($subject->getEmailForVerification())], expiresAt: $expiresAt, locale: $locale), $this->deliveryContext->capture(true))"
+                    "trigger": "Host delivery capability requested."
                 },
                 {
                     "path": "packages/nvl/auth/src/Services/AuthInvitations.php",
-                    "connection": "$invitation->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\AuthDeliveryRequested($delivery, $this->deliveryContext->capture(false))"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthInvitations.php",
-                    "connection": "$locked->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\AuthDeliveryRequested($delivery, $this->deliveryContext->capture(false))"
+                    "trigger": "Host delivery capability requested."
                 },
                 {
                     "path": "packages/nvl/auth/src/Services/AuthPasswords.php",
-                    "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit())->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\AuthDeliveryRequested(new \\Nvl\\Auth\\ValueObjects\\AuthDeliveryRequest(messageId: (string) \\Illuminate\\Support\\Str::uuid(), feature: \\Nvl\\Auth\\Enums\\AuthFeature::Password, type: \\Nvl\\Auth\\Enums\\AuthMessageType::PasswordReset, recipient: $subject->getEmailForPasswordReset(), payload: ['token' => $token, 'identifier' => $data['identifier']], expiresAt: $expiresAt, locale: $locale), $this->deliveryContext->capture(true))"
+                    "trigger": "Host delivery capability requested."
                 },
                 {
                     "path": "packages/nvl/auth/src/Services/AuthUsers.php",
-                    "connection": "$user->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\AuthDeliveryRequested(new \\Nvl\\Auth\\ValueObjects\\AuthDeliveryRequest(messageId: (string) \\Illuminate\\Support\\Str::uuid(), feature: \\Nvl\\Auth\\Enums\\AuthFeature::EmailVerification, type: \\Nvl\\Auth\\Enums\\AuthMessageType::EmailVerification, recipient: $user->getEmailForVerification(), payload: ['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'email_hash' => sha1($user->getEmailForVerification())], expiresAt: $expiresAt, locale: !array_key_exists('locale', $data) ? null : $data['locale']), $this->deliveryContext->capture(true))"
+                    "trigger": "Host delivery capability requested."
                 }
             ],
             "security_notes": [
@@ -168,13 +157,11 @@
             "producers": [
                 {
                     "path": "packages/nvl/auth/src/Services/Authentication.php",
-                    "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit())->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\AuthenticationAttempted($identifierName, $identifier)"
+                    "trigger": "Guard authentication attempted."
                 },
                 {
                     "path": "packages/nvl/auth/src/Services/AuthenticationSessions.php",
-                    "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit())->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\AuthenticationAttempted('subject_reference', $reference->identifier)"
+                    "trigger": "Guard authentication attempted."
                 }
             ],
             "security_notes": [
@@ -248,23 +235,11 @@
             "producers": [
                 {
                     "path": "packages/nvl/auth/src/Services/Authentication.php",
-                    "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit())->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\AuthenticationRejected($identifierName, $identifier, 'credentials_invalid')"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/Authentication.php",
-                    "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit())->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\AuthenticationRejected($identifierName, $identifier, $exception->errorCode, \\Nvl\\Auth\\ValueObjects\\SubjectReference::fromAuthenticatable($subject))"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/Authentication.php",
-                    "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit())->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\AuthenticationRejected($identifierName, $identifier, 'pipeline_rejected', $reference)"
+                    "trigger": "Guard authentication rejected."
                 },
                 {
                     "path": "packages/nvl/auth/src/Services/AuthenticationSessions.php",
-                    "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit())->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\AuthenticationRejected('subject_reference', $reference->identifier, $reason, $reference)"
+                    "trigger": "Guard authentication rejected."
                 }
             ],
             "security_notes": [
@@ -359,18 +334,11 @@
             "producers": [
                 {
                     "path": "packages/nvl/auth/src/Services/AuthInvitations.php",
-                    "connection": "$invitation->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\InvitationAccepted(invitationId: $invitation->identifier(), type: $invitation->type, purpose: $invitation->purpose, subject: $reference, acceptedAt: $invitation->accepted_at)"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthInvitations.php",
-                    "connection": "$invitation->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\InvitationAccepted(invitationId: $invitation->identifier(), type: $invitation->type, purpose: $invitation->purpose, subject: $reference, acceptedAt: $invitation->accepted_at, context: null)"
+                    "trigger": "Invitation accepted."
                 },
                 {
                     "path": "packages/nvl/auth/src/Services/OwnerInvitations.php",
-                    "connection": "$model->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\InvitationAccepted($fresh->identifier(), $fresh->type, $fresh->purpose, $recipient, $fresh->accepted_at)"
+                    "trigger": "Invitation accepted."
                 }
             ],
             "security_notes": [
@@ -399,7 +367,7 @@
                     "type": "array",
                     "visibility": "public",
                     "required": false,
-                    "default_expression": "array (\n)"
+                    "default_expression": "[]"
                 },
                 {
                     "name": "context",
@@ -445,48 +413,11 @@
             "producers": [
                 {
                     "path": "packages/nvl/auth/src/Services/AuthInvitations.php",
-                    "connection": "$invitation->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\PrincipalChanged($reference->identifier, 'invitation_registered', context: null)"
+                    "trigger": "Principal mutation persisted."
                 },
                 {
                     "path": "packages/nvl/auth/src/Services/AuthUsers.php",
-                    "connection": "$user->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\PrincipalChanged($this->attributes->identifier($user), $operation->value, $metadata, \\Nvl\\Auth\\ValueObjects\\AuthEventContext::centralIdentity())"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthUsers.php",
-                    "connection": "$user->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\PrincipalChanged($this->attributes->identifier($user), 'created', ['email' => $this->attributes->value($user, \\Nvl\\Auth\\Enums\\PrincipalAttribute::Email)], \\Nvl\\Auth\\ValueObjects\\AuthEventContext::centralIdentity())"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthUsers.php",
-                    "connection": "$user->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\PrincipalChanged($this->attributes->identifier($user), 'self_deleted', context: \\Nvl\\Auth\\ValueObjects\\AuthEventContext::centralIdentity())"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthUsers.php",
-                    "connection": "$user->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\PrincipalChanged($this->attributes->identifier($user), 'deleted', $metadata, \\Nvl\\Auth\\ValueObjects\\AuthEventContext::centralIdentity())"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthUsers.php",
-                    "connection": "$user->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\PrincipalChanged($this->attributes->identifier($user), 'restored', $metadata, \\Nvl\\Auth\\ValueObjects\\AuthEventContext::centralIdentity())"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthUsers.php",
-                    "connection": "$user->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\PrincipalChanged($this->attributes->identifier($user), $operation, $metadata, \\Nvl\\Auth\\ValueObjects\\AuthEventContext::centralIdentity())"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthUsers.php",
-                    "connection": "$user->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\PrincipalChanged($this->attributes->identifier($user), 'profile_updated', ['attributes' => array_keys($attributes)], \\Nvl\\Auth\\ValueObjects\\AuthEventContext::centralIdentity())"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthUsers.php",
-                    "connection": "$user->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\PrincipalChanged($this->attributes->identifier($user), 'updated', ['attributes' => array_keys($attributes)], \\Nvl\\Auth\\ValueObjects\\AuthEventContext::centralIdentity())"
+                    "trigger": "Principal mutation persisted."
                 }
             ],
             "security_notes": [
@@ -515,21 +446,21 @@
                     "type": "array",
                     "visibility": "public",
                     "required": false,
-                    "default_expression": "array (\n)"
+                    "default_expression": "[]"
                 },
                 {
                     "name": "permissions",
                     "type": "array",
                     "visibility": "public",
                     "required": false,
-                    "default_expression": "array (\n)"
+                    "default_expression": "[]"
                 },
                 {
                     "name": "metadata",
                     "type": "array",
                     "visibility": "public",
                     "required": false,
-                    "default_expression": "array (\n)"
+                    "default_expression": "[]"
                 },
                 {
                     "name": "context",
@@ -583,18 +514,7 @@
             "producers": [
                 {
                     "path": "packages/nvl/auth/src/Services/RbacManager.php",
-                    "connection": "\\Illuminate\\Support\\Facades\\DB::connection($this->principals->connectionName($subject))",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\RbacAssignmentChanged($this->principals->identifier($subject), 'assigned', $roles, $permissions, context: \\Nvl\\Auth\\ValueObjects\\AuthEventContext::capture($this->ownership))"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/RbacManager.php",
-                    "connection": "\\Illuminate\\Support\\Facades\\DB::connection($this->principals->connectionName($subject))",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\RbacAssignmentChanged($this->principals->identifier($subject), 'roles_synchronized', $roles, [], $metadata, \\Nvl\\Auth\\ValueObjects\\AuthEventContext::capture($this->ownership))"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/RbacManager.php",
-                    "connection": "\\Illuminate\\Support\\Facades\\DB::connection($this->principals->connectionName($subject))",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\RbacAssignmentChanged($this->principals->identifier($subject), 'permissions_synchronized', [], $permissions, $metadata, \\Nvl\\Auth\\ValueObjects\\AuthEventContext::capture($this->ownership))"
+                    "trigger": "Principal role/permission assignment persisted."
                 }
             ],
             "security_notes": [
@@ -629,7 +549,7 @@
                     "type": "array",
                     "visibility": "public",
                     "required": false,
-                    "default_expression": "array (\n)"
+                    "default_expression": "[]"
                 },
                 {
                     "name": "schemaVersion",
@@ -668,58 +588,11 @@
             "producers": [
                 {
                     "path": "packages/nvl/auth/src/Services/AuthPermissions.php",
-                    "connection": "$permission->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\RbacChanged('permission', $permission->id, 'created', ['name' => $permission->name])"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthPermissions.php",
-                    "connection": "$result['permission']->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\RbacChanged('permission', $result['permission']->id, 'created', ['name' => $result['permission']->name, 'role_ids' => $result['roleIds'], 'role_names' => $result['roleNames']])"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthPermissions.php",
-                    "connection": "$permission->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\RbacChanged('permission', $permission->id, 'updated')"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthPermissions.php",
-                    "connection": "$permission->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\RbacChanged('permission', $identifier, 'deleted')"
+                    "trigger": "Role/permission aggregate mutation persisted."
                 },
                 {
                     "path": "packages/nvl/auth/src/Services/AuthRoles.php",
-                    "connection": "$role->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\RbacChanged('role', $role->id, 'created', ['name' => $role->name])"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthRoles.php",
-                    "connection": "$role->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\RbacChanged('role', $role->id, 'updated')"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthRoles.php",
-                    "connection": "$role->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\RbacChanged('role', $identifier, 'deleted')"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthRoles.php",
-                    "connection": "$clone->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\RbacChanged('role', $clone->id, 'cloned', ['source_role_id' => $source->id])"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthRoles.php",
-                    "connection": "$result['role']->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\RbacChanged('role', $result['role']->id, 'permissions_added', ['permission_ids' => $result['permissionIds'], 'permission_names' => $result['permissionNames']])"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthRoles.php",
-                    "connection": "$result['role']->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\RbacChanged('role', $result['role']->id, 'permissions_synchronized', ['permission_ids' => $result['permissionIds'], 'permission_names' => $result['permissionNames']])"
-                },
-                {
-                    "path": "packages/nvl/auth/src/Services/AuthRoles.php",
-                    "connection": "$role->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\RbacChanged('role', $role->id, 'template_applied', ['template' => $templateKey, 'target_role' => $mutation['name']])"
+                    "trigger": "Role/permission aggregate mutation persisted."
                 }
             ],
             "security_notes": [
@@ -762,13 +635,11 @@
             "producers": [
                 {
                     "path": "packages/nvl/auth/src/Services/Authentication.php",
-                    "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit())->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\UserAuthenticated($reference)"
+                    "trigger": "Guard authentication completed."
                 },
                 {
                     "path": "packages/nvl/auth/src/Services/AuthenticationSessions.php",
-                    "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit())->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\UserAuthenticated($reference)"
+                    "trigger": "Guard authentication completed."
                 }
             ],
             "security_notes": [
@@ -811,8 +682,7 @@
             "producers": [
                 {
                     "path": "packages/nvl/auth/src/Services/AuthenticationSessions.php",
-                    "connection": "(new \\Nvl\\Auth\\Models\\AuthAudit())->getConnection()",
-                    "construction_expression": "new \\Nvl\\Auth\\Events\\UserLoggedOut($reference)"
+                    "trigger": "Guard logout completed."
                 }
             ],
             "security_notes": [
@@ -834,7 +704,23 @@
                     "name": "owner",
                     "type": "?Nvl\\Support\\Ownership\\ValueObjects\\OwnerReference"
                 }
-            ]
+            ],
+            "constructor_fields": [
+                {
+                    "name": "mode",
+                    "type": "Nvl\\Support\\Ownership\\Enums\\OwnershipContextMode",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "owner",
+                    "type": "?Nvl\\Support\\Ownership\\ValueObjects\\OwnerReference",
+                    "visibility": "public",
+                    "required": false,
+                    "default_expression": "NULL"
+                }
+            ],
+            "kind": "value_object"
         },
         {
             "class": "Nvl\\Auth\\ValueObjects\\AuthDeliveryRequest",
@@ -880,7 +766,74 @@
                     "name": "invitation",
                     "type": "?array"
                 }
-            ]
+            ],
+            "constructor_fields": [
+                {
+                    "name": "messageId",
+                    "type": "string",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "feature",
+                    "type": "Nvl\\Auth\\Enums\\AuthFeature",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "type",
+                    "type": "Nvl\\Auth\\Enums\\AuthMessageType",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "recipient",
+                    "type": "string",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "payload",
+                    "type": "array",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "expiresAt",
+                    "type": "Carbon\\CarbonImmutable",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "locale",
+                    "type": "?string",
+                    "visibility": "public",
+                    "required": false,
+                    "default_expression": "NULL"
+                },
+                {
+                    "name": "metadata",
+                    "type": "array",
+                    "visibility": "public",
+                    "required": false,
+                    "default_expression": "[]"
+                },
+                {
+                    "name": "subject",
+                    "type": "?Nvl\\Auth\\ValueObjects\\SubjectReference",
+                    "visibility": "public",
+                    "required": false,
+                    "default_expression": "NULL"
+                },
+                {
+                    "name": "invitation",
+                    "type": "?array",
+                    "visibility": "public",
+                    "required": false,
+                    "default_expression": "NULL"
+                }
+            ],
+            "kind": "value_object"
         },
         {
             "class": "Nvl\\Auth\\ValueObjects\\SubjectReference",
@@ -894,7 +847,22 @@
                     "name": "identifier",
                     "type": "string"
                 }
-            ]
+            ],
+            "constructor_fields": [
+                {
+                    "name": "type",
+                    "type": "string",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "identifier",
+                    "type": "string",
+                    "visibility": "public",
+                    "required": true
+                }
+            ],
+            "kind": "value_object"
         },
         {
             "class": "Nvl\\Support\\Ownership\\ValueObjects\\OwnerReference",
@@ -920,7 +888,41 @@
                     "name": "version",
                     "type": "int"
                 }
-            ]
+            ],
+            "constructor_fields": [
+                {
+                    "name": "type",
+                    "type": "string",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "storage",
+                    "type": "string",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "keyType",
+                    "type": "string",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "key",
+                    "type": "string",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "version",
+                    "type": "int",
+                    "visibility": "public",
+                    "required": false,
+                    "default_expression": "1"
+                }
+            ],
+            "kind": "value_object"
         },
         {
             "class": "Nvl\\Support\\Ownership\\ValueObjects\\OwnershipJobEnvelope",
@@ -930,7 +932,16 @@
                     "name": "data",
                     "type": "array"
                 }
-            ]
+            ],
+            "constructor_fields": [
+                {
+                    "name": "data",
+                    "type": "array",
+                    "visibility": "public",
+                    "required": true
+                }
+            ],
+            "kind": "value_object"
         }
     ],
     "aliases": [],

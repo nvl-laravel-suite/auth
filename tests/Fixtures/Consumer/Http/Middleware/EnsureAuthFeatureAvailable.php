@@ -11,7 +11,7 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Services\FeatureGate;
-use Nvl\Support\Http\PackageExceptionPayload;
+use Nvl\Auth\Tests\Fixtures\ConsumerSupport\PackageExceptionPayload;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
