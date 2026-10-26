@@ -1,6 +1,6 @@
 # NVL Auth Light
 
-Auth provides native Laravel service families for authentication, accounts, invitations, challenges, membership and security adapters. Required runtime dependencies are PHP 8.4, Laravel 13, Carbon and NVL Core. Package family metadata remains ^6.0 during the coordinated Light transition; the coordinated major release is separate.
+Auth provides native Laravel service families for authentication, accounts, invitations, challenges, membership and security adapters. Required runtime dependencies are PHP 8.4, Laravel 13, Carbon and NVL Core. NVL Light uses the coordinated 7.x package line.
 
 Inject services from `Nvl\Auth\Services`. Inputs are explicit principals, native models, enums, scalar values and validated arrays. Reads return Eloquent models, collections, paginators or shaped arrays. Secret-bearing results retain redacted value objects. There are no operation Actions, execute interfaces, passive package DTOs or package-owned HTTP routes.
 

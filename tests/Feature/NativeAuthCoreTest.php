@@ -9,9 +9,29 @@ use Illuminate\Contracts\Session\Session;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthChallenges;
 use Nvl\Auth\Services\Authentication;
 use Nvl\Auth\Services\AuthenticationSessions;
+
+it('preserves host and runtime hidden attributes alongside mapped authentication secrets', function (): void {
+    config(['nvl-auth.features.principal_management.settings.attributes.password' => 'credential_hash']);
+    $user = new class extends User
+    {
+        /** @var list<string> */
+        protected $hidden = ['host_secret'];
+    };
+    $user->setRawAttributes([
+        'name' => 'Visible name',
+        'credential_hash' => 'credential-secret',
+        'host_secret' => 'host-secret',
+        'session_secret' => 'runtime-secret',
+    ]);
+    $user->makeHidden('session_secret');
+
+    expect($user->toArray())->toBe(['name' => 'Visible name'])
+        ->and($user->getHidden())->toContain('credential_hash', 'host_secret', 'session_secret');
+});
 
 it('publishes explicit native credential and session contracts', function (): void {
     foreach ([

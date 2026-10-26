@@ -197,11 +197,14 @@ class User extends Authenticatable implements CanResetPasswordContract, HasLocal
      */
     public function getHidden(): array
     {
-        return array_map($this->principalColumn(...), [
-            PrincipalAttribute::Password,
-            PrincipalAttribute::RememberToken,
-            PrincipalAttribute::LastLoginIp,
-        ]);
+        return array_values(array_unique([
+            ...parent::getHidden(),
+            ...array_map($this->principalColumn(...), [
+                PrincipalAttribute::Password,
+                PrincipalAttribute::RememberToken,
+                PrincipalAttribute::LastLoginIp,
+            ]),
+        ]));
     }
 
     /**
