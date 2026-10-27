@@ -26,11 +26,13 @@ use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Auth\CanonicalActorResolver;
@@ -46,7 +48,7 @@ use SensitiveParameter;
 final readonly class AuthPasswords
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private Hasher $hasher, private AuthAuditRecorder $audits, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private PasswordBrokerManager $brokers, private AuthPipeline $pipeline, private AuthenticationEligibility $eligibility, private DomainEventDispatcher $domainEvents, private PasswordUpdater $passwords, private ConnectionCommitCallbacks $eventCommits, private CanonicalActorResolver $canonical, private PasswordValidationRules $policy, private PrincipalSecurity $security) {}
+    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private Hasher $hasher, private AuthAuditRecorder $audits, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private PasswordBrokerManager $brokers, private AuthPipeline $pipeline, private AuthenticationEligibility $eligibility, private DomainEventDispatcher $domainEvents, private PasswordUpdater $passwords, private ConnectionCommitCallbacks $eventCommits, private CanonicalActorResolver $canonical, private PasswordValidationRules $policy, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent) {}
 
     /**
      * Verify the current password and timestamp the active session.
@@ -240,24 +242,23 @@ final readonly class AuthPasswords
     public function update(
         Authenticatable&CanResetPassword $subject,
         #[SensitiveParameter]
-        array $data
-    ): void {
+        array $data, #[SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): void
+    {
         $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Update);
+        $this->recent->assertValid($subject, $grant, RecentAuthenticationPurpose::PasswordChange, $context);
         $data = $this->validateUpdatePassword($data);
         if (! $subject instanceof Model) {
             throw AuthException::invalidConfiguration('Password updates require an Eloquent principal.');
         }
         $prototype = new ($subject::class);
-        $prototype->getConnection()->transaction(function () use ($subject, $data): void {
+        $prototype->getConnection()->transaction(function () use ($subject, $data, $grant, $context): void {
+            $this->recent->consume($subject, $grant, RecentAuthenticationPurpose::PasswordChange, $context);
             $this->security->assertTokenContainment($subject);
             $this->security->lock($subject);
             $this->security->lockChallenges($subject);
             $subject = $this->canonical->resolve($subject, true);
             if (! $subject instanceof CanResetPassword) {
                 throw AuthException::invalidConfiguration('Password updates require a resettable principal.');
-            }
-            if (! $this->hasher->check($data['currentPassword'], (string) $subject->getAuthPassword())) {
-                throw new AuthException('password_invalid', 'The current password is invalid.', 422);
             }
             $this->passwords->update($subject, $data['password']);
             $subject->setRememberToken(Str::random(60));
@@ -329,15 +330,12 @@ final readonly class AuthPasswords
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{currentPassword: string, password: string, passwordConfirmation: string}
+     * @return array{password: string, passwordConfirmation: string}
      */
     private function validateUpdatePassword(#[SensitiveParameter] array $data): array
     {
-        if (array_diff(array_keys($data), ['currentPassword', 'password', 'passwordConfirmation']) !== []) {
+        if (array_diff(array_keys($data), ['password', 'passwordConfirmation']) !== []) {
             throw new \InvalidArgumentException('Unknown or protected Auth input fields.');
-        }
-        if (! is_string($data['currentPassword'] ?? null)) {
-            throw new \InvalidArgumentException('Invalid Auth input [currentPassword].');
         }
         if (! is_string($data['password'] ?? null)) {
             throw new \InvalidArgumentException('Invalid Auth input [password].');
@@ -345,7 +343,7 @@ final readonly class AuthPasswords
         if (! is_string($data['passwordConfirmation'] ?? null)) {
             throw new \InvalidArgumentException('Invalid Auth input [passwordConfirmation].');
         }
-        Validator::make($data, ['currentPassword' => ['required', 'string', 'max:4096'], 'password' => ['required', 'string', 'confirmed:passwordConfirmation', ...$this->policy->rules()]])->validate();
+        Validator::make($data, ['password' => ['required', 'string', 'confirmed:passwordConfirmation', ...$this->policy->rules()]])->validate();
 
         return $data;
     }

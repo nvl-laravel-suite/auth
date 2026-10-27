@@ -27,6 +27,7 @@ use Nvl\Auth\Results\IssuedApiToken;
 use Nvl\Auth\Traits\IssuesAuthenticationProofs;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\IssuedAuthenticationProof;
+use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Events\DomainEventDispatcher;
 use SensitiveParameter;
 use Throwable;
@@ -126,8 +127,23 @@ final readonly class Authentication
         return $this->verifiedCredentials($credentials)['subject'];
     }
 
+    /**
+     * Verify this canonical subject's password for native recent authentication.
+     *
+     * @internal
+     */
+    public function proveReauthentication(Authenticatable $subject, #[SensitiveParameter] string $password, AuthenticationRequestContext $context): IssuedAuthenticationProof
+    {
+        if (! $subject instanceof Model) {
+            throw AuthException::invalidConfiguration('Reauthentication requires an Eloquent principal.');
+        }
+        $column = $this->principalAttributes->identifierColumn($this->configuration->string('identifier', 'email'));
+
+        return $this->passwordProof(['identifier' => $subject->getAttribute($column), 'password' => $password], $context, AuthenticationDestination::Reauthentication, SubjectReference::fromAuthenticatable($subject));
+    }
+
     /** @param array{identifier?: mixed, password?: mixed} $credentials */
-    private function passwordProof(#[SensitiveParameter] array $credentials, AuthenticationRequestContext $context, AuthenticationDestination $destination): IssuedAuthenticationProof
+    private function passwordProof(#[SensitiveParameter] array $credentials, AuthenticationRequestContext $context, AuthenticationDestination $destination, ?SubjectReference $expectedSubject = null): IssuedAuthenticationProof
     {
         $this->features->assertAllowed(AuthFeature::Authentication, FeatureOperation::Use);
         $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Use);
@@ -139,6 +155,9 @@ final readonly class Authentication
         try {
             $verified = $this->verifiedCredentials($credentials);
             $subject = $verified['subject'];
+            if ($expectedSubject !== null && SubjectReference::fromAuthenticatable($subject) != $expectedSubject) {
+                throw new AuthException('credentials_invalid', 'The supplied credentials are invalid.', 422);
+            }
             $this->operations->central(AuthIdentityOperation::Login, $subject);
             $this->eligibility->assertEligible($subject, AuthenticationPurpose::CredentialLogin);
 

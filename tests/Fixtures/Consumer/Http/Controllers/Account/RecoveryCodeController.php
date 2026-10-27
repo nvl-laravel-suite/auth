@@ -20,7 +20,7 @@ final class RecoveryCodeController extends AuthenticatedController
      */
     public function regenerate(Request $request, AuthSecondFactor $action): JsonResponse
     {
-        $result = $action->regenerateRecoveryCodes($this->subject($request));
+        $result = $action->regenerateRecoveryCodes($this->subject($request), grant: $this->recentGrant($request), context: $this->authenticationContext($request));
 
         return response()->json([
             'data' => ['batch_id' => $result->batchId, 'codes' => $result->codes],
@@ -43,7 +43,7 @@ final class RecoveryCodeController extends AuthenticatedController
      */
     public function revoke(Request $request, AuthSecondFactor $action): JsonResponse
     {
-        $count = $action->revokeRecoveryCodes($this->subject($request));
+        $count = $action->revokeRecoveryCodes($this->subject($request), grant: $this->recentGrant($request), context: $this->authenticationContext($request));
 
         return response()->json(['data' => ['count' => $count], 'code' => 'recovery_codes_revoked', 'message' => trans('nvl-auth::responsecode.recovery_codes_revoked')]);
     }

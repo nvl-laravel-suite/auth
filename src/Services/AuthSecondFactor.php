@@ -14,11 +14,13 @@ use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\RecoveryCode;
 use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Results\GeneratedRecoveryCodes;
 use Nvl\Auth\Results\TotpEnrollment;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use SensitiveParameter;
 
@@ -30,7 +32,7 @@ use SensitiveParameter;
 final readonly class AuthSecondFactor
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private TotpEngine $totp, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private AuthConfiguration $configuration, private SecretHasher $hasher, private PrincipalSecurity $security) {}
+    public function __construct(private FeatureGate $features, private TotpEngine $totp, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private AuthConfiguration $configuration, private SecretHasher $hasher, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent) {}
 
     /**
      * Replace prior pending enrollments and return new provisioning material once.
@@ -40,16 +42,18 @@ final readonly class AuthSecondFactor
      *
      * @param  array<string, mixed>  $data
      */
-    public function startEnrollment(Authenticatable $subject, array $data): TotpEnrollment
+    public function startEnrollment(Authenticatable $subject, array $data, #[SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): TotpEnrollment
     {
         $this->features->assertAllowed(AuthFeature::Totp, FeatureOperation::Enroll);
+        $this->recent->assertValid($subject, $grant, RecentAuthenticationPurpose::FactorEnrollment, $context);
         $data = $this->validateStartTotpEnrollment($data);
         $reference = SubjectReference::fromAuthenticatable($subject);
         $secret = $this->totp->generateSecret();
         $parameters = $this->totp->parameters();
         $connection = (new TotpCredential)->getConnectionName();
 
-        return DB::connection($connection)->transaction(function () use ($data, $parameters, $reference, $secret, $subject): TotpEnrollment {
+        return DB::connection($connection)->transaction(function () use ($data, $parameters, $reference, $secret, $subject, $grant, $context): TotpEnrollment {
+            $this->recent->consume($subject, $grant, RecentAuthenticationPurpose::FactorEnrollment, $context);
             $this->security->lock($subject);
             $this->security->lockChallenges($subject);
             TotpCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('confirmed_at')->whereNull('revoked_at')->delete();
@@ -70,9 +74,10 @@ final readonly class AuthSecondFactor
         Authenticatable $subject,
         TotpCredential $credential,
         #[SensitiveParameter]
-        array $data
-    ): TotpCredential {
+        array $data, #[SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): TotpCredential
+    {
         $this->features->assertAllowed(AuthFeature::Totp, FeatureOperation::Enroll);
+        $this->recent->assertValid($subject, $grant, RecentAuthenticationPurpose::FactorEnrollment, $context);
         $data = $this->validateConfirmTotpEnrollment($data);
         $reference = SubjectReference::fromAuthenticatable($subject);
 
@@ -80,7 +85,8 @@ final readonly class AuthSecondFactor
             throw AuthException::invalidConfiguration('Credential mutations require the canonical source connection.');
         }
 
-        return DB::connection($credential->getConnectionName())->transaction(function () use ($data, $credential, $reference, $subject): TotpCredential {
+        return DB::connection($credential->getConnectionName())->transaction(function () use ($data, $credential, $reference, $subject, $grant, $context): TotpCredential {
+            $this->recent->consume($subject, $grant, RecentAuthenticationPurpose::FactorEnrollment, $context);
             $this->security->lock($subject);
             $this->security->lockChallenges($subject);
             /** @var TotpCredential $locked */
@@ -142,9 +148,10 @@ final readonly class AuthSecondFactor
     /**
      * Revoke an owned credential idempotently.
      */
-    public function revoke(Authenticatable $subject, TotpCredential $credential): TotpCredential
+    public function revoke(Authenticatable $subject, TotpCredential $credential, #[SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): TotpCredential
     {
         $this->features->assertAllowed(AuthFeature::Totp, FeatureOperation::Revoke);
+        $this->recent->assertValid($subject, $grant, RecentAuthenticationPurpose::FactorRemoval, $context);
         $reference = SubjectReference::fromAuthenticatable($subject);
         if ($credential->subject_type !== $reference->type || $credential->subject_id !== $reference->identifier) {
             throw new AuthException('totp_unavailable', 'The TOTP credential is unavailable.', 404);
@@ -154,7 +161,8 @@ final readonly class AuthSecondFactor
             throw AuthException::invalidConfiguration('Credential mutations require the canonical source connection.');
         }
 
-        return DB::connection($credential->getConnectionName())->transaction(function () use ($credential, $reference, $subject): TotpCredential {
+        return DB::connection($credential->getConnectionName())->transaction(function () use ($credential, $reference, $subject, $grant, $context): TotpCredential {
+            $this->recent->consume($subject, $grant, RecentAuthenticationPurpose::FactorRemoval, $context);
             $this->security->lock($subject);
             $this->security->lockChallenges($subject);
             /** @var TotpCredential $locked */
@@ -194,9 +202,10 @@ final readonly class AuthSecondFactor
     /**
      * Generate and persist one new recovery-code batch.
      */
-    public function regenerateRecoveryCodes(Authenticatable $subject): GeneratedRecoveryCodes
+    public function regenerateRecoveryCodes(Authenticatable $subject, #[SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): GeneratedRecoveryCodes
     {
         $this->features->assertAllowed(AuthFeature::RecoveryCodes, FeatureOperation::Issue);
+        $this->recent->assertValid($subject, $grant, RecentAuthenticationPurpose::RecoveryRegeneration, $context);
         $reference = SubjectReference::fromAuthenticatable($subject);
         $count = $this->configuration->integerBetween('features.recovery_codes.settings.count', 8, 1, 100);
         $length = $this->configuration->integerBetween('features.recovery_codes.settings.length', 10, 8, 128);
@@ -207,7 +216,8 @@ final readonly class AuthSecondFactor
         }
         $connection = (new RecoveryCode)->getConnectionName();
 
-        return DB::connection($connection)->transaction(function () use ($batchId, $codes, $reference, $subject): GeneratedRecoveryCodes {
+        return DB::connection($connection)->transaction(function () use ($batchId, $codes, $reference, $subject, $grant, $context): GeneratedRecoveryCodes {
+            $this->recent->consume($subject, $grant, RecentAuthenticationPurpose::RecoveryRegeneration, $context);
             $this->security->lock($subject);
             $this->security->lockChallenges($subject);
             RecoveryCode::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('used_at')->whereNull('revoked_at')->update(['revoked_at' => CarbonImmutable::now()]);
@@ -254,13 +264,15 @@ final readonly class AuthSecondFactor
     /**
      * Revoke every active code and return the affected count.
      */
-    public function revokeRecoveryCodes(Authenticatable $subject): int
+    public function revokeRecoveryCodes(Authenticatable $subject, #[SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): int
     {
         $this->features->assertAllowed(AuthFeature::RecoveryCodes, FeatureOperation::Revoke);
+        $this->recent->assertValid($subject, $grant, RecentAuthenticationPurpose::RecoveryRegeneration, $context);
         $reference = SubjectReference::fromAuthenticatable($subject);
         $connection = (new RecoveryCode)->getConnectionName();
 
-        return DB::connection($connection)->transaction(function () use ($reference, $subject): int {
+        return DB::connection($connection)->transaction(function () use ($reference, $subject, $grant, $context): int {
+            $this->recent->consume($subject, $grant, RecentAuthenticationPurpose::RecoveryRegeneration, $context);
             $this->security->lock($subject);
             $this->security->lockChallenges($subject);
             $count = RecoveryCode::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('used_at')->whereNull('revoked_at')->update(['revoked_at' => CarbonImmutable::now()]);

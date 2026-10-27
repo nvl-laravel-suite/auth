@@ -4,21 +4,31 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests;
 
+use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\SanctumServiceProvider;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\SystemMutationAccess;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
+use Nvl\Auth\Models\SocialIdentity;
+use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Providers\AuthServiceProvider;
 use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\AuthReauthentication;
+use Nvl\Auth\Services\AuthSocialIdentities;
 use Nvl\Auth\Tests\Fixtures\AllowAllManagementAccess;
 use Nvl\Auth\Tests\Fixtures\AllowAllSystemMutationAccess;
 use Nvl\Auth\Tests\Fixtures\Consumer\RouteServiceProvider;
 use Nvl\Auth\Tests\Fixtures\TestSubjectResolver;
 use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
+use Nvl\Auth\ValueObjects\IssuedRecentAuthentication;
+use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Providers\LocaleServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
+use PragmaRX\Google2FA\Google2FA;
 use Spatie\LaravelData\LaravelDataServiceProvider;
 use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\PermissionServiceProvider;
@@ -95,6 +105,33 @@ abstract class TestCase extends Orchestra
     protected function authenticationContext(): AuthenticationRequestContext
     {
         return new AuthenticationRequestContext(guardName: 'web', sessionBinding: app('session.store')->getId());
+    }
+
+    /** Obtain real native authority for lifecycle fixtures; advance only a spent TOTP timestep. */
+    protected function recentGrant(Authenticatable $subject, RecentAuthenticationPurpose $purpose, string $password = 'correct-password'): IssuedRecentAuthentication
+    {
+        $proof = ['password' => $password];
+        $reference = SubjectReference::fromAuthenticatable($subject);
+        $credential = TotpCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNotNull('confirmed_at')->whereNull('revoked_at')->first();
+        if ($credential !== null) {
+            $next = ($credential->last_accepted_timestep ?? 0) * $credential->period + $credential->period;
+            if ($next > now()->timestamp) {
+                $this->travelTo(CarbonImmutable::createFromTimestampUTC($next));
+            }
+            $proof['code'] = (new Google2FA)->getCurrentOtp($credential->secret);
+        }
+
+        return app(AuthReauthentication::class)->confirm($subject, $proof, $purpose, $this->authenticationContext());
+    }
+
+    /** Complete the real native provider intent when a test exercises social login. */
+    protected function completeSocialAuthentication(AuthSocialIdentities $service, string $provider): SocialIdentity
+    {
+        $context = $this->authenticationContext();
+        $started = $service->startAuthentication($provider, $context);
+        $service->finishAuthentication($provider, $started['intent']->reveal(), $context);
+
+        return SocialIdentity::query()->where('provider', $provider)->firstOrFail();
     }
 
     /**

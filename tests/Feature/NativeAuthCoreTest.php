@@ -17,6 +17,7 @@ use Nvl\Auth\Enums\AuthenticationDestination;
 use Nvl\Auth\Enums\AuthenticationMethod;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Events\AuthenticationRejected;
 use Nvl\Auth\Events\UserAuthenticated;
 use Nvl\Auth\Exceptions\AuthException;
@@ -258,7 +259,7 @@ it('accepts one native recovery proof for stateless login and rejects its reuse'
     config(['nvl-auth.features.totp.enabled' => true, 'nvl-auth.features.recovery_codes.enabled' => true]);
     $user = $this->user();
     TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
-    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user);
+    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
     $credentials = ['identifier' => $user->email, 'password' => 'correct-password'];
     $token = ['name' => 'Recovery device', 'abilities' => ['profile:read']];
     $proof = ['recoveryCode' => $recovery->codes[0]];
@@ -338,7 +339,7 @@ it('requires native enrolled proof before stateful success and consumes the serv
     config(['nvl-auth.features.totp.enabled' => true, 'nvl-auth.features.recovery_codes.enabled' => true]);
     $user = $this->user();
     TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
-    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user);
+    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
     $login = app(Authentication::class);
     $session = app('session.store');
     $session->start();
@@ -462,7 +463,7 @@ it('expires a native server session factor continuation before proof can establi
     config(['nvl-auth.features.totp.enabled' => true, 'nvl-auth.features.recovery_codes.enabled' => true]);
     $user = $this->user();
     TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
-    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user);
+    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
     $login = app(Authentication::class);
     $guard = auth()->guard('web');
     $session = app('session.store');
@@ -490,7 +491,7 @@ it('enforces native factor attempts and one use across stale session snapshots',
     config(['nvl-auth.features.totp.enabled' => true, 'nvl-auth.features.recovery_codes.enabled' => true]);
     $user = $this->user();
     TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
-    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user);
+    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
     $login = app(Authentication::class);
     $guard = auth()->guard('web');
     $session = app('session.store');

@@ -7,6 +7,7 @@ use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Enums\AuthenticationDestination;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\TotpCredential;
@@ -52,8 +53,8 @@ it('applies enrolled MFA to every native primary method and retains verified pas
     $this->app->singleton(PasskeyCeremony::class, TestPasskeyCeremony::class);
     if (str_contains($method, 'passkey')) {
         $passkeys = app(AuthPasskeys::class);
-        $registration = $passkeys->beginRegistration($user);
-        $passkeys->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]]);
+        $registration = $passkeys->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+        $passkeys->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
     }
     $credential = TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
     if ($method === 'password') {

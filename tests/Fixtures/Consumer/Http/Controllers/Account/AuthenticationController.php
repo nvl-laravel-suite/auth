@@ -8,10 +8,13 @@ use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Services\AuthEmailVerification;
 use Nvl\Auth\Services\AuthenticationSessions;
 use Nvl\Auth\Services\AuthPasswords;
+use Nvl\Auth\Services\AuthReauthentication;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\ConfirmPasswordData;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\UpdatePasswordData;
 use Spatie\LaravelData\Optional;
@@ -45,12 +48,18 @@ final class AuthenticationController extends AuthenticatedController
             throw AuthException::invalidConfiguration('The host subject does not support password updates.');
         }
 
-        $action->update(
-            $subject,
-            array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional),
-        );
+        $action->update($subject, array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional), grant: $this->recentGrant($request), context: $this->authenticationContext($request));
 
         return response()->json(['data' => null, 'code' => 'password_updated', 'message' => trans('nvl-auth::responsecode.password_updated')]);
+    }
+
+    /** Issue a native operation grant independently of Laravel's presentation timestamp. */
+    public function reauthenticate(Request $request, AuthReauthentication $service): JsonResponse
+    {
+        $input = $request->validate(['purpose' => ['required', Rule::enum(RecentAuthenticationPurpose::class)], 'proof' => ['required', 'array']]);
+        $grant = $service->confirm($this->subject($request), $input['proof'], RecentAuthenticationPurpose::from($input['purpose']), $this->authenticationContext($request));
+
+        return response()->json(['data' => ['grant' => $grant->reveal(), 'expires_in' => 300]]);
     }
 
     /**

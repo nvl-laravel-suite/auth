@@ -16,6 +16,7 @@ use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Enums\AuthenticationDestination;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Events\AuthenticationAttempted;
 use Nvl\Auth\Events\AuthenticationRejected;
 use Nvl\Auth\Events\UserAuthenticated;
@@ -203,7 +204,7 @@ it('consumes a verified recovery capability before a later rejecting login pipel
     config(['nvl-auth.features.totp.enabled' => true, 'nvl-auth.features.recovery_codes.enabled' => true]);
     $user = $this->user();
     TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
-    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user);
+    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
     $context = $this->authenticationContext();
     $proof = app(Authentication::class)->proveCredentials(['identifier' => $user->email, 'password' => 'correct-password'], $context);
     app(AuthenticationProofs::class)->completeFactor($proof->reveal(), AuthenticationDestination::Session, $context, ['recoveryCode' => $recovery->codes[0]]);
@@ -234,8 +235,8 @@ it('rejects another browser before redeeming native email and passkey primaries'
     } else {
         $this->app->singleton(PasskeyCeremony::class, TestPasskeyCeremony::class);
         $passkeys = app(AuthPasskeys::class);
-        $registration = $passkeys->beginRegistration($user);
-        $passkeys->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]]);
+        $registration = $passkeys->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+        $passkeys->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
         $options = $passkeys->beginAuthentication(context: $context);
         $input = ['ceremonyId' => $options->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2]];
         expect(fn () => $passkeys->finishAuthentication($input, sessionBinding: $wrong->sessionBinding))->toThrow(AuthException::class);
@@ -415,7 +416,7 @@ it('does not consume a pending recovery factor while session authentication is d
     config(['nvl-auth.features.totp.enabled' => true, 'nvl-auth.features.recovery_codes.enabled' => true]);
     $user = $this->user();
     TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
-    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user);
+    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
     $this->authenticationContext();
     $authentication = app(Authentication::class);
     expect(fn () => $authentication->login(['identifier' => $user->email, 'password' => 'correct-password'], [], auth()->guard('web'), app('session.store')))->toThrow(AuthException::class, 'second factor');

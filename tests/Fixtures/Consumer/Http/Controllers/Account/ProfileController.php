@@ -26,7 +26,7 @@ final class ProfileController extends AuthenticatedController
 
     public function update(UpdateProfileData $data, Request $request, AuthUsers $action): JsonResponse
     {
-        $user = $action->updateProfile($this->subject($request), array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional));
+        $user = $action->updateProfile($this->subject($request), array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional), grant: $this->recentGrant($request), context: $this->authenticationContext($request));
 
         return response()->json([
             'data' => $user,
@@ -40,7 +40,7 @@ final class ProfileController extends AuthenticatedController
         Request $request,
         AuthUsers $action,
     ): JsonResponse {
-        $action->deleteOwnAccount($this->subject($request), array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional), auth()->guard(config('nvl-auth.guard', 'web')), $request->session());
+        $action->deleteOwnAccount($this->subject($request), [], auth()->guard(config('nvl-auth.guard', 'web')), $request->session(), grant: $this->recentGrant($request), context: $this->authenticationContext($request));
 
         return response()->json([
             'data' => null,

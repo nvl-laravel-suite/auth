@@ -14,3 +14,5 @@ Route::post('password/confirm', [AuthenticationController::class, 'confirmPasswo
         'nvl.auth.feature:sessions,use',
     ])
     ->name('password.confirm');
+
+Route::post('reauthenticate', [AuthenticationController::class, 'reauthenticate'])->name('reauthenticate');

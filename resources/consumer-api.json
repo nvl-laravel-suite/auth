@@ -834,6 +834,32 @@
                 "UpdatedAt"
             ]
         },
+        "Nvl\\Auth\\Enums\\RecentAuthenticationPurpose": {
+            "kind": "enum",
+            "file": "src/Enums/RecentAuthenticationPurpose.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "AccountDeletion",
+                "EmailChange",
+                "FactorEnrollment",
+                "FactorRemoval",
+                "ImpersonationStart",
+                "PasswordChange",
+                "RecoveryRegeneration",
+                "SessionRevocation",
+                "SocialLink",
+                "SocialReconnect",
+                "SocialUnlink"
+            ]
+        },
         "Nvl\\Auth\\Enums\\UserBulkOperation": {
             "kind": "enum",
             "file": "src/Enums/UserBulkOperation.php",
@@ -1681,6 +1707,7 @@
             "methods": [
                 "__construct",
                 "beginAuthentication",
+                "beginReauthentication",
                 "beginRegistration",
                 "finishAuthentication",
                 "finishRegistration",
@@ -1742,6 +1769,16 @@
                 "roles",
                 "suggestPermissions",
                 "suggestRoles"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\AuthReauthentication": {
+            "kind": "class",
+            "file": "src/Services/AuthReauthentication.php",
+            "methods": [
+                "__construct",
+                "confirm"
             ],
             "properties": [],
             "constants": []
@@ -2042,6 +2079,19 @@
         "Nvl\\Auth\\ValueObjects\\IssuedAuthenticationProof": {
             "kind": "class",
             "file": "src/ValueObjects/IssuedAuthenticationProof.php",
+            "methods": [
+                "__construct",
+                "__debugInfo",
+                "__serialize",
+                "jsonSerialize",
+                "reveal"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\IssuedRecentAuthentication": {
+            "kind": "class",
+            "file": "src/ValueObjects/IssuedRecentAuthentication.php",
             "methods": [
                 "__construct",
                 "__debugInfo",

@@ -71,7 +71,7 @@ public function verifySecurityCodeAuthentication(#[SensitiveParameter] array $da
 ```php
 public function requestReset(array $data, ?string $locale = null): void;
 public function reset( #[SensitiveParameter] array $data ): void;
-public function update( Authenticatable&CanResetPassword $subject, #[SensitiveParameter] array $data ): void;
+public function update( Authenticatable&CanResetPassword $subject, #[SensitiveParameter] array $data, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): void;
 ```
 
 ## AuthEmailVerification
@@ -96,13 +96,13 @@ public function revoke(Invitation|string $invitation, Authenticatable $actor): I
 ## AuthUsers
 
 ```php
-public function create(Authenticatable $actor, array $data): User;
-public function deleteOwnAccount(Authenticatable $subject, array $data, StatefulGuard $guard, Session $session): bool;
+public function create(Authenticatable $actor, #[\SensitiveParameter] array $data): User;
+public function deleteOwnAccount(Authenticatable $subject, #[\SensitiveParameter] array $data, StatefulGuard $guard, Session $session, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): bool;
 public function delete(Authenticatable|SystemMutationContext $authority, User|string $user): bool;
 public function restore(Authenticatable|SystemMutationContext $authority, User|string $user): User;
-public function setActive(Authenticatable|SystemMutationContext $authority, User|string $user, array $data): User;
-public function updateProfile(Authenticatable $subject, array $data): User;
-public function update(Authenticatable $actor, User|string $user, array $data): User;
+public function setActive(Authenticatable|SystemMutationContext $authority, User|string $user, #[\SensitiveParameter] array $data): User;
+public function updateProfile(Authenticatable $subject, #[\SensitiveParameter] array $data, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): User;
+public function update(Authenticatable $actor, User|string $user, #[\SensitiveParameter] array $data): User;
 ```
 
 ## AuthUserReader
@@ -227,33 +227,34 @@ public function suggestRoles(Authenticatable $actor, ?string $search = null, ?in
 ## AuthSecondFactor
 
 ```php
-public function confirmEnrollment( Authenticatable $subject, TotpCredential $credential, #[SensitiveParameter] array $data, ): TotpCredential;
-public function verify( Authenticatable $subject, #[SensitiveParameter] array $data, ): TotpCredential;
-public function revoke( Authenticatable $subject, TotpCredential $credential, ): TotpCredential;
+public function confirmEnrollment( Authenticatable $subject, TotpCredential $credential, #[SensitiveParameter] array $data, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): TotpCredential;
+public function verify( Authenticatable $subject, #[SensitiveParameter] array $data ): TotpCredential;
+public function revoke(Authenticatable $subject, TotpCredential $credential, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): TotpCredential;
 public function state(Authenticatable $subject): array;
-public function regenerateRecoveryCodes(Authenticatable $subject): GeneratedRecoveryCodes;
-public function consumeRecoveryCode( Authenticatable $subject, #[SensitiveParameter] array $data, ): RecoveryCode;
-public function revokeRecoveryCodes(Authenticatable $subject): int;
+public function regenerateRecoveryCodes(Authenticatable $subject, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): GeneratedRecoveryCodes;
+public function consumeRecoveryCode( Authenticatable $subject, #[SensitiveParameter] array $data ): RecoveryCode;
+public function revokeRecoveryCodes(Authenticatable $subject, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): int;
 ```
 
 ## AuthPasskeys
 
 ```php
 public function beginAuthentication(?Authenticatable $subject = null, ?OwnerReference $owner = null, ?string $sessionBinding = null, ?AuthenticationRequestContext $context = null): PasskeyCeremonyOptions;
-public function beginRegistration(Authenticatable $subject): PasskeyCeremonyOptions;
-public function finishAuthentication( array $data, ?OwnerReference $requestedOwner = null, ?string $sessionBinding = null, ): array;
-public function finishRegistration( Authenticatable $subject, array $data, ): Passkey;
-public function revoke(Authenticatable $subject, Passkey $passkey): Passkey;
+public function beginReauthentication(Authenticatable $subject, AuthenticationRequestContext $context): PasskeyCeremonyOptions;
+public function beginRegistration(Authenticatable $subject, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): PasskeyCeremonyOptions;
+public function finishAuthentication(#[\SensitiveParameter] array $data, ?OwnerReference $requestedOwner = null, ?string $sessionBinding = null): array;
+public function finishRegistration(Authenticatable $subject, #[\SensitiveParameter] array $data, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): Passkey;
+public function revoke(Authenticatable $subject, Passkey $passkey, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): Passkey;
 ```
 
 ## AuthSocialIdentities
 
 ```php
 public function startAuthentication(string $provider, AuthenticationRequestContext $context): array;
-public function finishAuthentication(string $provider, #[SensitiveParameter] string $intent, AuthenticationRequestContext $context): IssuedAuthenticationProof;
-public function completeAuthorization(string $provider, ?Authenticatable $subject = null): SocialIdentity;
-public function link(Authenticatable $subject, ExternalIdentity $identity): SocialIdentity;
-public function revoke(Authenticatable $subject, SocialIdentity $identity): SocialIdentity;
+public function finishAuthentication(string $provider, #[\SensitiveParameter] string $intent, AuthenticationRequestContext $context): IssuedAuthenticationProof;
+public function completeAuthorization(string $provider, Authenticatable $subject, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): SocialIdentity;
+public function link(Authenticatable $subject, ExternalIdentity $identity, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): SocialIdentity;
+public function revoke(Authenticatable $subject, SocialIdentity $identity, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): SocialIdentity;
 ```
 
 ## Proof-backed completion
@@ -279,3 +280,17 @@ For optional stateless composition, supply a trusted `tokenNamespace` and a cryp
 Only `IssuedAuthenticationProof::reveal()` discloses the bearer. Debug output is redacted; JSON/PHP serialization throws. Hooks receive method, subject and bounded operation attributes, never credentials, factor codes, proof bearers or password fingerprints. Exactly one terminal invocation with the original context is required. Native canonical/password/revision/enrollment checks surround consumer hooks.
 
 Successful proof consumption precedes configurable login/token pipelines. A later ordinary pipeline rejection leaves it consumed; explicit outer token rollback restores all transaction-participating proof/token/fact state atomically. Complete browser guard transitions outside host domain transactions.
+
+## Native recent authentication
+
+```php
+$context = new AuthenticationRequestContext(guardName: 'web', sessionBinding: $request->session()->getId());
+$grant = $reauthentication->confirm($subject, ['password' => $password, 'code' => $totp], RecentAuthenticationPurpose::PasswordChange, $context);
+$passwords->update($subject, ['password' => $newPassword, 'passwordConfirmation' => $newPassword], $grant->reveal(), $context);
+```
+
+`AuthReauthentication::confirm()` accepts exactly one primary (`password` or an opaque `passkeyProof`) and at most one `code`/`recoveryCode`. Use `AuthPasskeys::beginReauthentication()` and `finishAuthentication()` for a subject-bound passkey receipt; session-login receipts cannot be reused for confirmation. Verified UV supports passwordless principals. Social receipts fail explicitly until the linked-identity reauthentication integration is supplied. TOTP/recovery alone is insufficient.
+
+Confirmation runs outside the principal source transaction. The grant binds the closed `RecentAuthenticationPurpose`, canonical subject, current security revision and trusted guard/session for 300 seconds. The intended mutation consumes it inside its own transaction: rollback restores grant/mutation, while the previously committed factor stays spent. Self-service password/email/deletion, factor enrollment/removal, recovery regeneration and social linking/unlinking/reconnection require the matching grant even through direct PHP calls. Enrollment begin and completion are distinct operations, each accepting an explicit grant; an operation that changes security revision requires a new confirmation for later operations.
+
+`AccountConfirmation::assertConfirmed(subject, AuthenticationEvidence, RecentAuthenticationPurpose)` adds host policy after mandatory native validation. It receives no credential, bearer or password fingerprint and cannot disable validation. Native proof/security-state schema is mandatory; optional method flags do not erase enrollment requirements. `auth.password_confirmed_at` remains presentation only. Separately authorized administration and `SystemMutationContext` keep their existing authority; consumers deliberately orchestrate any human-admin step-up.

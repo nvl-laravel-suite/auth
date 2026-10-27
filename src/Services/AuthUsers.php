@@ -16,7 +16,6 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use InvalidArgumentException;
 use JsonException;
-use Nvl\Auth\Contracts\AccountConfirmation;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
@@ -26,12 +25,14 @@ use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\PrincipalAttribute;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Enums\UserBulkOperation;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
@@ -46,7 +47,7 @@ use Nvl\Support\Events\DomainEventDispatcher;
 final readonly class AuthUsers
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private MutationAuthorizer $authorization, private UserLocator $users, private AuthAuditRecorder $audits, private PrincipalAttributeMapper $attributes, private PrincipalSessionContainment $sessions, private AuthMemberships $owners, private AuthOwnershipState $ownershipState, private DomainEventDispatcher $domainEvents, private ManagementAuthorizer $createAuthorization, private AuthModelRegistry $models, private Container $container, private AuthConfiguration $configuration, private AccountConfirmation $confirmation, private AuthOperationBoundary $operations, private ManagementAuthorizer $updateAuthorization, private PasswordUpdater $passwords, private PasswordValidationRules $passwordPolicy, private CanonicalActorResolver $canonical, private PrincipalSecurity $security) {}
+    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private MutationAuthorizer $authorization, private UserLocator $users, private AuthAuditRecorder $audits, private PrincipalAttributeMapper $attributes, private PrincipalSessionContainment $sessions, private AuthMemberships $owners, private AuthOwnershipState $ownershipState, private DomainEventDispatcher $domainEvents, private ManagementAuthorizer $createAuthorization, private AuthModelRegistry $models, private Container $container, private AuthConfiguration $configuration, private AuthOperationBoundary $operations, private ManagementAuthorizer $updateAuthorization, private PasswordUpdater $passwords, private PasswordValidationRules $passwordPolicy, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent) {}
 
     /**
      * Apply one operation to at most one hundred principals.
@@ -196,17 +197,18 @@ final readonly class AuthUsers
     /** Delete the authenticated package principal and revoke every active credential.
      * @param  array<string, mixed>  $data
      */
-    public function deleteOwnAccount(Authenticatable $subject, #[\SensitiveParameter] array $data, StatefulGuard $guard, Session $session): bool
+    public function deleteOwnAccount(Authenticatable $subject, #[\SensitiveParameter] array $data, StatefulGuard $guard, Session $session, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): bool
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Revoke);
+        $this->recent->assertValid($subject, $grant, RecentAuthenticationPurpose::AccountDeletion, $context);
         $data = $this->validateDeleteOwnAccount($data);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Revoke);
         $this->operations->central(AuthIdentityOperation::Profile, $subject);
         $user = $this->users->authenticated($this->canonical->resolve($subject));
-        $deleted = DB::connection($user->getConnectionName())->transaction(function () use (&$user, $data): bool {
+        $deleted = DB::connection($user->getConnectionName())->transaction(function () use (&$user, $grant, $context): bool {
+            $this->recent->consume($user, $grant, RecentAuthenticationPurpose::AccountDeletion, $context);
             $this->security->assertTokenContainment($user);
             $user = $this->users->query()->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
-            $this->confirmation->assertConfirmed($user, $data['currentPassword']);
             $this->security->lock($user);
             $this->security->lockChallenges($user);
             $reference = SubjectReference::fromAuthenticatable($user);
@@ -330,14 +332,14 @@ final readonly class AuthUsers
     /** Persist self-service profile changes.
      * @param  array<string, mixed>  $data
      */
-    public function updateProfile(Authenticatable $subject, #[\SensitiveParameter] array $data): User
+    public function updateProfile(Authenticatable $subject, #[\SensitiveParameter] array $data, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): User
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Update);
         $data = $this->validateUpdateProfile($data);
         $this->operations->central(AuthIdentityOperation::Profile, $subject);
         $user = $this->users->authenticated($this->canonical->resolve($subject));
 
-        return DB::connection($user->getConnectionName())->transaction(function () use ($data, $user): User {
+        return DB::connection($user->getConnectionName())->transaction(function () use ($data, $user, $grant, $context): User {
             $this->security->lock($user);
             $this->security->lockChallenges($user);
             $user = $this->users->query()->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
@@ -346,10 +348,7 @@ final readonly class AuthUsers
             $currentEmail = $this->attributes->value($user, PrincipalAttribute::Email);
             $emailChanged = is_string($submittedEmail) && is_string($currentEmail) && mb_strtolower(trim($submittedEmail)) !== mb_strtolower(trim($currentEmail));
             if ($emailChanged) {
-                if (! array_key_exists('currentPassword', $data)) {
-                    throw new AuthException('account_confirmation_required', 'Email changes require account confirmation.', 422);
-                }
-                $this->confirmation->assertConfirmed($user, $data['currentPassword']);
+                $this->recent->consume($user, $grant, RecentAuthenticationPurpose::EmailChange, $context);
                 $this->features->assertAllowed(AuthFeature::EmailVerification, FeatureOperation::Issue);
                 $normalizedEmail = mb_strtolower(trim($submittedEmail));
                 if ($user::query()->where($this->attributes->column(PrincipalAttribute::Email), $normalizedEmail)->whereKeyNot($user->getKey())->exists()) {
@@ -447,19 +446,15 @@ final readonly class AuthUsers
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{currentPassword: string}
+     * @return array{}
      */
     private function validateDeleteOwnAccount(#[\SensitiveParameter] array $data): array
     {
-        if (array_diff(array_keys($data), ['currentPassword']) !== []) {
-            throw new InvalidArgumentException('Unknown or protected Auth input fields.');
+        if ($data !== []) {
+            throw new InvalidArgumentException('Account deletion takes its opaque grant separately.');
         }
-        if (! is_string($data['currentPassword'] ?? null)) {
-            throw new InvalidArgumentException('Invalid Auth input [currentPassword].');
-        }
-        Validator::make($data, ['currentPassword' => ['required', 'string', 'max:4096']])->validate();
 
-        return $data;
+        return [];
     }
 
     /** Native Auth operation.
@@ -591,11 +586,11 @@ final readonly class AuthUsers
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{name?: string, email?: string, locale?: string, timezone?: string, profile?: array<array-key, mixed>, preferences?: array<array-key, mixed>, currentPassword?: string}
+     * @return array{name?: string, email?: string, locale?: string, timezone?: string, profile?: array<array-key, mixed>, preferences?: array<array-key, mixed>}
      */
     private function validateUpdateProfile(#[\SensitiveParameter] array $data): array
     {
-        if (array_diff(array_keys($data), ['name', 'email', 'locale', 'timezone', 'profile', 'preferences', 'currentPassword']) !== []) {
+        if (array_diff(array_keys($data), ['name', 'email', 'locale', 'timezone', 'profile', 'preferences']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');
         }
         $validated = [];
@@ -635,16 +630,11 @@ final readonly class AuthUsers
             }
             $validated['preferences'] = $data['preferences'];
         }
-        if (array_key_exists('currentPassword', $data)) {
-            if (! is_string($data['currentPassword'])) {
-                throw new InvalidArgumentException('Invalid Auth input [currentPassword].');
-            }
-            $validated['currentPassword'] = $data['currentPassword'];
-        }
+
         if (isset($validated['email'])) {
             $validated['email'] = mb_strtolower(trim($validated['email']));
         }
-        Validator::make($validated, ['name' => ['sometimes', 'string', 'max:160'], 'email' => ['sometimes', 'email:rfc', 'max:254'], 'locale' => ['sometimes', 'string', 'regex:/^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$/'], 'timezone' => ['sometimes', 'timezone:all'], 'profile' => ['sometimes', 'array'], 'preferences' => ['sometimes', 'array'], 'currentPassword' => ['sometimes', 'string', 'max:4096']])->validate();
+        Validator::make($validated, ['name' => ['sometimes', 'string', 'max:160'], 'email' => ['sometimes', 'email:rfc', 'max:254'], 'locale' => ['sometimes', 'string', 'regex:/^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$/'], 'timezone' => ['sometimes', 'timezone:all'], 'profile' => ['sometimes', 'array'], 'preferences' => ['sometimes', 'array']])->validate();
 
         return $validated;
     }

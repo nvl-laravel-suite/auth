@@ -17,6 +17,7 @@ use Nvl\Auth\Enums\AuthenticationMethod;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\SocialIdentity;
@@ -37,7 +38,7 @@ final readonly class AuthSocialIdentities
     use IssuesAuthenticationProofs;
 
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private SocialProviderConfiguration $configuration, private SocialIdentityProviderFactory $providerFactory, private AuthOperationBoundary $operations, private SocialSubjectResolver $subjects, private AuthSubjectResolver $authSubjects, private AuthAuditRecorder $audits, private SecretHasher $hasher, private PrincipalSecurity $security, private AuthIdentityChallenges $records) {}
+    public function __construct(private FeatureGate $features, private SocialProviderConfiguration $configuration, private SocialIdentityProviderFactory $providerFactory, private AuthOperationBoundary $operations, private SocialSubjectResolver $subjects, private AuthSubjectResolver $authSubjects, private AuthAuditRecorder $audits, private SecretHasher $hasher, private PrincipalSecurity $security, private AuthIdentityChallenges $records, private RecentAuthenticationProofs $recent) {}
 
     /** Begin a browser-bound native social authentication, retaining SDK-owned OAuth state.
      * @return array{url: string, intent: IssuedAuthenticationProof}
@@ -82,7 +83,7 @@ final readonly class AuthSocialIdentities
             $existing = SocialIdentity::query()->where('provider', $provider)->where('provider_user_id_hash', $hash)->lockForUpdate()->first();
             $challenge->consumed_at = CarbonImmutable::now('UTC');
             $this->records->save($challenge);
-            $linked = $this->link($subject, $identity);
+            $linked = $this->persistIdentity($subject, $identity);
             $fresh = SocialIdentity::query()->whereKey($linked->identifier())->lockForUpdate()->first();
             $expectedRevision = $revision + ($existing === null ? 1 : 0);
             $reference = SubjectReference::fromAuthenticatable($subject);
@@ -122,13 +123,13 @@ final readonly class AuthSocialIdentities
     /**
      * Acquire provider claims and link them to a supplied or resolved host subject.
      */
-    public function completeAuthorization(string $provider, ?Authenticatable $subject = null): SocialIdentity
+    public function completeAuthorization(string $provider, Authenticatable $subject, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): SocialIdentity
     {
         $this->features->assertAllowed(AuthFeature::SocialIdentities, FeatureOperation::Use);
         $this->operations->central(AuthIdentityOperation::SocialIdentity, $subject);
         $identity = $this->verifiedExternalIdentity($provider);
 
-        return $this->link($this->authorizationSubject($identity, $subject), $identity);
+        return $this->link($this->authorizationSubject($identity, $subject), $identity, $grant, $context);
     }
 
     /** Network verification precedes native row locks, including inside a host transaction. */
@@ -178,7 +179,21 @@ final readonly class AuthSocialIdentities
     /**
      * Link or refresh one provider identity.
      */
-    public function link(Authenticatable $subject, ExternalIdentity $identity): SocialIdentity
+    public function link(Authenticatable $subject, ExternalIdentity $identity, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): SocialIdentity
+    {
+        $reference = SubjectReference::fromAuthenticatable($subject);
+        $existing = SocialIdentity::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->where('provider', $identity->provider)->where('provider_user_id_hash', $this->hasher->hash("social-identity-{$identity->provider}", $identity->providerUserId))->exists();
+        $purpose = $existing ? RecentAuthenticationPurpose::SocialReconnect : RecentAuthenticationPurpose::SocialLink;
+        $this->recent->assertValid($subject, $grant, $purpose, $context);
+
+        return (new SocialIdentity)->getConnection()->transaction(function () use ($subject, $identity, $grant, $purpose, $context): SocialIdentity {
+            $this->recent->consume($subject, $grant, $purpose, $context);
+
+            return $this->persistIdentity($subject, $identity);
+        });
+    }
+
+    private function persistIdentity(Authenticatable $subject, ExternalIdentity $identity): SocialIdentity
     {
         $this->features->assertAllowed(AuthFeature::SocialIdentities, FeatureOperation::Enroll);
         $this->operations->central(AuthIdentityOperation::SocialIdentity, $subject);
@@ -214,9 +229,10 @@ final readonly class AuthSocialIdentities
     /**
      * Revoke an owned identity idempotently.
      */
-    public function revoke(Authenticatable $subject, SocialIdentity $identity): SocialIdentity
+    public function revoke(Authenticatable $subject, SocialIdentity $identity, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): SocialIdentity
     {
         $this->features->assertAllowed(AuthFeature::SocialIdentities, FeatureOperation::Revoke);
+        $this->recent->assertValid($subject, $grant, RecentAuthenticationPurpose::SocialUnlink, $context);
         $reference = SubjectReference::fromAuthenticatable($subject);
         if ($identity->subject_type !== $reference->type || $identity->subject_id !== $reference->identifier) {
             throw new AuthException('social_identity_unavailable', 'The social identity is unavailable.', 404);
@@ -226,7 +242,8 @@ final readonly class AuthSocialIdentities
             throw AuthException::invalidConfiguration('Credential mutations require the canonical source connection.');
         }
 
-        return DB::connection($identity->getConnectionName())->transaction(function () use ($identity, $reference, $subject): SocialIdentity {
+        return DB::connection($identity->getConnectionName())->transaction(function () use ($identity, $reference, $subject, $grant, $context): SocialIdentity {
+            $this->recent->consume($subject, $grant, RecentAuthenticationPurpose::SocialUnlink, $context);
             $this->security->lock($subject);
             $this->security->lockChallenges($subject);
             /** @var SocialIdentity $locked */

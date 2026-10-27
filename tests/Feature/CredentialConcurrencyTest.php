@@ -10,6 +10,7 @@ use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Contracts\SecurityTokenContainment;
 use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\Challenge;
@@ -20,6 +21,7 @@ use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Services\Authentication;
 use Nvl\Auth\Services\AuthPasskeys;
 use Nvl\Auth\Services\AuthPasswords;
+use Nvl\Auth\Services\AuthReauthentication;
 use Nvl\Auth\Services\AuthSecondFactor;
 use Nvl\Auth\Services\AuthSocialIdentities;
 use Nvl\Auth\Services\AuthUsers;
@@ -43,11 +45,12 @@ it('retains monotonic security revision and rolls back credential replacement', 
     $user = $this->user();
     $security = app(PrincipalSecurity::class);
     expect($security->revision($user))->toBe(1);
-    $batch = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user);
+    $batch = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
     expect($security->revision($user))->toBe(2);
     try {
-        DB::transaction(function () use ($user): void {
-            app(AuthSecondFactor::class)->regenerateRecoveryCodes($user);
+        $grant = $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration);
+        DB::transaction(function () use ($user, $grant): void {
+            app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $grant->reveal(), context: $this->authenticationContext());
             throw new RuntimeException('host rollback');
         });
     } catch (RuntimeException $exception) {
@@ -65,8 +68,13 @@ it('creates one initial security state from two committed processes', function (
         ->and(PrincipalSecurityState::query()->count())->toBe(1);
 })->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/PostgreSQL.');
 it('serializes concurrent credential inventory replacements', function (string $operation): void {
-    $id = $this->user()->getKey();
-    $worker = static function () use ($id, $operation): array {
+    $user = $this->user();
+    $id = $user->getKey();
+    $purpose = $operation === 'totp' ? RecentAuthenticationPurpose::FactorEnrollment : RecentAuthenticationPurpose::RecoveryRegeneration;
+    $firstGrant = $this->recentGrant($user, $purpose)->reveal();
+    $secondGrant = $this->recentGrant($user, $purpose)->reveal();
+    $context = $this->authenticationContext();
+    $worker = static function (string $grant) use ($id, $operation, $context): array {
         DB::listen(static function ($query) use ($operation): void {
             if (str_starts_with(strtolower($query->sql), $operation === 'totp' ? 'delete' : 'update')) {
                 usleep(250000);
@@ -74,15 +82,15 @@ it('serializes concurrent credential inventory replacements', function (string $
         });
         $user = TestUser::query()->findOrFail($id);
         if ($operation === 'totp') {
-            app(AuthSecondFactor::class)->startEnrollment($user, ['accountName' => $user->email]);
+            app(AuthSecondFactor::class)->startEnrollment($user, ['accountName' => $user->email], grant: $grant, context: $context);
         } else {
-            app(AuthSecondFactor::class)->regenerateRecoveryCodes($user);
+            app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $grant, context: $context);
         }
 
         return [];
     };
-    $results = SecurityRace::run([$worker, $worker]);
-    expect(array_column($results, 'ok'))->toBe([true, true], json_encode($results, JSON_THROW_ON_ERROR));
+    $results = SecurityRace::run([static fn (): array => $worker($firstGrant), static fn (): array => $worker($secondGrant)]);
+    expect(count(array_filter(array_column($results, 'ok'))))->toBe(1, json_encode($results, JSON_THROW_ON_ERROR));
     if ($operation === 'totp') {
         expect(TotpCredential::query()->whereNull('confirmed_at')->whereNull('revoked_at')->count())->toBe(1);
     } else {
@@ -97,8 +105,8 @@ it('finishes passkey verification outside the security transaction', function ()
     }));
     $user = $this->user();
     $service = app(AuthPasskeys::class);
-    $options = $service->beginRegistration($user);
-    $service->finishRegistration($user, ['ceremonyId' => $options->ceremonyId, 'response' => ['valid' => true]]);
+    $options = $service->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $service->finishRegistration($user, ['ceremonyId' => $options->ceremonyId, 'response' => ['valid' => true]], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
 });
 
 it('never exceeds the passkey limit when distinct ceremonies finish together', function (): void {
@@ -109,12 +117,13 @@ it('never exceeds the passkey limit when distinct ceremonies finish together', f
     $user = $this->user();
     $id = $user->getKey();
     $service = app(AuthPasskeys::class);
-    $options = [$service->beginRegistration($user), $service->beginRegistration($user)];
+    $options = [$service->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext()), $service->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext())];
     $workers = [];
+    $context = $this->authenticationContext();
     foreach ($options as $index => $option) {
-        $workers[] = static function () use ($id, $index, $option): array {
+        $workers[] = static function () use ($id, $index, $option, $context): array {
             try {
-                app(AuthPasskeys::class)->finishRegistration(TestUser::query()->findOrFail($id), ['ceremonyId' => $option->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'race-'.$index]]);
+                app(AuthPasskeys::class)->finishRegistration(TestUser::query()->findOrFail($id), ['ceremonyId' => $option->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'race-'.$index]], grant: app(AuthReauthentication::class)->confirm(TestUser::query()->findOrFail($id), ['password' => 'correct-password'], RecentAuthenticationPurpose::FactorEnrollment, $context)->reveal(), context: $context);
 
                 return ['enrolled' => true];
             } catch (AuthException $exception) {
@@ -134,7 +143,7 @@ it('advances passwords and revokes only exact managed token namespaces', functio
     $managed = $user->createToken('secure_auth:managed');
     $unrelated = $user->createToken('secureXauth:unrelated');
     $differentCase = $user->createToken('SECURE_AUTH:unrelated');
-    app(AuthPasswords::class)->update($user, ['currentPassword' => 'correct-password', 'password' => 'new-password-123', 'passwordConfirmation' => 'new-password-123']);
+    app(AuthPasswords::class)->update($user, ['password' => 'new-password-123', 'passwordConfirmation' => 'new-password-123'], grant: $this->recentGrant($user, RecentAuthenticationPurpose::PasswordChange, 'correct-password')->reveal(), context: $this->authenticationContext());
     expect(app(PrincipalSecurity::class)->revision($user))->toBe(2)
         ->and($managed->accessToken->fresh())->toBeNull()
         ->and($unrelated->accessToken->fresh())->not->toBeNull()
@@ -165,8 +174,9 @@ it('leaves committed facts and revisions untouched after password rollback', fun
     expect($security->revision($user))->toBe(1);
     $token = $user->createToken('nvl-auth:managed');
     try {
-        DB::transaction(function () use ($user): void {
-            app(AuthPasswords::class)->update($user, ['currentPassword' => 'correct-password', 'password' => 'new-password-123', 'passwordConfirmation' => 'new-password-123']);
+        $grant = $this->recentGrant($user, RecentAuthenticationPurpose::PasswordChange);
+        DB::transaction(function () use ($user, $grant): void {
+            app(AuthPasswords::class)->update($user, ['password' => 'new-password-123', 'passwordConfirmation' => 'new-password-123'], grant: $grant->reveal(), context: $this->authenticationContext());
             throw new RuntimeException('rollback password');
         });
     } catch (RuntimeException $exception) {
@@ -184,7 +194,7 @@ it('rejects a mismatched token source before writing credentials or security sta
     $tokens = Mockery::mock(SecurityTokenContainment::class);
     $tokens->shouldReceive('connection')->andReturn(DB::connection('security_elsewhere'));
     app()->instance(ApiTokenManager::class, $tokens);
-    expect(fn () => app(AuthPasswords::class)->update($user, ['currentPassword' => 'correct-password', 'password' => 'new-password-123', 'passwordConfirmation' => 'new-password-123']))
+    expect(fn () => app(AuthPasswords::class)->update($user, ['password' => 'new-password-123', 'passwordConfirmation' => 'new-password-123'], grant: $this->recentGrant($user, RecentAuthenticationPurpose::PasswordChange, 'correct-password')->reveal(), context: $this->authenticationContext()))
         ->toThrow(AuthException::class, 'actual principal source');
     expect(PrincipalSecurityState::query()->count())->toBe(0)
         ->and(Hash::check('correct-password', $user->refresh()->password))->toBeTrue();
@@ -193,7 +203,7 @@ it('rejects a mismatched token source before writing credentials or security sta
 it('changes passwords when optional API tokens are disabled', function (): void {
     config(['nvl-auth.features.api_tokens.enabled' => false]);
     $user = $this->user();
-    app(AuthPasswords::class)->update($user, ['currentPassword' => 'correct-password', 'password' => 'new-password-123', 'passwordConfirmation' => 'new-password-123']);
+    app(AuthPasswords::class)->update($user, ['password' => 'new-password-123', 'passwordConfirmation' => 'new-password-123'], grant: $this->recentGrant($user, RecentAuthenticationPurpose::PasswordChange, 'correct-password')->reveal(), context: $this->authenticationContext());
     expect(app(PrincipalSecurity::class)->revision($user))->toBe(2);
 });
 
@@ -221,8 +231,8 @@ it('verifies passkey assertions outside principal and challenge locks', function
     }));
     $user = $this->user();
     $service = app(AuthPasskeys::class);
-    $options = $service->beginRegistration($user);
-    $service->finishRegistration($user, ['ceremonyId' => $options->ceremonyId, 'response' => ['valid' => true]]);
+    $options = $service->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $service->finishRegistration($user, ['ceremonyId' => $options->ceremonyId, 'response' => ['valid' => true]], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
     $options = $service->beginAuthentication($user, context: $this->authenticationContext());
     $service->finishAuthentication(['ceremonyId' => $options->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2]], sessionBinding: app('session.store')->getId());
 });
@@ -232,7 +242,7 @@ it('invalidates native authentication challenges while preserving business chall
     $reference = SubjectReference::fromAuthenticatable($user);
     $native = Challenge::factory()->create(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'type' => 'credential_second_factor']);
     $business = Challenge::factory()->create(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'type' => 'security_code', 'purpose' => 'approve_invoice']);
-    app(AuthSecondFactor::class)->regenerateRecoveryCodes($user);
+    app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
     expect($native->refresh()->revoked_at)->not->toBeNull()->and($business->refresh()->revoked_at)->toBeNull();
 });
 
@@ -242,14 +252,14 @@ it('locks the social callback principal before its credential', function (): voi
     $external = new ExternalIdentity('github', 'callback-order');
     app()->instance(SocialIdentityProviderFactory::class, new TestSocialIdentityProviderFactory(new TestSocialIdentityProvider(identity: $external)));
     $service = app(AuthSocialIdentities::class);
-    $service->link($user, $external);
+    $service->link($user, $external, grant: $this->recentGrant($user, RecentAuthenticationPurpose::SocialLink, 'correct-password')->reveal(), context: $this->authenticationContext());
     $queries = [];
     DB::listen(function (QueryExecuted $query) use (&$queries): void {
         if ($query->connection->transactionLevel() > 0 && str_starts_with(strtolower($query->sql), 'select') && (str_contains($query->sql, 'nvl_auth_users') || str_contains($query->sql, 'nvl_auth_social_identities'))) {
             $queries[] = $query->sql;
         }
     });
-    $service->completeAuthorization('github');
+    $this->completeSocialAuthentication($service, 'github');
     expect($queries[0])->toContain('nvl_auth_users')
         ->and(app(PrincipalSecurity::class)->revision($user))->toBe(2);
 });
@@ -257,7 +267,7 @@ it('locks the social callback principal before its credential', function (): voi
 it('locks the factor continuation principal before its challenge', function (): void {
     $user = $this->user();
     TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
-    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user);
+    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
     $login = app(Authentication::class);
     $session = app('session.store');
     $session->start();
@@ -279,8 +289,8 @@ it('rejects a passkey resolver that returns a different canonical principal', fu
     $user = $this->user();
     $other = $this->user('other@example.test');
     $service = app(AuthPasskeys::class);
-    $registration = $service->beginRegistration($user);
-    $service->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]]);
+    $registration = $service->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $service->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
     $options = $service->beginAuthentication($user, context: $this->authenticationContext());
     $resolver = Mockery::mock(AuthSubjectResolver::class);
     $resolver->shouldReceive('resolve')->andReturn($other);
@@ -305,8 +315,8 @@ it('takes a read-only passkey snapshot before provider verification inside a hos
     }));
     $user = $this->user();
     $service = app(AuthPasskeys::class);
-    $registration = $service->beginRegistration($user);
-    $passkey = $service->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]]);
+    $registration = $service->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $passkey = $service->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
     if (! $hasState) {
         PrincipalSecurityState::query()->delete();
     }
@@ -342,8 +352,8 @@ it('rejects passkey revision or credential drift after provider verification in 
     }));
     $user = $this->user();
     $service = app(AuthPasskeys::class);
-    $registration = $service->beginRegistration($user);
-    $passkey = $service->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]]);
+    $registration = $service->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $passkey = $service->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
     $authentication = $service->beginAuthentication($user, context: $this->authenticationContext());
     DB::beginTransaction();
     try {

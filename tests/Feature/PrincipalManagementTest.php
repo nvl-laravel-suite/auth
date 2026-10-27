@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Enums\UserBulkOperation;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Events\PrincipalChanged;
@@ -234,7 +235,7 @@ it('changes self-service email sparsely after confirmation and restarts verifica
     $user = $this->user('old@example.test');
     $user->forceFill(['email_verified_at' => now(), 'locale' => 'bg'])->save();
 
-    $updated = app(AuthUsers::class)->updateProfile($user, ['email' => ' New.Address@Example.Test ', 'currentPassword' => 'correct-password']);
+    $updated = app(AuthUsers::class)->updateProfile($user, ['email' => ' New.Address@Example.Test '], grant: $this->recentGrant($user, RecentAuthenticationPurpose::EmailChange, 'correct-password')->reveal(), context: $this->authenticationContext());
 
     expect($updated->email)->toBe('new.address@example.test')
         ->and($updated->email_verified_at)->toBeNull()
@@ -270,13 +271,13 @@ it('requires valid account confirmation before changing email', function (array 
         ->errorCode->toBe($code)
         ->and($user->refresh()->email)->toBe('confirmation-required@example.test');
 })->with([
-    'missing current password' => [
+    'missing recent grant' => [
         ['email' => 'missing-confirmation@example.test'],
-        'account_confirmation_required',
+        'recent_authentication_required',
     ],
-    'incorrect current password' => [
-        ['email' => 'invalid-confirmation@example.test', 'currentPassword' => 'incorrect-password'],
-        'account_confirmation_invalid',
+    'legacy password is no authority' => [
+        ['email' => 'invalid-confirmation@example.test'],
+        'recent_authentication_required',
     ],
 ]);
 
@@ -285,7 +286,7 @@ it('rejects a self-service email conflict without changing profile state', funct
     $user = $this->user('unchanged@example.test');
     $this->user('taken@example.test');
 
-    expect(fn () => app(AuthUsers::class)->updateProfile($user, ['email' => 'taken@example.test', 'currentPassword' => 'correct-password']))->toThrow(AuthException::class, 'unavailable')
+    expect(fn () => app(AuthUsers::class)->updateProfile($user, ['email' => 'taken@example.test'], grant: $this->recentGrant($user, RecentAuthenticationPurpose::EmailChange, 'correct-password')->reveal(), context: $this->authenticationContext()))->toThrow(AuthException::class, 'unavailable')
         ->and($user->refresh()->email)->toBe('unchanged@example.test');
 });
 
@@ -296,10 +297,7 @@ it('confirms, revokes credentials, and invalidates the session for self deletion
     $request = app('request');
     $request->setLaravelSession(app('session')->driver());
 
-    expect(app(AuthUsers::class)->deleteOwnAccount(
-        $user,
-        ['currentPassword' => 'correct-password'],
-        auth()->guard('web'), app('session.store')))->toBeTrue()
+    expect(app(AuthUsers::class)->deleteOwnAccount($user, [], auth()->guard('web'), app('session.store'), grant: $this->recentGrant($user, RecentAuthenticationPurpose::AccountDeletion, 'correct-password')->reveal(), context: $this->authenticationContext()))->toBeTrue()
         ->and(Auth::guard('web')->check())->toBeFalse()
         ->and($user->trashed())->toBeTrue()
         ->and($user->tokens()->count())->toBe(0);

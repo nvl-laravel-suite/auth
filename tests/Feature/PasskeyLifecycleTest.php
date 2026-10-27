@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Nvl\Auth\Contracts\PasskeyCeremony;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Services\AuthPasskeys;
@@ -16,11 +17,8 @@ beforeEach(function (): void {
 
 it('persists verified passkeys and supplies stored material to the ceremony adapter', function (): void {
     $user = $this->user();
-    $registration = app(AuthPasskeys::class)->beginRegistration($user);
-    $passkey = app(AuthPasskeys::class)->finishRegistration(
-        $user,
-        ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true], 'name' => 'Laptop']
-    );
+    $registration = app(AuthPasskeys::class)->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $passkey = app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true], 'name' => 'Laptop'], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
     $authentication = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
     $completed = app(AuthPasskeys::class)->finishAuthentication(
         ['ceremonyId' => $authentication->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2]], sessionBinding: app('session.store')->getId());
@@ -36,8 +34,8 @@ it('persists verified passkeys and supplies stored material to the ceremony adap
 
 it('commits a failed passkey ceremony attempt before returning its neutral failure', function (): void {
     $user = $this->user();
-    $registration = app(AuthPasskeys::class)->beginRegistration($user);
-    app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]]);
+    $registration = app(AuthPasskeys::class)->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
     $authentication = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
 
     expect(fn () => app(AuthPasskeys::class)->finishAuthentication(
@@ -48,8 +46,8 @@ it('commits a failed passkey ceremony attempt before returning its neutral failu
 
 it('normalizes provider exceptions at the passkey boundary', function (): void {
     $user = $this->user();
-    $registration = app(AuthPasskeys::class)->beginRegistration($user);
-    app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]]);
+    $registration = app(AuthPasskeys::class)->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
     $authentication = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
 
     try {
@@ -70,15 +68,12 @@ it('normalizes provider exceptions at the passkey boundary', function (): void {
 
 it('enforces passkey uniqueness, credential limits, and user verification', function (): void {
     $user = $this->user();
-    $registration = app(AuthPasskeys::class)->beginRegistration($user);
-    app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]]);
+    $registration = app(AuthPasskeys::class)->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
 
-    $duplicate = app(AuthPasskeys::class)->beginRegistration($user);
+    $duplicate = app(AuthPasskeys::class)->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
 
-    expect(fn () => app(AuthPasskeys::class)->finishRegistration(
-        $user,
-        ['ceremonyId' => $duplicate->ceremonyId, 'response' => ['valid' => true]]
-    ))->toThrow(AuthException::class, 'already registered')
+    expect(fn () => app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $duplicate->ceremonyId, 'response' => ['valid' => true]], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext()))->toThrow(AuthException::class, 'already registered')
         ->and(Challenge::query()
             ->where('type', 'passkey_registration')
             ->where('secret_hash', app(SecretHasher::class)->hash('passkey-ceremony', $duplicate->ceremonyId))
@@ -87,7 +82,7 @@ it('enforces passkey uniqueness, credential limits, and user verification', func
 
     config()->set('nvl-auth.features.passkeys.settings.max_credentials_per_subject', 1);
 
-    expect(fn () => app(AuthPasskeys::class)->beginRegistration($user))
+    expect(fn () => app(AuthPasskeys::class)->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext()))
         ->toThrow(AuthException::class, 'limit');
 
     $authentication = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());

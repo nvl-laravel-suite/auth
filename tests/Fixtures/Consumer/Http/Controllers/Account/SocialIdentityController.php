@@ -30,7 +30,7 @@ final class SocialIdentityController extends AuthenticatedController
         string $provider,
         AuthSocialIdentities $action,
     ): JsonResponse {
-        $identity = $action->completeAuthorization($provider, $this->subject($request));
+        $identity = $action->completeAuthorization($provider, $this->subject($request), grant: $this->recentGrant($request), context: $this->authenticationContext($request));
 
         return response()->json(['data' => ['social_identity_id' => $identity->identifier(), 'provider' => $identity->provider], 'code' => 'social_identity_linked', 'message' => trans('nvl-auth::responsecode.social_identity_linked')]);
     }
@@ -43,7 +43,7 @@ final class SocialIdentityController extends AuthenticatedController
         SocialIdentity $socialIdentity,
         AuthSocialIdentities $action,
     ): JsonResponse {
-        $action->revoke($this->subject($request), $socialIdentity);
+        $action->revoke($this->subject($request), $socialIdentity, grant: $this->recentGrant($request), context: $this->authenticationContext($request));
 
         return response()->json(['data' => null, 'code' => 'social_identity_revoked', 'message' => trans('nvl-auth::responsecode.social_identity_revoked')]);
     }

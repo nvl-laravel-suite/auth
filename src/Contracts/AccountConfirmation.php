@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace Nvl\Auth\Contracts;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use SensitiveParameter;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
+use Nvl\Auth\ValueObjects\AuthenticationEvidence;
 
 /**
- * Confirms a subject-controlled credential before sensitive self-service mutations.
+ * Additional host policy after mandatory native recent-grant validation.
  *
  * @api
  */
 interface AccountConfirmation
 {
-    /** Require a valid subject confirmation credential. */
-    public function assertConfirmed(Authenticatable $subject, #[SensitiveParameter] string $credential): void;
+    public function assertConfirmed(Authenticatable $subject, AuthenticationEvidence $evidence, RecentAuthenticationPurpose $purpose): void;
 }

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations;
 
-use SensitiveParameter;
-use Spatie\LaravelData\Attributes\Hidden;
 use Spatie\LaravelData\Attributes\MapInputName;
 use Spatie\LaravelData\Attributes\MapOutputName;
 use Spatie\LaravelData\Data;
@@ -32,9 +30,6 @@ final class UpdateProfileData extends Data
         public readonly string|Optional $timezone = new Optional,
         public readonly array|Optional $profile = new Optional,
         public readonly array|Optional $preferences = new Optional,
-        #[Hidden]
-        #[SensitiveParameter]
-        public readonly string|Optional $currentPassword = new Optional,
     ) {}
 
     /** @return array<string, list<string>> */
@@ -47,7 +42,6 @@ final class UpdateProfileData extends Data
             'timezone' => ['sometimes', 'timezone:all'],
             'profile' => ['sometimes', 'array'],
             'preferences' => ['sometimes', 'array'],
-            'currentPassword' => ['sometimes', 'string', 'max:4096'],
         ];
     }
 }

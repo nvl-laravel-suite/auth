@@ -6,6 +6,7 @@ use Nvl\Auth\Adapters\Laravel\EloquentAuthSubjectResolver;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\SocialIdentity;
 use Nvl\Auth\Services\AuthSocialIdentities;
@@ -28,14 +29,14 @@ it('acquires, links, encrypts, and revokes an allowlisted social identity', func
     expect(app(AuthSocialIdentities::class)->startAuthorization('github'))
         ->toBe('https://provider.example/authorize/github');
 
-    $identity = app(AuthSocialIdentities::class)->completeAuthorization('github');
+    $identity = $this->completeSocialAuthentication(app(AuthSocialIdentities::class), 'github');
 
     expect($identity)->toBeInstanceOf(SocialIdentity::class)
         ->and($identity->subject_id)->toBe((string) $user->getKey())
         ->and($identity->getRawOriginal('provider_user_id'))->not->toBe('provider-user-123')
         ->and($identity->getRawOriginal('profile'))->not->toContain('source');
 
-    app(AuthSocialIdentities::class)->revoke($user, $identity);
+    app(AuthSocialIdentities::class)->revoke($user, $identity, grant: $this->recentGrant($user, RecentAuthenticationPurpose::SocialUnlink, 'correct-password')->reveal(), context: $this->authenticationContext());
 
     expect($identity->refresh()->revoked_at)->not->toBeNull();
 });
@@ -80,12 +81,12 @@ it('permits an authenticated subject to link without email but rejects unknown u
     $this->app->instance(SocialSubjectResolver::class, Mockery::mock(SocialSubjectResolver::class));
     $service = app(AuthSocialIdentities::class);
 
-    expect(fn () => $service->completeAuthorization('github'))->toThrow(AuthException::class, 'did not prove');
+    expect(fn () => $this->completeSocialAuthentication($service, 'github'))->toThrow(AuthException::class, 'did not prove');
     $user = $this->user();
-    $linked = $service->completeAuthorization('github', $user);
-    expect($service->completeAuthorization('github')->id)->toBe($linked->id);
-    $service->revoke($user, $linked);
-    expect(fn () => $service->completeAuthorization('github'))->toThrow(AuthException::class, 'unavailable');
+    $linked = $service->completeAuthorization('github', $user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::SocialLink, 'correct-password')->reveal(), context: $this->authenticationContext());
+    expect($this->completeSocialAuthentication($service, 'github')->id)->toBe($linked->id);
+    $service->revoke($user, $linked, grant: $this->recentGrant($user, RecentAuthenticationPurpose::SocialUnlink, 'correct-password')->reveal(), context: $this->authenticationContext());
+    expect(fn () => $this->completeSocialAuthentication($service, 'github'))->toThrow(AuthException::class, 'unavailable');
 });
 
 it('rejects an identity whose returned provider does not match before persistence', function (): void {
@@ -108,8 +109,8 @@ it('rejects changing the issuer on a retained link', function (): void {
     config()->set('nvl-auth.features.social_identities.enabled', true);
     $service = app(AuthSocialIdentities::class);
     $user = $this->user();
-    $service->link($user, new ExternalIdentity('google', 'subject', issuer: 'https://issuer.example'));
-    expect(fn () => $service->link($user, new ExternalIdentity('google', 'subject', issuer: 'https://other.example')))->toThrow(AuthException::class);
+    $service->link($user, new ExternalIdentity('google', 'subject', issuer: 'https://issuer.example'), grant: $this->recentGrant($user, RecentAuthenticationPurpose::SocialLink, 'correct-password')->reveal(), context: $this->authenticationContext());
+    expect(fn () => $service->link($user, new ExternalIdentity('google', 'subject', issuer: 'https://other.example'), grant: $this->recentGrant($user, RecentAuthenticationPurpose::SocialReconnect, 'correct-password')->reveal(), context: $this->authenticationContext()))->toThrow(AuthException::class);
 });
 
 it('rejects oversized external identity claims and invalid issuers', function (): void {
@@ -128,13 +129,13 @@ it('rejects a verified callback and direct link for a revoked identity without i
     $resolver->shouldReceive('resolve')->andReturn($user);
     $this->app->instance(SocialSubjectResolver::class, $resolver);
     $service = app(AuthSocialIdentities::class);
-    $linked = $service->link($user, $external);
-    $service->revoke($user, $linked);
+    $linked = $service->link($user, $external, grant: $this->recentGrant($user, RecentAuthenticationPurpose::SocialLink, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $service->revoke($user, $linked, grant: $this->recentGrant($user, RecentAuthenticationPurpose::SocialUnlink, 'correct-password')->reveal(), context: $this->authenticationContext());
     $revokedAt = $linked->refresh()->revoked_at;
 
-    expect(fn () => $service->completeAuthorization('github'))->toThrow(AuthException::class);
+    expect(fn () => $this->completeSocialAuthentication($service, 'github'))->toThrow(AuthException::class);
     $resolver->shouldNotHaveReceived('resolve');
     expect($linked->refresh()->revoked_at?->equalTo($revokedAt))->toBeTrue();
-    expect(fn () => $service->link($user, $external))->toThrow(AuthException::class);
+    expect(fn () => $service->link($user, $external, grant: $this->recentGrant($user, RecentAuthenticationPurpose::SocialLink, 'correct-password')->reveal(), context: $this->authenticationContext()))->toThrow(AuthException::class);
     expect($linked->refresh()->revoked_at?->equalTo($revokedAt))->toBeTrue();
 });

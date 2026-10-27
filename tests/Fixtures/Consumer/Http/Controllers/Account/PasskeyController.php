@@ -21,7 +21,7 @@ final class PasskeyController extends AuthenticatedController
      */
     public function begin(Request $request, AuthPasskeys $action): JsonResponse
     {
-        $options = $action->beginRegistration($this->subject($request));
+        $options = $action->beginRegistration($this->subject($request), grant: $this->recentGrant($request), context: $this->authenticationContext($request));
 
         return response()->json([
             'data' => ['ceremony_id' => $options->ceremonyId, 'options' => $options->options, 'expires_at' => $options->expiresAt->toIso8601String()],
@@ -34,10 +34,7 @@ final class PasskeyController extends AuthenticatedController
      */
     public function finish(FinishPasskeyRegistrationData $data, Request $request, AuthPasskeys $action): JsonResponse
     {
-        $passkey = $action->finishRegistration(
-            $this->subject($request),
-            array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional),
-        );
+        $passkey = $action->finishRegistration($this->subject($request), array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional), grant: $this->recentGrant($request), context: $this->authenticationContext($request));
 
         return response()->json([
             'data' => ['passkey_id' => $passkey->identifier(), 'name' => $passkey->name],
@@ -53,7 +50,7 @@ final class PasskeyController extends AuthenticatedController
         Passkey $passkey,
         AuthPasskeys $action,
     ): JsonResponse {
-        $action->revoke($this->subject($request), $passkey);
+        $action->revoke($this->subject($request), $passkey, grant: $this->recentGrant($request), context: $this->authenticationContext($request));
 
         return response()->json(['data' => null, 'code' => 'passkey_revoked', 'message' => trans('nvl-auth::responsecode.passkey_revoked')]);
     }
