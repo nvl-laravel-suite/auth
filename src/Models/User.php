@@ -21,6 +21,7 @@ use Illuminate\Notifications\Notifiable;
 use Nvl\Auth\Database\Factories\UserFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\PrincipalAttribute;
+use Nvl\Auth\Services\PrincipalCreationGuard;
 use Nvl\Auth\Services\PrincipalEmailIdentity;
 use Nvl\Support\Config\PackageStorage;
 
@@ -242,6 +243,9 @@ class User extends Authenticatable implements CanResetPasswordContract, HasLocal
     /** The identity key is computed from final attributes, including factory overrides and quiet writes. */
     public function save(array $options = []): bool
     {
+        if (! $this->exists) {
+            app(PrincipalCreationGuard::class)->assertCreationAllowed();
+        }
         if (! $this->exists || $this->isDirty($this->principalColumn(PrincipalAttribute::Email)) || $this->isDirty($this->getEmailIdentityHashName())) {
             PrincipalEmailIdentity::assertReady($this);
             $this->attributes[$this->getEmailIdentityHashName()] = PrincipalEmailIdentity::key($this->getEmailForVerification());

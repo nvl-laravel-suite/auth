@@ -15,6 +15,7 @@ use Nvl\Auth\Services\AuthInvitations;
 use Nvl\Auth\Services\AuthPasskeys;
 use Nvl\Auth\Services\AuthPasswords;
 use Nvl\Auth\Services\AuthPermissions;
+use Nvl\Auth\Services\AuthRegistration;
 use Nvl\Auth\Services\AuthSecondFactor;
 use Nvl\Auth\Services\AuthSocialIdentities;
 use Nvl\Auth\Services\AuthTokens;
@@ -24,6 +25,7 @@ it('fails a representative Action for every disabled feature before database acc
     $user = $this->user();
     $reference = SubjectReference::fromAuthenticatable($user);
     $actions = [
+        AuthFeature::Registration->value => fn () => app(AuthRegistration::class)->register([]),
         AuthFeature::Authentication->value => fn () => app(Authentication::class)->login(['identifier' => $user->email, 'password' => 'password'], [], auth()->guard('web'), app('session')->driver()),
         AuthFeature::Password->value => fn () => app(AuthPasswords::class)->requestReset(['identifier' => $user->email]),
         AuthFeature::EmailVerification->value => fn () => app(AuthEmailVerification::class)->request($user),

@@ -207,6 +207,15 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\RegistrationAdmission": {
+            "kind": "interface",
+            "file": "src/Contracts/RegistrationAdmission.php",
+            "methods": [
+                "assertAllowed"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\RoleTemplateProvider": {
             "kind": "interface",
             "file": "src/Contracts/RoleTemplateProvider.php",
@@ -454,6 +463,7 @@
                 "PrincipalManagement",
                 "Rbac",
                 "RecoveryCodes",
+                "Registration",
                 "SecurityCodes",
                 "Sessions",
                 "SocialIdentities",
@@ -891,6 +901,41 @@
                 "SocialUnlink"
             ]
         },
+        "Nvl\\Auth\\Enums\\RegistrationMethod": {
+            "kind": "enum",
+            "file": "src/Enums/RegistrationMethod.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "Password",
+                "Social"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\RegistrationMode": {
+            "kind": "enum",
+            "file": "src/Enums/RegistrationMode.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "Closed",
+                "InvitationOnly",
+                "Open"
+            ]
+        },
         "Nvl\\Auth\\Enums\\UserBulkOperation": {
             "kind": "enum",
             "file": "src/Enums/UserBulkOperation.php",
@@ -1000,6 +1045,21 @@
                 "payload",
                 "schemaVersion",
                 "userId"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Events\\PrincipalRegistered": {
+            "kind": "class",
+            "file": "src/Events/PrincipalRegistered.php",
+            "methods": [
+                "__construct",
+                "schemaVersion"
+            ],
+            "properties": [
+                "classification",
+                "method",
+                "schemaVersion",
+                "subject"
             ],
             "constants": []
         },
@@ -1812,6 +1872,16 @@
             "methods": [
                 "__construct",
                 "confirm"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\AuthRegistration": {
+            "kind": "class",
+            "file": "src/Services/AuthRegistration.php",
+            "methods": [
+                "__construct",
+                "register"
             ],
             "properties": [],
             "constants": []

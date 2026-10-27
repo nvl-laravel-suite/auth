@@ -10,8 +10,10 @@ use Nvl\Auth\Contracts\InvitationRegistrationMapper;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Contracts\RegistrationAdmission;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Enums\PrincipalMutation;
+use Nvl\Auth\Enums\RegistrationMethod;
 use Nvl\Auth\Models\Invitation;
 
 /**
@@ -31,6 +33,8 @@ final readonly class PackageInvitationSubjectResolver implements InvitationSubje
         private PrincipalAttributeMapper $attributes,
         private PasswordUpdater $passwords,
         private PrincipalExtensions $extensions,
+        private RegistrationAdmission $admission,
+        private ConfiguredRegistrationAdmission $nativeAdmission,
     ) {}
 
     /** {@inheritDoc} */
@@ -43,7 +47,10 @@ final readonly class PackageInvitationSubjectResolver implements InvitationSubje
         if (! is_array($extensions)) {
             throw new \InvalidArgumentException('Invalid Auth input [extensions].');
         }
-        $mapped += $this->extensions->map(PrincipalMutation::InvitationRegistration, $extensions, occupiedColumns: array_keys($mapped));
+        $extensions = $this->extensions->map(PrincipalMutation::InvitationRegistration, $extensions, occupiedColumns: array_keys($mapped));
+        $this->admission->assertAllowed(RegistrationMethod::Password, PrincipalEmailIdentity::normalize($invitation->recipient), $extensions);
+        $this->nativeAdmission->assertProvisioningAllowed(invited: true);
+        $mapped += $extensions;
         $user = $class::query()->create($mapped);
         if (is_string($input['password'] ?? null)) {
             $this->passwords->update($user, $input['password']);

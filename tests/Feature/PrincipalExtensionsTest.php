@@ -136,6 +136,7 @@ it('rolls back native principal changes and emits no success when mapping fails'
 
 it('maps invited principal extensions inside the native acceptance transaction', function (): void {
     config()->set('nvl-auth.features.invitations.enabled', true);
+    config(['nvl-auth.features.registration.enabled' => true, 'nvl-auth.features.registration.settings.mode' => 'invitation_only']);
     $actor = $this->user();
     $issued = app(AuthInvitations::class)->create(['recipient' => 'extended.invitee@example.test'], $actor);
     $data = ['token' => $issued['token'], 'name' => 'Invitee', 'password' => 'SecurePassword123', 'passwordConfirmation' => 'SecurePassword123'];

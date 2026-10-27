@@ -40,6 +40,7 @@ final class FeatureManifest
             FeatureOperation::Cleanup,
         ];
         $definitions = [
+            new FeatureDefinition(AuthFeature::Registration, [FeatureOperation::Read, FeatureOperation::Issue], [AuthFeature::Authentication, AuthFeature::PrincipalManagement]),
             new FeatureDefinition(
                 AuthFeature::Authentication,
                 $readWrite,

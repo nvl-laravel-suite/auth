@@ -16,6 +16,10 @@ use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\Tests\Fixtures\SecurityRace;
 use Nvl\Auth\Tests\Fixtures\TestUser;
 
+beforeEach(function (): void {
+    config(['nvl-auth.features.registration.enabled' => true, 'nvl-auth.features.registration.settings.mode' => 'invitation_only']);
+});
+
 it('never returns a principal inserted after invitation signup checked the mailbox', function (): void {
     $existing = $this->user('invitee@example.test');
     $invitation = Invitation::factory()->create(['recipient' => $existing->email]);

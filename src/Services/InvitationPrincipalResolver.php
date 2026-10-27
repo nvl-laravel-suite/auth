@@ -23,7 +23,7 @@ use Nvl\Support\Auth\CanonicalActorResolver;
  */
 final readonly class InvitationPrincipalResolver
 {
-    public function __construct(private AuthModelRegistry $models, private PrincipalAttributeMapper $attributes, private InvitationSubjectResolver $subjects, private InvitationRecipientProof $proof, private CanonicalActorResolver $canonical, private PrincipalSecurity $security) {}
+    public function __construct(private AuthModelRegistry $models, private PrincipalAttributeMapper $attributes, private InvitationSubjectResolver $subjects, private InvitationRecipientProof $proof, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private ConfiguredRegistrationAdmission $registration) {}
 
     /** Lock a known recipient before an invitation/delegation row; never gap-lock an absent mailbox. */
     public function lockExisting(Invitation $invitation): void
@@ -62,6 +62,10 @@ final readonly class InvitationPrincipalResolver
 
             return $existing;
         }
+        if (($data['registrationMethod'] ?? 'password') !== 'password') {
+            throw new AuthException('social_registration_unavailable', 'Verified social registration is not available yet.', 422);
+        }
+        $this->registration->assertProvisioningAllowed(invited: true);
         $dispatcher = Model::getEventDispatcher();
         if ($dispatcher === null) {
             throw AuthException::invalidConfiguration('Invitation provisioning requires Eloquent creation events.');

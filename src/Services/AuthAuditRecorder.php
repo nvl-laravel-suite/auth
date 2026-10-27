@@ -74,7 +74,7 @@ final readonly class AuthAuditRecorder implements AuthAuditRecorderContract
     /** Native Auth operation. */
     private function centralOperation(string $action): ?AuthIdentityOperation
     {
-        foreach ([AuthIdentityOperation::Login->value => ['authentication.', 'session.', 'client.'], AuthIdentityOperation::Recovery->value => ['magic_link.', 'magic_links.', 'security_code.', 'security_codes.'], AuthIdentityOperation::Password->value => ['password.'], AuthIdentityOperation::VerifyEmail->value => ['email_verification.'], AuthIdentityOperation::Profile->value => ['profile.', 'account.'], AuthIdentityOperation::Mfa->value => ['totp.', 'passkey.', 'recovery_code.'], AuthIdentityOperation::SocialIdentity->value => ['social_identity.']] as $operation => $prefixes) {
+        foreach ([AuthIdentityOperation::Registration->value => ['registration.'], AuthIdentityOperation::Login->value => ['authentication.', 'session.', 'client.'], AuthIdentityOperation::Recovery->value => ['magic_link.', 'magic_links.', 'security_code.', 'security_codes.'], AuthIdentityOperation::Password->value => ['password.'], AuthIdentityOperation::VerifyEmail->value => ['email_verification.'], AuthIdentityOperation::Profile->value => ['profile.', 'account.'], AuthIdentityOperation::Mfa->value => ['totp.', 'passkey.', 'recovery_code.'], AuthIdentityOperation::SocialIdentity->value => ['social_identity.']] as $operation => $prefixes) {
             if (array_any($prefixes, static fn (string $prefix): bool => str_starts_with($action, $prefix))) {
                 return AuthIdentityOperation::from($operation);
             }

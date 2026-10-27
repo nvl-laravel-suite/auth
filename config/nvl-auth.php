@@ -85,6 +85,11 @@ return [
     |
     */
     'features' => [
+        'registration' => [
+            'enabled' => PackageEnvironment::get('NVL_AUTH_REGISTRATION_ENABLED', false),
+            'services' => ['admission' => null],
+            'settings' => ['mode' => 'closed'],
+        ],
         'authentication' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_AUTHENTICATION_ENABLED', true),
 

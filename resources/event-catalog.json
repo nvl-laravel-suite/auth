@@ -426,6 +426,70 @@
             "no_op_semantics": "Attempt, rejection, session and delivery observations can repeat for separate requests. Mutation events follow their writer branch; there is no generic cross-request deduplication. Native Laravel Verified and PasswordReset are framework events outside this catalog: Eloquent writers use their source commit boundary; non-Eloquent/custom updater paths retain synchronous behavior where no source connection seam exists."
         },
         {
+            "class": "Nvl\\Auth\\Events\\PrincipalRegistered",
+            "source": "packages/nvl/auth/src/Events/PrincipalRegistered.php",
+            "constructor_fields": [
+                {
+                    "name": "subject",
+                    "type": "Nvl\\Auth\\ValueObjects\\SubjectReference",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "method",
+                    "type": "Nvl\\Auth\\Enums\\RegistrationMethod",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "classification",
+                    "type": "string",
+                    "visibility": "public",
+                    "required": false,
+                    "default_expression": "'public'"
+                },
+                {
+                    "name": "schemaVersion",
+                    "type": "int",
+                    "visibility": "public",
+                    "required": false,
+                    "default_expression": "1"
+                }
+            ],
+            "public_fields": [
+                {
+                    "name": "subject",
+                    "type": "Nvl\\Auth\\ValueObjects\\SubjectReference"
+                },
+                {
+                    "name": "method",
+                    "type": "Nvl\\Auth\\Enums\\RegistrationMethod"
+                },
+                {
+                    "name": "classification",
+                    "type": "string"
+                },
+                {
+                    "name": "schemaVersion",
+                    "type": "int"
+                }
+            ],
+            "kind": "value_object",
+            "schema_version": 1,
+            "trigger": "Native public signup source committed.",
+            "aliases": [],
+            "producers": [
+                {
+                    "path": "packages/nvl/auth/src/Services/AuthRegistration.php",
+                    "trigger": "Native public signup source committed."
+                }
+            ],
+            "security_notes": [
+                "Subject reference, native method and classification only; no password, email or extensions. Native registration never dispatches Laravel Registered automatically."
+            ],
+            "no_op_semantics": "Exactly one fact per successful signup; rollback and duplicate conflict emit none. Listener failure cannot roll back the committed principal."
+        },
+        {
             "class": "Nvl\\Auth\\Events\\RbacAssignmentChanged",
             "source": "packages/nvl/auth/src/Events/RbacAssignmentChanged.php",
             "constructor_fields": [

@@ -28,6 +28,10 @@ beforeEach(function (): void {
     Event::fake([AuthDeliveryRequested::class]);
 });
 
+beforeEach(function (): void {
+    config(['nvl-auth.features.registration.enabled' => true, 'nvl-auth.features.registration.settings.mode' => 'invitation_only']);
+});
+
 it('rejects a stale password after a broker reset for confirmation and replacement', function (): void {
     $user = $this->user('stale-password@example.test');
     $stale = $user->fresh();

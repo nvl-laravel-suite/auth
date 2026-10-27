@@ -32,6 +32,7 @@ use Nvl\Auth\Contracts\PasswordPolicy;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\PrincipalExtensionMapper;
+use Nvl\Auth\Contracts\RegistrationAdmission;
 use Nvl\Auth\Contracts\SecurityTokenContainment;
 use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
@@ -138,6 +139,10 @@ final class AuthDoctor
         if ($configuration->featureEnabled(AuthFeature::Authentication)) {
             $checks[] = $this->check('contract.authentication_assurance', $this->integration($container, AuthenticationAssurancePolicy::class) instanceof AuthenticationAssurancePolicy, 'Authentication requires a valid assurance policy.');
             $checks[] = $this->check('contract.authentication_eligibility', $this->integration($container, AuthenticationEligibility::class) instanceof AuthenticationEligibility, 'Authentication operations require a valid eligibility policy.');
+        }
+        if ($configuration->featureEnabled(AuthFeature::Registration)) {
+            $checks[] = $this->check('contract.registration_admission', $this->integration($container, RegistrationAdmission::class) instanceof RegistrationAdmission, 'Registration requires a valid admission policy.');
+            $checks[] = $this->check('configuration.registration_mode', in_array($configuration->get('features.registration.settings.mode'), ['closed', 'invitation_only', 'open'], true), 'Registration requires a closed mode value.');
         }
         if ($configuration->featureEnabled(AuthFeature::PrincipalManagement)) {
             $checks[] = $this->check('contract.principal_extension_mapper', $this->integration($container, PrincipalExtensionMapper::class) instanceof PrincipalExtensionMapper, 'Principal extensions require a valid mapper.');

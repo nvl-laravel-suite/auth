@@ -50,6 +50,7 @@ final readonly class CentralIdentityAuditRecorder
             AuthIdentityOperation::Login, AuthIdentityOperation::Logout => ['authentication.', 'session.', 'client.'],
             AuthIdentityOperation::Recovery, AuthIdentityOperation::Password => ['password.', 'magic_link.', 'magic_links.', 'security_code.', 'security_codes.'],
             AuthIdentityOperation::VerifyEmail => ['email_verification.'],
+            AuthIdentityOperation::Registration => ['registration.'],
             AuthIdentityOperation::Profile => ['profile.', 'account.'],
             AuthIdentityOperation::Mfa => ['totp.', 'passkey.', 'recovery_code.'],
             AuthIdentityOperation::SocialIdentity => ['social_identity.'],

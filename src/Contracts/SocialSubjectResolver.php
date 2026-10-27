@@ -8,14 +8,15 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Nvl\Auth\ValueObjects\ExternalIdentity;
 
 /**
- * Resolves or provisions a configured principal after verified social authentication.
+ * Resolves an existing configured principal after verified social authentication.
  *
  * @api
  */
 interface SocialSubjectResolver
 {
     /**
-     * Resolve the principal for one external identity.
+     * Resolve an existing canonical principal for one external identity.
+     * Raw or quiet provisioning is outside this resolver contract.
      *
      * Implementations matching by email must require a true emailVerified claim
      * and retain or inspect emailVerificationSource as verification provenance.

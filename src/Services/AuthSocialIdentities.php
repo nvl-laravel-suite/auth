@@ -21,6 +21,7 @@ use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\SocialIdentity;
+use Nvl\Auth\Models\User;
 use Nvl\Auth\Traits\IssuesAuthenticationProofs;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\ExternalIdentity;
@@ -38,7 +39,7 @@ final readonly class AuthSocialIdentities
     use IssuesAuthenticationProofs;
 
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private SocialProviderConfiguration $configuration, private SocialIdentityProviderFactory $providerFactory, private AuthOperationBoundary $operations, private SocialSubjectResolver $subjects, private AuthSubjectResolver $authSubjects, private AuthAuditRecorder $audits, private SecretHasher $hasher, private PrincipalSecurity $security, private AuthIdentityChallenges $records, private RecentAuthenticationProofs $recent) {}
+    public function __construct(private FeatureGate $features, private SocialProviderConfiguration $configuration, private SocialIdentityProviderFactory $providerFactory, private AuthOperationBoundary $operations, private SocialSubjectResolver $subjects, private AuthSubjectResolver $authSubjects, private AuthAuditRecorder $audits, private SecretHasher $hasher, private PrincipalSecurity $security, private AuthIdentityChallenges $records, private RecentAuthenticationProofs $recent, private AuthModelRegistry $models, private PrincipalCreationGuard $creationGuard) {}
 
     /** Begin a browser-bound native social authentication, retaining SDK-owned OAuth state.
      * @return array{url: string, intent: IssuedAuthenticationProof}
@@ -173,7 +174,23 @@ final readonly class AuthSocialIdentities
             throw new AuthException('social_email_unverified', 'The social provider did not prove the returned email address.', 422);
         }
 
-        return $this->subjects->resolve($identity);
+        $class = $this->models->userClass();
+        $prototype = new $class;
+        PrincipalEmailIdentity::assertReady($prototype);
+
+        return $prototype->getConnection()->transaction(function () use ($identity, $class, $prototype): Authenticatable {
+            $subject = $this->creationGuard->existingOnly(fn (): Authenticatable => $this->subjects->resolve($identity));
+            if (! $subject instanceof User || $subject::class !== $class || ! $subject->exists
+                || $subject->getConnection() !== $prototype->getConnection() || $subject->getTable() !== $prototype->getTable()) {
+                throw AuthException::invalidConfiguration('Social resolution must return an existing canonical principal.');
+            }
+            $fresh = $class::query()->useWritePdo()->whereKey($subject->getKey())->first();
+            if ($fresh === null) {
+                throw new AuthException('social_identity_unavailable', 'The social principal is unavailable.', 404);
+            }
+
+            return $fresh;
+        });
     }
 
     /**
