@@ -1912,6 +1912,7 @@
             "file": "src/Services/AuthenticationSessions.php",
             "methods": [
                 "__construct",
+                "assertCanTransition",
                 "completeSecondFactor",
                 "establishFromProof",
                 "hasPendingSecondFactor",

@@ -463,9 +463,9 @@ it('correlates concurrent social fixture intents with their own OAuth state', fu
     $intents = app(OwnerAuthenticationIntents::class);
     $request = Request::create('/social/github/redirect');
     $request->setLaravelSession($session);
-    $controller->redirect('github', $request, $social, $intents);
+    $controller->redirect('github', $request, $social, $intents, app(AuthenticationSessions::class));
     $first = Challenge::query()->where('type', 'social_authentication')->sole();
-    $controller->redirect('github', $request, $social, $intents);
+    $controller->redirect('github', $request, $social, $intents, app(AuthenticationSessions::class));
     $callback = Request::create('/social/github/callback?state=flow-1');
     $callback->setLaravelSession($session);
     $controller->callback('github', $callback, $social, app(AuthenticationSessions::class), app(AuthSubjectResolver::class));

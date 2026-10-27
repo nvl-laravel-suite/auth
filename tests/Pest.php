@@ -7,11 +7,14 @@ use Nvl\Auth\Tests\FreshAdoptedAuthProviderTestCase;
 use Nvl\Auth\Tests\HostAuthAdoptionTestCase;
 use Nvl\Auth\Tests\NativeOwnerScenarioTestCase;
 use Nvl\Auth\Tests\SecurityConcurrencyTestCase;
+use Nvl\Auth\Tests\StatefulAuthTestCase;
 use Nvl\Auth\Tests\TestCase;
 
 $raceFiles = [__DIR__.'/Feature/PasswordMutationSecurityTest.php', __DIR__.'/Feature/WebauthnPasskeyCeremonyTest.php', __DIR__.'/Feature/PasskeyLifecycleTest.php', __DIR__.'/Feature/TotpAndRecoveryCodeTest.php', __DIR__.'/Feature/PrincipalManagementTest.php', __DIR__.'/Feature/SocialIdentityLifecycleTest.php', __DIR__.'/Feature/NativeAuthCoreTest.php', __DIR__.'/Feature/RecentAuthenticationTest.php', __DIR__.'/Feature/SensitiveOperationAdmissionTest.php', __DIR__.'/Feature/AuthenticationProofLifecycleTest.php', __DIR__.'/Feature/AuthenticationAssuranceTest.php', __DIR__.'/Feature/CredentialConcurrencyTest.php', __DIR__.'/Feature/InvitationRegistrationRaceTest.php', __DIR__.'/Feature/SchemaOwnershipTest.php'];
 uses(SecurityConcurrencyTestCase::class)->in(...$raceFiles);
-$legacyFeatureFiles = array_diff(glob(__DIR__.'/Feature/*Test.php') ?: [], $raceFiles);
+$statefulFiles = [__DIR__.'/Feature/StatefulTransactionBoundaryTest.php', __DIR__.'/Feature/AuthenticationAndVerificationTest.php', __DIR__.'/Feature/PrincipalAttributeMappingTest.php', __DIR__.'/Feature/ConsumerContractBindingTest.php', __DIR__.'/Feature/HttpApiTest.php', __DIR__.'/Feature/FeatureAdmissionTest.php'];
+uses(StatefulAuthTestCase::class)->in(...$statefulFiles);
+$legacyFeatureFiles = array_diff(glob(__DIR__.'/Feature/*Test.php') ?: [], $raceFiles, $statefulFiles);
 uses(TestCase::class)->in(...$legacyFeatureFiles);
 uses(TestCase::class)->in(__DIR__.'/Unit');
 $nativeOwnerScenarios = [

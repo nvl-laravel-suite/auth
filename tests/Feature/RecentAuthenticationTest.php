@@ -6,6 +6,7 @@ use Carbon\CarbonImmutable;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\RecoveryCode;
 use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Services\AuthPasskeys;
@@ -70,7 +71,7 @@ it('rejects nested confirmation before spending a recovery proof', function (): 
     $user = $this->user();
     $recovery = RecoveryCode::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass(), 'code_hash' => app(SecretHasher::class)->hash('recovery-code', 'UNSPENT')]);
     expect(fn () => $user->getConnection()->transaction(fn () => app(AuthReauthentication::class)->confirm($user, ['password' => 'correct-password', 'recoveryCode' => 'UNSPENT'], RecentAuthenticationPurpose::PasswordChange, $this->authenticationContext())))
-        ->toThrow(AuthException::class, 'before the sensitive mutation');
+        ->toThrow(AuthException::class, 'enclosing source transaction');
     expect($recovery->refresh()->used_at)->toBeNull();
 });
 
@@ -102,4 +103,20 @@ it('redacts recent grants and never accepts a browser password-confirmed timesta
         ->and(fn () => serialize($grant))->toThrow(LogicException::class);
     app('session.store')->put('auth.password_confirmed_at', now()->timestamp);
     expect(fn () => app(AuthPasswords::class)->update($user, ['password' => 'replacement-password', 'passwordConfirmation' => 'replacement-password']))->toThrow(AuthException::class);
+});
+
+it('rejects non UV passkey recent authentication even when ordinary passkey policy allows it', function (): void {
+    config(['nvl-auth.features.passkeys.enabled' => true, 'nvl-auth.features.passkeys.settings.require_user_verification' => false]);
+    app()->singleton(PasskeyCeremony::class, TestPasskeyCeremony::class);
+    $user = $this->user();
+    $context = $this->authenticationContext();
+    $service = app(AuthPasskeys::class);
+    $options = $service->beginRegistration($user, $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment)->reveal(), $context);
+    $service->finishRegistration($user, ['ceremonyId' => $options->ceremonyId, 'response' => ['valid' => true]], $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment)->reveal(), $context);
+    $user->forceFill(['password' => null])->save();
+    $ceremony = $service->beginReauthentication($user, $context);
+    $verified = $service->finishAuthentication(['ceremonyId' => $ceremony->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2, 'user_verified' => false]], sessionBinding: $context->sessionBinding);
+    $count = Challenge::query()->where('type', 'recent_authentication')->count();
+    expect(fn () => app(AuthReauthentication::class)->confirm($user, ['passkeyProof' => $verified['proof']->reveal()], RecentAuthenticationPurpose::PasswordChange, $context))->toThrow(AuthException::class);
+    expect(Challenge::query()->where('type', 'recent_authentication')->count())->toBe($count);
 });

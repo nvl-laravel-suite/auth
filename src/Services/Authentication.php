@@ -70,6 +70,7 @@ final readonly class Authentication
     public function login(#[SensitiveParameter] array $credentials, array $context, StatefulGuard $guard, Session $session, #[SensitiveParameter] array $factorProof = []): Authenticatable
     {
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Use);
+        $this->sessions->assertCanTransition();
         $remember = $context['remember'] ?? false;
         if (! is_bool($remember) || array_intersect(array_keys($context), ['guardName', 'sessionBinding', 'tokenNamespace', 'flowNonce']) !== []) {
             throw new \InvalidArgumentException('Invalid or protected authentication context.');

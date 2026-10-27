@@ -403,6 +403,7 @@ final readonly class AuthChallenges
      */
     public function verifySecurityCodeAuthentication(#[\SensitiveParameter] array $data, StatefulGuard $guard, Session $session, AuthenticationRequestContext $context): Authenticatable
     {
+        $this->sessions->assertCanTransition();
         $proof = $this->proveSecurityCodeAuthentication($data, $context);
 
         return $this->sessions->establishFromProof($proof->reveal(), $guard, $session, $context);

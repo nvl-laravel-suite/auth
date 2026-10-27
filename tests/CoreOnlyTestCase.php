@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Providers\AuthServiceProvider;
 use Nvl\Support\Providers\LocaleServiceProvider;
@@ -13,7 +13,7 @@ use Orchestra\Testbench\TestCase;
 /** Core integration with no optional Auth adapter provider registered. */
 abstract class CoreOnlyTestCase extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseMigrations;
 
     protected function getPackageProviders($app): array
     {

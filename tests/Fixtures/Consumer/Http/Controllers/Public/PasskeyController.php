@@ -16,8 +16,9 @@ use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 /** Host-owned HTTP ceremony and session transport. */
 final class PasskeyController
 {
-    public function begin(Request $request, AuthPasskeys $passkeys): JsonResponse
+    public function begin(Request $request, AuthPasskeys $passkeys, AuthenticationSessions $sessions): JsonResponse
     {
+        $sessions->assertCanTransition();
         $options = $passkeys->beginAuthentication(owner: $this->owner($request), sessionBinding: $request->session()->getId(), context: new AuthenticationRequestContext(guardName: config('nvl-auth.guard', 'web'), sessionBinding: $request->session()->getId()));
 
         return response()->json(['data' => ['ceremony_id' => $options->ceremonyId, 'options' => $options->options, 'expires_at' => $options->expiresAt->toIso8601String()], 'code' => 'passkey_authentication_started', 'message' => trans('nvl-auth::responsecode.passkey_authentication_started')]);
@@ -25,6 +26,7 @@ final class PasskeyController
 
     public function finish(FinishPasskeyAuthenticationData $data, Request $request, AuthPasskeys $passkeys, AuthenticationSessions $sessions, AuthSubjectResolver $subjects): JsonResponse
     {
+        $sessions->assertCanTransition();
         $completed = $passkeys->finishAuthentication(get_object_vars($data), $this->owner($request), $request->session()->getId());
         $reference = $completed['subject'];
         $sessions->establishFromProof($completed['proof']->reveal(), auth()->guard(config('nvl-auth.guard', 'web')), $request->session(), $completed['requestContext']);

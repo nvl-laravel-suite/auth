@@ -6,6 +6,7 @@ namespace Nvl\Auth\Services;
 
 use Carbon\CarbonImmutable;
 use DateTimeZone;
+use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Contracts\Container\Container;
@@ -47,7 +48,7 @@ use Nvl\Support\Events\DomainEventDispatcher;
 final readonly class AuthUsers
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private MutationAuthorizer $authorization, private UserLocator $users, private AuthAuditRecorder $audits, private PrincipalAttributeMapper $attributes, private PrincipalSessionContainment $sessions, private AuthMemberships $owners, private AuthOwnershipState $ownershipState, private DomainEventDispatcher $domainEvents, private ManagementAuthorizer $createAuthorization, private AuthModelRegistry $models, private Container $container, private AuthConfiguration $configuration, private AuthOperationBoundary $operations, private ManagementAuthorizer $updateAuthorization, private PasswordUpdater $passwords, private PasswordValidationRules $passwordPolicy, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent) {}
+    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private MutationAuthorizer $authorization, private UserLocator $users, private AuthAuditRecorder $audits, private PrincipalAttributeMapper $attributes, private PrincipalSessionContainment $sessions, private AuthMemberships $owners, private AuthOwnershipState $ownershipState, private DomainEventDispatcher $domainEvents, private ManagementAuthorizer $createAuthorization, private AuthModelRegistry $models, private Container $container, private AuthConfiguration $configuration, private AuthOperationBoundary $operations, private ManagementAuthorizer $updateAuthorization, private PasswordUpdater $passwords, private PasswordValidationRules $passwordPolicy, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private AuthenticationSessions $browserSessions) {}
 
     /**
      * Apply one operation to at most one hundred principals.
@@ -200,6 +201,7 @@ final readonly class AuthUsers
     public function deleteOwnAccount(Authenticatable $subject, #[\SensitiveParameter] array $data, StatefulGuard $guard, Session $session, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): bool
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Revoke);
+        $this->browserSessions->assertCanTransition($subject);
         $this->recent->assertValid($subject, $grant, RecentAuthenticationPurpose::AccountDeletion, $context);
         $data = $this->validateDeleteOwnAccount($data);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Revoke);
@@ -223,9 +225,18 @@ final readonly class AuthUsers
 
             return $deleted;
         }, 3);
-        $guard->logout();
-        $session->invalidate();
-        $session->regenerateToken();
+        try {
+            $guard->logout();
+        } finally {
+            if ($guard instanceof SessionGuard) {
+                $guard->forgetUser();
+            }
+            try {
+                $session->invalidate();
+            } finally {
+                $session->regenerateToken();
+            }
+        }
         if ($subject instanceof User) {
             $subject->setRawAttributes($user->getAttributes(), true);
         }

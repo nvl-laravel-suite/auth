@@ -19,8 +19,9 @@ use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 /** Host-owned Socialite redirect, state and callback transport. */
 final class SocialIdentityController
 {
-    public function redirect(string $provider, Request $request, AuthSocialIdentities $social, OwnerAuthenticationIntents $intents): JsonResponse
+    public function redirect(string $provider, Request $request, AuthSocialIdentities $social, OwnerAuthenticationIntents $intents, AuthenticationSessions $sessions): JsonResponse
     {
+        $sessions->assertCanTransition();
         $owner = $request->attributes->get('owner');
         $returnPath = $request->query('return_path');
         $issued = $owner instanceof OwnerReference ? $intents->issue($owner, OwnerAuthenticationPurpose::SocialLogin, $request->session()->getId(), provider: $provider, returnPath: is_string($returnPath) ? $returnPath : null) : null;
@@ -39,6 +40,7 @@ final class SocialIdentityController
 
     public function callback(string $provider, Request $request, AuthSocialIdentities $social, AuthenticationSessions $sessions, AuthSubjectResolver $subjects): JsonResponse
     {
+        $sessions->assertCanTransition();
         $state = $request->query('state');
         $pending = is_string($state) ? $request->session()->pull('native-social.'.hash('sha256', $provider.':'.$state)) : null;
         if (! is_array($pending) || ! is_string($pending['intent'] ?? null) || ! ($pending['context'] ?? null) instanceof AuthenticationRequestContext) {

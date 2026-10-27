@@ -25,6 +25,7 @@ final class ChallengeController
 
     public function consumeMagicLink(Request $request, AuthChallenges $challenges, AuthenticationSessions $sessions, AuthSubjectResolver $subjects): JsonResponse
     {
+        $sessions->assertCanTransition();
         $data = $request->validate(['recipient' => ['nullable', 'email'], 'token' => ['required', 'string'], 'challengeId' => ['nullable', 'string']]);
         $context = $this->context($request);
         $proof = $challenges->consumeMagicLinkAuthentication(['recipient' => null, ...$data], $context);

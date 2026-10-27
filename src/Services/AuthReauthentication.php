@@ -24,7 +24,7 @@ use SensitiveParameter;
  */
 final readonly class AuthReauthentication
 {
-    public function __construct(private Authentication $authentication, private AuthenticationProofs $proofs, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private AuthIdentityChallenges $records, private SecretHasher $hasher) {}
+    public function __construct(private Authentication $authentication, private AuthenticationProofs $proofs, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private AuthIdentityChallenges $records, private SecretHasher $hasher, private StatefulAuthenticationBoundary $boundary) {}
 
     /** @param array{password?: mixed, code?: mixed, recoveryCode?: mixed, passkeyProof?: mixed, socialProof?: mixed} $proof */
     public function confirm(Authenticatable $subject, #[SensitiveParameter] array $proof, RecentAuthenticationPurpose $purpose, AuthenticationRequestContext $context): IssuedRecentAuthentication
@@ -32,9 +32,7 @@ final readonly class AuthReauthentication
         if (! $subject instanceof Model || $subject->getConnection() !== (new Challenge)->getConnection()) {
             throw AuthException::invalidConfiguration('Recent authentication requires the canonical principal source.');
         }
-        if ($subject->getConnection()->transactionLevel() !== 0) {
-            throw new AuthException('stateful_transaction_unsupported', 'Fresh confirmation must finish before the sensitive mutation transaction starts.', 409);
-        }
+        $this->boundary->assertOutsideTransaction($subject->getConnection());
         $context->assertBound(AuthenticationDestination::Reauthentication);
         if (array_diff(array_keys($proof), ['password', 'code', 'recoveryCode', 'passkeyProof', 'socialProof']) !== []
             || count(array_intersect(array_keys($proof), ['password', 'passkeyProof', 'socialProof'])) !== 1
@@ -67,7 +65,8 @@ final readonly class AuthReauthentication
         $verification = $consumed['verification'];
         $evidence = $verification->evidence;
         if ($evidence->subject != SubjectReference::fromAuthenticatable($subject)
-            || $evidence->method !== (isset($proof['password']) ? AuthenticationMethod::Password : AuthenticationMethod::Passkey)) {
+            || $evidence->method !== (isset($proof['password']) ? AuthenticationMethod::Password : AuthenticationMethod::Passkey)
+            || $evidence->method === AuthenticationMethod::Passkey && ! in_array('user_verified', $evidence->factors, true)) {
             throw new AuthException('authentication_proof_invalid', 'The authentication proof does not match the subject.', 422);
         }
         $principal = $consumed['subject'];
