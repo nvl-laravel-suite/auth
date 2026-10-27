@@ -13,6 +13,7 @@ use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Providers\AuthServiceProvider;
+use Nvl\Auth\Services\AuthSchemaManager;
 use Nvl\Auth\Services\ConfiguredPolicyAuthManagementAccess;
 use Nvl\Auth\Services\LaravelGateAuthManagementAccess;
 use Nvl\Auth\Tests\Fixtures\EmbeddedRolePolicy;
@@ -305,4 +306,21 @@ it('keeps host route choices outside native service readiness', function (): voi
     expect(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR))->toBe($baseline);
     Route::get('/fixture-auth-login', static fn (): string => 'login')->name('fixture.auth.login');
     $this->artisan('nvl:auth:doctor', ['--format' => 'json'])->doesntExpectOutputToContain('route evidence')->assertSuccessful();
+});
+
+it('includes and repairs the existing challenge store for stateful TOTP without magic links or security codes', function (): void {
+    config([
+        'nvl-auth.migrations.install_all' => false,
+        'nvl-auth.features.magic_links.enabled' => false,
+        'nvl-auth.features.security_codes.enabled' => false,
+        'nvl-auth.features.totp.enabled' => true,
+        'nvl-auth.features.sessions.enabled' => true,
+    ]);
+    Schema::drop(AuthTables::Challenges);
+    $schemas = app(AuthSchemaManager::class);
+    expect($schemas->requiredTables())->toContain(AuthTables::Challenges)
+        ->and($schemas->execute()['missing'])->toContain(AuthTables::Challenges);
+    $result = $schemas->execute(apply: true);
+    expect($result['created'])->toContain(AuthTables::Challenges)
+        ->and(Schema::hasTable(AuthTables::Challenges))->toBeTrue();
 });

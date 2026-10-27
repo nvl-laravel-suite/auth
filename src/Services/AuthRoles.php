@@ -31,7 +31,7 @@ use Spatie\Permission\PermissionRegistrar;
 final readonly class AuthRoles
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private ManagementAuthorizer $authorization, private AuthModelRegistry $models, private RbacEntityLocator $entities, private RoleHierarchy $hierarchy, private AuthConfiguration $configuration, private AuthAuditRecorder $audits, private DomainEventDispatcher $domainEvents, private RbacAssignmentService $assignments, private RoleTemplateRegistry $templates, private RbacSynchronizer $synchronizer, private Container $rbacContainer, private MutationAuthorizer $syncUserRolesAuthorization, private RbacPrincipalAccess $principals, private RbacManager $rbac) {}
+    public function __construct(private FeatureGate $features, private ManagementAuthorizer $authorization, private AuthModelRegistry $models, private RbacEntityLocator $entities, private RoleHierarchy $hierarchy, private AuthConfiguration $configuration, private AuthAuditRecorder $audits, private AuthCommittedAudit $committedAudits, private DomainEventDispatcher $domainEvents, private RbacAssignmentService $assignments, private RoleTemplateRegistry $templates, private RbacSynchronizer $synchronizer, private Container $rbacContainer, private MutationAuthorizer $syncUserRolesAuthorization, private RbacPrincipalAccess $principals, private RbacManager $rbac) {}
 
     /** Persist one role.
      * @param  array<string, mixed>  $data
@@ -184,9 +184,9 @@ final readonly class AuthRoles
         $roleClass = $this->models->roleClass();
         $permissionClass = $this->models->permissionClass();
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
-        $connection = (new $roleClass)->getConnectionName();
+        $connection = $this->synchronizer->roleConnection();
 
-        return DB::connection($connection)->transaction(function () use ($actor, $data, $guard, $permissionClass, $roleClass, $template, $templateKey): Role {
+        return $connection->transaction(function () use ($actor, $connection, $data, $guard, $permissionClass, $roleClass, $template, $templateKey): Role {
             $parent = $template->parentRole !== null ? $this->entities->roleByName($template->parentRole, $guard) : null;
             $mutation = $template->toMutation($data['roleName'], $parent?->id);
             try {
@@ -203,7 +203,7 @@ final readonly class AuthRoles
             unset($attributes['system']);
             $role->fill($attributes)->save();
             $role->syncPermissions($permissions);
-            $this->audits->record('role.template_applied', actor: $actor, metadata: ['role_id' => $role->id, 'template' => $templateKey, 'target_role' => $mutation['name']]);
+            $this->committedAudits->afterCommit($connection, 'role.template_applied', actor: $actor, metadata: ['role_id' => $role->id, 'template' => $templateKey, 'target_role' => $mutation['name']]);
             $this->domainEvents->dispatch(new RbacChanged('role', $role->id, 'template_applied', ['template' => $templateKey, 'target_role' => $mutation['name']]), $role->getConnection());
 
             return $role->refresh()->load(['parent', 'permissions']);
@@ -218,10 +218,10 @@ final readonly class AuthRoles
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
         $this->authorization->authorize($actor, 'nvl.auth.rbac.synchronize');
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
-        $connection = (new Role)->getConnectionName();
-        $roleCount = DB::connection($connection)->transaction(fn (): int => $this->synchronizer->synchronizeRoles($guard), 3);
+        $connection = $this->synchronizer->roleConnection();
+        $roleCount = $connection->transaction(fn (): int => $this->synchronizer->synchronizeRoles($guard), 3);
         $this->registrar()->forgetCachedPermissions();
-        $this->audits->record('rbac.roles_synchronized', actor: $actor, metadata: ['roles' => $roleCount, 'guard' => $guard]);
+        $this->committedAudits->afterCommit($connection, 'rbac.roles_synchronized', actor: $actor, metadata: ['roles' => $roleCount, 'guard' => $guard]);
 
         return $roleCount;
     }

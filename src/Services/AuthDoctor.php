@@ -99,7 +99,7 @@ final class AuthDoctor
         $appKey = config('app.key');
         $checks[] = $this->check('security.app_key', is_string($appKey) && $appKey !== '', 'APP_KEY is required for hashing and encrypted casts.');
         $checks[] = $this->check('configuration.pipelines', $this->pipelinesReady($configuration, $container), 'Auth pipelines contain an unknown pipeline or invalid stage.');
-        $checks[] = $this->check('configuration.models', $this->ownedModelsReady($container), 'Configured User, Role, Permission, or PersonalAccessToken models do not extend their package model.');
+        $checks[] = $this->check('configuration.models', $this->ownedModelsReady($container), 'An enabled native Auth model does not extend its package model.');
         $principalTable = $this->configuredTable($configuration, AuthTables::Users);
         $attributeCollisions = $configuration->featureEnabled(AuthFeature::PrincipalManagement) && $schema->hasTable($principalTable) ? $this->principalAttributeCollisions($container, $schema, $principalTable) : [];
         $checks[] = $this->check('configuration.principal_attributes', $attributeCollisions === [], sprintf('Physical principal columns collide with Eloquent relationships: %s.', implode(', ', $attributeCollisions)));
@@ -294,13 +294,26 @@ final class AuthDoctor
         return is_string($configured) && trim($configured) !== '' ? trim($configured) : $default;
     }
 
-    /** Determine whether every configured package model has a valid base type. */
+    /** Validate only the models owned by enabled features and selected native adapters. */
     private function ownedModelsReady(Container $container): bool
     {
         try {
             $models = $container->make(AuthModelRegistry::class);
 
-            return class_exists($models->userClass()) && class_exists($models->roleClass()) && class_exists($models->permissionClass()) && class_exists($models->personalAccessTokenClass());
+            if ($this->configuration->featureEnabled(AuthFeature::PrincipalManagement) && ! class_exists($models->userClass())) {
+                return false;
+            }
+            if ($this->configuration->featureEnabled(AuthFeature::Rbac)
+                && (! class_exists($models->roleClass()) || ! class_exists($models->permissionClass()))) {
+                return false;
+            }
+            if ($this->configuration->featureEnabled(AuthFeature::ApiTokens)
+                && $this->integration($container, ApiTokenManager::class) instanceof SanctumApiTokenManager
+                && ! class_exists($models->personalAccessTokenClass())) {
+                return false;
+            }
+
+            return true;
         } catch (Throwable) {
             return false;
         }
@@ -372,6 +385,10 @@ final class AuthDoctor
             }
             foreach ($services as $service => $value) {
                 if ($value === null || $value === '' || $value === []) {
+                    continue;
+                }
+                if ($feature === AuthFeature::Invitations && $service === 'recipient_proof'
+                    && $value === VerifiedInvitationRecipientProof::class) {
                     continue;
                 }
                 $paths[] = "features.{$feature->value}.services.{$service}";

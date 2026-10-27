@@ -5,8 +5,43 @@ Inject the following families from `Nvl\Auth\Services`. Signatures below reflect
 ## Authentication
 
 ```php
+public function loginWithToken(#[SensitiveParameter] array $credentials, array $token, array $context = [], #[SensitiveParameter] array $factorProof = []): array;
+public function login(#[SensitiveParameter] array $credentials, array $context, StatefulGuard $guard, Session $session, #[SensitiveParameter] array $factorProof = []): Authenticatable;
+public function hasPendingSecondFactor(Session $session): bool;
+public function completeSecondFactor(#[SensitiveParameter] array $factorProof, StatefulGuard $guard, Session $session): Authenticatable;
 public function verifyCredentials( #[SensitiveParameter] array $credentials ): Authenticatable;
 ```
+
+`loginWithToken()` is the complete stateless password operation. Credentials contain
+`identifier` and `password`; token input contains `name`, `abilities` and optional
+`expiresAt` (`CarbonImmutable|null`). Context accepts `ipAddress`, `userAgent` and
+`requestId`. Supply either `code` or `recoveryCode` in factor proof when the
+principal has an enrolled factor and TOTP is enabled. The result is
+`array{subject: Authenticatable, token: IssuedApiToken}`.
+
+The operation runs native eligibility, factor proof, the login pipeline, canonical
+principal rechecks, metadata, audit and token issuance without using a web guard
+or session. Its adapter must implement `TransactionalApiTokenManager`; principal,
+native audit and token writes must use the same connection. Unsupported or split
+storage fails closed. Host audit callbacks and domain events follow the outer
+source commit. A consumed factor proof stays consumed if a subsequent login stage
+rejects, preserving replay protection.
+
+`verifyCredentials()` proves credentials only; it does not replace a complete
+authentication operation. Stateful `login()` owns the same native factor and
+canonical credential/eligibility checks before session success. Supply `code` or
+`recoveryCode` in its optional proof. With an enrolled factor but no proof it
+throws `second_factor_required` and retains an opaque continuation in the supplied
+session. The existing locked challenge store enforces five-minute expiry, five
+attempts and one-use consumption, including across stale session snapshots. No
+password is retained. The host can show its factor form when
+`hasPendingSecondFactor()` returns true, then call `completeSecondFactor()` with
+the proof and the same guard/session. Password changes, disabled principals,
+expired/consumed challenges and pipeline identity substitution fail closed.
+
+TOTP with browser Sessions now requires the existing challenge table even when
+Magic Links and Security Codes are disabled. Native schema planning, installation
+and repair include that feature dependency; no new table shape is introduced.
 
 ## AuthenticationSessions
 
@@ -119,12 +154,20 @@ public function prune(Authenticatable|SystemMutationContext $authority, bool $dr
 ## AuthTokens
 
 ```php
+public function create(Authenticatable $subject, array $data): IssuedApiToken;
 public function all(Authenticatable $subject): array;
 public function revokeAll(Authenticatable $subject): int;
 public function revoke(Authenticatable $subject, string $tokenId): bool;
 public function rotate( Authenticatable $subject, string $tokenId, array $data, ): IssuedApiToken;
 public function update( Authenticatable $subject, string $tokenId, array $data, ): array;
 ```
+
+Raw `create()` is a token management operation. It reloads the persisted principal
+and rechecks configured authentication eligibility and token policy at issuance
+and pipeline success boundaries. Native transactional adapters include token and
+audit writes in their source transaction. Non-Eloquent custom providers retain
+their external freshness contract. Use `loginWithToken()` for complete
+credential-based token authentication.
 
 ## AuthRoles
 
@@ -150,6 +193,12 @@ public function syncUserPermissions(Authenticatable|SystemMutationContext $autho
 public function synchronize(Authenticatable $actor): array;
 public function bootstrap(SystemMutationContext $context): array;
 ```
+
+Catalog synchronization uses the configured Permission model's actual connection.
+Template synchronization, template application and combined synchronization/bootstrap
+require configured Role and Permission models on the same actual connection and
+reject a split before writes. Failed synchronization rolls back that source;
+success audits follow its outer commit and are discarded on rollback.
 
 ## AuthRbacReader
 

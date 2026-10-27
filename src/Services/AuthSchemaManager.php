@@ -153,7 +153,8 @@ final readonly class AuthSchemaManager
         if ($this->enabled(AuthFeature::Invitations)) {
             $tables[] = AuthTables::get(AuthTables::Invitations);
         }
-        if ($this->enabled(AuthFeature::MagicLinks) || $this->enabled(AuthFeature::SecurityCodes)) {
+        if ($this->enabled(AuthFeature::MagicLinks) || $this->enabled(AuthFeature::SecurityCodes)
+            || ($this->enabled(AuthFeature::Totp) && $this->enabled(AuthFeature::Sessions))) {
             $tables[] = AuthTables::get(AuthTables::Challenges);
         }
         if ($this->enabled(AuthFeature::Totp)) {

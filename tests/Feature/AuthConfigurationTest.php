@@ -5,19 +5,86 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Gate;
+use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Providers\AuthServiceProvider;
+use Nvl\Auth\Services\AuthDoctor;
 use Nvl\Auth\Services\AuthManagementAbilityCatalog;
 use Nvl\Auth\Services\ConfiguredPolicyAuthManagementAccess;
 use Nvl\Auth\Services\FeatureManifest;
+use Nvl\Auth\Services\VerifiedInvitationRecipientProof;
 use Nvl\Auth\Tests\Fixtures\EmbeddedPermissionPolicy;
 use Nvl\Auth\Tests\Fixtures\EmbeddedRolePolicy;
 use Nvl\Auth\Tests\Fixtures\EmbeddedUserPolicy;
 use Nvl\Auth\Tests\Fixtures\TestUser;
+
+it('accepts valid models for enabled native Auth features', function (): void {
+    expect(collect(app(AuthDoctor::class)->inspect())->firstWhere('name', 'configuration.models'))
+        ->toMatchArray(['passed' => true]);
+});
+
+it('exempts only the shipped native invitation proof from disabled integration diagnostics', function (bool $custom): void {
+    config(['nvl-auth.features.invitations.enabled' => false]);
+    expect(config('nvl-auth.features.invitations.services.recipient_proof'))->toBe(VerifiedInvitationRecipientProof::class);
+    if ($custom) {
+        config(['nvl-auth.features.invitations.services.recipient_proof' => 'App\\Auth\\CustomInvitationRecipientProof']);
+    }
+    $check = collect(app(AuthDoctor::class)->inspect(strict: true))
+        ->firstWhere('name', 'dormant.features.invitations.services.recipient_proof');
+    if ($custom) {
+        expect($check)->toMatchArray(['passed' => false]);
+    } else {
+        expect($check)->toBeNull();
+    }
+})->with(['native default' => false, 'custom integration' => true]);
+
+it('does not inspect models belonging to disabled optional Auth features', function (): void {
+    config([
+        'nvl-auth.features.principal_management.enabled' => false,
+        'nvl-auth.features.principal_management.models.user' => 'MissingDisabledUser',
+        'nvl-auth.features.rbac.enabled' => false,
+        'nvl-auth.features.rbac.models.role' => 'MissingDisabledRole',
+        'nvl-auth.features.rbac.models.permission' => 'MissingDisabledPermission',
+        'nvl-auth.features.api_tokens.enabled' => false,
+        'nvl-auth.features.api_tokens.models.personal_access_token' => 'MissingDisabledToken',
+    ]);
+
+    expect(collect(app(AuthDoctor::class)->inspect())->firstWhere('name', 'configuration.models'))
+        ->toMatchArray(['passed' => true]);
+});
+
+it('rejects an invalid model when its native Auth feature is enabled', function (AuthFeature $feature, string $model): void {
+    config([
+        'nvl-auth.features.'.$feature->value.'.enabled' => true,
+        'nvl-auth.features.'.$feature->value.'.models.'.$model => 'MissingEnabledModel',
+    ]);
+    if ($feature === AuthFeature::PrincipalManagement) {
+        config(['nvl-auth.tables.users' => 'missing_principal_model_probe']);
+    }
+
+    expect(collect(app(AuthDoctor::class)->inspect())->firstWhere('name', 'configuration.models'))
+        ->toMatchArray(['passed' => false]);
+})->with([
+    'native User' => [AuthFeature::PrincipalManagement, 'user'],
+    'native Role' => [AuthFeature::Rbac, 'role'],
+    'native Permission' => [AuthFeature::Rbac, 'permission'],
+    'native Sanctum token' => [AuthFeature::ApiTokens, 'personal_access_token'],
+]);
+
+it('does not require a Sanctum model for a selected custom token adapter', function (): void {
+    config([
+        'nvl-auth.features.api_tokens.enabled' => true,
+        'nvl-auth.features.api_tokens.models.personal_access_token' => 'MissingUnusedSanctumToken',
+    ]);
+    app()->instance(ApiTokenManager::class, Mockery::mock(ApiTokenManager::class));
+
+    expect(collect(app(AuthDoctor::class)->inspect())->firstWhere('name', 'configuration.models'))
+        ->toMatchArray(['passed' => true]);
+});
 
 it('catalogs every package management ability with policy mapping metadata', function (): void {
     $catalog = app(AuthManagementAbilityCatalog::class);

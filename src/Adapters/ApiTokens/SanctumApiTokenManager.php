@@ -7,6 +7,7 @@ namespace Nvl\Auth\Adapters\ApiTokens;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -17,6 +18,7 @@ use Laravel\Sanctum\NewAccessToken;
 use Laravel\Sanctum\PersonalAccessToken;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\OwnerBoundApiTokenManager;
+use Nvl\Auth\Contracts\TransactionalApiTokenManager;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Results\IssuedApiToken;
 use Nvl\Auth\Services\AuthConfiguration;
@@ -26,12 +28,18 @@ use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 /**
  * Manages personal access tokens directly in Sanctum's authoritative table.
  */
-final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiTokenManager
+final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiTokenManager, TransactionalApiTokenManager
 {
     /**
      * Create the namespaced Sanctum adapter.
      */
     public function __construct(private readonly AuthConfiguration $configuration, private readonly OwnershipBoundary $boundary) {}
+
+    /** {@inheritDoc} */
+    public function connection(Authenticatable $subject): Connection
+    {
+        return $this->tokens($this->subject($subject))->getModel()->getConnection();
+    }
 
     /**
      * List subject-owned Sanctum tokens.

@@ -38,7 +38,7 @@ final readonly class AuthCommittedAudit
     /** @param array<string, mixed> $metadata */
     public function record(Connection $connection, string $action, string $outcome = 'success', ?SubjectReference $subject = null, ?Authenticatable $actor = null, ?string $clientId = null, array $metadata = []): void
     {
-        if ($this->state->configured() && $this->recorder instanceof AuthAuditRecorder) {
+        if ($this->recorder instanceof AuthAuditRecorder) {
             if ((new AuthAudit)->getConnection() !== $connection) {
                 throw AuthException::invalidConfiguration('Native audit facts must share their owning source transaction.');
             }
@@ -47,13 +47,32 @@ final readonly class AuthCommittedAudit
             return;
         }
         $envelope = $this->state->configured() ? OwnershipJobEnvelope::capture($this->context) : null;
-        $callback = $this->recorder instanceof AuthAuditRecorder ? $this->recorder->prepare($action, $outcome, $subject, $actor, $clientId, $metadata) : fn () => $this->recorder->record($action, $outcome, $subject, $actor, $clientId, $metadata);
+        $callback = fn () => $this->recorder->record($action, $outcome, $subject, $actor, $clientId, $metadata);
         $this->commits->afterCommit($connection, function () use ($callback, $envelope): void {
             if ($envelope !== null) {
                 $this->queue->run($envelope, $callback);
 
                 return;
             }
+            $callback();
+        });
+    }
+
+    /**
+     * Capture synchronization context while recording success after its actual source commit.
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    public function afterCommit(Connection $connection, string $action, ?Authenticatable $actor = null, array $metadata = []): void
+    {
+        if (! $this->recorder instanceof AuthAuditRecorder) {
+            $this->record($connection, $action, actor: $actor, metadata: $metadata);
+
+            return;
+        }
+
+        $callback = $this->recorder->prepare($action, actor: $actor, metadata: $metadata);
+        $this->commits->afterCommit($connection, static function () use ($callback): void {
             $callback();
         });
     }

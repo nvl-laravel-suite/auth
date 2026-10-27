@@ -7,11 +7,15 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Events\AuthDeliveryRequested;
+use Nvl\Auth\Events\UserAuthenticated;
+use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\AuthEmailVerification;
+use Nvl\Auth\Services\Authentication;
 use Nvl\Auth\Services\AuthInvitations;
 use Nvl\Auth\Services\AuthPasswords;
 use Nvl\Auth\Tests\CommittedDeliveryTestCase;
+use Nvl\Auth\Tests\Fixtures\HostAuditRecorder;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 
@@ -120,4 +124,84 @@ it('uses the original directly supplied invitation audit recorder after the owni
     expect($originalRecorder->actions)->toBe(['invitation.issued'])
         ->and($adapterRecorder->actions)->toBe([]);
     Event::assertDispatchedTimes(AuthDeliveryRequested::class, 1);
+});
+
+it('keeps stateless token metadata native audits and events on the actual outer transaction', function (bool $commit): void {
+    $user = $this->user();
+    $connection = $user->getConnection();
+    expect($connection->transactionLevel())->toBe(0);
+    Event::fake([UserAuthenticated::class]);
+    $connection->beginTransaction();
+    try {
+        app(Authentication::class)->loginWithToken(
+            ['identifier' => $user->email, 'password' => 'correct-password'],
+            ['name' => 'Committed mobile', 'abilities' => ['profile:read']],
+        );
+        expect($user->tokens()->count())->toBe(1)
+            ->and($user->fresh()->last_login_at)->not->toBeNull()
+            ->and(AuthAudit::query()->where('action', 'authentication.succeeded')->count())->toBe(1);
+        Event::assertNotDispatched(UserAuthenticated::class);
+        if ($commit) {
+            $connection->commit();
+        } else {
+            $connection->rollBack();
+        }
+    } finally {
+        if ($connection->transactionLevel() > 0) {
+            $connection->rollBack();
+        }
+    }
+    expect($user->tokens()->count())->toBe($commit ? 1 : 0)
+        ->and($user->fresh()->last_login_at !== null)->toBe($commit)
+        ->and(AuthAudit::query()->where('action', 'authentication.succeeded')->count())->toBe($commit ? 1 : 0);
+    Event::assertDispatchedTimes(UserAuthenticated::class, $commit ? 1 : 0);
+})->with(['commit' => true, 'rollback' => false]);
+
+it('defers host stateless success audit adapters until the source commits and discards them on rollback', function (bool $commit): void {
+    $user = $this->user();
+    $recorder = new HostAuditRecorder;
+    app()->instance(AuthAuditRecorder::class, $recorder);
+    $connection = $user->getConnection();
+    $connection->beginTransaction();
+    try {
+        app(Authentication::class)->loginWithToken(
+            ['identifier' => $user->email, 'password' => 'correct-password'],
+            ['name' => 'Committed mobile', 'abilities' => ['profile:read']],
+        );
+        expect($recorder->facts)->toBe([]);
+        if ($commit) {
+            $connection->commit();
+        } else {
+            $connection->rollBack();
+        }
+    } finally {
+        if ($connection->transactionLevel() > 0) {
+            $connection->rollBack();
+        }
+    }
+    expect(array_column($recorder->facts, 'action'))->toBe($commit ? ['api_token.issued', 'authentication.succeeded'] : []);
+})->with(['commit' => true, 'rollback' => false]);
+
+it('does not relabel a committed stateless login as rejected when a host after commit audit observer fails', function (): void {
+    $user = $this->user();
+    $recorder = new class implements AuthAuditRecorder
+    {
+        /** @var list<string> */
+        public array $actions = [];
+
+        /** @param array<string, mixed> $metadata */
+        public function record(string $action, string $outcome = 'success', ?SubjectReference $subject = null, ?Authenticatable $actor = null, ?string $clientId = null, array $metadata = []): ?object
+        {
+            $this->actions[] = $action;
+            throw new RuntimeException('Host after commit audit failed');
+        }
+    };
+    app()->instance(AuthAuditRecorder::class, $recorder);
+    expect(fn () => app(Authentication::class)->loginWithToken(
+        ['identifier' => $user->email, 'password' => 'correct-password'],
+        ['name' => 'Committed mobile', 'abilities' => ['profile:read']],
+    ))->toThrow(RuntimeException::class, 'Host after commit audit failed')
+        ->and($user->tokens()->count())->toBe(1)
+        ->and($user->fresh()->last_login_at)->not->toBeNull()
+        ->and($recorder->actions)->toBe(['api_token.issued']);
 });

@@ -235,6 +235,21 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\TransactionalApiTokenManager": {
+            "kind": "interface",
+            "file": "src/Contracts/TransactionalApiTokenManager.php",
+            "methods": [
+                "connection",
+                "create",
+                "list",
+                "revoke",
+                "revokeAll",
+                "rotate",
+                "update"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Database\\Factories\\AuthAuditFactory": {
             "kind": "class",
             "file": "database/factories/AuthAuditFactory.php",
@@ -1754,7 +1769,10 @@
             "file": "src/Services/Authentication.php",
             "methods": [
                 "__construct",
+                "completeSecondFactor",
+                "hasPendingSecondFactor",
                 "login",
+                "loginWithToken",
                 "verifyCredentials"
             ],
             "properties": [],

@@ -29,7 +29,7 @@ use Spatie\Permission\PermissionRegistrar;
 final readonly class AuthPermissions
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private ManagementAuthorizer $authorization, private AuthModelRegistry $models, private AuthConfiguration $configuration, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private RbacAssignmentService $assignments, private RbacEntityLocator $entities, private RbacSynchronizer $synchronizer, private Container $rbacContainer, private MutationAuthorizer $syncUserPermissionsAuthorization, private RbacPrincipalAccess $principals, private RbacManager $rbac, private MutationAuthorizer $bootstrapAuthorization) {}
+    public function __construct(private FeatureGate $features, private ManagementAuthorizer $authorization, private AuthModelRegistry $models, private AuthConfiguration $configuration, private AuthAuditRecorder $audits, private AuthCommittedAudit $committedAudits, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private RbacAssignmentService $assignments, private RbacEntityLocator $entities, private RbacSynchronizer $synchronizer, private Container $rbacContainer, private MutationAuthorizer $syncUserPermissionsAuthorization, private RbacPrincipalAccess $principals, private RbacManager $rbac, private MutationAuthorizer $bootstrapAuthorization) {}
 
     /** Persist one permission.
      * @param  array<string, mixed>  $data
@@ -135,10 +135,11 @@ final readonly class AuthPermissions
         $this->operations->requirePlatformAdministration();
         $this->authorization->authorize($actor, 'nvl.auth.rbac.synchronize');
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
-        $connection = (new Permission)->getConnectionName();
-        $created = DB::connection($connection)->transaction(fn (): int => $this->synchronizer->synchronizePermissions($guard), 3);
+        $permissionClass = $this->models->permissionClass();
+        $connection = (new $permissionClass)->getConnection();
+        $created = $connection->transaction(fn (): int => $this->synchronizer->synchronizePermissions($guard), 3);
         $this->registrar()->forgetCachedPermissions();
-        $this->audits->record('rbac.permissions_synchronized', actor: $actor, metadata: ['created' => $created, 'guard' => $guard]);
+        $this->committedAudits->afterCommit($connection, 'rbac.permissions_synchronized', actor: $actor, metadata: ['created' => $created, 'guard' => $guard]);
 
         return $created;
     }
@@ -174,13 +175,12 @@ final readonly class AuthPermissions
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
         $this->authorization->authorize($actor, 'nvl.auth.rbac.synchronize');
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
-        $permissionClass = $this->models->permissionClass();
-        $connection = (new $permissionClass)->getConnectionName();
-        $result = DB::connection($connection)->transaction(function () use ($guard): array {
+        $connection = $this->synchronizer->roleConnection();
+        $result = $connection->transaction(function () use ($guard): array {
             return ['permissionsCreated' => $this->synchronizer->synchronizePermissions($guard), 'rolesSynchronized' => $this->synchronizer->synchronizeRoles($guard), 'guard' => $guard];
         }, 3);
         $this->registrar()->forgetCachedPermissions();
-        $this->audits->record('rbac.synchronized', actor: $actor, metadata: ['permissions_created' => $result['permissionsCreated'], 'roles_synchronized' => $result['rolesSynchronized'], 'guard' => $result['guard']]);
+        $this->committedAudits->afterCommit($connection, 'rbac.synchronized', actor: $actor, metadata: ['permissions_created' => $result['permissionsCreated'], 'roles_synchronized' => $result['rolesSynchronized'], 'guard' => $result['guard']]);
 
         return $result;
     }
@@ -196,14 +196,13 @@ final readonly class AuthPermissions
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
         $actor = $this->bootstrapAuthorization->authorize($context, 'nvl.auth.rbac.bootstrap');
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
-        $permissionClass = $this->models->permissionClass();
-        $connection = (new $permissionClass)->getConnectionName();
+        $connection = $this->synchronizer->roleConnection();
         $this->registrar()->forgetCachedPermissions();
-        $result = DB::connection($connection)->transaction(function () use ($guard): array {
+        $result = $connection->transaction(function () use ($guard): array {
             return ['permissionsCreated' => $this->synchronizer->synchronizePermissions($guard), 'rolesSynchronized' => $this->synchronizer->synchronizeRoles($guard), 'guard' => $guard];
         }, 3);
         $this->registrar()->forgetCachedPermissions();
-        $this->audits->record('rbac.bootstrapped', actor: $actor, metadata: [...['permissions_created' => $result['permissionsCreated'], 'roles_synchronized' => $result['rolesSynchronized'], 'guard' => $result['guard']], ...$context->auditMetadata()]);
+        $this->committedAudits->afterCommit($connection, 'rbac.bootstrapped', actor: $actor, metadata: [...['permissions_created' => $result['permissionsCreated'], 'roles_synchronized' => $result['rolesSynchronized'], 'guard' => $result['guard']], ...$context->auditMetadata()]);
 
         return $result;
     }

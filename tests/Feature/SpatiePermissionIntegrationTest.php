@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Nvl\Auth\Contracts\SystemMutationAccess;
 use Nvl\Auth\Events\RbacAssignmentChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
+use Nvl\Auth\Models\Permission;
+use Nvl\Auth\Models\Role;
 use Nvl\Auth\Services\AuthInvitations;
 use Nvl\Auth\Services\AuthPermissions;
 use Nvl\Auth\Services\AuthRoles;
@@ -15,6 +18,103 @@ use Nvl\Auth\Tests\Fixtures\HostRbacPrincipal;
 use Nvl\Auth\Tests\Fixtures\TestPermissionCatalog;
 use Nvl\Auth\Tests\Fixtures\TestRoleTemplates;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
+use Spatie\Permission\PermissionRegistrar;
+
+it('rolls back configured RBAC storage when synchronization fails midway', function (string $operation): void {
+    config(['database.connections.rbac_custom' => config('database.connections.sqlite')]);
+    $connection = DB::connection('rbac_custom');
+    $connection->getPdo()->exec(DB::connection()->getPdo()->query("SELECT sql FROM sqlite_master WHERE name = 'nvl_auth_roles'")->fetchColumn());
+    $connection->getPdo()->exec(DB::connection()->getPdo()->query("SELECT sql FROM sqlite_master WHERE name = 'nvl_auth_permissions'")->fetchColumn());
+    $connection->getPdo()->exec(DB::connection()->getPdo()->query("SELECT sql FROM sqlite_master WHERE name = 'nvl_auth_role_has_permissions'")->fetchColumn());
+    $role = new class extends Role
+    {
+        protected $connection = 'rbac_custom';
+    };
+    $permission = new class extends Permission
+    {
+        protected $connection = 'rbac_custom';
+    };
+    config([
+        'nvl-auth.features.rbac.models.role' => $role::class,
+        'nvl-auth.features.rbac.models.permission' => $permission::class,
+        'permission.models.role' => $role::class,
+        'permission.models.permission' => $permission::class,
+        'nvl-auth.features.rbac.services.permission_catalogs' => [TestPermissionCatalog::class],
+        'nvl-auth.features.rbac.services.role_templates' => [TestRoleTemplates::class],
+    ]);
+    app(PermissionRegistrar::class)->setRoleClass($role::class)->setPermissionClass($permission::class);
+    Event::listen('eloquent.created: '.$permission::class, static function (Permission $model): void {
+        if ($model->name === 'users.manage') {
+            throw new RuntimeException('Reject second permission.');
+        }
+    });
+    $actor = $this->user();
+
+    expect(fn () => match ($operation) {
+        'catalog' => app(AuthPermissions::class)->synchronizeCatalog($actor),
+        'templates' => app(AuthRoles::class)->synchronizeTemplates($actor),
+        'synchronize' => app(AuthPermissions::class)->synchronize($actor),
+        'bootstrap' => app(AuthPermissions::class)->bootstrap(new SystemMutationContext('Install', 'custom-source')),
+    })->toThrow(RuntimeException::class, 'Reject second permission.');
+
+    expect($permission::query()->count())->toBe(0)
+        ->and($role::query()->count())->toBe(0)
+        ->and(AuthAudit::query()->where('action', 'like', 'rbac.%')->count())->toBe(0);
+})->with(['catalog', 'templates', 'synchronize', 'bootstrap']);
+
+it('rejects split role and permission storage before synchronization writes', function (string $operation): void {
+    config(['database.connections.rbac_custom' => config('database.connections.sqlite')]);
+    $role = new class extends Role
+    {
+        protected $connection = 'rbac_custom';
+    };
+    config([
+        'nvl-auth.features.rbac.models.role' => $role::class,
+        'nvl-auth.features.rbac.services.permission_catalogs' => [TestPermissionCatalog::class],
+        'nvl-auth.features.rbac.services.role_templates' => [TestRoleTemplates::class],
+    ]);
+    $actor = $this->user();
+
+    expect(fn () => match ($operation) {
+        'templates' => app(AuthRoles::class)->synchronizeTemplates($actor),
+        'apply' => app(AuthRoles::class)->applyTemplate($actor, ['template' => 'manager']),
+        'synchronize' => app(AuthPermissions::class)->synchronize($actor),
+        'bootstrap' => app(AuthPermissions::class)->bootstrap(new SystemMutationContext('Install', 'split-source')),
+    })->toThrow(AuthException::class, 'same connection');
+
+    expect(Permission::query()->count())->toBe(0)
+        ->and(AuthAudit::query()->where('action', 'like', 'rbac.%')->count())->toBe(0);
+})->with(['templates', 'apply', 'synchronize', 'bootstrap']);
+
+it('records synchronization success only after the owning transaction commits', function (string $operation, string $action): void {
+    config()->set('nvl-auth.features.rbac.services.permission_catalogs', [TestPermissionCatalog::class]);
+    config()->set('nvl-auth.features.rbac.services.role_templates', [TestRoleTemplates::class]);
+    $actor = $this->user();
+    $synchronize = fn () => match ($operation) {
+        'catalog' => app(AuthPermissions::class)->synchronizeCatalog($actor),
+        'templates' => app(AuthRoles::class)->synchronizeTemplates($actor),
+        'synchronize' => app(AuthPermissions::class)->synchronize($actor),
+        'bootstrap' => app(AuthPermissions::class)->bootstrap(new SystemMutationContext('Install', 'commit-source')),
+    };
+    $connection = DB::connection();
+    $connection->beginTransaction();
+    try {
+        $synchronize();
+        expect(AuthAudit::query()->where('action', $action)->count())->toBe(0);
+    } finally {
+        $connection->rollBack();
+    }
+
+    expect(Permission::query()->count())->toBe(0)
+        ->and(AuthAudit::query()->where('action', $action)->count())->toBe(0);
+    $synchronize();
+    expect(AuthAudit::query()->where('action', $action)->count())->toBe(1);
+})->with([
+    ['catalog', 'rbac.permissions_synchronized'],
+    ['templates', 'rbac.roles_synchronized'],
+    ['synchronize', 'rbac.synchronized'],
+    ['bootstrap', 'rbac.bootstrapped'],
+]);
 
 it('synchronizes spatie catalogs and applies invitation role payloads', function (): void {
     config()->set('nvl-auth.features.rbac.enabled', true);

@@ -15,7 +15,8 @@ rows. Do not log service results containing issuance secrets.
 
 ## Authentication and enumeration
 
-- Login returns one neutral credential failure.
+- Login returns one neutral credential failure. Stateful credential login enforces enrolled TOTP or recovery proof before guard authentication. Its opaque server-session continuation uses an existing locked Challenge row, expires after five minutes, shares a five-attempt budget across stale session snapshots, binds the current password hash through a purpose-separated HMAC, and is consumed before the success pipeline. It never retains the password.
+- Native credential and passwordless session paths reload persisted eligibility across login pipelines and reject principal substitution. Raw token issuance supplies canonical current actors to configured eligibility and ability providers; non-Eloquent adapters retain their external identity freshness contract.
 - Password-reset request does not reveal whether the identifier matched or was
   rejected by the configured `AuthenticationEligibility` policy. Ineligible
   subjects receive no token or delivery, and reset consumption checks the same

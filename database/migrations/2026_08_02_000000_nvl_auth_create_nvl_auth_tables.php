@@ -95,7 +95,8 @@ return new class extends Migration implements AuthSchemaMigration
             });
         }
 
-        if (($this->featureEnabled('magic_links') || $this->featureEnabled('security_codes'))
+        if (($this->featureEnabled('magic_links') || $this->featureEnabled('security_codes')
+            || ($this->featureEnabled('totp') && $this->featureEnabled('sessions')))
             && ! $schema->hasTable(AuthTables::get(AuthTables::Challenges))) {
             $schema->create(AuthTables::get(AuthTables::Challenges), function (Blueprint $table): void {
                 $table->uuid('id')->primary();

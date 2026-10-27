@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Illuminate\Database\Connection;
 use LogicException;
+use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
 
@@ -23,6 +25,19 @@ final readonly class RbacSynchronizer
         private RoleTemplateRegistry $templates,
         private AuthModelRegistry $models,
     ) {}
+
+    /** Resolve the single storage source required by role-permission mutations. */
+    public function roleConnection(): Connection
+    {
+        $roleClass = $this->models->roleClass();
+        $permissionClass = $this->models->permissionClass();
+        $connection = (new $roleClass)->getConnection();
+        if ($connection !== (new $permissionClass)->getConnection()) {
+            throw AuthException::invalidConfiguration('RBAC roles and permissions must use the same connection.');
+        }
+
+        return $connection;
+    }
 
     /**
      * Create missing catalog permissions and return the created count.
@@ -53,6 +68,7 @@ final readonly class RbacSynchronizer
      */
     public function synchronizeRoles(string $guard): int
     {
+        $this->roleConnection();
         $roles = $this->templates->roles();
         $roleClass = $this->models->roleClass();
         $permissionClass = $this->models->permissionClass();

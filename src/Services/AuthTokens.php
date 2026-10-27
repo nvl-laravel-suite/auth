@@ -6,12 +6,15 @@ namespace Nvl\Auth\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\Validator;
 use InvalidArgumentException;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\TransactionalApiTokenManager;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Results\IssuedApiToken;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
@@ -25,7 +28,20 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 final readonly class AuthTokens
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private ApiTokenPolicy $policy, private ApiTokenManager $tokens, private AuthPipeline $pipeline, private AuthAuditRecorder $audits) {}
+    public function __construct(private FeatureGate $features, private ApiTokenPolicy $policy, private ApiTokenManager $tokens, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, private AuthCommittedAudit $committedAudits) {}
+
+    /** Require a token provider that can participate in complete authentication atomicity.
+     *
+     * @internal
+     */
+    public function connection(Authenticatable $subject): Connection
+    {
+        if (! $this->tokens instanceof TransactionalApiTokenManager) {
+            throw AuthException::invalidConfiguration('Stateless login requires a TransactionalApiTokenManager.');
+        }
+
+        return $this->tokens->connection($subject);
+    }
 
     /**
      * Issue one token directly through the configured provider.
@@ -36,15 +52,29 @@ final readonly class AuthTokens
     {
         $this->features->assertAllowed(AuthFeature::ApiTokens, FeatureOperation::Issue);
         $data = $this->validateApiToken($data);
-        $this->policy->authorize($subject, $data);
+        $subject = $this->policy->authorize($subject, $data);
         $reference = SubjectReference::fromAuthenticatable($subject);
 
-        return $this->pipeline->run('api_token_issued', new AuthPipelineContext('api_token_issued', ['abilities' => $data['abilities']], $reference), function () use ($data, $reference, $subject): IssuedApiToken {
-            $issued = $this->tokens->create($subject, $data);
-            $this->audits->record('api_token.issued', subject: $reference, actor: $subject, metadata: ['token_id' => $issued->token['id'], 'abilities' => $data['abilities']]);
+        $issue = function () use ($data, $reference, $subject): IssuedApiToken {
+            $subject = $this->policy->authorize($subject, $data);
+            $issued = $this->pipeline->run('api_token_issued', new AuthPipelineContext('api_token_issued', ['abilities' => $data['abilities']], $reference), function () use ($data, $reference, $subject): IssuedApiToken {
+                $subject = $this->policy->authorize($subject, $data);
+                $issued = $this->tokens->create($subject, $data);
+                $metadata = ['token_id' => $issued->token['id'], 'abilities' => $data['abilities']];
+                if ($this->tokens instanceof TransactionalApiTokenManager) {
+                    $this->committedAudits->withRecorder($this->audits)->record($this->tokens->connection($subject), 'api_token.issued', subject: $reference, actor: $subject, metadata: $metadata);
+                } else {
+                    $this->audits->record('api_token.issued', subject: $reference, actor: $subject, metadata: $metadata);
+                }
+
+                return $issued;
+            });
+            $this->policy->authorize($subject, $data);
 
             return $issued;
-        });
+        };
+
+        return $this->tokens instanceof TransactionalApiTokenManager ? $this->tokens->connection($subject)->transaction($issue) : $issue();
     }
 
     /**
@@ -55,7 +85,7 @@ final readonly class AuthTokens
     public function all(Authenticatable $subject): array
     {
         $this->features->assertAllowed(AuthFeature::ApiTokens, FeatureOperation::Read);
-        $this->policy->authorizeSubject($subject);
+        $subject = $this->policy->authorizeSubject($subject);
 
         return $this->tokens->list($subject);
     }
@@ -66,7 +96,7 @@ final readonly class AuthTokens
     public function revokeAll(Authenticatable $subject): int
     {
         $this->features->assertAllowed(AuthFeature::ApiTokens, FeatureOperation::Revoke);
-        $this->policy->authorizeSubject($subject);
+        $subject = $this->policy->authorizeSubject($subject);
         $count = $this->tokens->revokeAll($subject);
         $this->audits->record('api_token.revoked_all', subject: SubjectReference::fromAuthenticatable($subject), actor: $subject, metadata: ['count' => $count]);
 
@@ -79,7 +109,7 @@ final readonly class AuthTokens
     public function revoke(Authenticatable $subject, string $tokenId): bool
     {
         $this->features->assertAllowed(AuthFeature::ApiTokens, FeatureOperation::Revoke);
-        $this->policy->authorizeSubject($subject);
+        $subject = $this->policy->authorizeSubject($subject);
         $revoked = $this->tokens->revoke($subject, $tokenId);
         if ($revoked) {
             $this->audits->record('api_token.revoked', subject: SubjectReference::fromAuthenticatable($subject), actor: $subject, metadata: ['token_id' => $tokenId]);
@@ -97,7 +127,7 @@ final readonly class AuthTokens
     {
         $this->features->assertAllowed(AuthFeature::ApiTokens, FeatureOperation::Update);
         $data = $this->validateApiToken($data);
-        $this->policy->authorize($subject, $data);
+        $subject = $this->policy->authorize($subject, $data);
         $issued = $this->tokens->rotate($subject, $tokenId, $data);
         $this->audits->record('api_token.rotated', subject: SubjectReference::fromAuthenticatable($subject), actor: $subject, metadata: ['old_token_id' => $tokenId, 'token_id' => $issued->token['id']]);
 
@@ -114,7 +144,7 @@ final readonly class AuthTokens
     {
         $this->features->assertAllowed(AuthFeature::ApiTokens, FeatureOperation::Update);
         $data = $this->validateApiToken($data);
-        $this->policy->authorize($subject, $data);
+        $subject = $this->policy->authorize($subject, $data);
         $updated = $this->tokens->update($subject, $tokenId, $data);
         $this->audits->record('api_token.updated', subject: SubjectReference::fromAuthenticatable($subject), actor: $subject, metadata: ['token_id' => $updated['id']]);
 
