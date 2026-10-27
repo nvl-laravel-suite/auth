@@ -34,6 +34,7 @@ with `nvl.auth.` and response envelopes use `data`, `code`, and `message`.
 | `POST logout` | `account.logout` | authentication/revoke |
 | `PUT password` | `account.password.update` | password/update |
 | `POST password/confirm` | `account.password.confirm` | password/use |
+| `POST reauthenticate` | `account.reauthenticate` | password/use; requires sessions; returns an operation-bound grant |
 | `POST email/verification` | `account.email.request` | email verification/issue |
 | `POST totp/enroll` | `account.totp.enroll` | TOTP/enroll |
 | `POST totp/{credential}/confirm` | `account.totp.confirm` | TOTP/enroll |

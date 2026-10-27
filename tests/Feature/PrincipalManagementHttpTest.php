@@ -90,6 +90,10 @@ it('serves configurable principal profile and RBAC APIs without Inertia', functi
         'profile' => ['department' => 'security'],
     ])->assertOk()
         ->assertJsonPath('data.profile.department', 'security');
+    $this->patchJson('/nvl/api/v1/auth/profile', ['email' => 'unproved@example.test'])
+        ->assertUnprocessable()
+        ->assertJsonPath('code', 'operation_failed');
+    expect($actor->fresh()->email)->toBe('api.owner@example.test');
     $this->patchJson("/nvl/api/v1/auth/users/{$userId}/status", ['active' => false])
         ->assertOk()
         ->assertJsonPath('code', 'user_disabled');

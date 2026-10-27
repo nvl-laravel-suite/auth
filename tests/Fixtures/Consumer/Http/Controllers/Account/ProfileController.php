@@ -26,7 +26,7 @@ final class ProfileController extends AuthenticatedController
 
     public function update(UpdateProfileData $data, Request $request, AuthUsers $action): JsonResponse
     {
-        $user = $action->updateProfile($this->subject($request), array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional), grant: $this->recentGrant($request), context: $this->authenticationContext($request));
+        $user = $action->updateProfile($this->subject($request), array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional), grant: $this->recentGrant($request), context: $request->hasSession() ? $this->authenticationContext($request) : null);
 
         return response()->json([
             'data' => $user,

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Routing\Router;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
@@ -120,6 +121,7 @@ it('exposes totp state only for the authenticated subject with private read-only
 });
 
 it('restarts pending enrollment with fresh one-time material and preserves confirmed and other subject credentials', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-01-01 12:00:05 UTC'));
     config()->set('nvl-auth.features.totp.enabled', true);
     $user = $this->user();
     $other = $this->user('other-restart@example.test');

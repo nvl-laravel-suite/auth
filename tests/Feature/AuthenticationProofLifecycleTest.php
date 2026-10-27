@@ -205,6 +205,7 @@ it('consumes a verified recovery capability before a later rejecting login pipel
     $user = $this->user();
     TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
     $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $consumedBefore = Challenge::query()->where('type', 'authentication_proof')->whereNotNull('consumed_at')->count();
     $context = $this->authenticationContext();
     $proof = app(Authentication::class)->proveCredentials(['identifier' => $user->email, 'password' => 'correct-password'], $context);
     app(AuthenticationProofs::class)->completeFactor($proof->reveal(), AuthenticationDestination::Session, $context, ['recoveryCode' => $recovery->codes[0]]);
@@ -213,7 +214,7 @@ it('consumes a verified recovery capability before a later rejecting login pipel
     config(['nvl-auth.pipelines.login' => []]);
     expect(fn () => app(AuthenticationSessions::class)->establishFromProof($proof->reveal(), auth()->guard('web'), app('session.store'), $context))->toThrow(AuthException::class);
     expect(RecoveryCode::query()->whereNotNull('used_at')->count())->toBe(1)
-        ->and(Challenge::query()->where('type', 'authentication_proof')->whereNotNull('consumed_at')->count())->toBe(1);
+        ->and(Challenge::query()->where('type', 'authentication_proof')->whereNotNull('consumed_at')->count())->toBe($consumedBefore + 1);
 });
 
 it('rejects another browser before redeeming native email and passkey primaries', function (string $method): void {

@@ -115,7 +115,11 @@ abstract class AuthTestCase extends Orchestra
             if ($next > now()->timestamp) {
                 $this->travelTo(CarbonImmutable::createFromTimestampUTC($next));
             }
-            $proof['code'] = (new Google2FA)->getCurrentOtp($credential->secret);
+            $totp = new Google2FA;
+            $totp->setEnforceGoogleAuthenticatorCompatibility(false);
+            $totp->setAlgorithm($credential->algorithm);
+            $totp->setOneTimePasswordLength($credential->digits);
+            $proof['code'] = $totp->oathTotp($credential->secret, intdiv(now()->timestamp, $credential->period));
         }
 
         return app(AuthReauthentication::class)->confirm($subject, $proof, $purpose, $this->authenticationContext());

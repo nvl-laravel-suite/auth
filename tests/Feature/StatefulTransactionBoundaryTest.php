@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Auth\StatefulGuard;
+use Illuminate\Contracts\Session\Session;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -168,3 +170,25 @@ it('retains outer-aware domain creation with no publication after rollback', fun
     expect(TestUser::query()->where('email', 'rolled-back@example.test')->exists())->toBeFalse();
     Event::assertNotDispatched(PrincipalChanged::class);
 });
+
+it('preflights logout before guard resolution and checks the resolved subject source', function (string $source): void {
+    $subject = $this->user();
+    $guard = Mockery::mock(StatefulGuard::class);
+    $session = Mockery::mock(Session::class);
+    if ($source === 'subject') {
+        config(['database.connections.logout_subject' => config('database.connections.'.config('database.default'))]);
+        $subject->setConnection('logout_subject');
+        $guard->shouldReceive('user')->once()->andReturn($subject);
+    } else {
+        $guard->shouldNotReceive('user');
+    }
+    $guard->shouldNotReceive('logout');
+    $session->shouldNotReceive('invalidate');
+    $connection = $subject->getConnection();
+    $connection->beginTransaction();
+    try {
+        expect(fn () => app(AuthenticationSessions::class)->logout($guard, $session))->toThrow(AuthException::class, 'enclosing source transaction');
+    } finally {
+        $connection->rollBack();
+    }
+})->with(['common', 'subject']);

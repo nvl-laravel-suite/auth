@@ -14,6 +14,7 @@ use Nvl\Auth\Services\AuthInvitations;
 use Nvl\Auth\Services\AuthPermissions;
 use Nvl\Auth\Services\AuthRoles;
 use Nvl\Auth\Services\DenySystemMutationAccess;
+use Nvl\Auth\Services\PrincipalEmailIdentity;
 use Nvl\Auth\Tests\Fixtures\HostRbacPrincipal;
 use Nvl\Auth\Tests\Fixtures\TestPermissionCatalog;
 use Nvl\Auth\Tests\Fixtures\TestRoleTemplates;
@@ -199,11 +200,13 @@ it('assigns host principal RBAC while principal management is disabled', functio
     config()->set('nvl-auth.features.rbac.services.permission_catalogs', [TestPermissionCatalog::class]);
     config()->set('nvl-auth.features.rbac.services.role_templates', [TestRoleTemplates::class]);
     app(AuthPermissions::class)->bootstrap(new SystemMutationContext('Test setup', 'host-rbac-setup'));
-    $principal = HostRbacPrincipal::query()->create([
+    $principal = (new HostRbacPrincipal)->forceFill([
         'name' => 'Host Principal',
         'email' => 'host-principal@example.test',
+        'email_identity_hash' => PrincipalEmailIdentity::key('host-principal@example.test'),
         'password' => 'not-used',
     ]);
+    $principal->save();
     Event::fake([RbacAssignmentChanged::class]);
 
     $updated = app(AuthRoles::class)->syncUserRoles(

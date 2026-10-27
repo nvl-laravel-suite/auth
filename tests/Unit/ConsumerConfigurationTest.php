@@ -50,7 +50,7 @@ it('exposes complete consumer validation rules and invitation registration data'
         ])
         ->and(AcceptInvitationData::rules())->toHaveKeys(['token', 'registrationMethod', 'password'])
         ->and(ConsumeMagicLinkData::rules())->toHaveKeys(['token', 'recipient', 'challengeId'])
-        ->and(DeleteOwnAccountData::rules())->toHaveKey('currentPassword')
+        ->and(DeleteOwnAccountData::rules())->toBe([])
         ->and(ApplyRoleTemplateData::rules())->toHaveKeys(['template', 'roleName'])
         ->and(InvitationIndexQueryData::rules())->toHaveKeys([
             'recipient',

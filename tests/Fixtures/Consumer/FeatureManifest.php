@@ -88,7 +88,7 @@ final class FeatureManifest
                 $readWrite,
                 [AuthFeature::Authentication],
                 ['public' => 'passwords', 'account' => 'passwords'],
-                ['public' => ['password.request', 'password.reset'], 'account' => ['password.update', 'password.confirm']],
+                ['public' => ['password.request', 'password.reset'], 'account' => ['password.update', 'password.confirm', 'reauthenticate']],
                 ['account' => [AuthFeature::Sessions]],
             ),
             new FeatureDefinition(

@@ -13,6 +13,7 @@ use Nvl\Auth\Contracts\AuthSchemaMigration;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Services\AuthSchemaManager;
+use Nvl\Auth\Services\PrincipalEmailIdentity;
 
 it('adds reversible invitation delivery outcome columns without changing existing rows', function (): void {
     $migration = authDeliveryOutcomeMigration();
@@ -288,11 +289,15 @@ it('fails closed when an enabled schema remains incomplete after repair', functi
     $schema = Mockery::mock(Builder::class);
     $schema->shouldReceive('hasTable')->andReturnTrue();
     $schema->shouldReceive('hasColumn')->with(AuthTables::PrincipalSecurityStates, Mockery::any())->andReturnTrue();
+    $schema->shouldReceive('hasColumn')->with(AuthTables::Users, 'email_identity_hash')->andReturnTrue();
     $schema->shouldReceive('hasColumn')->andReturnFalse();
     $schema->shouldReceive('hasColumns')->andReturnTrue();
     $schema->shouldReceive('getIndexes')->with(AuthTables::PrincipalSecurityStates)->andReturn([['name' => 'nvl_auth_principal_security_states_subject_unique', 'unique' => true, 'columns' => ['subject_type', 'subject_id']]]);
     $schema->shouldReceive('parseSchemaAndTable')->with(AuthTables::PrincipalSecurityStates)->andReturn([null, AuthTables::PrincipalSecurityStates]);
     $schema->shouldReceive('hasIndex')->with(AuthTables::PrincipalSecurityStates, 'nvl_auth_principal_security_states_subject_unique')->andReturnTrue();
+    $schema->shouldReceive('hasIndex')->with(AuthTables::Users, PrincipalEmailIdentity::INDEX)->andReturnTrue();
+    $schema->shouldReceive('getIndexes')->with(AuthTables::Users)->andReturn([['name' => PrincipalEmailIdentity::INDEX, 'unique' => true, 'columns' => ['email_identity_hash']]]);
+    $schema->shouldReceive('parseSchemaAndTable')->with(AuthTables::Users)->andReturn([null, AuthTables::Users]);
     $schema->shouldReceive('hasIndex')->andReturnFalse();
     $schema->shouldReceive('table')->atLeast()->once();
 

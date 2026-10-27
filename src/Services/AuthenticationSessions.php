@@ -158,9 +158,10 @@ final readonly class AuthenticationSessions
     {
         $this->features->assertAllowed(AuthFeature::Authentication, FeatureOperation::Revoke);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Revoke);
-        $this->assertCanTransition($guard->user());
-        $this->operations->central(AuthIdentityOperation::Logout);
+        $this->assertCanTransition();
         $subject = $guard->user();
+        $this->assertCanTransition($subject);
+        $this->operations->central(AuthIdentityOperation::Logout);
         $reference = $subject instanceof Authenticatable ? SubjectReference::fromAuthenticatable($subject) : null;
         $this->pipeline->run('logout', new AuthPipelineContext('logout', subject: $reference), function () use ($guard, $session, $reference, $subject): void {
             $this->assertCanTransition($subject);
