@@ -6,17 +6,24 @@ namespace Nvl\Auth\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
+use Nvl\Auth\Enums\AuthenticationDestination;
+use Nvl\Auth\Enums\AuthenticationMethod;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\SocialIdentity;
+use Nvl\Auth\Traits\IssuesAuthenticationProofs;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\ExternalIdentity;
+use Nvl\Auth\ValueObjects\IssuedAuthenticationProof;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Throwable;
 
@@ -27,8 +34,67 @@ use Throwable;
  */
 final readonly class AuthSocialIdentities
 {
+    use IssuesAuthenticationProofs;
+
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private SocialProviderConfiguration $configuration, private SocialIdentityProviderFactory $providerFactory, private AuthOperationBoundary $operations, private SocialSubjectResolver $subjects, private AuthSubjectResolver $authSubjects, private AuthAuditRecorder $audits, private SecretHasher $hasher, private PrincipalSecurity $security) {}
+    public function __construct(private FeatureGate $features, private SocialProviderConfiguration $configuration, private SocialIdentityProviderFactory $providerFactory, private AuthOperationBoundary $operations, private SocialSubjectResolver $subjects, private AuthSubjectResolver $authSubjects, private AuthAuditRecorder $audits, private SecretHasher $hasher, private PrincipalSecurity $security, private AuthIdentityChallenges $records) {}
+
+    /** Begin a browser-bound native social authentication, retaining SDK-owned OAuth state.
+     * @return array{url: string, intent: IssuedAuthenticationProof}
+     */
+    public function startAuthentication(string $provider, AuthenticationRequestContext $context): array
+    {
+        $context->assertBound(AuthenticationDestination::Session);
+        $url = $this->startAuthorization($provider);
+        $secret = bin2hex(random_bytes(32));
+        $this->records->create(['type' => 'social_authentication', 'purpose' => 'social_login', 'secret_hash' => $this->hasher->hash('native-social-intent', $secret),
+            'payload' => ['provider' => $provider, 'destination' => AuthenticationDestination::Session->value, 'context' => $context->facts()], 'max_attempts' => 1, 'expires_at' => CarbonImmutable::now('UTC')->addSeconds(300)]);
+
+        return ['url' => $url, 'intent' => new IssuedAuthenticationProof($secret)];
+    }
+
+    /** Acquire fresh provider claims only through a matching native browser intent. */
+    public function finishAuthentication(string $provider, #[\SensitiveParameter] string $intent, AuthenticationRequestContext $context): IssuedAuthenticationProof
+    {
+        $this->features->assertAllowed(AuthFeature::SocialIdentities, FeatureOperation::Use);
+        $this->operations->central(AuthIdentityOperation::SocialIdentity);
+        $context->assertBound(AuthenticationDestination::Session);
+        $snapshot = $this->records->query()->where('type', 'social_authentication')->where('secret_hash', $this->hasher->hash('native-social-intent', $intent))->first();
+        $facts = ['provider' => $provider, 'destination' => AuthenticationDestination::Session->value, 'context' => $context->facts()];
+        if (! $snapshot instanceof Challenge || ! $snapshot->isUsable() || $snapshot->payload !== $facts) {
+            throw new AuthException('authentication_proof_invalid', 'The social authentication intent is invalid or expired.', 422);
+        }
+        $identity = $this->verifiedExternalIdentity($provider);
+        $subject = $this->authorizationSubject($identity);
+        if (! $subject instanceof Model || $subject->getConnection() !== $snapshot->getConnection()) {
+            throw AuthException::invalidConfiguration('Social authentication requires one canonical source.');
+        }
+        $revision = $this->security->revisionSnapshot($subject);
+
+        return $subject->getConnection()->transaction(function () use ($subject, $identity, $provider, $snapshot, $facts, $context, $revision): IssuedAuthenticationProof {
+            $state = $this->security->lock($subject);
+            $this->security->lockChallenges($subject);
+            $challenge = $this->records->query()->whereKey($snapshot->identifier())->where('type', 'social_authentication')->lockForUpdate()->first();
+            if (! $challenge instanceof Challenge || ! $challenge->isUsable() || $challenge->payload !== $facts || $state->revision !== $revision) {
+                throw new AuthException('authentication_proof_invalid', 'The social authentication intent is invalid or expired.', 422);
+            }
+            $hash = $this->hasher->hash("social-identity-{$provider}", $identity->providerUserId);
+            $existing = SocialIdentity::query()->where('provider', $provider)->where('provider_user_id_hash', $hash)->lockForUpdate()->first();
+            $challenge->consumed_at = CarbonImmutable::now('UTC');
+            $this->records->save($challenge);
+            $linked = $this->link($subject, $identity);
+            $fresh = SocialIdentity::query()->whereKey($linked->identifier())->lockForUpdate()->first();
+            $expectedRevision = $revision + ($existing === null ? 1 : 0);
+            $reference = SubjectReference::fromAuthenticatable($subject);
+            if (! $fresh instanceof SocialIdentity || $fresh->revoked_at !== null || $fresh->subject_type !== $reference->type || $fresh->subject_id !== $reference->identifier
+                || $fresh->provider !== $provider || $fresh->provider_user_id_hash !== $hash || ($fresh->profile['issuer'] ?? null) !== $identity->issuer
+                || $this->security->lock($subject)->revision !== $expectedRevision) {
+                throw new AuthException('social_identity_unavailable', 'The social identity is unavailable.', 404);
+            }
+
+            return $this->issueNativeProof($subject, AuthenticationMethod::Social, AuthenticationDestination::Session, $context, $expectedRevision, provider: $provider);
+        });
+    }
 
     /**
      * Return the provider redirect URL.
@@ -60,6 +126,14 @@ final readonly class AuthSocialIdentities
     {
         $this->features->assertAllowed(AuthFeature::SocialIdentities, FeatureOperation::Use);
         $this->operations->central(AuthIdentityOperation::SocialIdentity, $subject);
+        $identity = $this->verifiedExternalIdentity($provider);
+
+        return $this->link($this->authorizationSubject($identity, $subject), $identity);
+    }
+
+    /** Network verification precedes native row locks, including inside a host transaction. */
+    private function verifiedExternalIdentity(string $provider): ExternalIdentity
+    {
         $configuration = $this->configuration->provider($provider);
         try {
             $identity = $this->providerFactory->make($provider)->user($provider, $configuration['callback_url']);
@@ -71,28 +145,34 @@ final readonly class AuthSocialIdentities
         if ($identity->provider !== $provider) {
             throw AuthException::invalidConfiguration('The social identity belongs to a different provider.');
         }
-        if ($subject === null) {
-            $hash = $this->hasher->hash("social-identity-{$provider}", $identity->providerUserId);
-            $existing = SocialIdentity::query()->where('provider', $provider)->where('provider_user_id_hash', $hash)->first();
-            if ($existing instanceof SocialIdentity) {
-                if ($existing->revoked_at !== null) {
-                    throw new AuthException('social_identity_unavailable', 'The social identity is unavailable.', 404);
-                }
-                $linkedSubject = $this->authSubjects->resolve(new SubjectReference($existing->subject_type, $existing->subject_id));
-                if ($linkedSubject === null) {
-                    throw new AuthException('social_identity_unavailable', 'The social identity is unavailable.', 404);
-                }
 
-                return $this->link($linkedSubject, $identity);
-            }
-            if ($identity->email === null || trim($identity->email) === '' || ! $identity->emailVerified) {
-                throw new AuthException('social_email_unverified', 'The social provider did not prove the returned email address.', 422);
-            }
+        return $identity;
+    }
+
+    /** Preserve existing host identity resolution while native finalizers retain proof provenance. */
+    private function authorizationSubject(ExternalIdentity $identity, ?Authenticatable $subject = null): Authenticatable
+    {
+        if ($subject !== null) {
+            return $subject;
         }
-        $resolvedSubject = $subject ?? $this->subjects->resolve($identity);
-        $record = $this->link($resolvedSubject, $identity);
+        $hash = $this->hasher->hash("social-identity-{$identity->provider}", $identity->providerUserId);
+        $existing = SocialIdentity::query()->where('provider', $identity->provider)->where('provider_user_id_hash', $hash)->first();
+        if ($existing instanceof SocialIdentity) {
+            if ($existing->revoked_at !== null) {
+                throw new AuthException('social_identity_unavailable', 'The social identity is unavailable.', 404);
+            }
+            $linkedSubject = $this->authSubjects->resolve(new SubjectReference($existing->subject_type, $existing->subject_id));
+            if ($linkedSubject === null) {
+                throw new AuthException('social_identity_unavailable', 'The social identity is unavailable.', 404);
+            }
 
-        return $record;
+            return $linkedSubject;
+        }
+        if ($identity->email === null || trim($identity->email) === '' || ! $identity->emailVerified) {
+            throw new AuthException('social_email_unverified', 'The social provider did not prove the returned email address.', 422);
+        }
+
+        return $this->subjects->resolve($identity);
     }
 
     /**

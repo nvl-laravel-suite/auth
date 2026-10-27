@@ -16,6 +16,7 @@ use Nvl\Auth\Tests\Fixtures\AllowAllSystemMutationAccess;
 use Nvl\Auth\Tests\Fixtures\Consumer\RouteServiceProvider;
 use Nvl\Auth\Tests\Fixtures\TestSubjectResolver;
 use Nvl\Auth\Tests\Fixtures\TestUser;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Support\Providers\LocaleServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Spatie\LaravelData\LaravelDataServiceProvider;
@@ -88,6 +89,12 @@ abstract class TestCase extends Orchestra
         $this->app->singleton(AuthManagementAccess::class, AllowAllManagementAccess::class);
         $this->app->singleton(AuthSubjectResolver::class, TestSubjectResolver::class);
         $this->app->singleton(SystemMutationAccess::class, AllowAllSystemMutationAccess::class);
+    }
+
+    /** Trusted browser binding for direct native service tests. */
+    protected function authenticationContext(): AuthenticationRequestContext
+    {
+        return new AuthenticationRequestContext(guardName: 'web', sessionBinding: app('session.store')->getId());
     }
 
     /**

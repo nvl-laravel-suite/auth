@@ -91,8 +91,8 @@ it('installs only enabled feature schema and safely installs later capabilities'
     $plan = app(AuthSchemaManager::class)->execute();
     $applied = app(AuthSchemaManager::class)->execute(true);
 
-    expect($plan['missing'])->toBe([AuthTables::Users, AuthTables::TotpCredentials])
-        ->and($applied['created'])->toBe([AuthTables::Users, AuthTables::TotpCredentials])
+    expect($plan['missing'])->toBe([AuthTables::Challenges, AuthTables::Users, AuthTables::TotpCredentials])
+        ->and($applied['created'])->toBe([AuthTables::Challenges, AuthTables::Users, AuthTables::TotpCredentials])
         ->and(Schema::hasTable(AuthTables::Users))->toBeTrue()
         ->and(Schema::hasTable(AuthTables::TotpCredentials))->toBeTrue()
         ->and(Schema::hasTable(AuthTables::Passkeys))->toBeFalse();

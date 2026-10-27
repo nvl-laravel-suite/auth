@@ -210,7 +210,7 @@ it('creates later-enabled delivery tables and applies their corrective schema', 
         $plan = app(AuthSchemaManager::class)->execute();
         $applied = app(AuthSchemaManager::class)->execute(true);
 
-        expect($plan['missing'])->toBe([AuthTables::Invitations, AuthTables::Challenges])
+        expect($plan['missing'])->toBe([AuthTables::Challenges, AuthTables::Invitations])
             ->and($applied['created'])->toBe($plan['missing'])
             ->and(Schema::hasColumn(AuthTables::Invitations, 'context_hash'))->toBeTrue()
             ->and(Schema::hasColumn(AuthTables::Challenges, 'secondary_secret_hash'))->toBeTrue();
@@ -287,13 +287,20 @@ it('fails closed when an enabled schema remains incomplete after repair', functi
 
     $schema = Mockery::mock(Builder::class);
     $schema->shouldReceive('hasTable')->andReturnTrue();
+    $schema->shouldReceive('hasColumn')->with(AuthTables::PrincipalSecurityStates, Mockery::any())->andReturnTrue();
     $schema->shouldReceive('hasColumn')->andReturnFalse();
+    $schema->shouldReceive('hasColumns')->andReturnTrue();
+    $schema->shouldReceive('getIndexes')->with(AuthTables::PrincipalSecurityStates)->andReturn([['name' => 'nvl_auth_principal_security_states_subject_unique', 'unique' => true, 'columns' => ['subject_type', 'subject_id']]]);
+    $schema->shouldReceive('parseSchemaAndTable')->with(AuthTables::PrincipalSecurityStates)->andReturn([null, AuthTables::PrincipalSecurityStates]);
+    $schema->shouldReceive('hasIndex')->with(AuthTables::PrincipalSecurityStates, 'nvl_auth_principal_security_states_subject_unique')->andReturnTrue();
     $schema->shouldReceive('hasIndex')->andReturnFalse();
-    $schema->shouldReceive('table')->times(11);
+    $schema->shouldReceive('table')->atLeast()->once();
 
     $connection = Mockery::mock(Connection::class)->shouldIgnoreMissing();
     $connection->shouldReceive('setReadWriteType')->andReturnSelf();
     $connection->shouldReceive('getSchemaBuilder')->andReturn($schema);
+    $connection->shouldReceive('getDriverName')->andReturn('stubborn_auth_schema');
+    $schema->shouldReceive('getConnection')->andReturn($connection);
 
     app('db')->extend(
         'stubborn_auth_schema',

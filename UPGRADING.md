@@ -11,3 +11,12 @@ Retired Tenancy configuration, model branches and automatic legacy-table convers
 Keep source-transaction committed audit and delivery listeners, native queued envelopes and explicit actor/metadata contracts. Rebuild configuration/event caches and restart workers after deployment. Physical absence of optional dependencies requires a clean consumer dependency resolution; a development suite vendor directory does not prove it.
 
 Map `users.manageCredentials` and `users.verifyEmail` explicitly in host management policies. Password edits or removal require the former; an explicit verified-email override requires the latter. An email change clears verification unless an authorized explicit override is supplied. Configure `features.password.services.policy` to replace the default new-password policy. Existing shorter credentials remain usable; bcrypt inputs over 72 bytes are always rejected. Password changes rotate native remember credentials without deleting unrelated application tokens or sessions.
+
+
+## Mandatory authentication proofs
+
+Apply `2026_10_27_000002_nvl_auth_ensure_authentication_challenges.php` under the existing migration owner. Native proof storage is mandatory even with magic links, security codes and TOTP disabled. Schema planning and Doctor require it. The forward migration intentionally repeats the frozen historical challenge definition so historical migrations remain unchanged; SchemaManager uses this same current creation/repair path. Existing business records survive, partial unsafe schemas require a data-preserving host migration, and host-owned migration mode never applies DDL automatically.
+
+Replace removed `AuthenticationSessions::establish` / `establishForPurpose` with native proof-backed completion. Legacy/generic login links cannot be promoted; request fresh native authentication links. Email request methods now require trusted browser/guard context. Passkey begin requires context and finish returns a proof. Social browser login uses `startAuthentication` / `finishAuthentication`; existing account link management remains separate. See [method and continuation examples](docs/php-api.md#proof-backed-completion).
+
+Enrolled MFA is mandatory across all login methods, including when TOTP is disabled. Restore an available enrolled/recovery method instead of relying on the feature flag to erase the requirement. Configure additional class-based assurance via `features.authentication.services.assurance`; consumers retain routes, requests, responses, delivery, UI and owner authorization.

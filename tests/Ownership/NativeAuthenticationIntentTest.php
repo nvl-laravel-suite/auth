@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Enums\OwnerAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\TotpCredential;
+use Nvl\Auth\Services\EnrolledFactorAssurancePolicy;
 use Nvl\Auth\Services\OwnerAuthenticationIntents;
 use Nvl\Auth\Tests\Fixtures\AuthOwnerScenario;
 
@@ -52,4 +54,14 @@ it('keeps same-browser concurrent flows independent', function (): void {
         ->toBe($scenario->b()->scopeKey())
         ->and($intents->consume($a['nonce'], OwnerAuthenticationPurpose::Login, 'flow-a', $scenario->a())->scopeKey())
         ->toBe($scenario->a()->scopeKey());
+});
+
+it('retains central enrolled MFA requirements under either ambient owner scope', function (): void {
+    $scenario = new AuthOwnerScenario;
+    $user = $this->user();
+    TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
+    config(['nvl-auth.features.totp.enabled' => false]);
+    $policy = app(EnrolledFactorAssurancePolicy::class);
+    expect($scenario->run($scenario->a(), fn () => $policy->requiresSecondFactor($user)))->toBeTrue()
+        ->and($scenario->run($scenario->b(), fn () => $policy->requiresSecondFactor($user)))->toBeTrue();
 });

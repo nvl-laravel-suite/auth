@@ -56,9 +56,22 @@ final readonly class AuthPipeline
             $stages[] = $stage;
         }
 
-        return (new Pipeline($this->container))
+        $calls = 0;
+        $result = (new Pipeline($this->container))
             ->send($context)
             ->through($stages)
-            ->then($terminal);
+            ->then(function (AuthPipelineContext $received) use ($terminal, $context, &$calls): mixed {
+                $calls++;
+                if ($calls !== 1 || $received !== $context) {
+                    throw new AuthException('pipeline_invalid', 'The native pipeline terminal must be invoked exactly once with its original context.', 422);
+                }
+
+                return $terminal($context);
+            });
+        if ($calls !== 1) {
+            throw new AuthException('pipeline_invalid', 'The native pipeline terminal must be invoked exactly once.', 422);
+        }
+
+        return $result;
     }
 }

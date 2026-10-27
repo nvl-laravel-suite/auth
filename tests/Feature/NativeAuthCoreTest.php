@@ -9,8 +9,11 @@ use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\Event;
 use Nvl\Auth\Contracts\ApiTokenManager;
+use Nvl\Auth\Contracts\AuthenticationAssurancePolicy;
 use Nvl\Auth\Contracts\AuthPipelineStage;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
+use Nvl\Auth\Enums\AuthenticationDestination;
+use Nvl\Auth\Enums\AuthenticationMethod;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Events\AuthenticationRejected;
@@ -22,12 +25,16 @@ use Nvl\Auth\Models\User;
 use Nvl\Auth\Results\IssuedApiToken;
 use Nvl\Auth\Services\AuthChallenges;
 use Nvl\Auth\Services\Authentication;
+use Nvl\Auth\Services\AuthenticationProofs;
 use Nvl\Auth\Services\AuthenticationSessions;
 use Nvl\Auth\Services\AuthSecondFactor;
 use Nvl\Auth\Services\AuthTokens;
 use Nvl\Auth\Tests\Fixtures\RejectLoginStage;
+use Nvl\Auth\Traits\IssuesAuthenticationProofs;
+use Nvl\Auth\ValueObjects\AuthenticationEvidence;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
+use Nvl\Auth\ValueObjects\IssuedAuthenticationProof;
 use PragmaRX\Google2FA\Google2FA;
 
 it('preserves host and runtime hidden attributes alongside mapped authentication secrets', function (): void {
@@ -53,7 +60,7 @@ it('publishes explicit native credential and session contracts', function (): vo
     foreach ([
         [Authentication::class, 'verifyCredentials', ['array'], Authenticatable::class],
         [Authentication::class, 'login', ['array', 'array', StatefulGuard::class, Session::class, 'array'], Authenticatable::class],
-        [AuthenticationSessions::class, 'establish', [Authenticatable::class, StatefulGuard::class, Session::class, 'bool'], 'void'],
+        [AuthenticationSessions::class, 'establishFromProof', ['string', StatefulGuard::class, Session::class, AuthenticationRequestContext::class, 'bool'], Authenticatable::class],
     ] as [$class, $method, $parameters, $return]) {
         $reflection = new ReflectionMethod($class, $method);
         expect(array_map(static fn (ReflectionParameter $parameter): string => (string) $parameter->getType(), $reflection->getParameters()))->toBe($parameters)
@@ -380,6 +387,8 @@ it('rejects stateful credential identity eligibility and password changes after 
 it('rejects stale eligibility and principal substitution during passwordless session establishment', function (bool $substitute): void {
     $user = $this->user();
     $other = $this->user('session-other@example.test');
+    $context = $this->authenticationContext();
+    $proof = app(Authentication::class)->proveCredentials(['identifier' => $user->email, 'password' => 'correct-password'], $context);
     if ($substitute) {
         nativeStatelessStage(function (AuthPipelineContext $context, Closure $next) use ($other): Authenticatable {
             $next($context);
@@ -389,7 +398,7 @@ it('rejects stale eligibility and principal substitution during passwordless ses
     } else {
         $user->newQuery()->whereKey($user->id)->update(['is_active' => false]);
     }
-    expect(fn () => app(AuthenticationSessions::class)->establish($user, auth()->guard('web'), app('session.store')))
+    expect(fn () => app(AuthenticationSessions::class)->establishFromProof($proof->reveal(), auth()->guard('web'), app('session.store'), $context))
         ->toThrow(AuthException::class)
         ->and(auth()->guard('web')->check())->toBeFalse()
         ->and(AuthAudit::query()->where('action', 'authentication.succeeded')->count())->toBe(0);
@@ -493,3 +502,29 @@ it('enforces native factor attempts and one use across stale session snapshots',
         ->and($login->hasPendingSecondFactor($session))->toBeFalse();
     expect(app(AuthSecondFactor::class)->consumeRecoveryCode($user, ['code' => $recovery->codes[1]])->used_at)->not->toBeNull();
 })->with(['consumed continuation' => true, 'attempt budget' => false]);
+
+it('rejects skipped or repeated native login terminal calls', function (string $mode): void {
+    $user = $this->user();
+    nativeStatelessStage(function (AuthPipelineContext $context, Closure $next) use ($user, $mode): mixed {
+        if ($mode === 'skip') {
+            return $user;
+        }
+        $next($context);
+
+        return $next($context);
+    });
+    expect(fn () => app(Authentication::class)->loginWithToken(['identifier' => $user->email, 'password' => 'correct-password'], ['name' => 'Rejected', 'abilities' => ['profile:read']]))->toThrow(AuthException::class);
+    expect($user->tokens()->count())->toBe(0);
+})->with(['skip', 'double']);
+
+it('publishes native proof contracts and complete credential operations without internal issuance or bare establishment', function (): void {
+    $catalog = json_decode(file_get_contents(__DIR__.'/../../resources/consumer-api.json'), true, flags: JSON_THROW_ON_ERROR)['symbols'];
+    foreach ([Authentication::class, AuthenticationSessions::class, AuthenticationRequestContext::class, AuthenticationProofs::class, AuthenticationAssurancePolicy::class, AuthenticationMethod::class, AuthenticationDestination::class, AuthenticationEvidence::class, IssuedAuthenticationProof::class] as $symbol) {
+        expect($catalog)->toHaveKey($symbol);
+    }
+    expect($catalog[Authentication::class]['methods'])->toContain('login', 'loginWithToken', 'proveCredentials', 'proveCredentialsForToken')
+        ->and($catalog[AuthenticationSessions::class]['methods'])->toContain('establishFromProof')->not->toContain('establish', 'establishForPurpose')
+        ->and($catalog[Authentication::class]['methods'])->not->toContain('passwordProof', 'issueNativeProof')
+        ->and($catalog[AuthenticationProofs::class]['methods'])->not->toContain('recheck')
+        ->and($catalog)->not->toHaveKey(IssuesAuthenticationProofs::class);
+});

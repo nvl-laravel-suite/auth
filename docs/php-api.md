@@ -9,14 +9,16 @@ public function loginWithToken(#[SensitiveParameter] array $credentials, array $
 public function login(#[SensitiveParameter] array $credentials, array $context, StatefulGuard $guard, Session $session, #[SensitiveParameter] array $factorProof = []): Authenticatable;
 public function hasPendingSecondFactor(Session $session): bool;
 public function completeSecondFactor(#[SensitiveParameter] array $factorProof, StatefulGuard $guard, Session $session): Authenticatable;
-public function verifyCredentials( #[SensitiveParameter] array $credentials ): Authenticatable;
+public function verifyCredentials(#[SensitiveParameter] array $credentials): Authenticatable;
+public function proveCredentials(#[SensitiveParameter] array $credentials, AuthenticationRequestContext $context): IssuedAuthenticationProof;
+public function proveCredentialsForToken(#[SensitiveParameter] array $credentials, AuthenticationRequestContext $context): IssuedAuthenticationProof;
 ```
 
 `loginWithToken()` is the complete stateless password operation. Credentials contain
 `identifier` and `password`; token input contains `name`, `abilities` and optional
 `expiresAt` (`CarbonImmutable|null`). Context accepts `ipAddress`, `userAgent` and
 `requestId`. Supply either `code` or `recoveryCode` in factor proof when the
-principal has an enrolled factor and TOTP is enabled. The result is
+principal has an enrolled required factor. Disabling TOTP does not remove enrollment; unavailable factor methods fail closed. The result is
 `array{subject: Authenticatable, token: IssuedApiToken}`.
 
 The operation runs native eligibility, factor proof, the login pipeline, canonical
@@ -39,14 +41,12 @@ password is retained. The host can show its factor form when
 the proof and the same guard/session. Password changes, disabled principals,
 expired/consumed challenges and pipeline identity substitution fail closed.
 
-TOTP with browser Sessions now requires the existing challenge table even when
-Magic Links and Security Codes are disabled. Native schema planning, installation
-and repair include that feature dependency; no new table shape is introduced.
+Native authentication proof storage is mandatory even with all optional delivery/factor methods disabled. The forward proof-storage migration installs the existing challenge shape; historical migrations remain unchanged.
 
 ## AuthenticationSessions
 
 ```php
-public function establishForPurpose(Authenticatable $principal, StatefulGuard $guard, Session $session, AuthenticationPurpose $purpose, AuthenticationRequestContext $requestContext, bool $remember = false): void;
+public function establishFromProof(#[SensitiveParameter] string $proof, StatefulGuard $guard, Session $session, AuthenticationRequestContext $context, bool $remember = false): Authenticatable;
 public function logout(StatefulGuard $guard, Session $session): void;
 ```
 
@@ -57,11 +57,13 @@ public function consume(AuthFeature $feature, AuthMessageType $messageType, stri
 public function consumeById(AuthFeature $feature, AuthMessageType $messageType, string $challengeId, string $purpose, string $secret): Challenge;
 public function consumeMagicLink(array $data, string $purpose = 'login'): Challenge;
 public function requestMagicLink(array $data, ?SubjectReference $subject = null, array $payload = [], ?string $locale = null): array;
-public function requestMagicLinkAuthentication(array $data, ?string $locale = null): ?array;
+public function requestMagicLinkAuthentication(array $data, AuthenticationRequestContext $context, ?string $locale = null): ?array;
+public function consumeMagicLinkAuthentication(#[SensitiveParameter] array $data, AuthenticationRequestContext $context): IssuedAuthenticationProof;
 public function requestSecurityCode(array $data, ?SubjectReference $subject = null, array $payload = [], ?string $locale = null): array;
-public function requestSecurityCodeAuthentication(array $data, ?string $locale = null): ?array;
+public function requestSecurityCodeAuthentication(array $data, AuthenticationRequestContext $context, ?string $locale = null): ?array;
+public function proveSecurityCodeAuthentication(#[SensitiveParameter] array $data, AuthenticationRequestContext $context): IssuedAuthenticationProof;
 public function verifySecurityCode(array $data): Challenge;
-public function verifySecurityCodeAuthentication(array $data, StatefulGuard $guard, Session $session): Challenge;
+public function verifySecurityCodeAuthentication(#[SensitiveParameter] array $data, StatefulGuard $guard, Session $session, AuthenticationRequestContext $context): Authenticatable;
 ```
 
 ## AuthPasswords
@@ -237,6 +239,7 @@ public function revokeRecoveryCodes(Authenticatable $subject): int;
 ## AuthPasskeys
 
 ```php
+public function beginAuthentication(?Authenticatable $subject = null, ?OwnerReference $owner = null, ?string $sessionBinding = null, ?AuthenticationRequestContext $context = null): PasskeyCeremonyOptions;
 public function beginRegistration(Authenticatable $subject): PasskeyCeremonyOptions;
 public function finishAuthentication( array $data, ?OwnerReference $requestedOwner = null, ?string $sessionBinding = null, ): array;
 public function finishRegistration( Authenticatable $subject, array $data, ): Passkey;
@@ -246,9 +249,33 @@ public function revoke(Authenticatable $subject, Passkey $passkey): Passkey;
 ## AuthSocialIdentities
 
 ```php
+public function startAuthentication(string $provider, AuthenticationRequestContext $context): array;
+public function finishAuthentication(string $provider, #[SensitiveParameter] string $intent, AuthenticationRequestContext $context): IssuedAuthenticationProof;
 public function completeAuthorization(string $provider, ?Authenticatable $subject = null): SocialIdentity;
 public function link(Authenticatable $subject, ExternalIdentity $identity): SocialIdentity;
 public function revoke(Authenticatable $subject, SocialIdentity $identity): SocialIdentity;
 ```
 
-`AuthenticationSessions::establishForPurpose` is an internal orchestration seam for proved passwordless/social authentication. Its explicit AuthenticationPurpose and bounded AuthenticationRequestContext select the correct eligibility policy once; it is not an HTTP input selector.
+## Proof-backed completion
+
+Raw-principal `establish` and `establishForPurpose` are removed. Use complete `login` / `loginWithToken`, or optionally compose native verified proof initiation and completion:
+
+```php
+$context = new AuthenticationRequestContext(
+    guardName: 'web', sessionBinding: $request->session()->getId(),
+);
+$proof = $authentication->proveCredentials($credentials, $context);
+$subject = $sessions->establishFromProof(
+    $proof->reveal(), $guard, $request->session(), $context,
+);
+```
+
+Context is trusted host transport, never credential input. Preserve it from email request to redemption and from passkey/social initiation to completion. Passkey completion returns `subject`, `proof` and native `requestContext`; use that returned context. Social initiation returns `url` and redacted `intent`; retain the intent and context in the initiating browser session, and use `finishAuthentication` after SDK-managed OAuth state validation. Generic delivery challenges and social identity models cannot authenticate.
+
+For enrolled principals, password, email link/code, ordinary social and non-UV passkeys require the same second-factor continuation. Native verified UV passkeys satisfy MFA. Handle `second_factor_required` with the host factor form, then call `Authentication::completeSecondFactor($factorProof, $guard, $session)`. Final verified authentication proofs/continuations expire after 300 seconds and share five failed factor attempts. Primary email delivery retains its configured digits/fallback digits, TTL and primary attempt limit; those settings do not change final proof/MFA limits. TOTP or recovery follows valid primary proof; recovery is never a primary login method. A custom `AuthenticationAssurancePolicy` can add requirements but cannot disable native enrollment enforcement.
+
+For optional stateless composition, supply a trusted `tokenNamespace` and a cryptographically random `flowNonce` of at least 32 characters to `proveCredentialsForToken`, then call `AuthTokens::authenticateFromProof($proof->reveal(), $token, $context)`. Token operations never inspect browser state. Session and token proofs reject each other's destination and reject changed guard, browser, owner intent, namespace or nonce.
+
+Only `IssuedAuthenticationProof::reveal()` discloses the bearer. Debug output is redacted; JSON/PHP serialization throws. Hooks receive method, subject and bounded operation attributes, never credentials, factor codes, proof bearers or password fingerprints. Exactly one terminal invocation with the original context is required. Native canonical/password/revision/enrollment checks surround consumer hooks.
+
+Successful proof consumption precedes configurable login/token pipelines. A later ordinary pipeline rejection leaves it consumed; explicit outer token rollback restores all transaction-participating proof/token/fact state atomically. Complete browser guard transitions outside host domain transactions.

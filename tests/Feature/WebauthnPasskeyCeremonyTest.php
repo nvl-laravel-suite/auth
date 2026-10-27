@@ -57,13 +57,12 @@ it('registers and authenticates a real ES256 WebAuthn credential end to end', fu
         $user,
         ['ceremonyId' => $registration->ceremonyId, 'response' => $authenticator->registrationResponse($registration->options), 'name' => 'Platform authenticator']
     );
-    $authentication = app(AuthPasskeys::class)->beginAuthentication();
+    $authentication = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
     $completed = app(AuthPasskeys::class)->finishAuthentication(
         ['ceremonyId' => $authentication->ceremonyId, 'response' => $authenticator->authenticationResponse(
             $authentication->options,
             $registration->options['user']['id']
-        )]
-    );
+        )], sessionBinding: app('session.store')->getId());
 
     expect($passkey->credential_id)->toBe($authenticator->credentialId())
         ->and($passkey->transports)->toBe(['internal'])
@@ -81,10 +80,9 @@ it('supports subject-scoped assertions without a returned user handle', function
         $user,
         ['ceremonyId' => $registration->ceremonyId, 'response' => $authenticator->registrationResponse($registration->options)]
     );
-    $authentication = app(AuthPasskeys::class)->beginAuthentication($user);
+    $authentication = app(AuthPasskeys::class)->beginAuthentication($user, context: $this->authenticationContext());
     $completed = app(AuthPasskeys::class)->finishAuthentication(
-        ['ceremonyId' => $authentication->ceremonyId, 'response' => $authenticator->authenticationResponse($authentication->options, null)]
-    );
+        ['ceremonyId' => $authentication->ceremonyId, 'response' => $authenticator->authenticationResponse($authentication->options, null)], sessionBinding: app('session.store')->getId());
 
     expect($authentication->options['allowCredentials'])->toHaveCount(1)
         ->and($completed['subject']->identifier)->toBe((string) $user->getKey());
@@ -98,14 +96,13 @@ it('accepts authenticators that do not implement signature counters', function (
         $user,
         ['ceremonyId' => $registration->ceremonyId, 'response' => $authenticator->registrationResponse($registration->options)]
     );
-    $authentication = app(AuthPasskeys::class)->beginAuthentication();
+    $authentication = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
     $completed = app(AuthPasskeys::class)->finishAuthentication(
         ['ceremonyId' => $authentication->ceremonyId, 'response' => $authenticator->authenticationResponse(
             $authentication->options,
             $registration->options['user']['id'],
             signatureCounter: 0,
-        )]
-    );
+        )], sessionBinding: app('session.store')->getId());
 
     expect($completed['subject']->identifier)->toBe((string) $user->getKey())
         ->and($passkey->refresh()->signature_counter)->toBe(0);
@@ -119,7 +116,7 @@ it('rejects wrong origins and invalid assertion signatures behind stable errors'
         $user,
         ['ceremonyId' => $registration->ceremonyId, 'response' => $authenticator->registrationResponse($registration->options)]
     );
-    $wrongOrigin = app(AuthPasskeys::class)->beginAuthentication();
+    $wrongOrigin = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
 
     try {
         app(AuthPasskeys::class)->finishAuthentication(
@@ -127,8 +124,7 @@ it('rejects wrong origins and invalid assertion signatures behind stable errors'
                 $wrongOrigin->options,
                 $registration->options['user']['id'],
                 origin: 'https://attacker.example',
-            )]
-        );
+            )], sessionBinding: app('session.store')->getId());
 
         throw new RuntimeException('The wrong WebAuthn origin was accepted.');
     } catch (AuthException $exception) {
@@ -136,18 +132,17 @@ it('rejects wrong origins and invalid assertion signatures behind stable errors'
             ->and($exception->getMessage())->not->toContain('origin');
     }
 
-    $invalidSignature = app(AuthPasskeys::class)->beginAuthentication();
+    $invalidSignature = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
 
     expect(fn () => app(AuthPasskeys::class)->finishAuthentication(
         ['ceremonyId' => $invalidSignature->ceremonyId, 'response' => $authenticator->authenticationResponse(
             $invalidSignature->options,
             $registration->options['user']['id'],
             validSignature: false,
-        )]
-    ))->toThrow(
-        AuthException::class,
-        'The passkey assertion was rejected.',
-    );
+        )], sessionBinding: app('session.store')->getId()))->toThrow(
+            AuthException::class,
+            'The passkey assertion was rejected.',
+        );
 });
 
 it('rejects invalid challenges RP hashes and required user verification', function (): void {
@@ -175,15 +170,14 @@ it('rejects invalid challenges RP hashes and required user verification', functi
         ['relyingPartyIdOverride' => 'attacker.example'],
         ['userVerified' => false],
     ] as $overrides) {
-        $authentication = app(AuthPasskeys::class)->beginAuthentication();
+        $authentication = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
 
         expect(fn () => app(AuthPasskeys::class)->finishAuthentication(
             ['ceremonyId' => $authentication->ceremonyId, 'response' => $authenticator->authenticationResponse(
                 $authentication->options,
                 $registration->options['user']['id'],
                 ...$overrides,
-            )]
-        ))->toThrow(AuthException::class, 'The passkey assertion was rejected.');
+            )], sessionBinding: app('session.store')->getId()))->toThrow(AuthException::class, 'The passkey assertion was rejected.');
     }
 });
 
@@ -223,6 +217,7 @@ it('serves the complete built-in registration and authentication HTTP flow', fun
     $authentication = $this->postJson('/nvl/api/v1/auth/passkeys/authentication/options')
         ->assertOk()
         ->assertJsonPath('code', 'passkey_authentication_started');
+    $this->withCredentials()->withCookie(config('session.cookie'), app('session.store')->getId());
     $authenticationOptions = $authentication->json('data.options');
     $authenticationId = $authentication->json('data.ceremony_id');
 

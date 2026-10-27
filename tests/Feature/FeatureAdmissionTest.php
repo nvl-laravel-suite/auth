@@ -35,7 +35,7 @@ it('fails a representative Action for every disabled feature before database acc
         AuthFeature::RecoveryCodes->value => fn () => app(AuthSecondFactor::class)->regenerateRecoveryCodes($user),
         AuthFeature::SocialIdentities->value => fn () => app(AuthSocialIdentities::class)->startAuthorization('github'),
         AuthFeature::Clients->value => fn () => app(AuthClients::class)->start(['clientId' => '00000000-0000-0000-0000-000000000000', 'flow' => 'login', 'returnPath' => '/']),
-        AuthFeature::Sessions->value => fn () => app(AuthenticationSessions::class)->establish($user, auth()->guard('web'), app('session')->driver()),
+        AuthFeature::Sessions->value => fn () => app(AuthenticationSessions::class)->establishFromProof(str_repeat('a', 64), auth()->guard('web'), app('session')->driver(), $this->authenticationContext()),
         AuthFeature::ApiTokens->value => fn () => app(AuthTokens::class)->all($user),
         AuthFeature::Rbac->value => fn () => app(AuthPermissions::class)->synchronizeCatalog($user),
         AuthFeature::Audit->value => fn () => app(AuthAuditReader::class)->paginate($user),

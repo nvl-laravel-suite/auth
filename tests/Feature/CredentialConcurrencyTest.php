@@ -223,8 +223,8 @@ it('verifies passkey assertions outside principal and challenge locks', function
     $service = app(AuthPasskeys::class);
     $options = $service->beginRegistration($user);
     $service->finishRegistration($user, ['ceremonyId' => $options->ceremonyId, 'response' => ['valid' => true]]);
-    $options = $service->beginAuthentication($user);
-    $service->finishAuthentication(['ceremonyId' => $options->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2]]);
+    $options = $service->beginAuthentication($user, context: $this->authenticationContext());
+    $service->finishAuthentication(['ceremonyId' => $options->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2]], sessionBinding: app('session.store')->getId());
 });
 
 it('invalidates native authentication challenges while preserving business challenges', function (): void {
@@ -281,11 +281,11 @@ it('rejects a passkey resolver that returns a different canonical principal', fu
     $service = app(AuthPasskeys::class);
     $registration = $service->beginRegistration($user);
     $service->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]]);
-    $options = $service->beginAuthentication($user);
+    $options = $service->beginAuthentication($user, context: $this->authenticationContext());
     $resolver = Mockery::mock(AuthSubjectResolver::class);
     $resolver->shouldReceive('resolve')->andReturn($other);
     app()->instance(AuthSubjectResolver::class, $resolver);
-    expect(fn () => app(AuthPasskeys::class)->finishAuthentication(['ceremonyId' => $options->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2]]))->toThrow(AuthException::class);
+    expect(fn () => app(AuthPasskeys::class)->finishAuthentication(['ceremonyId' => $options->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2]], sessionBinding: app('session.store')->getId()))->toThrow(AuthException::class);
 });
 
 it('enforces one persisted security state per canonical subject', function (): void {
@@ -310,12 +310,12 @@ it('takes a read-only passkey snapshot before provider verification inside a hos
     if (! $hasState) {
         PrincipalSecurityState::query()->delete();
     }
-    $authentication = $service->beginAuthentication($user);
+    $authentication = $service->beginAuthentication($user, context: $this->authenticationContext());
     DB::beginTransaction();
     try {
         DB::connection()->flushQueryLog();
         DB::connection()->enableQueryLog();
-        $result = $service->finishAuthentication(['ceremonyId' => $authentication->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2]]);
+        $result = $service->finishAuthentication(['ceremonyId' => $authentication->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2]], sessionBinding: app('session.store')->getId());
         expect($result['subject']->identifier)->toBe((string) $user->getKey())
             ->and(DB::connection()->transactionLevel())->toBe(1)
             ->and($passkey->refresh()->signature_counter)->toBe(2);
@@ -344,10 +344,10 @@ it('rejects passkey revision or credential drift after provider verification in 
     $service = app(AuthPasskeys::class);
     $registration = $service->beginRegistration($user);
     $passkey = $service->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]]);
-    $authentication = $service->beginAuthentication($user);
+    $authentication = $service->beginAuthentication($user, context: $this->authenticationContext());
     DB::beginTransaction();
     try {
-        expect(fn () => $service->finishAuthentication(['ceremonyId' => $authentication->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2]]))->toThrow(AuthException::class, 'unavailable');
+        expect(fn () => $service->finishAuthentication(['ceremonyId' => $authentication->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2]], sessionBinding: app('session.store')->getId()))->toThrow(AuthException::class, 'unavailable');
         expect($passkey->refresh()->signature_counter)->toBe(1)
             ->and(Challenge::query()->where('type', 'passkey_authentication')->sole()->consumed_at)->toBeNull();
     } finally {

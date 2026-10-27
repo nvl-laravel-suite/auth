@@ -13,13 +13,17 @@ use Illuminate\Support\Facades\Validator;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
+use Nvl\Auth\Enums\AuthenticationDestination;
+use Nvl\Auth\Enums\AuthenticationMethod;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\OwnerAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\Passkey;
+use Nvl\Auth\Traits\IssuesAuthenticationProofs;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
+use Nvl\Auth\ValueObjects\IssuedAuthenticationProof;
 use Nvl\Auth\ValueObjects\PasskeyCeremonyOptions;
 use Nvl\Auth\ValueObjects\PasskeyCredential;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -33,15 +37,25 @@ use Throwable;
  */
 final readonly class AuthPasskeys
 {
+    use IssuesAuthenticationProofs;
+
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthConfiguration $configuration, private Container $container, private SecretHasher $hasher, private AuthAuditRecorder $audits, private OwnerAuthenticationChallengeIntents $ownerIntents, private PasskeyInputValidator $input, private PrincipalSecurity $security, private AuthSubjectResolver $subjects) {}
+    public function __construct(private FeatureGate $features, private AuthConfiguration $configuration, private Container $container, private SecretHasher $hasher, private AuthAuditRecorder $audits, private OwnerAuthenticationChallengeIntents $ownerIntents, private PasskeyInputValidator $input, private PrincipalSecurity $security, private AuthSubjectResolver $subjects, private AuthIdentityChallenges $records) {}
 
     /**
      * Begin one passkey authentication ceremony.
      */
-    public function beginAuthentication(?Authenticatable $subject = null, ?OwnerReference $owner = null, ?string $sessionBinding = null): PasskeyCeremonyOptions
+    public function beginAuthentication(?Authenticatable $subject = null, ?OwnerReference $owner = null, ?string $sessionBinding = null, ?AuthenticationRequestContext $context = null): PasskeyCeremonyOptions
     {
         $this->features->assertAllowed(AuthFeature::Passkeys, FeatureOperation::Use);
+        if ($context === null) {
+            throw new AuthException('authentication_binding_invalid', 'A trusted authentication binding is required.', 422);
+        }
+        $context->assertBound(AuthenticationDestination::Session);
+        if ($sessionBinding !== null && $sessionBinding !== $context->sessionBinding) {
+            throw new AuthException('authentication_binding_invalid', 'The browser binding does not match.', 422);
+        }
+        $sessionBinding = $context->sessionBinding;
         $reference = $subject instanceof Authenticatable ? SubjectReference::fromAuthenticatable($subject) : null;
         $credentialIds = [];
         if ($reference instanceof SubjectReference) {
@@ -56,8 +70,8 @@ final readonly class AuthPasskeys
             throw new AuthException('passkey_provider_unavailable', 'The passkey ceremony could not be started.', 502, previous: $exception);
         }
         $connection = (new Challenge)->getConnectionName();
-        DB::connection($connection)->transaction(function () use ($options, $reference, $subject, $owner, $sessionBinding): void {
-            $challenge = Challenge::query()->create(['type' => 'passkey_authentication', 'purpose' => 'passkey_authentication', 'subject_type' => $reference?->type, 'subject_id' => $reference?->identifier, 'secret_hash' => $this->hasher->hash('passkey-ceremony', $options->ceremonyId), 'payload' => $options->state, 'max_attempts' => 1, 'expires_at' => $options->expiresAt]);
+        DB::connection($connection)->transaction(function () use ($options, $reference, $subject, $owner, $sessionBinding, $context): void {
+            $challenge = $this->records->create(['type' => 'passkey_authentication', 'purpose' => 'passkey_authentication', 'subject_type' => $reference?->type, 'subject_id' => $reference?->identifier, 'secret_hash' => $this->hasher->hash('passkey-ceremony', $options->ceremonyId), 'payload' => [...$options->state, '_native_context' => $context->facts(), '_native_destination' => AuthenticationDestination::Session->value], 'max_attempts' => 1, 'expires_at' => $options->expiresAt]);
             $this->ownerIntents->attach($challenge, $owner, $sessionBinding, OwnerAuthenticationPurpose::PasskeyLogin, 'passkey', $reference);
             $this->audits->record('passkey.authentication_started', subject: $reference, actor: $subject, metadata: ['challenge_id' => $challenge->identifier()]);
         }, 3);
@@ -87,7 +101,7 @@ final readonly class AuthPasskeys
         }
         $connection = (new Challenge)->getConnectionName();
         DB::connection($connection)->transaction(function () use ($options, $reference, $subject): void {
-            $challenge = Challenge::query()->create(['type' => 'passkey_registration', 'purpose' => 'passkey_registration', 'subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'secret_hash' => $this->hasher->hash('passkey-ceremony', $options->ceremonyId), 'payload' => $options->state, 'max_attempts' => 1, 'expires_at' => $options->expiresAt]);
+            $challenge = $this->records->create(['type' => 'passkey_registration', 'purpose' => 'passkey_registration', 'subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'secret_hash' => $this->hasher->hash('passkey-ceremony', $options->ceremonyId), 'payload' => $options->state, 'max_attempts' => 1, 'expires_at' => $options->expiresAt]);
             $this->audits->record('passkey.registration_started', subject: $reference, actor: $subject, metadata: ['challenge_id' => $challenge->identifier()]);
         }, 3);
 
@@ -96,7 +110,7 @@ final readonly class AuthPasskeys
 
     /** Verify a browser ceremony and recover only its server-owned tenant context.
      * @param  array<string, mixed>  $data
-     * @return array{subject: SubjectReference, requestContext: AuthenticationRequestContext|null}
+     * @return array{subject: SubjectReference, proof: IssuedAuthenticationProof, requestContext: AuthenticationRequestContext}
      */
     public function finishAuthentication(#[\SensitiveParameter] array $data, ?OwnerReference $requestedOwner = null, ?string $sessionBinding = null): array
     {
@@ -108,17 +122,26 @@ final readonly class AuthPasskeys
 
     /** Native Auth operation.
      * @param  array<string, mixed>  $data
-     * @return array{subject: SubjectReference, requestContext: AuthenticationRequestContext|null}
+     * @return array{subject: SubjectReference, proof: IssuedAuthenticationProof, requestContext: AuthenticationRequestContext}
      */
     private function finishAuthenticationFinish(#[\SensitiveParameter] array $data, ?OwnerReference $requestedOwner = null, ?string $sessionBinding = null): array
     {
         $data = $this->validateFinishPasskeyAuthentication($data);
         $this->input->validate($data['ceremonyId'], $data['response']);
         $connection = (new Challenge)->getConnectionName();
-        $snapshot = Challenge::query()->where('type', 'passkey_authentication')->where('secret_hash', $this->hasher->hash('passkey-ceremony', $data['ceremonyId']))->first();
+        $snapshot = $this->records->query()->where('type', 'passkey_authentication')->where('secret_hash', $this->hasher->hash('passkey-ceremony', $data['ceremonyId']))->first();
         if (! $snapshot instanceof Challenge || ! $snapshot->isUsable()) {
             throw new AuthException('passkey_ceremony_invalid', 'The passkey ceremony is invalid or expired.', 422);
         }
+        if (! is_array($snapshot->payload['_native_context'] ?? null) || ($snapshot->payload['_native_destination'] ?? null) !== AuthenticationDestination::Session->value) {
+            throw new AuthException('passkey_ceremony_invalid', 'The passkey ceremony is invalid or expired.', 422);
+        }
+        $nativeContext = AuthenticationRequestContext::fromFacts($snapshot->payload['_native_context']);
+        if ($nativeContext->sessionBinding !== $sessionBinding) {
+            throw new AuthException('authentication_binding_invalid', 'The browser binding does not match.', 422);
+        }
+        $ownerContext = $this->ownerIntents->context($snapshot, $requestedOwner, $sessionBinding);
+        $proofContext = $ownerContext === null ? $nativeContext : AuthenticationRequestContext::fromFacts([...$ownerContext->facts(), 'guardName' => $nativeContext->guardName, 'sessionBinding' => $nativeContext->sessionBinding]);
         $candidate = null;
         $principal = null;
         $revision = null;
@@ -134,17 +157,17 @@ final readonly class AuthPasskeys
                 throw new AuthException('passkey_invalid', 'The passkey credential is unavailable.', 422);
             }
             $revision = $this->security->revisionSnapshot($principal);
-            $assertion = $this->ceremony()->finishAuthentication(is_array($snapshot->payload) ? $snapshot->payload : [], $data['response'], new PasskeyCredential(credentialId: $candidate->credential_id, publicKey: $candidate->public_key, userHandle: $candidate->user_handle, signatureCounter: $candidate->signature_counter, backupEligible: $candidate->backup_eligible, backedUp: $candidate->backed_up));
+            $assertion = $this->ceremony()->finishAuthentication($snapshot->payload ?? [], $data['response'], new PasskeyCredential(credentialId: $candidate->credential_id, publicKey: $candidate->public_key, userHandle: $candidate->user_handle, signatureCounter: $candidate->signature_counter, backupEligible: $candidate->backup_eligible, backedUp: $candidate->backed_up));
         } catch (Throwable $exception) {
             $assertion = new AuthException('passkey_invalid', 'The passkey assertion was rejected.', 422, previous: $exception);
         }
-        $result = DB::connection($connection)->transaction(function () use ($snapshot, $candidate, $principal, $revision, $credentialId, $assertion): array|Throwable {
+        $result = DB::connection($connection)->transaction(function () use ($snapshot, $candidate, $principal, $revision, $credentialId, $assertion, $proofContext): array|Throwable {
             $state = $principal === null ? null : $this->security->lock($principal);
             if ($principal !== null) {
                 $this->security->lockChallenges($principal);
             }
             /** @var Challenge|null $challenge */
-            $challenge = Challenge::query()->whereKey($snapshot->identifier())->where('type', 'passkey_authentication')->where('secret_hash', $snapshot->secret_hash)->lockForUpdate()->first();
+            $challenge = $this->records->query()->whereKey($snapshot->identifier())->where('type', 'passkey_authentication')->where('secret_hash', $snapshot->secret_hash)->lockForUpdate()->first();
             if (! $challenge instanceof Challenge || ! $challenge->isUsable() || $challenge->payload !== $snapshot->payload || $challenge->subject_type !== $snapshot->subject_type || $challenge->subject_id !== $snapshot->subject_id) {
                 return new AuthException('passkey_ceremony_invalid', 'The passkey ceremony is invalid or expired.', 422);
             }
@@ -186,13 +209,15 @@ final readonly class AuthPasskeys
             $reference = new SubjectReference($passkey->subject_type, $passkey->subject_id);
             $this->audits->record('passkey.authenticated', subject: $reference, metadata: ['passkey_id' => $passkey->identifier(), 'user_verified' => $assertion->userVerified]);
 
-            return ['subject' => $reference, 'challenge' => $challenge];
+            $proof = $this->issueNativeProof($principal, AuthenticationMethod::Passkey, AuthenticationDestination::Session, $proofContext, $state->revision, $assertion->userVerified ? ['primary', 'user_verified'] : ['primary']);
+
+            return ['subject' => $reference, 'proof' => $proof, 'requestContext' => $proofContext];
         }, 3);
         if ($result instanceof Throwable) {
             throw $result;
         }
 
-        return ['subject' => $result['subject'], 'requestContext' => $this->ownerIntents->context($result['challenge'], $requestedOwner, $sessionBinding)];
+        return $result;
     }
 
     /**
@@ -208,12 +233,12 @@ final readonly class AuthPasskeys
         $this->input->validateName($data['name']);
         $reference = SubjectReference::fromAuthenticatable($subject);
         $connection = (new Challenge)->getConnectionName();
-        $snapshot = Challenge::query()->where('type', 'passkey_registration')->where('secret_hash', $this->hasher->hash('passkey-ceremony', $data['ceremonyId']))->first();
+        $snapshot = $this->records->query()->where('type', 'passkey_registration')->where('secret_hash', $this->hasher->hash('passkey-ceremony', $data['ceremonyId']))->first();
         if (! $snapshot instanceof Challenge || ! $snapshot->isUsable() || $snapshot->subject_type !== $reference->type || $snapshot->subject_id !== $reference->identifier) {
             throw new AuthException('passkey_ceremony_invalid', 'The passkey ceremony is invalid or expired.', 422);
         }
         try {
-            $registration = $this->ceremony()->finishRegistration($reference, is_array($snapshot->payload) ? $snapshot->payload : [], $data['response']);
+            $registration = $this->ceremony()->finishRegistration($reference, $snapshot->payload ?? [], $data['response']);
         } catch (Throwable $exception) {
             $registration = new AuthException('passkey_invalid', 'The passkey registration was rejected.', 422, previous: $exception);
         }
@@ -222,7 +247,7 @@ final readonly class AuthPasskeys
                 $this->security->lock($subject);
                 $this->security->lockChallenges($subject);
                 /** @var Challenge|null $challenge */
-                $challenge = Challenge::query()->where('type', 'passkey_registration')->where('secret_hash', $this->hasher->hash('passkey-ceremony', $data['ceremonyId']))->lockForUpdate()->first();
+                $challenge = $this->records->query()->where('type', 'passkey_registration')->where('secret_hash', $this->hasher->hash('passkey-ceremony', $data['ceremonyId']))->lockForUpdate()->first();
                 if (! $challenge instanceof Challenge || ! $challenge->isUsable() || $challenge->subject_type !== $reference->type || $challenge->subject_id !== $reference->identifier || $challenge->payload !== $snapshot->payload) {
                     return new AuthException('passkey_ceremony_invalid', 'The passkey ceremony is invalid or expired.', 422);
                 }
@@ -266,7 +291,7 @@ final readonly class AuthPasskeys
     {
         DB::connection($connection)->transaction(function () use ($ceremonyId): void {
             /** @var Challenge|null $challenge */
-            $challenge = Challenge::query()->where('type', 'passkey_registration')->where('secret_hash', $this->hasher->hash('passkey-ceremony', $ceremonyId))->lockForUpdate()->first();
+            $challenge = $this->records->query()->where('type', 'passkey_registration')->where('secret_hash', $this->hasher->hash('passkey-ceremony', $ceremonyId))->lockForUpdate()->first();
             if ($challenge instanceof Challenge && $challenge->isUsable()) {
                 $challenge->increment('attempts');
             }

@@ -142,3 +142,12 @@ Native password changes/resets, administrative credential reset, TOTP enrollment
 Mutations lock canonical principals in stable order, their security states, native challenges, then credentials. Passkey provider verification runs before these locks and the final write revalidates the stored ceremony, credential and revision. Both MySQL and PostgreSQL use current locking reads for unique state creation/reload.
 
 Current invalidation covers subject-bound `passkey_authentication`, `passkey_registration` and `credential_second_factor` challenges across owners. Generic magic-link/security-code business purposes retain their own lifecycle; they are not current-revision native authentication proofs. Remember tokens rotate on security changes. Password mutations revoke every package-managed API token across native owners while preserving unrelated token namespaces.
+
+
+## Native proof provenance and assurance
+
+Every native login method enforces required enrolled MFA independently of optional method flags. Password/email/ordinary social/non-UV passkey evidence is single factor; native verified passkey UV satisfies MFA. Social profile amr/acr claims never grant MFA. Enrolled credentials remain central facts under ambient owner scopes; owner access remains separate from identity proof.
+
+Native email/passkey/social initiation captures trusted destination and browser/guard context before redemption. Generic business challenge APIs cannot mint native login evidence. Passwords capture credential fingerprint and revision before provider verification, then compare canonical persistence under lock before rehash/issuance. Social provider I/O precedes native locks, including within a host transaction. Proof completion reconstructs encrypted native evidence under canonical locks and rechecks persistence around hooks, even when a consumer resolver supplies stale models.
+
+Proofs use purpose-separated HMAC indexes, encrypted facts, 300-second lifetime, five shared failed factor attempts and one-use final consumption. Token proofs bind a client namespace and per-flow nonce without browser state. Issued proof secrets redact debug output and reject serialization. No supported public generic issuer or bare-principal session establishment remains.

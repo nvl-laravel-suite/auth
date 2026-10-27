@@ -94,6 +94,15 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\AuthenticationAssurancePolicy": {
+            "kind": "interface",
+            "file": "src/Contracts/AuthenticationAssurancePolicy.php",
+            "methods": [
+                "assertSatisfied"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\AuthenticationEligibility": {
             "kind": "interface",
             "file": "src/Contracts/AuthenticationEligibility.php",
@@ -652,6 +661,45 @@
                 "UsersBulkUpdated",
                 "UsersListed",
                 "VerificationInvalid"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\AuthenticationDestination": {
+            "kind": "enum",
+            "file": "src/Enums/AuthenticationDestination.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "ApiToken",
+                "Reauthentication",
+                "Session"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\AuthenticationMethod": {
+            "kind": "enum",
+            "file": "src/Enums/AuthenticationMethod.php",
+            "methods": [
+                "cases",
+                "from",
+                "purpose",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "EmailCode",
+                "EmailLink",
+                "Passkey",
+                "Password",
+                "Social"
             ]
         },
         "Nvl\\Auth\\Enums\\AuthenticationPurpose": {
@@ -1526,7 +1574,9 @@
                 "consume",
                 "consumeById",
                 "consumeMagicLink",
+                "consumeMagicLinkAuthentication",
                 "issue",
+                "proveSecurityCodeAuthentication",
                 "requestMagicLink",
                 "requestMagicLinkAuthentication",
                 "requestSecurityCode",
@@ -1737,8 +1787,10 @@
             "methods": [
                 "__construct",
                 "completeAuthorization",
+                "finishAuthentication",
                 "link",
                 "revoke",
+                "startAuthentication",
                 "startAuthorization"
             ],
             "properties": [],
@@ -1750,6 +1802,7 @@
             "methods": [
                 "__construct",
                 "all",
+                "authenticateFromProof",
                 "create",
                 "revoke",
                 "revokeAll",
@@ -1798,7 +1851,21 @@
                 "hasPendingSecondFactor",
                 "login",
                 "loginWithToken",
+                "proveCredentials",
+                "proveCredentialsForToken",
                 "verifyCredentials"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\AuthenticationProofs": {
+            "kind": "class",
+            "file": "src/Services/AuthenticationProofs.php",
+            "methods": [
+                "__construct",
+                "available",
+                "completeFactor",
+                "consume"
             ],
             "properties": [],
             "constants": []
@@ -1808,8 +1875,20 @@
             "file": "src/Services/AuthenticationSessions.php",
             "methods": [
                 "__construct",
-                "establish",
+                "completeSecondFactor",
+                "establishFromProof",
+                "hasPendingSecondFactor",
                 "logout"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\EnrolledFactorAssurancePolicy": {
+            "kind": "class",
+            "file": "src/Services/EnrolledFactorAssurancePolicy.php",
+            "methods": [
+                "assertSatisfied",
+                "requiresSecondFactor"
             ],
             "properties": [],
             "constants": []
@@ -1884,13 +1963,38 @@
             ],
             "constants": []
         },
+        "Nvl\\Auth\\ValueObjects\\AuthenticationEvidence": {
+            "kind": "class",
+            "file": "src/ValueObjects/AuthenticationEvidence.php",
+            "methods": [
+                "satisfiesMfa"
+            ],
+            "properties": [
+                "context",
+                "destination",
+                "expiresAt",
+                "factors",
+                "method",
+                "passwordBinding",
+                "provider",
+                "revision",
+                "subject",
+                "verifiedAt"
+            ],
+            "constants": []
+        },
         "Nvl\\Auth\\ValueObjects\\AuthenticationRequestContext": {
             "kind": "class",
             "file": "src/ValueObjects/AuthenticationRequestContext.php",
             "methods": [
-                "__construct"
+                "__construct",
+                "assertBound",
+                "facts",
+                "fromFacts"
             ],
             "properties": [
+                "flowNonce",
+                "guardName",
                 "ipAddress",
                 "ownerIntentNonce",
                 "ownerIntentSubjectBound",
@@ -1899,6 +2003,8 @@
                 "ownerSessionBinding",
                 "requestId",
                 "requestedOwner",
+                "sessionBinding",
+                "tokenNamespace",
                 "userAgent"
             ],
             "constants": []
@@ -1932,6 +2038,19 @@
                 "expiresAt",
                 "returnPath"
             ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\IssuedAuthenticationProof": {
+            "kind": "class",
+            "file": "src/ValueObjects/IssuedAuthenticationProof.php",
+            "methods": [
+                "__construct",
+                "__debugInfo",
+                "__serialize",
+                "jsonSerialize",
+                "reveal"
+            ],
+            "properties": [],
             "constants": []
         },
         "Nvl\\Auth\\ValueObjects\\PasskeyAssertion": {

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Nvl\Auth\Adapters\Laravel\EloquentAuthSubjectResolver;
+use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Services\Authentication;
@@ -50,6 +52,7 @@ beforeEach(function (): void {
     config()->set('nvl-auth.features.principal_management.settings.attributes.preferences', 'auth_preferences');
     app()->forgetInstance(AuthModelRegistry::class);
     app()->forgetInstance(PrincipalAttributeMapper::class);
+    app()->singleton(AuthSubjectResolver::class, EloquentAuthSubjectResolver::class);
 });
 
 it('preserves host fillable extensions alongside mapped principal attributes', function (): void {

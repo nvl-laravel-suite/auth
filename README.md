@@ -53,4 +53,4 @@ Configure `nvl-auth` deliberately. Host guards and password brokers remain host-
 
 See [native PHP API](docs/php-api.md), [upgrade notes](UPGRADING.md), [security](SECURITY.md), and the event definitions in `src/Events`. Tests cover direct native calls plus consumer HTTP, optional engines, native ownership and committed delivery.
 
-Stateful TOTP continuation requires the existing Auth challenges store even when magic links and security codes are disabled. The schema plan/doctor includes that dependency. Existing partial installations use the normal reviewed `nvl:auth:schema --apply` workflow, or update their published host migration; no new table shape or migration file is introduced.
+Authentication requires native proof storage and consistent enrolled MFA across all login methods. Run the forward proof-storage migration and migrate bare-principal completion as described in [upgrade notes](UPGRADING.md).

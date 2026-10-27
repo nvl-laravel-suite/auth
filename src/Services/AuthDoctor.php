@@ -19,6 +19,7 @@ use Nvl\Auth\Contracts\AccountConfirmation;
 use Nvl\Auth\Contracts\ApiTokenAbilityProvider;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthAuditContextProvider;
+use Nvl\Auth\Contracts\AuthenticationAssurancePolicy;
 use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\AuthIdentifierResolver;
 use Nvl\Auth\Contracts\AuthManagementAccess;
@@ -128,6 +129,7 @@ final class AuthDoctor
             $checks[] = $this->check('contract.password_updater', $this->integration($container, PasswordUpdater::class) instanceof PasswordUpdater, 'Password operations require a valid password updater.');
         }
         if ($configuration->featureEnabled(AuthFeature::Authentication)) {
+            $checks[] = $this->check('contract.authentication_assurance', $this->integration($container, AuthenticationAssurancePolicy::class) instanceof AuthenticationAssurancePolicy, 'Authentication requires a valid assurance policy.');
             $checks[] = $this->check('contract.authentication_eligibility', $this->integration($container, AuthenticationEligibility::class) instanceof AuthenticationEligibility, 'Authentication operations require a valid eligibility policy.');
         }
         if ($configuration->featureEnabled(AuthFeature::PrincipalManagement)) {

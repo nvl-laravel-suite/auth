@@ -52,6 +52,7 @@ final readonly class AuthSchemaManager
             $this->migration('2026_08_12_000000_nvl_auth_add_auth_delivery_context_columns.php')->up();
             $this->migration('2026_08_28_000000_nvl_auth_add_invitation_delivery_outcomes.php')->up();
             $this->migration('2026_10_27_000001_nvl_auth_create_principal_security_states.php')->up();
+            $this->migration('2026_10_27_000002_nvl_auth_ensure_authentication_challenges.php')->up();
         }
         $remaining = array_values(array_filter($required, static fn (string $table): bool => ! $schema->hasTable($table)));
         $remainingOutdated = $this->outdatedTables($schema, $required);
@@ -130,7 +131,7 @@ final readonly class AuthSchemaManager
      */
     public function requiredTables(): array
     {
-        $tables = [AuthTables::PrincipalSecurityStates];
+        $tables = [AuthTables::PrincipalSecurityStates, AuthTables::get(AuthTables::Challenges)];
         if ($this->enabled(AuthFeature::PrincipalManagement)) {
             $tables[] = $this->table('users', AuthTables::get(AuthTables::Users));
         }

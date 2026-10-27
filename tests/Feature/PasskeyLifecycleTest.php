@@ -21,10 +21,9 @@ it('persists verified passkeys and supplies stored material to the ceremony adap
         $user,
         ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true], 'name' => 'Laptop']
     );
-    $authentication = app(AuthPasskeys::class)->beginAuthentication();
+    $authentication = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
     $completed = app(AuthPasskeys::class)->finishAuthentication(
-        ['ceremonyId' => $authentication->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2]]
-    );
+        ['ceremonyId' => $authentication->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2]], sessionBinding: app('session.store')->getId());
     $adapter = app(PasskeyCeremony::class);
 
     expect($completed['subject']->identifier)->toBe((string) $user->getKey())
@@ -39,11 +38,10 @@ it('commits a failed passkey ceremony attempt before returning its neutral failu
     $user = $this->user();
     $registration = app(AuthPasskeys::class)->beginRegistration($user);
     app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]]);
-    $authentication = app(AuthPasskeys::class)->beginAuthentication();
+    $authentication = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
 
     expect(fn () => app(AuthPasskeys::class)->finishAuthentication(
-        ['ceremonyId' => $authentication->ceremonyId, 'response' => ['valid' => false, 'credential_id' => 'test-credential', 'signature_counter' => 2]]
-    ))->toThrow(AuthException::class);
+        ['ceremonyId' => $authentication->ceremonyId, 'response' => ['valid' => false, 'credential_id' => 'test-credential', 'signature_counter' => 2]], sessionBinding: app('session.store')->getId()))->toThrow(AuthException::class);
 
     expect(Challenge::query()->where('type', 'passkey_authentication')->sole()->attempts)->toBe(1);
 });
@@ -52,7 +50,7 @@ it('normalizes provider exceptions at the passkey boundary', function (): void {
     $user = $this->user();
     $registration = app(AuthPasskeys::class)->beginRegistration($user);
     app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]]);
-    $authentication = app(AuthPasskeys::class)->beginAuthentication();
+    $authentication = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
 
     try {
         app(AuthPasskeys::class)->finishAuthentication(
@@ -61,8 +59,7 @@ it('normalizes provider exceptions at the passkey boundary', function (): void {
                 'runtime_failure' => true,
                 'credential_id' => 'test-credential',
                 'signature_counter' => 2,
-            ]]
-        );
+            ]], sessionBinding: app('session.store')->getId());
 
         throw new RuntimeException('The passkey provider failure was not normalized.');
     } catch (AuthException $exception) {
@@ -93,7 +90,7 @@ it('enforces passkey uniqueness, credential limits, and user verification', func
     expect(fn () => app(AuthPasskeys::class)->beginRegistration($user))
         ->toThrow(AuthException::class, 'limit');
 
-    $authentication = app(AuthPasskeys::class)->beginAuthentication();
+    $authentication = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
 
     expect(fn () => app(AuthPasskeys::class)->finishAuthentication(
         ['ceremonyId' => $authentication->ceremonyId, 'response' => [
@@ -101,15 +98,14 @@ it('enforces passkey uniqueness, credential limits, and user verification', func
             'credential_id' => 'test-credential',
             'signature_counter' => 2,
             'user_verified' => false,
-        ]]
-    ))->toThrow(AuthException::class, 'rejected');
+        ]], sessionBinding: app('session.store')->getId()))->toThrow(AuthException::class, 'rejected');
 });
 
 it('normalizes passkey start failures and rejects oversized browser input', function (): void {
     $this->app->instance(PasskeyCeremony::class, new TestPasskeyCeremony(failBegin: true));
 
     try {
-        app(AuthPasskeys::class)->beginAuthentication();
+        app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
         $this->fail('The passkey start should fail.');
     } catch (AuthException $exception) {
         expect($exception->errorCode)->toBe('passkey_provider_unavailable')
@@ -119,6 +115,5 @@ it('normalizes passkey start failures and rejects oversized browser input', func
     $this->app->instance(PasskeyCeremony::class, new TestPasskeyCeremony);
 
     expect(fn () => app(AuthPasskeys::class)->finishAuthentication(
-        ['ceremonyId' => 'ceremony', 'response' => ['payload' => str_repeat('x', 131_073)]]
-    ))->toThrow(AuthException::class, 'input');
+        ['ceremonyId' => 'ceremony', 'response' => ['payload' => str_repeat('x', 131_073)]], sessionBinding: app('session.store')->getId()))->toThrow(AuthException::class, 'input');
 });

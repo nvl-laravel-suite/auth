@@ -93,6 +93,7 @@ return [
                 'identifier_resolver' => null,
                 'login_metadata_recorder' => null,
                 'eligibility' => null,
+                'assurance' => null,
             ],
             'settings' => ['owner_intent_ttl_minutes' => 10],
         ],
