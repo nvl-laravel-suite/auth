@@ -4,15 +4,21 @@ declare(strict_types=1);
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword;
+use Illuminate\Contracts\Hashing\Hasher;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\PasswordPolicy;
 use Nvl\Auth\Contracts\PasswordUpdater;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Services\Authentication;
+use Nvl\Auth\Services\AuthInvitations;
 use Nvl\Auth\Services\AuthPasswords;
 use Nvl\Auth\Services\AuthUsers;
 
@@ -118,4 +124,142 @@ it('continues to authenticate an existing short password', function (): void {
     $user->forceFill(['password' => Hash::make('short123')])->save();
     $authenticated = app(Authentication::class)->login(['identifier' => $user->email, 'password' => 'short123'], [], auth()->guard('web'), app('session')->driver());
     expect($authenticated->getAuthIdentifier())->toBe($user->getAuthIdentifier());
+});
+
+it('accepts 72 ASCII bytes and rejects 73 for bcrypt', function (): void {
+    $user = $this->user('ascii-boundary@example.test');
+    $submit = fn (string $password) => app(AuthPasswords::class)->update($user, ['currentPassword' => 'correct-password', 'password' => $password, 'passwordConfirmation' => $password]);
+    expect(fn () => $submit(str_repeat('a', 73)))->toThrow(ValidationException::class);
+    $submit(str_repeat('a', 72));
+    expect(Hash::check(str_repeat('a', 72), $user->fresh()->password))->toBeTrue();
+});
+
+it('allows argon passwords beyond 72 bytes while retaining the input limit', function (): void {
+    $user = $this->user('argon-boundary@example.test');
+    config()->set('hashing.driver', 'argon2id');
+    config()->set('hashing.argon', ['memory' => 1024, 'time' => 1, 'threads' => 1]);
+    $argon = app('hash')->driver('argon2id');
+    $user->forceFill(['password' => $argon->make('correct-password')])->save();
+    app()->instance(Hasher::class, $argon);
+    $submit = fn (string $password) => app(AuthPasswords::class)->update($user, ['currentPassword' => 'correct-password', 'password' => $password, 'passwordConfirmation' => $password]);
+    expect(fn () => $submit(str_repeat('a', 4097)))->toThrow(ValidationException::class);
+    $submit(str_repeat('a', 4096));
+    expect($argon->check(str_repeat('a', 4096), $user->fresh()->password))->toBeTrue();
+});
+
+it('requires credential authority for explicit password removal', function (): void {
+    $actor = $this->user('remove-actor@example.test');
+    $user = $this->user('remove-target@example.test');
+    $user->forceFill(['remember_token' => 'before-removal'])->save();
+    $access = new class implements AuthManagementAccess
+    {
+        public bool $credentials = false;
+
+        public function allows(Authenticatable $actor, string $ability, mixed $target = null): bool
+        {
+            return $ability === 'nvl.auth.users.update' || ($this->credentials && $ability === 'nvl.auth.users.manageCredentials');
+        }
+    };
+    app()->instance(AuthManagementAccess::class, $access);
+    expect(fn () => app(AuthUsers::class)->update($actor, $user, ['password' => null]))->toThrow(AuthException::class)
+        ->and(Hash::check('correct-password', $user->fresh()->password))->toBeTrue();
+    $access->credentials = true;
+    $updated = app(AuthUsers::class)->update($actor, $user, ['password' => null]);
+    expect($updated->password)->toBeNull()->and($updated->remember_token)->not->toBe('before-removal');
+});
+
+it('enforces the minimum on each new password operation', function (string $path): void {
+    $actor = $this->user('policy-actor@example.test');
+    $user = $this->user('policy-target@example.test');
+    $service = app(AuthPasswords::class);
+    $token = null;
+    if ($path === 'reset') {
+        $service->requestReset(['identifier' => $user->email]);
+        $token = Event::dispatched(AuthDeliveryRequested::class)->first()[0]->request->payload['token'];
+    }
+    if ($path === 'invitation') {
+        config()->set('nvl-auth.features.invitations.enabled', true);
+        $issued = app(AuthInvitations::class)->create(['recipient' => 'policy-invitee@example.test'], $actor);
+        $token = $issued['token'];
+    }
+    $submit = function (string $password) use ($actor, $user, $path, $service, $token) {
+        return match ($path) {
+            'reset' => $service->reset(['identifier' => $user->email, 'token' => $token, 'password' => $password, 'passwordConfirmation' => $password]),
+            'update' => $service->update($user, ['currentPassword' => 'correct-password', 'password' => $password, 'passwordConfirmation' => $password]),
+            'managed_create' => app(AuthUsers::class)->create($actor, ['name' => 'New user', 'email' => 'new-policy@example.test', 'password' => $password]),
+            'managed_update' => app(AuthUsers::class)->update($actor, $user, ['password' => $password]),
+            'invitation' => app(AuthInvitations::class)->register(['token' => $token, 'name' => 'Invited user', 'password' => $password, 'passwordConfirmation' => $password]),
+        };
+    };
+    expect(fn () => $submit('12345678901'))->toThrow(ValidationException::class);
+    $result = $submit('123456789012');
+    $principal = match ($path) {
+        'managed_create', 'managed_update' => $result,
+        'invitation' => $result['subject'],
+        default => $user->fresh(),
+    };
+    expect(Hash::check('123456789012', $principal->password))->toBeTrue();
+})->with(['reset', 'update', 'managed_create', 'managed_update', 'invitation']);
+
+it('composes the configured password alias with an injected updater', function (): void {
+    $actor = $this->user('alias-actor@example.test');
+    Schema::table($actor->getTable(), function (Blueprint $table): void {
+        $table->string('credential_hash')->nullable();
+    });
+    config()->set('nvl-auth.features.principal_management.settings.attributes.password', 'credential_hash');
+    app()->forgetInstance(PrincipalAttributeMapper::class);
+    $updater = new class implements PasswordUpdater
+    {
+        public array $seen = [];
+
+        public function update(CanResetPassword $subject, #[SensitiveParameter] string $password): void
+        {
+            $this->seen[] = [$subject::class, $subject->getAuthPasswordName(), $subject->name];
+            $subject->forceFill([$subject->getAuthPasswordName() => Hash::make($password)])->save();
+        }
+    };
+    app()->instance(PasswordUpdater::class, $updater);
+    $user = app(AuthUsers::class)->create($actor, ['name' => 'Aliased User', 'email' => 'alias-target@example.test', 'password' => 'first-password-123']);
+    expect(Hash::check('first-password-123', $user->credential_hash))->toBeTrue()
+        ->and($user->getRawOriginal('password'))->toBeNull();
+    $stale = $user->fresh();
+    $user->forceFill(['name' => 'Canonical alias'])->save();
+    $stale->name = 'Dirty alias';
+    $updated = app(AuthUsers::class)->update($actor, $stale, ['password' => 'second-password-123']);
+    expect($updater->seen)->toHaveCount(2)
+        ->and($updater->seen[1])->toBe([$user::class, 'credential_hash', 'Canonical alias'])
+        ->and(Hash::check('second-password-123', $updated->credential_hash))->toBeTrue();
+    $removed = app(AuthUsers::class)->update($actor, $updated, ['password' => null]);
+    expect($removed->credential_hash)->toBeNull()->and($updater->seen)->toHaveCount(2);
+    config()->set('nvl-auth.features.invitations.enabled', true);
+    $invitation = app(AuthInvitations::class)->create(['recipient' => 'alias-invite@example.test'], $actor);
+    $registered = app(AuthInvitations::class)->register(['token' => $invitation['token'], 'name' => 'Aliased Invitee', 'password' => 'invite-password-123', 'passwordConfirmation' => 'invite-password-123']);
+    expect($updater->seen)->toHaveCount(3)
+        ->and($updater->seen[2][1])->toBe('credential_hash')
+        ->and(Hash::check('invite-password-123', $registered['subject']->credential_hash))->toBeTrue()
+        ->and($registered['subject']->getRawOriginal('password'))->toBeNull();
+});
+
+it('keeps submitted passwords out of raw and decrypted audit facts', function (): void {
+    $actor = $this->user('audit-actor@example.test');
+    $user = $this->user('audit-target@example.test');
+    $secrets = ['create-private-password', 'update-private-password', 'reset-private-password', 'invite-private-password', 'self-private-password'];
+    app(AuthUsers::class)->create($actor, ['name' => 'Audit new', 'email' => 'audit-new@example.test', 'password' => $secrets[0]]);
+    app(AuthUsers::class)->update($actor, $user, ['password' => $secrets[1]]);
+    app(AuthPasswords::class)->requestReset(['identifier' => $user->email]);
+    $token = Event::dispatched(AuthDeliveryRequested::class)->first()[0]->request->payload['token'];
+    app(AuthPasswords::class)->reset(['identifier' => $user->email, 'token' => $token, 'password' => $secrets[2], 'passwordConfirmation' => $secrets[2]]);
+    app(AuthPasswords::class)->update($user, ['currentPassword' => $secrets[2], 'password' => $secrets[4], 'passwordConfirmation' => $secrets[4]]);
+    config()->set('nvl-auth.features.invitations.enabled', true);
+    $invitation = app(AuthInvitations::class)->create(['recipient' => 'audit-invite@example.test'], $actor);
+    app(AuthInvitations::class)->register(['token' => $invitation['token'], 'name' => 'Audit invited', 'password' => $secrets[3], 'passwordConfirmation' => $secrets[3]]);
+    $audits = AuthAudit::query()->get();
+    expect($audits->pluck('action')->all())->toContain('user.created', 'user.updated', 'password.reset', 'password.updated', 'invitation.accepted');
+    foreach ($audits as $audit) {
+        $raw = json_encode($audit->getRawOriginal(), JSON_THROW_ON_ERROR);
+        $decrypted = json_encode([$audit->metadata, $audit->ip_address, $audit->user_agent, $audit->action, $audit->request_id], JSON_THROW_ON_ERROR);
+        foreach ($secrets as $secret) {
+            expect($raw)->not->toContain($secret)->and($decrypted)->not->toContain($secret);
+        }
+    }
 });
