@@ -190,14 +190,18 @@ it('leaves committed facts and revisions untouched after password rollback', fun
 
 it('rejects a mismatched token source before writing credentials or security state', function (): void {
     $user = $this->user();
+    $grant = $this->recentGrant($user, RecentAuthenticationPurpose::PasswordChange, 'correct-password');
+    $securityState = PrincipalSecurityState::query()->sole()->getRawOriginal();
+    $passwordHash = $user->getRawOriginal('password');
     config(['database.connections.security_elsewhere' => config('database.connections.'.config('database.default'))]);
     $tokens = Mockery::mock(SecurityTokenContainment::class);
     $tokens->shouldReceive('connection')->andReturn(DB::connection('security_elsewhere'));
     app()->instance(ApiTokenManager::class, $tokens);
-    expect(fn () => app(AuthPasswords::class)->update($user, ['password' => 'new-password-123', 'passwordConfirmation' => 'new-password-123'], grant: $this->recentGrant($user, RecentAuthenticationPurpose::PasswordChange, 'correct-password')->reveal(), context: $this->authenticationContext()))
+    expect(fn () => app(AuthPasswords::class)->update($user, ['password' => 'new-password-123', 'passwordConfirmation' => 'new-password-123'], grant: $grant->reveal(), context: $this->authenticationContext()))
         ->toThrow(AuthException::class, 'actual principal source');
-    expect(PrincipalSecurityState::query()->count())->toBe(0)
-        ->and(Hash::check('correct-password', $user->refresh()->password))->toBeTrue();
+    expect(PrincipalSecurityState::query()->sole()->getRawOriginal())->toBe($securityState)
+        ->and($user->refresh()->getRawOriginal('password'))->toBe($passwordHash)
+        ->and(Hash::check('correct-password', $user->password))->toBeTrue();
 });
 
 it('changes passwords when optional API tokens are disabled', function (): void {
