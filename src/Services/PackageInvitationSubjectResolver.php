@@ -12,7 +12,6 @@ use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Models\Invitation;
-use Nvl\Auth\Models\User;
 
 /**
  * Resolves existing package users or provisions an invited package principal.
@@ -37,14 +36,6 @@ final readonly class PackageInvitationSubjectResolver implements InvitationSubje
     {
         $email = mb_strtolower(trim($invitation->recipient));
         $class = $this->models->userClass();
-        $existing = $class::query()
-            ->where($this->attributes->column(PrincipalAttribute::Email), $email)
-            ->first();
-
-        if ($existing instanceof User) {
-            return $existing;
-        }
-
         $mapped = $this->registration->map($invitation, $input);
         unset($mapped[$this->attributes->column(PrincipalAttribute::Password)]);
         $user = $class::query()->create($mapped);

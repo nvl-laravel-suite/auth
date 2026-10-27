@@ -11,6 +11,7 @@ use Nvl\Auth\Models\OwnerAuthenticationIntent;
 use Nvl\Auth\Models\OwnerMembership;
 use Nvl\Auth\Models\OwnerMembershipLock;
 use Nvl\Auth\Models\PersonalAccessToken;
+use Nvl\Auth\Models\PrincipalSecurityState;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Support\Models\ConfiguredModelResolver;
@@ -48,6 +49,7 @@ final readonly class AuthResourceRegistrar
             'auth.invitations' => [Invitation::class, $owned, true],
             ...(class_exists(\Laravel\Sanctum\PersonalAccessToken::class) ? ['auth.tokens' => [$this->models->personalAccessTokenClass(), $owned, true]] : []),
             'auth.challenges' => [Challenge::class, $owned, true],
+            'auth.security_states' => [PrincipalSecurityState::class, false, true],
             'auth.audits' => [AuthAudit::class, $owned, true],
         ] as $key => [$model, $captured, $central]) {
             $immutable = match ($key) {

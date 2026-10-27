@@ -16,13 +16,10 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\InvitationRecipientProof;
-use Nvl\Auth\Contracts\InvitationSubjectResolver;
-use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\InvitationDeliveryStatus;
-use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Events\InvitationAccepted;
 use Nvl\Auth\Events\PrincipalChanged;
@@ -48,7 +45,7 @@ final readonly class AuthInvitations
     private AuthCommittedAudit $committedAudits;
 
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private MutationAuthorizer $mutations, private OwnerInvitations $owned, private SecretHasher $hasher, private InvitationRecipientProof $recipientProof, private Container $container, private OwnershipBoundary $boundary, private OwnerMembershipAssignments $assignments, private ManagementAuthorizer $authorization, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, AuthCommittedAudit $committedAudits, private DomainEventDispatcher $domainEvents, private OwnershipContext $ownerContext, private AuthConfiguration $configuration, private OpaqueTokenFactory $tokens, private InvitationSubjectResolver $subjects, private AuthModelRegistry $models, private PrincipalAttributeMapper $attributes, private PasswordValidationRules $passwordPolicy, private ?InvitationDeliveryMetadataPolicy $deliveryMetadata = null)
+    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private MutationAuthorizer $mutations, private OwnerInvitations $owned, private SecretHasher $hasher, private InvitationRecipientProof $recipientProof, private Container $container, private OwnershipBoundary $boundary, private OwnerMembershipAssignments $assignments, private ManagementAuthorizer $authorization, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, AuthCommittedAudit $committedAudits, private DomainEventDispatcher $domainEvents, private OwnershipContext $ownerContext, private AuthConfiguration $configuration, private OpaqueTokenFactory $tokens, private AuthModelRegistry $models, private PasswordValidationRules $passwordPolicy, private InvitationPrincipalResolver $principalResolver, private ?InvitationDeliveryMetadataPolicy $deliveryMetadata = null)
     {
         $this->committedAudits = $committedAudits->withRecorder($this->audits);
     }
@@ -306,12 +303,17 @@ final readonly class AuthInvitations
         $data = $this->validateAcceptInvitation($data);
         $connection = (new Invitation)->getConnectionName();
         $principalClass = $this->models->userClass();
-        $principalConnection = (new $principalClass)->getConnectionName();
-        if ($principalConnection !== $connection) {
+        $principalConnection = (new $principalClass)->getConnection();
+        if ($principalConnection !== (new Invitation)->getConnection()) {
             throw AuthException::invalidConfiguration('Invitation registration requires principal and invitation storage on one connection.');
         }
         try {
-            return DB::connection($connection)->transaction(function () use ($authenticatedRecipient, $connection, $data): array {
+            $candidate = Invitation::query()->where('token_hash', $this->hasher->hash('invitation-token', $data['token']))->first();
+
+            return DB::connection($connection)->transaction(function () use ($authenticatedRecipient, $connection, $data, $candidate): array {
+                if ($candidate instanceof Invitation) {
+                    $this->principalResolver->lockExisting($candidate);
+                }
                 $query = Invitation::query();
                 /** @var Invitation|null $invitation */
                 $invitation = $query->where('token_hash', $this->hasher->hash('invitation-token', $data['token']))->lockForUpdate()->first();
@@ -350,29 +352,7 @@ final readonly class AuthInvitations
      */
     private function registerResolveSubject(Invitation $invitation, #[\SensitiveParameter] array $data, ?Authenticatable $authenticatedRecipient): Authenticatable
     {
-        $data = $this->validateAcceptInvitation($data);
-        $principalClass = $this->models->userClass();
-        /** @var Authenticatable|null $existing */
-        $existing = $principalClass::query()->where($this->attributes->column(PrincipalAttribute::Email), mb_strtolower(trim($invitation->recipient)))->first();
-        if ($existing instanceof Authenticatable) {
-            if (! $authenticatedRecipient instanceof Authenticatable) {
-                throw new AuthException('invitation_identity_proof_required', 'The invitation recipient identity could not be verified.', 403);
-            }
-            $this->recipientProof->assertMatches($invitation, $authenticatedRecipient);
-            $existingReference = SubjectReference::fromAuthenticatable($existing);
-            $authenticatedReference = SubjectReference::fromAuthenticatable($authenticatedRecipient);
-            if ($existingReference->type !== $authenticatedReference->type || $existingReference->identifier !== $authenticatedReference->identifier) {
-                throw new AuthException('invitation_identity_proof_required', 'The invitation recipient identity could not be verified.', 403);
-            }
-
-            return $existing;
-        }
-        $subject = $this->subjects->resolve($invitation, array_diff_key($data, ['token' => true]) + ['password_confirmation' => $data['passwordConfirmation'] ?? null]);
-        if (! $subject instanceof Model) {
-            throw AuthException::invalidConfiguration('Invitation subjects must be persistent Eloquent principals.');
-        }
-
-        return $subject;
+        return $this->principalResolver->resolve($invitation, $this->validateAcceptInvitation($data), $authenticatedRecipient);
     }
 
     /**

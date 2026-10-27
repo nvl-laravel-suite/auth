@@ -46,7 +46,7 @@ use SensitiveParameter;
 final readonly class AuthPasswords
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private Hasher $hasher, private AuthAuditRecorder $audits, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private PasswordBrokerManager $brokers, private AuthPipeline $pipeline, private AuthenticationEligibility $eligibility, private DomainEventDispatcher $domainEvents, private PasswordUpdater $passwords, private ConnectionCommitCallbacks $eventCommits, private CanonicalActorResolver $canonical, private PasswordValidationRules $policy) {}
+    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private Hasher $hasher, private AuthAuditRecorder $audits, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private PasswordBrokerManager $brokers, private AuthPipeline $pipeline, private AuthenticationEligibility $eligibility, private DomainEventDispatcher $domainEvents, private PasswordUpdater $passwords, private ConnectionCommitCallbacks $eventCommits, private CanonicalActorResolver $canonical, private PasswordValidationRules $policy, private PrincipalSecurity $security) {}
 
     /**
      * Verify the current password and timestamp the active session.
@@ -67,6 +67,9 @@ final readonly class AuthPasswords
         }
         $prototype = new ($subject::class);
         $failedSubject = $prototype->getConnection()->transaction(function () use ($subject, $data, $session): ?Authenticatable {
+            $this->security->assertTokenContainment($subject);
+            $this->security->lock($subject);
+            $this->security->lockChallenges($subject);
             $subject = $this->canonical->resolve($subject, true);
             $reference = SubjectReference::fromAuthenticatable($subject);
             if (! $this->hasher->check($data['password'], (string) $subject->getAuthPassword())) {
@@ -162,6 +165,9 @@ final readonly class AuthPasswords
             };
             try {
                 $status = $connection->transaction(function () use ($broker, $candidate, $data, $identifierName, $rejection): string {
+                    $this->security->assertTokenContainment($candidate);
+                    $this->security->lock($candidate);
+                    $this->security->lockChallenges($candidate);
                     $locked = $this->canonical->resolve($candidate, true);
                     if (! $locked instanceof CanResetPassword || ! $locked instanceof Model) {
                         throw AuthException::invalidConfiguration('Password reset requires a resettable Eloquent principal.');
@@ -180,6 +186,7 @@ final readonly class AuthPasswords
                         $this->passwords->update($locked, $newPassword);
                         $locked->setRememberToken(Str::random(60));
                         $locked->save();
+                        $this->security->advance($locked, 'password_reset');
                         $event = new PasswordReset($locked);
                         $this->eventCommits->afterCommit($locked->getConnection(), static function () use ($event): void {
                             event($event);
@@ -242,6 +249,9 @@ final readonly class AuthPasswords
         }
         $prototype = new ($subject::class);
         $prototype->getConnection()->transaction(function () use ($subject, $data): void {
+            $this->security->assertTokenContainment($subject);
+            $this->security->lock($subject);
+            $this->security->lockChallenges($subject);
             $subject = $this->canonical->resolve($subject, true);
             if (! $subject instanceof CanResetPassword) {
                 throw AuthException::invalidConfiguration('Password updates require a resettable principal.');
@@ -252,6 +262,7 @@ final readonly class AuthPasswords
             $this->passwords->update($subject, $data['password']);
             $subject->setRememberToken(Str::random(60));
             $subject->save();
+            $this->security->advance($subject, 'password_changed');
             $this->audits->record('password.updated', subject: SubjectReference::fromAuthenticatable($subject), actor: $subject);
         });
     }

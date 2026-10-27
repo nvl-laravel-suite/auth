@@ -53,7 +53,7 @@ final readonly class Authentication
     /**
      * Create the native credential authentication operations.
      */
-    public function __construct(private FeatureGate $features, private OwnerAuthenticationSelection $ownerSelection, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private AuthManager $auth, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, private AuthenticationEligibility $eligibility, private SuccessfulLoginMetadataRecorder $loginMetadata, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private AuthModelRegistry $models, private AuthSecondFactor $secondFactor, private AuthTokens $tokens, private AuthCommittedAudit $committedAudits, private ConnectionCommitCallbacks $commits, private SecretHasher $hasher, private AuthIdentityChallenges $challenges) {}
+    public function __construct(private FeatureGate $features, private OwnerAuthenticationSelection $ownerSelection, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private AuthManager $auth, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, private AuthenticationEligibility $eligibility, private SuccessfulLoginMetadataRecorder $loginMetadata, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private AuthModelRegistry $models, private AuthSecondFactor $secondFactor, private AuthTokens $tokens, private AuthCommittedAudit $committedAudits, private ConnectionCommitCallbacks $commits, private SecretHasher $hasher, private AuthIdentityChallenges $challenges, private PrincipalSecurity $security) {}
 
     /**
      * Complete password and enrolled factor proof before issuing a stateless token.
@@ -242,14 +242,21 @@ final readonly class Authentication
             $session->forget(self::PendingFactorLogin);
             throw new AuthException('login_challenge_invalid', 'The credential login continuation is unavailable.', 422);
         }
-        $result = (new Challenge)->getConnection()->transaction(function () use ($session, $factorProof): array|Throwable {
+        $snapshot = $this->pendingChallenge($session);
+        if ($snapshot === null || ! $snapshot->isUsable() || ! is_string($snapshot->subject_type) || ! is_string($snapshot->subject_id)) {
+            throw new AuthException('login_challenge_invalid', 'The credential login continuation is unavailable.', 422);
+        }
+        $candidate = $this->freshPrincipal(new SubjectReference($snapshot->subject_type, $snapshot->subject_id));
+        $result = (new Challenge)->getConnection()->transaction(function () use ($session, $factorProof, $snapshot, $candidate): array|Throwable {
+            $this->security->lock($candidate);
+            $this->security->lockChallenges($candidate);
             $challenge = $this->pendingChallenge($session, lock: true);
-            if ($challenge === null || ! $challenge->isUsable()) {
+            if ($challenge === null || ! $challenge->isUsable() || $challenge->identifier() !== $snapshot->identifier()
+                || $challenge->subject_type !== $snapshot->subject_type || $challenge->subject_id !== $snapshot->subject_id) {
                 return new AuthException('login_challenge_invalid', 'The credential login continuation is unavailable.', 422);
             }
             $payload = $challenge->payload;
-            if (! is_array($payload) || ! is_string($payload['passwordBinding'] ?? null) || ! is_bool($payload['remember'] ?? null)
-                || ! is_string($challenge->subject_type) || ! is_string($challenge->subject_id)) {
+            if (! is_array($payload) || ! is_string($payload['passwordBinding'] ?? null) || ! is_bool($payload['remember'] ?? null)) {
                 $challenge->revoked_at = CarbonImmutable::now();
                 $this->challenges->save($challenge);
 

@@ -198,6 +198,22 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\SecurityTokenContainment": {
+            "kind": "interface",
+            "file": "src/Contracts/SecurityTokenContainment.php",
+            "methods": [
+                "connection",
+                "create",
+                "list",
+                "revoke",
+                "revokeAll",
+                "revokeForSecurity",
+                "rotate",
+                "update"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\SocialIdentityProvider": {
             "kind": "interface",
             "file": "src/Contracts/SocialIdentityProvider.php",

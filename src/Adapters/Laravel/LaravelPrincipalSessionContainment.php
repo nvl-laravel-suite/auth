@@ -10,11 +10,11 @@ use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
+use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
+use Nvl\Auth\Contracts\SecurityTokenContainment;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
-use Nvl\Support\Ownership\Contracts\OwnershipReadiness;
 
 /**
  * Contains Sanctum tokens, remember credentials, and Laravel database sessions.
@@ -27,8 +27,7 @@ final readonly class LaravelPrincipalSessionContainment implements PrincipalSess
     public function __construct(
         private ConfigRepository $configuration,
         private DatabaseManager $database,
-        private OwnershipReadiness $readiness,
-        private AuthModelRegistry $models,
+        private ApiTokenManager $tokens,
     ) {}
 
     /**
@@ -43,22 +42,15 @@ final readonly class LaravelPrincipalSessionContainment implements PrincipalSess
             throw AuthException::invalidConfiguration('Session containment requires an Eloquent principal.');
         }
 
-        if (method_exists($principal, 'tokens')) {
-            $tokens = (new \ReflectionMethod($principal, 'tokens'))->invoke($principal);
-            if (! $tokens instanceof MorphMany) {
-                throw AuthException::invalidConfiguration('Session containment requires a Sanctum token relationship.');
+        if (method_exists($principal, 'tokens') && ! (new \ReflectionMethod($principal, 'tokens'))->invoke($principal) instanceof MorphMany) {
+            throw AuthException::invalidConfiguration('Session containment requires a Sanctum token relationship.');
+        }
+        if ($this->configuration->get('nvl-auth.features.api_tokens.enabled') === true) {
+            $tokens = $this->tokens;
+            if (! $tokens instanceof SecurityTokenContainment || $tokens->connection($principal) !== $principal->getConnection()) {
+                throw AuthException::invalidConfiguration('Account containment requires same-source SecurityTokenContainment.');
             }
-            if ($this->configuration->get('nvl-auth.ownership.scoped') === true) {
-                $this->readiness->assertActive('auth.tokens');
-                $class = $this->models->personalAccessTokenClass();
-                $model = new $class;
-                if ($tokens->getRelated()::class !== $class || $tokens->getRelated()->getConnection() !== $model->getConnection() || $tokens->getRelated()->getTable() !== $model->getTable()) {
-                    throw AuthException::invalidConfiguration('Global containment requires canonical token storage.');
-                }
-                $model->getConnection()->table($model->getTable())->where('tokenable_type', $principal->getMorphClass())->where('tokenable_id', $principal->getKey())->delete();
-            } else {
-                $tokens->delete();
-            }
+            $tokens->revokeForSecurity($principal);
         }
 
         $rememberTokenName = $principal->getRememberTokenName();

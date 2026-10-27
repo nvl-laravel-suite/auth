@@ -11,6 +11,7 @@ feature-owned schema.
 
 | Table | Purpose | Sensitive handling |
 |---|---|---|
+| `nvl_auth_principal_security_states` | central monotonic principal security revision | unique bounded subject pair; retained through soft delete/restore |
 | `nvl_auth_users` | concrete authentication principals, profiles, status, login/lock state | passwords hashed by the model; last-login IP encrypted |
 | `nvl_auth_permissions` | Spatie-compatible permission catalog | bounded metadata |
 | `nvl_auth_roles` | Spatie-compatible roles, hierarchy, templates/system markers | bounded metadata |
@@ -76,3 +77,9 @@ roles, permissions, tokens, or immutable `nvl_auth_audits` facts.
 ## Optional native ownership schema
 
 Native adoption adds owner membership, membership-lock and authentication-intent tables, owner reference/scope columns and constrained RBAC pivots. Permissions remain global vocabulary. Credentials and principals remain global identities. Activation requires reviewed native Ownership adoption and readiness. Retired tenant tables are never automatically copied or deleted; keep their migration/data history for a reviewed host migration.
+
+## Mandatory security state installation
+
+The forward migration `2026_10_27_000001_nvl_auth_create_principal_security_states.php` adds one UUID row per canonical subject, with an unsigned revision initially 1 and a named unique subject pair. It is required independently of optional registration, MFA enrollment and session features. Principal and native security storage must share the same actual Laravel connection object.
+
+`nvl:auth:schema` reports missing columns and indexes. `--apply` creates the table or repairs missing revision/timestamp columns and the unique index without rewriting retained rows. Missing identity columns require a reviewed host migration. Host-owned migration mode never applies vendor DDL: update and run the published host migration first. The forward migration intentionally retains its table on rollback; never reset or prune revisions while a principal or dependent capability survives. Existing tables and migration history are unchanged.

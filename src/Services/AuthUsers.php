@@ -46,7 +46,7 @@ use Nvl\Support\Events\DomainEventDispatcher;
 final readonly class AuthUsers
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private MutationAuthorizer $authorization, private UserLocator $users, private AuthAuditRecorder $audits, private PrincipalAttributeMapper $attributes, private PrincipalSessionContainment $sessions, private AuthMemberships $owners, private AuthOwnershipState $ownershipState, private DomainEventDispatcher $domainEvents, private ManagementAuthorizer $createAuthorization, private AuthModelRegistry $models, private Container $container, private AuthConfiguration $configuration, private AccountConfirmation $confirmation, private AuthOperationBoundary $operations, private ManagementAuthorizer $updateAuthorization, private PasswordUpdater $passwords, private PasswordValidationRules $passwordPolicy, private CanonicalActorResolver $canonical) {}
+    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private MutationAuthorizer $authorization, private UserLocator $users, private AuthAuditRecorder $audits, private PrincipalAttributeMapper $attributes, private PrincipalSessionContainment $sessions, private AuthMemberships $owners, private AuthOwnershipState $ownershipState, private DomainEventDispatcher $domainEvents, private ManagementAuthorizer $createAuthorization, private AuthModelRegistry $models, private Container $container, private AuthConfiguration $configuration, private AccountConfirmation $confirmation, private AuthOperationBoundary $operations, private ManagementAuthorizer $updateAuthorization, private PasswordUpdater $passwords, private PasswordValidationRules $passwordPolicy, private CanonicalActorResolver $canonical, private PrincipalSecurity $security) {}
 
     /**
      * Apply one operation to at most one hundred principals.
@@ -75,7 +75,16 @@ final readonly class AuthUsers
         $connection = $this->users->query(true)->getModel()->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($ability, $actor, $authority, $context, $metadata, $operation, $userIds): array {
-            $users = $this->users->query(true)->whereKey($userIds)->lockForUpdate()->get();
+            $users = $this->users->query(true)->whereKey($userIds)->orderBy($this->users->query(true)->getModel()->getKeyName())->lockForUpdate()->get();
+            foreach ($users as $user) {
+                $this->security->assertTokenContainment($user);
+            }
+            foreach ($users as $user) {
+                $this->security->lock($user);
+            }
+            foreach ($users as $user) {
+                $this->security->lockChallenges($user);
+            }
             /** @var User $user */
             foreach ($users as $user) {
                 if ($authority instanceof Authenticatable) {
@@ -102,6 +111,10 @@ final readonly class AuthUsers
     private function bulkUpdateSetActive(User $user, #[\SensitiveParameter] array $data, ?SystemMutationContext $context = null): bool
     {
         $data = $this->validateUpdateUserStatus($data);
+        if ($this->attributes->value($user, PrincipalAttribute::Active) === $data['active']) {
+            return true;
+        }
+        $this->security->advance($user, $data['active'] ? 'principal_enabled' : 'principal_disabled');
         if (! $data['active']) {
             if ($this->ownershipState->native()) {
                 $this->owners->assertPrincipalCanBeDisabled(SubjectReference::fromAuthenticatable($user));
@@ -115,6 +128,10 @@ final readonly class AuthUsers
     /** Soft-delete one principal and revoke its tokens. */
     private function bulkUpdateDelete(User $user, ?SystemMutationContext $context): bool
     {
+        if ($user->trashed()) {
+            return true;
+        }
+        $this->security->advance($user, 'principal_deleted');
         if ($this->ownershipState->native()) {
             $this->owners->assertPrincipalCanBeDisabled(SubjectReference::fromAuthenticatable($user));
         }
@@ -126,6 +143,10 @@ final readonly class AuthUsers
     /** Restore one principal after invalidating any pre-deletion credentials. */
     private function bulkUpdateRestore(User $user, ?SystemMutationContext $context): bool
     {
+        if (! $user->trashed()) {
+            return true;
+        }
+        $this->security->advance($user, 'principal_restored');
         $restored = (bool) $user->restore();
         $this->sessions->contain($user, 'restored', $context);
 
@@ -162,6 +183,8 @@ final readonly class AuthUsers
             if ($data['roles'] !== [] || $data['permissions'] !== []) {
                 $this->container->make(RbacManager::class)->assign($user, $data['roles'], $data['permissions']);
             }
+            $this->security->lock($user);
+            $this->security->lockChallenges($user);
             $reference = SubjectReference::fromAuthenticatable($user);
             $this->audits->record('user.created', subject: $reference, actor: $actor);
             $this->domainEvents->dispatch(new PrincipalChanged($this->attributes->identifier($user), 'created', ['email' => $this->attributes->value($user, PrincipalAttribute::Email)], AuthEventContext::centralIdentity()), $user->getConnection());
@@ -181,12 +204,16 @@ final readonly class AuthUsers
         $this->operations->central(AuthIdentityOperation::Profile, $subject);
         $user = $this->users->authenticated($this->canonical->resolve($subject));
         $deleted = DB::connection($user->getConnectionName())->transaction(function () use (&$user, $data): bool {
+            $this->security->assertTokenContainment($user);
             $user = $this->users->query()->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
             $this->confirmation->assertConfirmed($user, $data['currentPassword']);
+            $this->security->lock($user);
+            $this->security->lockChallenges($user);
             $reference = SubjectReference::fromAuthenticatable($user);
             if ($this->ownershipState->native()) {
                 $this->owners->assertPrincipalCanBeDisabled($reference);
             }
+            $this->security->advance($user, 'principal_deleted');
             $this->sessions->contain($user, 'self_deleted');
             $deleted = (bool) $user->delete();
             $this->audits->record('user.self_deleted', subject: $reference, actor: $user);
@@ -217,10 +244,14 @@ final readonly class AuthUsers
         }
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $context, $metadata, $user): bool {
+            $this->security->assertTokenContainment($user);
+            $this->security->lock($user);
+            $this->security->lockChallenges($user);
             $reference = SubjectReference::fromAuthenticatable($user);
             if ($this->ownershipState->native()) {
                 $this->owners->assertPrincipalCanBeDisabled($reference);
             }
+            $this->security->advance($user, 'principal_deleted');
             $this->sessions->contain($user, 'deleted', $context);
             $deleted = (bool) $user->delete();
             $this->audits->record('user.deleted', subject: $reference, actor: $actor, metadata: $metadata);
@@ -240,6 +271,14 @@ final readonly class AuthUsers
         $user = $this->users->find($user, true);
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $context, $metadata, $user): User {
+            $this->security->assertTokenContainment($user);
+            $this->security->lock($user);
+            $this->security->lockChallenges($user);
+            $user = $this->users->query(true)->whereKey($user->getKey())->firstOrFail();
+            if (! $user->trashed()) {
+                return $user;
+            }
+            $this->security->advance($user, 'principal_restored');
             $user->restore();
             $this->sessions->contain($user, 'restored', $context);
             $this->audits->record('user.restored', subject: SubjectReference::fromAuthenticatable($user), actor: $actor, metadata: $metadata);
@@ -265,6 +304,14 @@ final readonly class AuthUsers
         }
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $context, $data, $metadata, $user): User {
+            $this->security->assertTokenContainment($user);
+            $this->security->lock($user);
+            $this->security->lockChallenges($user);
+            $user = $this->users->query()->whereKey($user->getKey())->firstOrFail();
+            if ($this->attributes->value($user, PrincipalAttribute::Active) === $data['active']) {
+                return $user;
+            }
+            $this->security->advance($user, $data['active'] ? 'principal_enabled' : 'principal_disabled');
             if (! $data['active']) {
                 $this->owners->assertPrincipalCanBeDisabled(SubjectReference::fromAuthenticatable($user));
             }
@@ -291,6 +338,8 @@ final readonly class AuthUsers
         $user = $this->users->authenticated($this->canonical->resolve($subject));
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($data, $user): User {
+            $this->security->lock($user);
+            $this->security->lockChallenges($user);
             $user = $this->users->query()->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
             $attributes = array_diff_key($data, array_flip(['currentPassword']));
             $submittedEmail = $attributes['email'] ?? null;
@@ -313,6 +362,7 @@ final readonly class AuthUsers
             $this->audits->record('profile.updated', subject: $reference, actor: $user, metadata: ['attributes' => array_keys($attributes)]);
             $this->domainEvents->dispatch(new PrincipalChanged($this->attributes->identifier($user), 'profile_updated', ['attributes' => array_keys($attributes)], AuthEventContext::centralIdentity()), $user->getConnection());
             if ($emailChanged) {
+                $this->security->advance($user, 'email_changed');
                 $this->updateProfileRequestEmailVerification($user, $data);
             }
 
@@ -349,6 +399,11 @@ final readonly class AuthUsers
         $user = $this->users->find($user, true);
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $data, $user): User {
+            if (array_key_exists('password', $data)) {
+                $this->security->assertTokenContainment($user);
+            }
+            $this->security->lock($user);
+            $this->security->lockChallenges($user);
             $user = $this->users->query(true)->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
             $this->updateAuthorization->authorize($actor, 'nvl.auth.users.update', $user);
             if (array_key_exists('password', $data)) {
@@ -365,8 +420,13 @@ final readonly class AuthUsers
                     $attributes['emailVerified'] = false;
                 }
             }
+            $oldEmail = $this->attributes->value($user, PrincipalAttribute::Email);
             unset($attributes['password']);
             $user->update($this->attributes->map($attributes));
+            $emailChanged = array_key_exists('email', $data) && is_string($oldEmail) && mb_strtolower(trim($oldEmail)) !== mb_strtolower(trim($data['email']));
+            if (! array_key_exists('password', $data) && $emailChanged) {
+                $this->security->advance($user, 'email_changed');
+            }
             if (array_key_exists('password', $data)) {
                 if ($data['password'] === null) {
                     $user->forceFill([$this->attributes->column(PrincipalAttribute::Password) => null]);
@@ -375,6 +435,7 @@ final readonly class AuthUsers
                 }
                 $user->setRememberToken(Str::random(60));
                 $user->save();
+                $this->security->advance($user, 'password_admin_reset');
             }
             $reference = SubjectReference::fromAuthenticatable($user);
             $this->audits->record('user.updated', subject: $reference, actor: $actor, metadata: ['attributes' => array_keys($attributes)]);

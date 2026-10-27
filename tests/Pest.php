@@ -6,9 +6,12 @@ use Nvl\Auth\Tests\DisabledAuthProviderTestCase;
 use Nvl\Auth\Tests\FreshAdoptedAuthProviderTestCase;
 use Nvl\Auth\Tests\HostAuthAdoptionTestCase;
 use Nvl\Auth\Tests\NativeOwnerScenarioTestCase;
+use Nvl\Auth\Tests\SecurityConcurrencyTestCase;
 use Nvl\Auth\Tests\TestCase;
 
-$legacyFeatureFiles = glob(__DIR__.'/Feature/*Test.php') ?: [];
+$raceFiles = [__DIR__.'/Feature/CredentialConcurrencyTest.php', __DIR__.'/Feature/InvitationRegistrationRaceTest.php', __DIR__.'/Feature/SchemaOwnershipTest.php'];
+uses(SecurityConcurrencyTestCase::class)->in(...$raceFiles);
+$legacyFeatureFiles = array_diff(glob(__DIR__.'/Feature/*Test.php') ?: [], $raceFiles);
 uses(TestCase::class)->in(...$legacyFeatureFiles);
 uses(TestCase::class)->in(__DIR__.'/Unit');
 $nativeOwnerScenarios = [

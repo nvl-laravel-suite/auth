@@ -28,7 +28,7 @@ use Throwable;
 final readonly class AuthSocialIdentities
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private SocialProviderConfiguration $configuration, private SocialIdentityProviderFactory $providerFactory, private AuthOperationBoundary $operations, private SocialSubjectResolver $subjects, private AuthSubjectResolver $authSubjects, private AuthAuditRecorder $audits, private SecretHasher $hasher) {}
+    public function __construct(private FeatureGate $features, private SocialProviderConfiguration $configuration, private SocialIdentityProviderFactory $providerFactory, private AuthOperationBoundary $operations, private SocialSubjectResolver $subjects, private AuthSubjectResolver $authSubjects, private AuthAuditRecorder $audits, private SecretHasher $hasher, private PrincipalSecurity $security) {}
 
     /**
      * Return the provider redirect URL.
@@ -73,12 +73,8 @@ final readonly class AuthSocialIdentities
         }
         if ($subject === null) {
             $hash = $this->hasher->hash("social-identity-{$provider}", $identity->providerUserId);
-            $connection = (new SocialIdentity)->getConnectionName();
-            $linked = DB::connection($connection)->transaction(function () use ($provider, $hash, $identity): ?SocialIdentity {
-                $existing = SocialIdentity::query()->where('provider', $provider)->where('provider_user_id_hash', $hash)->lockForUpdate()->first();
-                if (! $existing instanceof SocialIdentity) {
-                    return null;
-                }
+            $existing = SocialIdentity::query()->where('provider', $provider)->where('provider_user_id_hash', $hash)->first();
+            if ($existing instanceof SocialIdentity) {
                 if ($existing->revoked_at !== null) {
                     throw new AuthException('social_identity_unavailable', 'The social identity is unavailable.', 404);
                 }
@@ -88,9 +84,6 @@ final readonly class AuthSocialIdentities
                 }
 
                 return $this->link($linkedSubject, $identity);
-            }, 3);
-            if ($linked instanceof SocialIdentity) {
-                return $linked;
             }
             if ($identity->email === null || trim($identity->email) === '' || ! $identity->emailVerified) {
                 throw new AuthException('social_email_unverified', 'The social provider did not prove the returned email address.', 422);
@@ -114,6 +107,8 @@ final readonly class AuthSocialIdentities
         $connection = (new SocialIdentity)->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($identity, $providerUserHash, $reference, $subject): SocialIdentity {
+            $this->security->lock($subject);
+            $this->security->lockChallenges($subject);
             /** @var SocialIdentity|null $existing */
             $existing = SocialIdentity::query()->where('provider', $identity->provider)->where('provider_user_id_hash', $providerUserHash)->lockForUpdate()->first();
             if ($existing instanceof SocialIdentity && $existing->revoked_at !== null) {
@@ -127,6 +122,9 @@ final readonly class AuthSocialIdentities
             }
             $record = $existing ?? new SocialIdentity;
             $record->fill(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'provider' => $identity->provider, 'provider_user_id' => $identity->providerUserId, 'provider_user_id_hash' => $providerUserHash, 'email' => $identity->email, 'profile' => ['name' => $identity->name, 'avatar' => $identity->avatar, ...$identity->profile, 'email_verified' => $identity->emailVerified, 'email_verification_source' => $identity->emailVerificationSource, 'issuer' => $identity->issuer], 'last_used_at' => now()])->save();
+            if ($existing === null) {
+                $this->security->advance($subject, 'social_linked');
+            }
             $this->audits->record('social_identity.linked', subject: $reference, actor: $subject, metadata: ['provider' => $identity->provider, 'social_identity_id' => $record->identifier()]);
 
             return $record;
@@ -144,11 +142,18 @@ final readonly class AuthSocialIdentities
             throw new AuthException('social_identity_unavailable', 'The social identity is unavailable.', 404);
         }
 
+        if ($identity->getConnection() !== (new SocialIdentity)->getConnection()) {
+            throw AuthException::invalidConfiguration('Credential mutations require the canonical source connection.');
+        }
+
         return DB::connection($identity->getConnectionName())->transaction(function () use ($identity, $reference, $subject): SocialIdentity {
+            $this->security->lock($subject);
+            $this->security->lockChallenges($subject);
             /** @var SocialIdentity $locked */
             $locked = SocialIdentity::query()->whereKey($identity->identifier())->lockForUpdate()->firstOrFail();
             if ($locked->revoked_at === null) {
                 $locked->forceFill(['revoked_at' => CarbonImmutable::now()])->save();
+                $this->security->advance($subject, 'social_revoked');
                 $this->audits->record('social_identity.revoked', subject: $reference, actor: $subject, metadata: ['provider' => $locked->provider, 'social_identity_id' => $locked->identifier()]);
             }
 

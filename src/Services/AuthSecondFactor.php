@@ -30,7 +30,7 @@ use SensitiveParameter;
 final readonly class AuthSecondFactor
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private TotpEngine $totp, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private AuthConfiguration $configuration, private SecretHasher $hasher) {}
+    public function __construct(private FeatureGate $features, private TotpEngine $totp, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private AuthConfiguration $configuration, private SecretHasher $hasher, private PrincipalSecurity $security) {}
 
     /**
      * Replace prior pending enrollments and return new provisioning material once.
@@ -50,8 +50,11 @@ final readonly class AuthSecondFactor
         $connection = (new TotpCredential)->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($data, $parameters, $reference, $secret, $subject): TotpEnrollment {
+            $this->security->lock($subject);
+            $this->security->lockChallenges($subject);
             TotpCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('confirmed_at')->whereNull('revoked_at')->delete();
             $credential = TotpCredential::query()->create(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'name' => $data['name'], 'secret' => $secret, ...$parameters]);
+            $this->security->advance($subject, 'totp_pending_replaced');
             $this->audits->record('totp.enrollment_started', subject: $reference, actor: $subject, metadata: ['credential_id' => $credential->identifier()]);
 
             return new TotpEnrollment($credential, $secret, $this->totp->provisioningUri($data['accountName'], $secret));
@@ -73,7 +76,13 @@ final readonly class AuthSecondFactor
         $data = $this->validateConfirmTotpEnrollment($data);
         $reference = SubjectReference::fromAuthenticatable($subject);
 
+        if ($credential->getConnection() !== (new TotpCredential)->getConnection()) {
+            throw AuthException::invalidConfiguration('Credential mutations require the canonical source connection.');
+        }
+
         return DB::connection($credential->getConnectionName())->transaction(function () use ($data, $credential, $reference, $subject): TotpCredential {
+            $this->security->lock($subject);
+            $this->security->lockChallenges($subject);
             /** @var TotpCredential $locked */
             $locked = TotpCredential::query()->lockForUpdate()->findOrFail($credential->identifier());
             if ($locked->subject_type !== $reference->type || $locked->subject_id !== $reference->identifier || $locked->confirmed_at !== null || $locked->revoked_at !== null) {
@@ -84,6 +93,7 @@ final readonly class AuthSecondFactor
                 throw new AuthException('totp_invalid', 'The TOTP code is invalid.', 422);
             }
             $locked->forceFill(['confirmed_at' => CarbonImmutable::now(), 'last_used_at' => CarbonImmutable::now(), 'last_accepted_timestep' => $timestep])->save();
+            $this->security->advance($subject, 'totp_enrolled');
             $this->audits->record('totp.enrolled', subject: $reference, actor: $subject, metadata: ['credential_id' => $locked->identifier()]);
 
             return $locked;
@@ -105,7 +115,9 @@ final readonly class AuthSecondFactor
         $reference = SubjectReference::fromAuthenticatable($subject);
         $connection = (new TotpCredential)->getConnectionName();
         $result = DB::connection($connection)->transaction(function () use ($data, $reference, $subject): AuthException|TotpCredential {
-            $credentials = TotpCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNotNull('confirmed_at')->whereNull('revoked_at')->lockForUpdate()->get();
+            $this->security->lock($subject);
+            $this->security->lockChallenges($subject);
+            $credentials = TotpCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNotNull('confirmed_at')->whereNull('revoked_at')->orderBy('id')->lockForUpdate()->get();
             foreach ($credentials as $credential) {
                 $timestep = $this->totp->acceptedTimestep($credential, $data['code']);
                 if ($timestep === null) {
@@ -138,11 +150,18 @@ final readonly class AuthSecondFactor
             throw new AuthException('totp_unavailable', 'The TOTP credential is unavailable.', 404);
         }
 
+        if ($credential->getConnection() !== (new TotpCredential)->getConnection()) {
+            throw AuthException::invalidConfiguration('Credential mutations require the canonical source connection.');
+        }
+
         return DB::connection($credential->getConnectionName())->transaction(function () use ($credential, $reference, $subject): TotpCredential {
+            $this->security->lock($subject);
+            $this->security->lockChallenges($subject);
             /** @var TotpCredential $locked */
             $locked = TotpCredential::query()->whereKey($credential->identifier())->lockForUpdate()->firstOrFail();
             if ($locked->revoked_at === null) {
                 $locked->forceFill(['revoked_at' => CarbonImmutable::now()])->save();
+                $this->security->advance($subject, 'totp_revoked');
                 $this->audits->record('totp.revoked', subject: $reference, actor: $subject, metadata: ['credential_id' => $locked->identifier()]);
             }
 
@@ -189,10 +208,13 @@ final readonly class AuthSecondFactor
         $connection = (new RecoveryCode)->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($batchId, $codes, $reference, $subject): GeneratedRecoveryCodes {
+            $this->security->lock($subject);
+            $this->security->lockChallenges($subject);
             RecoveryCode::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('used_at')->whereNull('revoked_at')->update(['revoked_at' => CarbonImmutable::now()]);
             foreach ($codes as $code) {
                 RecoveryCode::query()->create(['batch_id' => $batchId, 'subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'code_hash' => $this->hasher->hash('recovery-code', $code)]);
             }
+            $this->security->advance($subject, 'recovery_replaced');
             $this->audits->record('recovery_codes.regenerated', subject: $reference, actor: $subject, metadata: ['batch_id' => $batchId, 'count' => count($codes)]);
 
             return new GeneratedRecoveryCodes($batchId, $codes);
@@ -215,6 +237,8 @@ final readonly class AuthSecondFactor
         $connection = (new RecoveryCode)->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($data, $reference, $subject): RecoveryCode {
+            $this->security->lock($subject);
+            $this->security->lockChallenges($subject);
             /** @var RecoveryCode|null $record */
             $record = RecoveryCode::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->where('code_hash', $this->hasher->hash('recovery-code', Str::upper(trim($data['code']))))->whereNull('used_at')->whereNull('revoked_at')->lockForUpdate()->first();
             if (! $record instanceof RecoveryCode) {
@@ -237,7 +261,12 @@ final readonly class AuthSecondFactor
         $connection = (new RecoveryCode)->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($reference, $subject): int {
+            $this->security->lock($subject);
+            $this->security->lockChallenges($subject);
             $count = RecoveryCode::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('used_at')->whereNull('revoked_at')->update(['revoked_at' => CarbonImmutable::now()]);
+            if ($count > 0) {
+                $this->security->advance($subject, 'recovery_revoked');
+            }
             $this->audits->record('recovery_codes.revoked', subject: $reference, actor: $subject, metadata: ['count' => $count]);
 
             return $count;

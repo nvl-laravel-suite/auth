@@ -2,13 +2,25 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
+use Nvl\Auth\Models\PrincipalSecurityState;
 use Nvl\Auth\Services\AuthSchemaManager;
+use Nvl\Auth\Services\PrincipalSecurity;
 
-it('installs exactly the seventeen namespaced auth-owned tables', function (): void {
+beforeEach(function (): void {
+    $driver = getenv('NVL_C1_TEST_DRIVER');
+    if (in_array($driver, ['mysql', 'pgsql'], true)) {
+        expect(DB::connection()->getDriverName())->toBe($driver);
+    }
+});
+
+it('installs exactly the eighteen namespaced auth-owned tables', function (): void {
     $owned = [
+        'nvl_auth_principal_security_states',
         AuthTables::Users,
         AuthTables::Permissions,
         AuthTables::Roles,
@@ -181,4 +193,26 @@ it('uses configured identity provider table names consistently during installati
     }
 
     $identity->up();
+});
+
+it('repairs partial mandatory security state without changing retained revisions', function (): void {
+    $user = $this->user();
+    $security = app(PrincipalSecurity::class);
+    $security->revision($user);
+    $user->getConnection()->transaction(fn () => $security->advance($user, 'security_containment'));
+    Schema::table(AuthTables::PrincipalSecurityStates, function (Blueprint $table): void {
+        $table->dropUnique('nvl_auth_principal_security_states_subject_unique');
+        $table->dropColumn('updated_at');
+    });
+    $plan = app(AuthSchemaManager::class)->execute();
+    expect($plan['outdated'][AuthTables::PrincipalSecurityStates])->toContain('updated_at');
+    config(['nvl-auth.migrations.enabled' => false]);
+    expect(fn () => app(AuthSchemaManager::class)->execute(true))->toThrow(RuntimeException::class, 'host-owned');
+    expect(PrincipalSecurityState::query()->sole()->revision)->toBe(2);
+    config(['nvl-auth.migrations.enabled' => true]);
+    app(AuthSchemaManager::class)->execute(true);
+    $migration = require dirname(__DIR__, 2).'/database/migrations/2026_10_27_000001_nvl_auth_create_principal_security_states.php';
+    $migration->down();
+    expect($security->revision($user))->toBe(2)
+        ->and(Schema::hasIndex(AuthTables::PrincipalSecurityStates, 'nvl_auth_principal_security_states_subject_unique'))->toBeTrue();
 });

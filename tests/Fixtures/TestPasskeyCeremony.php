@@ -26,7 +26,7 @@ final class TestPasskeyCeremony implements PasskeyCeremony
     /**
      * Create the controllable ceremony fixture.
      */
-    public function __construct(private readonly bool $failBegin = false) {}
+    public function __construct(private readonly bool $failBegin = false, private readonly ?\Closure $beforeRegistration = null, private readonly ?\Closure $beforeAuthentication = null) {}
 
     /** {@inheritDoc} */
     public function beginRegistration(
@@ -41,9 +41,10 @@ final class TestPasskeyCeremony implements PasskeyCeremony
     public function finishRegistration(SubjectReference $subject, array $state, array $response): PasskeyRegistration
     {
         $this->requireValidResponse($response);
+        ($this->beforeRegistration)?->__invoke();
 
         return new PasskeyRegistration(
-            credentialId: 'test-credential',
+            credentialId: is_string($response['credential_id'] ?? null) ? $response['credential_id'] : 'test-credential',
             publicKey: 'test-public-key',
             userHandle: 'test-user-handle',
             signatureCounter: 1,
@@ -79,6 +80,7 @@ final class TestPasskeyCeremony implements PasskeyCeremony
         PasskeyCredential $credential,
     ): PasskeyAssertion {
         $this->requireValidResponse($response);
+        ($this->beforeAuthentication)?->__invoke();
         $this->verifiedCredential = $credential;
         $counter = $response['signature_counter'] ?? null;
 
