@@ -66,16 +66,21 @@ final readonly class AuthPasswords
             throw AuthException::invalidConfiguration('Password confirmation requires an Eloquent principal.');
         }
         $prototype = new ($subject::class);
-        $prototype->getConnection()->transaction(function () use ($subject, $data, $session): void {
+        $failedSubject = $prototype->getConnection()->transaction(function () use ($subject, $data, $session): ?Authenticatable {
             $subject = $this->canonical->resolve($subject, true);
             $reference = SubjectReference::fromAuthenticatable($subject);
             if (! $this->hasher->check($data['password'], (string) $subject->getAuthPassword())) {
-                $this->audits->record('password.confirmation_failed', outcome: 'failure', subject: $reference, actor: $subject);
-                throw new AuthException('password_invalid', 'The current password is invalid.', 422);
+                return $subject;
             }
             $session->put('auth.password_confirmed_at', time());
             $this->audits->record('password.confirmed', subject: $reference, actor: $subject);
+
+            return null;
         });
+        if ($failedSubject !== null) {
+            $this->audits->record('password.confirmation_failed', outcome: 'failure', subject: SubjectReference::fromAuthenticatable($failedSubject), actor: $failedSubject);
+            throw new AuthException('password_invalid', 'The current password is invalid.', 422);
+        }
     }
 
     /**
@@ -151,27 +156,43 @@ final readonly class AuthPasswords
                 throw AuthException::invalidConfiguration('Atomic password reset requires an authenticatable principal.');
             }
             $connection = $this->resetConnection($broker, $candidate);
-            $status = $connection->transaction(function () use ($broker, $candidate, $data, $identifierName): string {
-                $locked = $this->canonical->resolve($candidate, true);
-                if (! $locked instanceof CanResetPassword || ! $locked instanceof Model) {
-                    throw AuthException::invalidConfiguration('Password reset requires a resettable Eloquent principal.');
-                }
-
-                return $broker->reset([$identifierName => $data['identifier'], 'token' => $data['token'], 'password' => $data['password']], function (CanResetPassword $subject, #[SensitiveParameter] string $newPassword) use ($locked): void {
-                    if (! $subject instanceof Model || $subject::class !== $locked::class || ! $subject->is($locked)) {
-                        throw AuthException::invalidConfiguration('Password broker returned a different principal.');
+            $rejection = new class
+            {
+                public ?SubjectReference $subject = null;
+            };
+            try {
+                $status = $connection->transaction(function () use ($broker, $candidate, $data, $identifierName, $rejection): string {
+                    $locked = $this->canonical->resolve($candidate, true);
+                    if (! $locked instanceof CanResetPassword || ! $locked instanceof Model) {
+                        throw AuthException::invalidConfiguration('Password reset requires a resettable Eloquent principal.');
                     }
-                    $this->eligibility->assertEligible($locked, AuthenticationPurpose::PasswordReset);
-                    $this->passwords->update($locked, $newPassword);
-                    $locked->setRememberToken(Str::random(60));
-                    $locked->save();
-                    $event = new PasswordReset($locked);
-                    $this->eventCommits->afterCommit($locked->getConnection(), static function () use ($event): void {
-                        event($event);
+
+                    return $broker->reset([$identifierName => $data['identifier'], 'token' => $data['token'], 'password' => $data['password']], function (CanResetPassword $subject, #[SensitiveParameter] string $newPassword) use ($locked, $rejection): void {
+                        if (! $subject instanceof Model || $subject::class !== $locked::class || ! $subject->is($locked)) {
+                            throw AuthException::invalidConfiguration('Password broker returned a different principal.');
+                        }
+                        try {
+                            $this->eligibility->assertEligible($locked, AuthenticationPurpose::PasswordReset);
+                        } catch (AuthException $exception) {
+                            $rejection->subject = SubjectReference::fromAuthenticatable($locked);
+                            throw $exception;
+                        }
+                        $this->passwords->update($locked, $newPassword);
+                        $locked->setRememberToken(Str::random(60));
+                        $locked->save();
+                        $event = new PasswordReset($locked);
+                        $this->eventCommits->afterCommit($locked->getConnection(), static function () use ($event): void {
+                            event($event);
+                        });
+                        $this->audits->record('password.reset', subject: SubjectReference::fromAuthenticatable($locked));
                     });
-                    $this->audits->record('password.reset', subject: SubjectReference::fromAuthenticatable($locked));
                 });
-            });
+            } catch (AuthException $exception) {
+                if ($rejection->subject !== null) {
+                    $this->audits->record('password.reset_rejected', outcome: 'failure', subject: $rejection->subject, metadata: ['reason' => $exception->errorCode]);
+                }
+                throw $exception;
+            }
 
             return $status;
         });

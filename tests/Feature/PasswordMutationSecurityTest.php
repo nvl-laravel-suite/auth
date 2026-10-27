@@ -17,6 +17,7 @@ use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
+use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\Authentication;
 use Nvl\Auth\Services\AuthInvitations;
 use Nvl\Auth\Services\AuthPasswords;
@@ -262,4 +263,54 @@ it('keeps submitted passwords out of raw and decrypted audit facts', function ()
             expect($raw)->not->toContain($secret)->and($decrypted)->not->toContain($secret);
         }
     }
+});
+
+it('requires verification authority before creating a verified principal', function (): void {
+    $actor = $this->user('create-verification-actor@example.test');
+    app()->instance(AuthManagementAccess::class, new class implements AuthManagementAccess
+    {
+        public function allows(Authenticatable $actor, string $ability, mixed $target = null): bool
+        {
+            return $ability === 'nvl.auth.users.create';
+        }
+    });
+    expect(fn () => app(AuthUsers::class)->create($actor, ['name' => 'Denied', 'email' => 'denied-verified@example.test', 'password' => 'secure-password-123', 'emailVerified' => true]))->toThrow(AuthException::class)
+        ->and(User::query()->where('email', 'denied-verified@example.test')->exists())->toBeFalse();
+});
+
+it('persists failed confirmation audits and respects an enclosing rollback', function (): void {
+    $user = $this->user('confirm-audit@example.test');
+    $confirm = fn () => app(AuthPasswords::class)->confirm($user, ['password' => 'incorrect-password'], app('session')->driver());
+    expect($confirm)->toThrow(AuthException::class);
+    $audits = AuthAudit::query()->where('action', 'password.confirmation_failed');
+    expect($audits->count())->toBe(1)->and($audits->first()->subject_id)->toBe($user->id);
+    $connection = $user->getConnection();
+    $connection->beginTransaction();
+    expect($confirm)->toThrow(AuthException::class)->and($audits->count())->toBe(2);
+    $connection->rollBack();
+    expect($audits->count())->toBe(1);
+});
+
+it('authorizes verified creation against an unpersisted configured principal', function (): void {
+    $actor = $this->user('allowed-verification-actor@example.test');
+    $access = new class implements AuthManagementAccess
+    {
+        public mixed $target = null;
+
+        public function allows(Authenticatable $actor, string $ability, mixed $target = null): bool
+        {
+            if ($ability === 'nvl.auth.users.verifyEmail') {
+                $this->target = $target;
+
+                return $target instanceof User && ! $target->exists;
+            }
+
+            return $ability === 'nvl.auth.users.create';
+        }
+    };
+    app()->instance(AuthManagementAccess::class, $access);
+    $user = app(AuthUsers::class)->create($actor, ['name' => 'Allowed', 'email' => 'allowed-verified@example.test', 'password' => 'secure-password-123', 'emailVerified' => true]);
+    expect($user->email_verified_at)->not->toBeNull()
+        ->and($access->target->email)->toBe('allowed-verified@example.test')
+        ->and($access->target->password)->toBeNull();
 });

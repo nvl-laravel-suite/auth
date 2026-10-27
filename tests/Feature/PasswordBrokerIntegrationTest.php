@@ -14,6 +14,7 @@ use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Services\AuthPasswords;
 
 it('applies replaceable eligibility before reset delivery and credential mutation', function (): void {
@@ -32,6 +33,15 @@ it('applies replaceable eligibility before reset delivery and credential mutatio
 
     expect(fn () => app(AuthPasswords::class)->reset(['identifier' => $user->email, 'token' => $event->request->payload['token'], 'password' => 'replacement-password', 'passwordConfirmation' => 'replacement-password']))->toThrow(AuthException::class, 'Host policy')
         ->and(Hash::check('correct-password', $user->refresh()->password))->toBeTrue();
+    $rejections = AuthAudit::query()->where('action', 'password.reset_rejected');
+    expect($rejections->count())->toBe(1)
+        ->and($rejections->first()->metadata['reason'])->toBe('host_subject_ineligible');
+    $connection = $user->getConnection();
+    $connection->beginTransaction();
+    expect(fn () => app(AuthPasswords::class)->reset(['identifier' => $user->email, 'token' => $event->request->payload['token'], 'password' => 'replacement-password', 'passwordConfirmation' => 'replacement-password']))->toThrow(AuthException::class)
+        ->and($rejections->count())->toBe(2);
+    $connection->rollBack();
+    expect($rejections->count())->toBe(1);
 
     Event::fake([AuthDeliveryRequested::class]);
     app(AuthPasswords::class)->requestReset(['identifier' => $user->email]);

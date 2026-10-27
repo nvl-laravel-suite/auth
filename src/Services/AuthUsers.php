@@ -145,7 +145,12 @@ final readonly class AuthUsers
             $this->createAuthorization->authorize($actor, 'nvl.auth.users.manageAccess');
         }
         $class = $this->models->userClass();
-        $connection = (new $class)->getConnectionName();
+        $prototype = new $class;
+        if ($data['emailVerified']) {
+            $prototype->forceFill($this->attributes->map(array_diff_key($data, array_flip(['roles', 'permissions', 'password']))));
+            $this->createAuthorization->authorize($actor, 'nvl.auth.users.verifyEmail', $prototype);
+        }
+        $connection = $prototype->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($actor, $class, $data): User {
             $user = $class::query()->create($this->attributes->map(array_diff_key($data, array_flip(['roles', 'permissions', 'password']))));
