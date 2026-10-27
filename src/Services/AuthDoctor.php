@@ -628,6 +628,10 @@ final class AuthDoctor
      */
     private function indexReady(Builder $schema, string $table, string $name, bool $unique): bool
     {
+        if ($table === AuthTables::PrincipalSecurityStates) {
+            return PrincipalSecuritySchema::indexReady($schema);
+        }
+
         return collect($schema->getIndexes($table))->contains(static fn (array $index): bool => $index['name'] === $name && $index['unique'] === $unique);
     }
 

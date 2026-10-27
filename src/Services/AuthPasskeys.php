@@ -133,7 +133,7 @@ final readonly class AuthPasskeys
             if ($principal === null || SubjectReference::fromAuthenticatable($principal) != new SubjectReference($candidate->subject_type, $candidate->subject_id)) {
                 throw new AuthException('passkey_invalid', 'The passkey credential is unavailable.', 422);
             }
-            $revision = $this->security->revision($principal);
+            $revision = $this->security->revisionSnapshot($principal);
             $assertion = $this->ceremony()->finishAuthentication(is_array($snapshot->payload) ? $snapshot->payload : [], $data['response'], new PasskeyCredential(credentialId: $candidate->credential_id, publicKey: $candidate->public_key, userHandle: $candidate->user_handle, signatureCounter: $candidate->signature_counter, backupEligible: $candidate->backup_eligible, backedUp: $candidate->backed_up));
         } catch (Throwable $exception) {
             $assertion = new AuthException('passkey_invalid', 'The passkey assertion was rejected.', 422, previous: $exception);

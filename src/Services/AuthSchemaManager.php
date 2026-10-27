@@ -99,7 +99,7 @@ final readonly class AuthSchemaManager
             if (! in_array($table, $required, true) || ! $schema->hasTable($table)) {
                 continue;
             }
-            $missing = array_values(array_filter($indexes, static fn (string $index): bool => ! $schema->hasIndex($table, $index, $table === AuthTables::PrincipalSecurityStates ? 'unique' : null)));
+            $missing = array_values(array_filter($indexes, static fn (string $index): bool => $table === AuthTables::PrincipalSecurityStates ? ! PrincipalSecuritySchema::indexReady($schema) : ! $schema->hasIndex($table, $index)));
             if ($missing !== []) {
                 $missingIndexes[$table] = $missing;
             }

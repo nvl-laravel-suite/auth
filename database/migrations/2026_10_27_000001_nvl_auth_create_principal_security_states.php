@@ -6,6 +6,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Contracts\AuthSchemaMigration;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Services\PrincipalSecuritySchema;
 use Nvl\Support\Config\PackageStorage;
 
 return new class extends Migration implements AuthSchemaMigration
@@ -37,6 +38,9 @@ return new class extends Migration implements AuthSchemaMigration
         if (! $schema->hasColumns($name, ['id', 'subject_type', 'subject_id'])) {
             throw new RuntimeException('Security state identity columns require a data-preserving host migration.');
         }
+        if ($schema->hasIndex($name, self::INDEX) && ! PrincipalSecuritySchema::indexReady($schema)) {
+            throw new RuntimeException('Security state requires a full unique subject index on (subject_type, subject_id); repair the conflicting host index without rewriting data.');
+        }
         foreach (['revision', 'created_at', 'updated_at'] as $column) {
             if (! $schema->hasColumn($name, $column)) {
                 $schema->table($name, function (Blueprint $table) use ($column): void {
@@ -47,9 +51,6 @@ return new class extends Migration implements AuthSchemaMigration
                     }
                 });
             }
-        }
-        if ($schema->hasIndex($name, self::INDEX) && ! $schema->hasIndex($name, self::INDEX, 'unique')) {
-            throw new RuntimeException('Security state requires a unique subject index; repair the conflicting host index without rewriting data.');
         }
         if (! $schema->hasIndex($name, self::INDEX)) {
             $schema->table($name, fn (Blueprint $table) => $table->unique(['subject_type', 'subject_id'], self::INDEX));

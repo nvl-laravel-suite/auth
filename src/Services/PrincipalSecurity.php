@@ -73,6 +73,17 @@ final readonly class PrincipalSecurity
         return $this->principal($subject)->getConnection()->transaction(fn (): int => $this->lock($subject)->revision, 3);
     }
 
+    /** Read a nonlocking revision snapshot without creating state, even in a host transaction.
+     * Revalidate this value under lock before accepting provider verification.
+     */
+    public function revisionSnapshot(Authenticatable $subject): int
+    {
+        $reference = SubjectReference::fromAuthenticatable($this->principal($subject, lock: false));
+        $state = PrincipalSecurityState::query()->useWritePdo()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->first();
+
+        return $state->revision ?? 1;
+    }
+
     /** Advance inside the owning transaction; rollback restores every invalidation. */
     public function advance(Authenticatable $subject, string $reason): int
     {
@@ -125,7 +136,7 @@ final readonly class PrincipalSecurity
     }
 
     /** Require persisted canonical storage, retaining soft-deleted principal identity. */
-    private function principal(Authenticatable $subject): Model&Authenticatable
+    private function principal(Authenticatable $subject, bool $lock = true): Model&Authenticatable
     {
         if (! $subject instanceof Model || ! $subject->exists) {
             throw AuthException::invalidConfiguration('Security state requires a persisted Eloquent principal.');
@@ -139,7 +150,7 @@ final readonly class PrincipalSecurity
             throw AuthException::invalidConfiguration('Principal and security state require canonical storage on the same actual connection.');
         }
         $query = $prototype->newQuery()->withoutGlobalScope(SoftDeletingScope::class)->useWritePdo()->whereKey($subject->getRawOriginal($prototype->getKeyName()));
-        if ($prototype->getConnection()->transactionLevel() > 0) {
+        if ($lock && $prototype->getConnection()->transactionLevel() > 0) {
             $query->lockForUpdate();
         }
         $fresh = $query->first();

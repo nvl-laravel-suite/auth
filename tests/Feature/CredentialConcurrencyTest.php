@@ -296,3 +296,61 @@ it('enforces one persisted security state per canonical subject', function (): v
         ->toThrow(UniqueConstraintViolationException::class);
     expect(PrincipalSecurityState::query()->count())->toBe(1);
 });
+
+it('takes a read-only passkey snapshot before provider verification inside a host transaction', function (bool $hasState): void {
+    config(['nvl-auth.features.passkeys.enabled' => true]);
+    $observed = [];
+    app()->instance(PasskeyCeremony::class, new TestPasskeyCeremony(beforeAuthentication: static function () use (&$observed): void {
+        $observed = ['queries' => DB::connection()->getQueryLog(), 'level' => DB::connection()->transactionLevel(), 'states' => PrincipalSecurityState::query()->count()];
+    }));
+    $user = $this->user();
+    $service = app(AuthPasskeys::class);
+    $registration = $service->beginRegistration($user);
+    $passkey = $service->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]]);
+    if (! $hasState) {
+        PrincipalSecurityState::query()->delete();
+    }
+    $authentication = $service->beginAuthentication($user);
+    DB::beginTransaction();
+    try {
+        DB::connection()->flushQueryLog();
+        DB::connection()->enableQueryLog();
+        $result = $service->finishAuthentication(['ceremonyId' => $authentication->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2]]);
+        expect($result['subject']->identifier)->toBe((string) $user->getKey())
+            ->and(DB::connection()->transactionLevel())->toBe(1)
+            ->and($passkey->refresh()->signature_counter)->toBe(2);
+    } finally {
+        DB::connection()->disableQueryLog();
+        DB::rollBack();
+    }
+    expect($observed['level'])->toBe(1)
+        ->and($observed['states'])->toBe($hasState ? 1 : 0)
+        ->and(array_filter($observed['queries'], static fn (array $query): bool => preg_match('/\b(for update|insert|update|delete|savepoint)\b/i', $query['query']) === 1))->toBe([])
+        ->and($passkey->refresh()->signature_counter)->toBe(1)
+        ->and(PrincipalSecurityState::query()->count())->toBe($hasState ? 1 : 0)
+        ->and(Challenge::query()->where('type', 'passkey_authentication')->sole()->consumed_at)->toBeNull();
+})->with(['retained state' => true, 'uninitialized state' => false]);
+
+it('rejects passkey revision or credential drift after provider verification in a host transaction', function (string $drift): void {
+    config(['nvl-auth.features.passkeys.enabled' => true]);
+    app()->instance(PasskeyCeremony::class, new TestPasskeyCeremony(beforeAuthentication: static function () use ($drift): void {
+        if ($drift === 'revision') {
+            PrincipalSecurityState::query()->increment('revision');
+        } else {
+            Passkey::query()->sole()->forceFill(['public_key' => 'changed-during-verification'])->save();
+        }
+    }));
+    $user = $this->user();
+    $service = app(AuthPasskeys::class);
+    $registration = $service->beginRegistration($user);
+    $passkey = $service->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => ['valid' => true]]);
+    $authentication = $service->beginAuthentication($user);
+    DB::beginTransaction();
+    try {
+        expect(fn () => $service->finishAuthentication(['ceremonyId' => $authentication->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2]]))->toThrow(AuthException::class, 'unavailable');
+        expect($passkey->refresh()->signature_counter)->toBe(1)
+            ->and(Challenge::query()->where('type', 'passkey_authentication')->sole()->consumed_at)->toBeNull();
+    } finally {
+        DB::rollBack();
+    }
+})->with(['revision', 'credential']);
