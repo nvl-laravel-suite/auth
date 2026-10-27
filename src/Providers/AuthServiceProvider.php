@@ -201,6 +201,9 @@ final class AuthServiceProvider extends ServiceProvider implements OwnershipInte
             $this->loadMigrationsFrom($root.'/database/migrations');
         }
         if ($configuration->enabled() && $configuration->featureEnabled(AuthFeature::ApiTokens)) {
+            if (! class_exists(Sanctum::class)) {
+                throw AuthException::invalidConfiguration('API tokens require laravel/sanctum.');
+            }
             $models = $this->app->make(AuthModelRegistry::class);
             Sanctum::usePersonalAccessTokenModel($models->personalAccessTokenClass());
         }
