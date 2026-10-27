@@ -62,6 +62,10 @@ final readonly class SocialProviderConfiguration
                 throw AuthException::invalidConfiguration("Social provider [{$provider}] parameters must be scalar.");
             }
 
+            if (in_array(strtolower($key), ['state', 'client_id', 'client_secret', 'redirect_uri', 'response_type', 'scope', 'nonce', 'code_challenge', 'code_challenge_method', 'code_verifier'], true)) {
+                throw AuthException::invalidConfiguration("Social provider [{$provider}] parameters contain a reserved OAuth parameter.");
+            }
+
             $normalizedParameters[$key] = $value;
         }
 

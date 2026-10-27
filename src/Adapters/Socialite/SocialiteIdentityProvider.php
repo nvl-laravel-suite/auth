@@ -7,6 +7,9 @@ namespace Nvl\Auth\Adapters\Socialite;
 use Laravel\Socialite\AbstractUser;
 use Laravel\Socialite\Contracts\Provider;
 use Laravel\Socialite\Two\AbstractProvider;
+use Laravel\Socialite\Two\GithubProvider;
+use Laravel\Socialite\Two\GoogleProvider;
+use Nvl\Auth\Adapters\Socialite\Contracts\SocialiteEmailVerification;
 use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\ValueObjects\ExternalIdentity;
@@ -19,7 +22,7 @@ final readonly class SocialiteIdentityProvider implements SocialIdentityProvider
     /**
      * Create the Socialite adapter.
      */
-    public function __construct(private Provider $providerDriver, private string $providerName) {}
+    public function __construct(private Provider $providerDriver, private string $providerName, private ?SocialiteEmailVerification $emailVerification = null, private ?string $issuer = null) {}
 
     /**
      * Build a stateful provider authorization URL.
@@ -44,9 +47,9 @@ final readonly class SocialiteIdentityProvider implements SocialIdentityProvider
             }
 
             if ($parameters !== []) {
-                if (array_key_exists('state', $parameters)) {
+                if (array_intersect(array_map('strtolower', array_keys($parameters)), ['state', 'client_id', 'client_secret', 'redirect_uri', 'response_type', 'scope', 'nonce', 'code_challenge', 'code_challenge_method', 'code_verifier']) !== []) {
                     throw AuthException::invalidConfiguration(
-                        'Socialite state is reserved and cannot be replaced by provider parameters.',
+                        'OAuth protocol parameters are reserved and cannot be replaced by provider parameters.',
                     );
                 }
                 $driver->with($parameters);
@@ -62,13 +65,7 @@ final readonly class SocialiteIdentityProvider implements SocialIdentityProvider
     public function user(string $provider, ?string $callbackUrl): ExternalIdentity
     {
         $user = $this->driver($provider, $callbackUrl)->user();
-        $providerUserId = $user->getId();
-
-        if (trim($providerUserId) === '') {
-            throw AuthException::invalidConfiguration(
-                "Socialite provider [{$provider}] returned no immutable user identifier.",
-            );
-        }
+        $providerUserId = $this->normalizeIdentifier($user->getId(), $provider);
 
         $email = $user->getEmail();
         if (! $user instanceof AbstractUser) {
@@ -77,28 +74,14 @@ final readonly class SocialiteIdentityProvider implements SocialIdentityProvider
             );
         }
 
-        $raw = $user->getRaw();
-        $verificationSource = null;
-        $emailVerified = false;
-
-        foreach (['email_verified', 'verified_email'] as $claim) {
-            if (! array_key_exists($claim, $raw)) {
-                continue;
-            }
-
-            $verificationSource = "socialite.raw.{$claim}";
-            $emailVerified = filter_var($raw[$claim], FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) === true;
-
-            break;
+        $policy = $this->emailVerification;
+        if ($policy === null && get_class($this->providerDriver) === GoogleProvider::class) {
+            $policy = new GoogleEmailVerification;
+        } elseif ($policy === null && get_class($this->providerDriver) === GithubProvider::class
+            && in_array('user:email', $this->providerDriver->getScopes(), true)) {
+            $policy = new GithubEmailVerification;
         }
-
-        if (is_string($email) && trim($email) !== '' && ! $emailVerified) {
-            throw new AuthException(
-                'social_email_unverified',
-                "Socialite provider [{$provider}] did not prove the returned email address.",
-                422,
-            );
-        }
+        $verification = $policy?->verification($user) ?? ['verified' => false, 'source' => null];
 
         return new ExternalIdentity(
             provider: $provider,
@@ -107,9 +90,22 @@ final readonly class SocialiteIdentityProvider implements SocialIdentityProvider
             name: $user->getName(),
             avatar: $user->getAvatar(),
             profile: ['nickname' => $user->getNickname()],
-            emailVerified: $emailVerified,
-            emailVerificationSource: $verificationSource,
+            emailVerified: $verification['verified'],
+            emailVerificationSource: $verification['source'],
+            issuer: $this->issuer,
         );
+    }
+
+    /** Normalize the SDK's untyped identifier without numeric coercion. */
+    private function normalizeIdentifier(mixed $identifier, string $provider): string
+    {
+        if ((! is_string($identifier) && ! is_int($identifier)) || trim((string) $identifier) === '') {
+            throw AuthException::invalidConfiguration(
+                "Socialite provider [{$provider}] returned no immutable user identifier.",
+            );
+        }
+
+        return (string) $identifier;
     }
 
     /**

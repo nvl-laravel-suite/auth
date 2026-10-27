@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Enums\AuthFeature;
@@ -27,7 +28,7 @@ use Throwable;
 final readonly class AuthSocialIdentities
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private SocialProviderConfiguration $configuration, private SocialIdentityProviderFactory $providerFactory, private AuthOperationBoundary $operations, private SocialSubjectResolver $subjects, private AuthAuditRecorder $audits, private SecretHasher $hasher) {}
+    public function __construct(private FeatureGate $features, private SocialProviderConfiguration $configuration, private SocialIdentityProviderFactory $providerFactory, private AuthOperationBoundary $operations, private SocialSubjectResolver $subjects, private AuthSubjectResolver $authSubjects, private AuthAuditRecorder $audits, private SecretHasher $hasher) {}
 
     /**
      * Return the provider redirect URL.
@@ -67,8 +68,30 @@ final readonly class AuthSocialIdentities
         } catch (Throwable $exception) {
             throw new AuthException('social_authorization_failed', 'The social authorization could not be completed.', 422, previous: $exception);
         }
-        if ($subject === null && $identity->email !== null && ! $identity->emailVerified) {
-            throw new AuthException('social_email_unverified', 'The social provider did not prove the returned email address.', 422);
+        if ($identity->provider !== $provider) {
+            throw AuthException::invalidConfiguration('The social identity belongs to a different provider.');
+        }
+        if ($subject === null) {
+            $hash = $this->hasher->hash("social-identity-{$provider}", $identity->providerUserId);
+            $connection = (new SocialIdentity)->getConnectionName();
+            $linked = DB::connection($connection)->transaction(function () use ($provider, $hash, $identity): ?SocialIdentity {
+                $existing = SocialIdentity::query()->where('provider', $provider)->where('provider_user_id_hash', $hash)->whereNull('revoked_at')->lockForUpdate()->first();
+                if (! $existing instanceof SocialIdentity) {
+                    return null;
+                }
+                $linkedSubject = $this->authSubjects->resolve(new SubjectReference($existing->subject_type, $existing->subject_id));
+                if ($linkedSubject === null) {
+                    throw new AuthException('social_identity_unavailable', 'The social identity is unavailable.', 404);
+                }
+
+                return $this->link($linkedSubject, $identity);
+            }, 3);
+            if ($linked instanceof SocialIdentity) {
+                return $linked;
+            }
+            if ($identity->email === null || trim($identity->email) === '' || ! $identity->emailVerified) {
+                throw new AuthException('social_email_unverified', 'The social provider did not prove the returned email address.', 422);
+            }
         }
         $resolvedSubject = $subject ?? $this->subjects->resolve($identity);
         $record = $this->link($resolvedSubject, $identity);
@@ -93,8 +116,11 @@ final readonly class AuthSocialIdentities
             if ($existing instanceof SocialIdentity && ($existing->subject_type !== $reference->type || $existing->subject_id !== $reference->identifier)) {
                 throw new AuthException('social_identity_conflict', 'The social identity is already linked.', 409);
             }
+            if ($existing instanceof SocialIdentity && ($existing->profile['issuer'] ?? null) !== $identity->issuer) {
+                throw new AuthException('social_identity_conflict', 'The social identity issuer does not match the existing link.', 409);
+            }
             $record = $existing ?? new SocialIdentity;
-            $record->fill(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'provider' => $identity->provider, 'provider_user_id' => $identity->providerUserId, 'provider_user_id_hash' => $providerUserHash, 'email' => $identity->email, 'profile' => ['name' => $identity->name, 'avatar' => $identity->avatar, ...$identity->profile, 'email_verified' => $identity->emailVerified, 'email_verification_source' => $identity->emailVerificationSource], 'last_used_at' => now(), 'revoked_at' => null])->save();
+            $record->fill(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'provider' => $identity->provider, 'provider_user_id' => $identity->providerUserId, 'provider_user_id_hash' => $providerUserHash, 'email' => $identity->email, 'profile' => ['name' => $identity->name, 'avatar' => $identity->avatar, ...$identity->profile, 'email_verified' => $identity->emailVerified, 'email_verification_source' => $identity->emailVerificationSource, 'issuer' => $identity->issuer], 'last_used_at' => now(), 'revoked_at' => null])->save();
             $this->audits->record('social_identity.linked', subject: $reference, actor: $subject, metadata: ['provider' => $identity->provider, 'social_identity_id' => $record->identifier()]);
 
             return $record;

@@ -62,13 +62,22 @@ user-verification policy before a passkey-enabled deployment is ready.
 
 ## Social identities
 
-Provider identity is `(provider, immutable provider user ID)`. Email is a claim,
-not ownership authority. The configured `SocialSubjectResolver` decides whether to
-resolve, provision, or reject a subject. Auth does not persist OAuth access or
-refresh tokens and does not auto-link by email. The Socialite adapter requires a
-true raw `email_verified` or `verified_email` claim whenever an email is
-returned, and `ExternalIdentity` carries the normalized boolean plus provenance.
-Custom resolvers matching by email must enforce both.
+Provider identity is a configured connection alias and immutable provider ID. A
+validated, fixed issuer can be supplied as provenance; existing links reject issuer
+changes, so changing a connection realm requires an explicit migration. Email is
+an optional claim, not ownership authority. An authenticated subject can link a
+proved provider identity without verified email. For an unauthenticated callback,
+an active immutable link can resolve its subject without email; unknown identities
+require verified email before the configured `SocialSubjectResolver` is called.
+Custom resolvers matching by email must inspect the verification and provenance.
+
+The Socialite adapter recognizes Google's boolean `email_verified` userinfo claim.
+For the unmodified GitHub SDK driver, it recognizes the SDK's verified-primary
+email endpoint only when `user:email` is in the effective driver scopes. Other
+drivers fail closed unless the host explicitly supplies a
+`SocialiteEmailVerification` policy backed by that provider's proof. The host is
+responsible for matching its policy to the driver and its returned claims. OAuth
+protocol parameters are reserved. No access or refresh tokens enter the identity.
 
 ## API tokens and RBAC
 
