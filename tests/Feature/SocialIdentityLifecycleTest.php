@@ -85,7 +85,7 @@ it('permits an authenticated subject to link without email but rejects unknown u
     $linked = $service->completeAuthorization('github', $user);
     expect($service->completeAuthorization('github')->id)->toBe($linked->id);
     $service->revoke($user, $linked);
-    expect(fn () => $service->completeAuthorization('github'))->toThrow(AuthException::class, 'did not prove');
+    expect(fn () => $service->completeAuthorization('github'))->toThrow(AuthException::class, 'unavailable');
 });
 
 it('rejects an identity whose returned provider does not match before persistence', function (): void {
@@ -116,4 +116,25 @@ it('rejects oversized external identity claims and invalid issuers', function ()
     expect(fn () => new ExternalIdentity('github', str_repeat('x', 16_384)))->toThrow(InvalidArgumentException::class);
     expect(fn () => new ExternalIdentity('google', 'subject', issuer: 'http://issuer.example'))->toThrow(InvalidArgumentException::class);
     expect(fn () => new ExternalIdentity('google', 'subject', issuer: 'https://issuer.example?query=1'))->toThrow(InvalidArgumentException::class);
+});
+
+it('rejects a verified callback and direct link for a revoked identity without invoking the resolver', function (): void {
+    config()->set('nvl-auth.features.social_identities.enabled', true);
+    config()->set('nvl-auth.features.social_identities.settings.providers.github', ['scopes' => [], 'parameters' => []]);
+    $external = new ExternalIdentity('github', 'revoked-subject', 'verified@example.test', emailVerified: true, emailVerificationSource: 'test.verified');
+    $this->app->instance(SocialIdentityProviderFactory::class, new TestSocialIdentityProviderFactory(new TestSocialIdentityProvider(identity: $external)));
+    $user = $this->user();
+    $resolver = Mockery::mock(SocialSubjectResolver::class);
+    $resolver->shouldReceive('resolve')->andReturn($user);
+    $this->app->instance(SocialSubjectResolver::class, $resolver);
+    $service = app(AuthSocialIdentities::class);
+    $linked = $service->link($user, $external);
+    $service->revoke($user, $linked);
+    $revokedAt = $linked->refresh()->revoked_at;
+
+    expect(fn () => $service->completeAuthorization('github'))->toThrow(AuthException::class);
+    $resolver->shouldNotHaveReceived('resolve');
+    expect($linked->refresh()->revoked_at?->equalTo($revokedAt))->toBeTrue();
+    expect(fn () => $service->link($user, $external))->toThrow(AuthException::class);
+    expect($linked->refresh()->revoked_at?->equalTo($revokedAt))->toBeTrue();
 });

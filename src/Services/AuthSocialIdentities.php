@@ -75,9 +75,12 @@ final readonly class AuthSocialIdentities
             $hash = $this->hasher->hash("social-identity-{$provider}", $identity->providerUserId);
             $connection = (new SocialIdentity)->getConnectionName();
             $linked = DB::connection($connection)->transaction(function () use ($provider, $hash, $identity): ?SocialIdentity {
-                $existing = SocialIdentity::query()->where('provider', $provider)->where('provider_user_id_hash', $hash)->whereNull('revoked_at')->lockForUpdate()->first();
+                $existing = SocialIdentity::query()->where('provider', $provider)->where('provider_user_id_hash', $hash)->lockForUpdate()->first();
                 if (! $existing instanceof SocialIdentity) {
                     return null;
+                }
+                if ($existing->revoked_at !== null) {
+                    throw new AuthException('social_identity_unavailable', 'The social identity is unavailable.', 404);
                 }
                 $linkedSubject = $this->authSubjects->resolve(new SubjectReference($existing->subject_type, $existing->subject_id));
                 if ($linkedSubject === null) {
@@ -113,6 +116,9 @@ final readonly class AuthSocialIdentities
         return DB::connection($connection)->transaction(function () use ($identity, $providerUserHash, $reference, $subject): SocialIdentity {
             /** @var SocialIdentity|null $existing */
             $existing = SocialIdentity::query()->where('provider', $identity->provider)->where('provider_user_id_hash', $providerUserHash)->lockForUpdate()->first();
+            if ($existing instanceof SocialIdentity && $existing->revoked_at !== null) {
+                throw new AuthException('social_identity_unavailable', 'The social identity is unavailable.', 404);
+            }
             if ($existing instanceof SocialIdentity && ($existing->subject_type !== $reference->type || $existing->subject_id !== $reference->identifier)) {
                 throw new AuthException('social_identity_conflict', 'The social identity is already linked.', 409);
             }
@@ -120,7 +126,7 @@ final readonly class AuthSocialIdentities
                 throw new AuthException('social_identity_conflict', 'The social identity issuer does not match the existing link.', 409);
             }
             $record = $existing ?? new SocialIdentity;
-            $record->fill(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'provider' => $identity->provider, 'provider_user_id' => $identity->providerUserId, 'provider_user_id_hash' => $providerUserHash, 'email' => $identity->email, 'profile' => ['name' => $identity->name, 'avatar' => $identity->avatar, ...$identity->profile, 'email_verified' => $identity->emailVerified, 'email_verification_source' => $identity->emailVerificationSource, 'issuer' => $identity->issuer], 'last_used_at' => now(), 'revoked_at' => null])->save();
+            $record->fill(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'provider' => $identity->provider, 'provider_user_id' => $identity->providerUserId, 'provider_user_id_hash' => $providerUserHash, 'email' => $identity->email, 'profile' => ['name' => $identity->name, 'avatar' => $identity->avatar, ...$identity->profile, 'email_verified' => $identity->emailVerified, 'email_verification_source' => $identity->emailVerificationSource, 'issuer' => $identity->issuer], 'last_used_at' => now()])->save();
             $this->audits->record('social_identity.linked', subject: $reference, actor: $subject, metadata: ['provider' => $identity->provider, 'social_identity_id' => $record->identifier()]);
 
             return $record;
