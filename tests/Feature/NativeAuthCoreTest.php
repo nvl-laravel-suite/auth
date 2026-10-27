@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Event;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthenticationAssurancePolicy;
 use Nvl\Auth\Contracts\AuthPipelineStage;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Enums\AuthenticationDestination;
 use Nvl\Auth\Enums\AuthenticationMethod;
@@ -33,6 +34,7 @@ use Nvl\Auth\Tests\Fixtures\RejectLoginStage;
 use Nvl\Auth\Traits\IssuesAuthenticationProofs;
 use Nvl\Auth\ValueObjects\AuthenticationEvidence;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
+use Nvl\Auth\ValueObjects\AuthenticationVerification;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\IssuedAuthenticationProof;
 use PragmaRX\Google2FA\Google2FA;
@@ -341,15 +343,19 @@ it('requires native enrolled proof before stateful success and consumes the serv
     $session = app('session.store');
     $session->start();
     $guard = auth()->guard('web');
-    Event::fake([UserAuthenticated::class]);
+    Event::fake([UserAuthenticated::class, AuthenticationRejected::class]);
 
     expect(fn () => $login->login(['identifier' => $user->email, 'password' => 'correct-password'], ['remember' => true, 'ipAddress' => '203.0.113.20'], $guard, $session))
         ->toThrow(AuthException::class, 'second factor')
         ->and($login->hasPendingSecondFactor($session))->toBeTrue()
         ->and($guard->check())->toBeFalse()
         ->and($user->fresh()->last_login_at)->toBeNull()
-        ->and(AuthAudit::query()->where('action', 'authentication.succeeded')->count())->toBe(0);
+        ->and(AuthAudit::query()->where('action', 'authentication.succeeded')->count())->toBe(0)
+        ->and(AuthAudit::query()->where('action', 'authentication.factor_required')->count())->toBe(1)
+        ->and(AuthAudit::query()->where('action', 'authentication.factor_required')->first()->subject_id)->toBe($user->id)
+        ->and(AuthAudit::query()->whereIn('action', ['authentication.failed', 'authentication.rejected'])->count())->toBe(0);
     Event::assertNotDispatched(UserAuthenticated::class);
+    Event::assertNotDispatched(AuthenticationRejected::class);
     expect(fn () => $login->completeSecondFactor(['code' => 'invalid'], $guard, $session))->toThrow(AuthException::class)
         ->and($guard->check())->toBeFalse();
     $authenticated = $login->completeSecondFactor(['recoveryCode' => $recovery->codes[0]], $guard, $session);
@@ -359,6 +365,9 @@ it('requires native enrolled proof before stateful success and consumes the serv
         ->and($user->fresh()->last_login_ip)->toBe('203.0.113.20')
         ->and(fn () => $login->completeSecondFactor(['recoveryCode' => $recovery->codes[0]], $guard, $session))->toThrow(AuthException::class);
     Event::assertDispatchedTimes(UserAuthenticated::class, 1);
+    expect(AuthAudit::query()->where('action', 'authentication.factor_required')->count())->toBe(1);
+    $audit = AuthAudit::query()->where('action', 'authentication.factor_required')->firstOrFail();
+    expect($audit->actor_id)->toBe($user->id)->and($audit->metadata)->toBeEmpty();
 });
 
 it('rejects stateful credential identity eligibility and password changes after the configured login pipeline', function (string $change): void {
@@ -525,6 +534,29 @@ it('publishes native proof contracts and complete credential operations without 
     expect($catalog[Authentication::class]['methods'])->toContain('login', 'loginWithToken', 'proveCredentials', 'proveCredentialsForToken')
         ->and($catalog[AuthenticationSessions::class]['methods'])->toContain('establishFromProof')->not->toContain('establish', 'establishForPurpose')
         ->and($catalog[Authentication::class]['methods'])->not->toContain('passwordProof', 'issueNativeProof')
-        ->and($catalog[AuthenticationProofs::class]['methods'])->not->toContain('recheck')
-        ->and($catalog)->not->toHaveKey(IssuesAuthenticationProofs::class);
+        ->and($catalog[AuthenticationProofs::class]['methods'])->not->toContain('recheck', 'consumeForFinalization')
+        ->and($catalog)->not->toHaveKeys([IssuesAuthenticationProofs::class, AuthenticationVerification::class])
+        ->and((new ReflectionClass(AuthenticationEvidence::class))->hasProperty('passwordBinding'))->toBeFalse();
 });
+
+it('preserves the mapped password identifier in browser and token login pipeline contexts', function (string $destination): void {
+    $user = $this->user();
+    $user->forceFill(['name' => $user->email])->save();
+    config(['nvl-auth.features.principal_management.settings.attributes.email' => 'name', 'nvl-auth.features.principal_management.settings.attributes.name' => 'email']);
+    app()->forgetInstance(PrincipalAttributeMapper::class);
+    $attributes = null;
+    nativeStatelessStage(function (AuthPipelineContext $context, Closure $next) use (&$attributes): mixed {
+        $attributes = $context->attributes;
+
+        return $next($context);
+    });
+    $credentials = ['identifier' => $user->email, 'password' => 'correct-password'];
+    if ($destination === 'browser') {
+        app(Authentication::class)->login($credentials, ['remember' => true], auth()->guard('web'), app('session.store'));
+    } else {
+        app(Authentication::class)->loginWithToken($credentials, ['name' => 'Mapped login', 'abilities' => ['profile:read']]);
+    }
+    expect($attributes)->toBe($destination === 'browser'
+        ? ['method' => 'credential_login', 'remember' => true, 'identifier_name' => 'name']
+        : ['method' => 'credential_login', 'stateless' => true, 'identifier_name' => 'name']);
+})->with(['browser', 'token']);

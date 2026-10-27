@@ -2,20 +2,26 @@
 
 declare(strict_types=1);
 
+use Nvl\Auth\Contracts\AuthenticationAssurancePolicy;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
+use Nvl\Auth\Enums\AuthenticationDestination;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Services\AuthChallenges;
 use Nvl\Auth\Services\Authentication;
+use Nvl\Auth\Services\AuthenticationProofs;
 use Nvl\Auth\Services\AuthenticationSessions;
 use Nvl\Auth\Services\AuthPasskeys;
 use Nvl\Auth\Services\AuthSocialIdentities;
+use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\Tests\Fixtures\TestPasskeyCeremony;
 use Nvl\Auth\Tests\Fixtures\TestSocialIdentityProviderFactory;
 use Nvl\Auth\Tests\Fixtures\TestSocialSubjectResolver;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
+use Nvl\Auth\ValueObjects\AuthenticationVerification;
 use PragmaRX\Google2FA\Google2FA;
 
 it('requires enrolled MFA even when the optional TOTP method is disabled', function (): void {
@@ -83,3 +89,51 @@ it('applies enrolled MFA to every native primary method and retains verified pas
             ->and(app(Authentication::class)->hasPendingSecondFactor($session))->toBeFalse();
     }
 })->with(['password', 'email_link', 'email_code', 'social', 'uv_passkey', 'non_uv_passkey']);
+
+it('keeps credential fingerprints outside consumer assurance evidence representations', function (): void {
+    $user = $this->user();
+    $captured = [];
+    $policy = Mockery::mock(AuthenticationAssurancePolicy::class);
+    $policy->shouldReceive('assertSatisfied')->andReturnUsing(function ($subject, $evidence) use (&$captured): void {
+        $captured[] = $evidence;
+    });
+    app()->instance(AuthenticationAssurancePolicy::class, $policy);
+    app(Authentication::class)->login(['identifier' => $user->email, 'password' => 'correct-password'], [], auth()->guard('web'), app('session.store'));
+    $fingerprint = app(SecretHasher::class)->hash('native-password-proof', $user->fresh()->getAuthPassword());
+    $verification = AuthenticationVerification::fromChallenge(Challenge::query()->where('type', 'authentication_proof')->firstOrFail());
+    ob_start();
+    var_dump($verification);
+    $debug = ob_get_clean();
+    expect($debug)->not->toContain($fingerprint)
+        ->and(get_object_vars($verification))->toHaveKeys(['evidence'])->not->toHaveKey('passwordBinding')
+        ->and(fn () => json_encode($verification, JSON_THROW_ON_ERROR))->toThrow(LogicException::class)
+        ->and(fn () => serialize($verification))->toThrow(LogicException::class)
+        ->and($verification->matchesPasswordBinding($fingerprint))->toBeTrue()
+        ->and($verification->matchesPasswordBinding('changed-credential'))->toBeFalse();
+    $context = new AuthenticationRequestContext(guardName: 'web', sessionBinding: app('session.store')->getId());
+    $proof = app(Authentication::class)->proveCredentials(['identifier' => $user->email, 'password' => 'correct-password'], $context);
+    $consumed = app(AuthenticationProofs::class)->consume($proof->reveal(), AuthenticationDestination::Session, $context);
+    expect(array_keys($consumed))->toBe(['subject', 'evidence']);
+    expect($captured)->not->toBeEmpty();
+    foreach ($captured as $evidence) {
+        ob_start();
+        var_dump($evidence);
+        $debug = ob_get_clean();
+        expect(get_object_vars($evidence))->not->toHaveKey('passwordBinding')
+            ->and(json_encode($evidence, JSON_THROW_ON_ERROR))->not->toContain($fingerprint)
+            ->and($debug)->not->toContain($fingerprint)
+            ->and(serialize($evidence))->not->toContain($fingerprint);
+    }
+});
+
+it('retains the credential snapshot across consumer assurance hooks', function (): void {
+    $user = $this->user();
+    $policy = Mockery::mock(AuthenticationAssurancePolicy::class);
+    $policy->shouldReceive('assertSatisfied')->once()->andReturnUsing(function () use ($user): void {
+        $user->newQuery()->whereKey($user->id)->update(['password' => password_hash('replacement-password', PASSWORD_BCRYPT, ['cost' => 4])]);
+    });
+    app()->instance(AuthenticationAssurancePolicy::class, $policy);
+    expect(fn () => app(Authentication::class)->login(['identifier' => $user->email, 'password' => 'correct-password'], [], auth()->guard('web'), app('session.store')))
+        ->toThrow(AuthException::class, 'proof is invalid');
+    expect(auth()->guard('web')->check())->toBeFalse();
+});

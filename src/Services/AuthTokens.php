@@ -11,9 +11,11 @@ use Illuminate\Support\Facades\Validator;
 use InvalidArgumentException;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Contracts\TransactionalApiTokenManager;
 use Nvl\Auth\Enums\AuthenticationDestination;
+use Nvl\Auth\Enums\AuthenticationMethod;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\AuthenticationRejected;
@@ -37,7 +39,7 @@ use Throwable;
 final readonly class AuthTokens
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private ApiTokenPolicy $policy, private ApiTokenManager $tokens, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, private AuthCommittedAudit $committedAudits, private AuthenticationProofs $proofs, private SuccessfulLoginMetadataRecorder $loginMetadata, private DomainEventDispatcher $domainEvents, private ConnectionCommitCallbacks $commits) {}
+    public function __construct(private FeatureGate $features, private ApiTokenPolicy $policy, private ApiTokenManager $tokens, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, private AuthCommittedAudit $committedAudits, private AuthenticationProofs $proofs, private SuccessfulLoginMetadataRecorder $loginMetadata, private DomainEventDispatcher $domainEvents, private ConnectionCommitCallbacks $commits, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes) {}
 
     /** Complete stateless authentication from a native namespace-bound proof.
      * @param  array{name: string, abilities: list<string>, expiresAt?: CarbonImmutable|null}  $token
@@ -48,7 +50,7 @@ final readonly class AuthTokens
         $this->features->assertAllowed(AuthFeature::Authentication, FeatureOperation::Use);
         $this->features->assertAllowed(AuthFeature::ApiTokens, FeatureOperation::Issue);
         try {
-            $consumed = $this->proofs->consume($proof, AuthenticationDestination::ApiToken, $context);
+            $consumed = $this->proofs->consumeForFinalization($proof, AuthenticationDestination::ApiToken, $context);
         } catch (AuthException $exception) {
             $this->audits->record('authentication.rejected', outcome: 'failure', metadata: ['reason' => $exception->errorCode, 'stateless' => true]);
             $this->domainEvents->dispatch(new AuthenticationRejected('subject_reference', '', $exception->errorCode), (new AuthAudit)->getConnection());
@@ -56,6 +58,7 @@ final readonly class AuthTokens
         }
         $subject = $consumed['subject'];
         $evidence = $consumed['evidence'];
+        $verification = $consumed['verification'];
         $connection = $subject->getConnection();
         if ($this->connection($subject) !== $connection || (new AuthAudit)->getConnection() !== $connection) {
             throw AuthException::invalidConfiguration('Stateless authentication requires principal, token and audit writes on one connection.');
@@ -63,21 +66,25 @@ final readonly class AuthTokens
 
         $sourceCommitted = false;
         try {
-            return $connection->transaction(function () use ($evidence, $token, $context, $connection, &$sourceCommitted): array {
+            return $connection->transaction(function () use ($evidence, $verification, $token, $context, $connection, &$sourceCommitted): array {
                 $this->commits->afterCommit($connection, static function () use (&$sourceCommitted): void {
                     $sourceCommitted = true;
                 });
-                $principal = $this->proofs->recheck($evidence);
+                $principal = $this->proofs->recheck($verification);
                 $reference = $evidence->subject;
-                $authenticated = $this->pipeline->run('login', new AuthPipelineContext('login', ['method' => $evidence->method->purpose()->value, 'stateless' => true], $reference), fn (): Authenticatable => $principal);
+                $attributes = ['method' => $evidence->method->purpose()->value, 'stateless' => true];
+                if ($evidence->method === AuthenticationMethod::Password) {
+                    $attributes['identifier_name'] = $this->principalAttributes->identifierColumn($this->configuration->string('identifier', 'email'));
+                }
+                $authenticated = $this->pipeline->run('login', new AuthPipelineContext('login', $attributes, $reference), fn (): Authenticatable => $principal);
                 if ($authenticated::class !== $principal::class || SubjectReference::fromAuthenticatable($authenticated) != $reference) {
                     throw new AuthException('login_rejected', 'The login pipeline changed the authenticated principal.', 422);
                 }
-                $principal = $this->proofs->recheck($evidence);
+                $principal = $this->proofs->recheck($verification);
                 $issued = $this->create($principal, $token);
-                $principal = $this->proofs->recheck($evidence);
+                $principal = $this->proofs->recheck($verification);
                 $this->loginMetadata->record($principal, $context);
-                $this->proofs->recheck($evidence);
+                $this->proofs->recheck($verification);
                 $this->committedAudits->withRecorder($this->audits)->record($connection, 'authentication.succeeded', subject: $reference, actor: $principal, metadata: ['method' => $evidence->method->purpose()->value, 'stateless' => true]);
                 $this->domainEvents->dispatch(new UserAuthenticated($reference), $connection);
 

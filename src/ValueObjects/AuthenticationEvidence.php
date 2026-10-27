@@ -28,7 +28,6 @@ final readonly class AuthenticationEvidence
         public array $factors,
         public AuthenticationRequestContext $context,
         public ?string $provider,
-        #[\SensitiveParameter] public ?string $passwordBinding,
     ) {}
 
     /**
@@ -51,7 +50,6 @@ final readonly class AuthenticationEvidence
             }
         }
         $provider = $facts['provider'] ?? null;
-        $passwordBinding = $facts['passwordBinding'] ?? null;
         if ($challenge->type !== 'authentication_proof' || $method === null || $destination === null
             || $challenge->purpose !== $method->purpose()->value || ! is_string($challenge->subject_type) || ! is_string($challenge->subject_id)
             || ! is_int($facts['revision'] ?? null) || $facts['revision'] < 1 || ! is_int($facts['verifiedAt'] ?? null)
@@ -60,9 +58,7 @@ final readonly class AuthenticationEvidence
             || in_array('user_verified', $factors, true) && $method !== AuthenticationMethod::Passkey
             || in_array('totp', $factors, true) && in_array('recovery', $factors, true)
             || ! is_array($facts['context'] ?? null)
-            || $passwordBinding !== null && ! is_string($passwordBinding)
             || $provider !== null && ! is_string($provider)
-            || $method === AuthenticationMethod::Password && ! is_string($passwordBinding)
             || $method === AuthenticationMethod::Social && ! is_string($provider)) {
             throw new AuthException('authentication_proof_invalid', 'The authentication proof is invalid or expired.', 422);
         }
@@ -73,7 +69,7 @@ final readonly class AuthenticationEvidence
         $context = AuthenticationRequestContext::fromFacts($facts['context']);
         $context->assertBound($destination);
 
-        return new self(new SubjectReference($challenge->subject_type, $challenge->subject_id), $method, $destination, $facts['revision'], $verified, $challenge->expires_at, $factors, $context, $provider, $passwordBinding);
+        return new self(new SubjectReference($challenge->subject_type, $challenge->subject_id), $method, $destination, $facts['revision'], $verified, $challenge->expires_at, $factors, $context, $provider);
     }
 
     public function satisfiesMfa(): bool

@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Contracts\Session\Session;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Enums\AuthenticationDestination;
 use Nvl\Auth\Enums\AuthenticationMethod;
@@ -40,7 +41,7 @@ final readonly class AuthenticationSessions
     /**
      * Create the session establishment use case.
      */
-    public function __construct(private FeatureGate $features, private OwnerAuthenticationSelection $ownerSelection, private AuthPipeline $pipeline, private SuccessfulLoginMetadataRecorder $loginMetadata, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private AuthenticationProofs $proofs, private AuthManager $auth) {}
+    public function __construct(private FeatureGate $features, private OwnerAuthenticationSelection $ownerSelection, private AuthPipeline $pipeline, private SuccessfulLoginMetadataRecorder $loginMetadata, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private AuthenticationProofs $proofs, private AuthManager $auth, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes) {}
 
     private const string PendingFactorLogin = 'nvl-auth.credential_login';
 
@@ -54,7 +55,7 @@ final readonly class AuthenticationSessions
             throw new AuthException('authentication_binding_invalid', 'The authentication browser binding does not match.', 422);
         }
         try {
-            $consumed = $this->proofs->consume($proof, AuthenticationDestination::Session, $context);
+            $consumed = $this->proofs->consumeForFinalization($proof, AuthenticationDestination::Session, $context);
         } catch (AuthException $exception) {
             if ($exception->errorCode === 'second_factor_required') {
                 $session->put(self::PendingFactorLogin, ['proof' => $proof, 'requestContext' => $context, 'remember' => $remember]);
@@ -68,6 +69,7 @@ final readonly class AuthenticationSessions
         $session->forget(self::PendingFactorLogin);
         $subject = $consumed['subject'];
         $evidence = $consumed['evidence'];
+        $verification = $consumed['verification'];
         $reference = $evidence->subject;
         $purpose = $evidence->method->purpose();
         $requestContext = $evidence->context;
@@ -83,18 +85,22 @@ final readonly class AuthenticationSessions
             $subject = $consumed['subject'];
             $connection = $subject->getConnection();
 
-            return $connection->transaction(function () use ($purpose, $reference, $remember, $guard, $session, $requestContext, $evidence, &$guardMutationStarted): Authenticatable {
-                $canonical = $this->proofs->recheck($evidence);
-                $authenticated = $this->pipeline->run('login', new AuthPipelineContext('login', ['method' => $purpose->value, 'remember' => $remember], $reference), fn (): Authenticatable => $canonical);
+            return $connection->transaction(function () use ($purpose, $reference, $remember, $guard, $session, $requestContext, $evidence, $verification, &$guardMutationStarted): Authenticatable {
+                $canonical = $this->proofs->recheck($verification);
+                $attributes = ['method' => $purpose->value, 'remember' => $remember];
+                if ($evidence->method === AuthenticationMethod::Password) {
+                    $attributes['identifier_name'] = $this->principalAttributes->identifierColumn($this->configuration->string('identifier', 'email'));
+                }
+                $authenticated = $this->pipeline->run('login', new AuthPipelineContext('login', $attributes, $reference), fn (): Authenticatable => $canonical);
                 if ($authenticated::class !== $canonical::class || SubjectReference::fromAuthenticatable($authenticated) != $reference) {
                     throw new AuthException('login_rejected', 'The login pipeline changed the authenticated principal.', 422);
                 }
-                $canonical = $this->proofs->recheck($evidence);
+                $canonical = $this->proofs->recheck($verification);
                 $guardMutationStarted = true;
                 $guard->login($canonical, $remember);
                 $session->regenerate(true);
                 $this->loginMetadata->record($canonical, $requestContext);
-                $canonical = $this->proofs->recheck($evidence);
+                $canonical = $this->proofs->recheck($verification);
                 $this->audits->record('authentication.succeeded', subject: $reference, actor: $canonical, metadata: ['method' => $purpose->value]);
                 $this->ownerSelection->select($canonical, $requestContext, $purpose === AuthenticationPurpose::SocialLogin ? OwnerAuthenticationPurpose::SocialLogin : $requestContext->ownerPurpose ?? OwnerAuthenticationPurpose::Login);
                 $this->domainEvents->dispatch(new UserAuthenticated($reference), $canonical->getConnection());

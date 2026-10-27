@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
+use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthenticationAssurancePolicy;
 use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
@@ -17,6 +18,7 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\ValueObjects\AuthenticationEvidence;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
+use Nvl\Auth\ValueObjects\AuthenticationVerification;
 use Nvl\Auth\ValueObjects\IssuedAuthenticationProof;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Auth\CanonicalActorResolver;
@@ -29,25 +31,48 @@ use Throwable;
  */
 final readonly class AuthenticationProofs
 {
-    public function __construct(private AuthIdentityChallenges $records, private PrincipalSecurity $security, private SecretHasher $hasher, private AuthSubjectResolver $subjects, private AuthenticationEligibility $eligibility, private EnrolledFactorAssurancePolicy $enrollment, private AuthenticationAssurancePolicy $assurance, private AuthSecondFactor $secondFactor, private CanonicalActorResolver $actors, private PrincipalEligibility $nativeEligibility) {}
+    public function __construct(private AuthIdentityChallenges $records, private PrincipalSecurity $security, private SecretHasher $hasher, private AuthSubjectResolver $subjects, private AuthenticationEligibility $eligibility, private EnrolledFactorAssurancePolicy $enrollment, private AuthenticationAssurancePolicy $assurance, private AuthSecondFactor $secondFactor, private CanonicalActorResolver $actors, private PrincipalEligibility $nativeEligibility, private AuthAuditRecorder $audits) {}
 
     /** @return array{subject: Model&Authenticatable, evidence: AuthenticationEvidence} */
     public function consume(#[\SensitiveParameter] string $proof, AuthenticationDestination $destination, AuthenticationRequestContext $context): array
     {
+        $consumed = $this->consumeForFinalization($proof, $destination, $context);
+
+        return ['subject' => $consumed['subject'], 'evidence' => $consumed['evidence']];
+    }
+
+    /**
+     * Retain the private verified snapshot only for native finalizer rechecks.
+     *
+     * @internal
+     *
+     * @return array{subject: Model&Authenticatable, evidence: AuthenticationEvidence, verification: AuthenticationVerification}
+     */
+    public function consumeForFinalization(#[\SensitiveParameter] string $proof, AuthenticationDestination $destination, AuthenticationRequestContext $context): array
+    {
         $snapshot = $this->find($proof);
         $candidate = $this->subject($snapshot);
 
-        return $candidate->getConnection()->transaction(function () use ($proof, $destination, $context, $candidate): array {
-            $this->security->lock($candidate);
-            $this->security->lockChallenges($candidate);
-            $challenge = $this->find($proof, true);
-            $evidence = $this->evidence($challenge, $destination, $context);
-            $subject = $this->recheck($evidence);
-            $challenge->consumed_at = CarbonImmutable::now('UTC');
-            $this->records->save($challenge);
+        $verification = null;
+        try {
+            return $candidate->getConnection()->transaction(function () use ($proof, $destination, $context, $candidate, &$verification): array {
+                $this->security->lock($candidate);
+                $this->security->lockChallenges($candidate);
+                $challenge = $this->find($proof, true);
+                $verification = $this->verification($challenge, $destination, $context);
+                $subject = $this->recheck($verification);
+                $challenge->consumed_at = CarbonImmutable::now('UTC');
+                $this->records->save($challenge);
 
-            return ['subject' => $subject, 'evidence' => $evidence];
-        });
+                return ['subject' => $subject, 'evidence' => $verification->evidence, 'verification' => $verification];
+            });
+        } catch (AuthException $exception) {
+            if ($exception->errorCode === 'second_factor_required' && $destination === AuthenticationDestination::Session
+                && $verification?->evidence->method === AuthenticationMethod::Password) {
+                $this->audits->record('authentication.factor_required', subject: $verification->evidence->subject, actor: $candidate);
+            }
+            throw $exception;
+        }
     }
 
     /** Complete a primary capability using a native one-use factor; no method/factor claims accepted.
@@ -67,8 +92,9 @@ final readonly class AuthenticationProofs
             $this->security->lock($candidate);
             $this->security->lockChallenges($candidate);
             $challenge = $this->find($proof, true);
-            $evidence = $this->evidence($challenge, $destination, $context);
-            $subject = $this->recheck($evidence, assurance: false);
+            $verification = $this->verification($challenge, $destination, $context);
+            $evidence = $verification->evidence;
+            $subject = $this->recheck($verification, assurance: false);
             $challenge->attempts++;
             $this->records->save($challenge);
             try {
@@ -102,16 +128,17 @@ final readonly class AuthenticationProofs
      *
      * @internal
      */
-    public function recheck(AuthenticationEvidence $evidence, bool $assurance = true): Model&Authenticatable
+    public function recheck(#[\SensitiveParameter] AuthenticationVerification $verification, bool $assurance = true): Model&Authenticatable
     {
-        $subject = $this->canonical($evidence);
+        $evidence = $verification->evidence;
+        $subject = $this->canonical($verification);
         $this->nativeEligibility->assertEligible($subject, $evidence->method->purpose());
         $this->eligibility->assertEligible($subject, $evidence->method->purpose());
         if ($assurance) {
             $this->enrollment->assertSatisfied($subject, $evidence, $evidence->method->purpose());
             $this->assurance->assertSatisfied($subject, $evidence, $evidence->method->purpose());
         }
-        $subject = $this->canonical($evidence);
+        $subject = $this->canonical($verification);
         $this->nativeEligibility->assertEligible($subject, $evidence->method->purpose());
         if ($assurance) {
             $this->enrollment->assertSatisfied($subject, $evidence, $evidence->method->purpose());
@@ -120,8 +147,9 @@ final readonly class AuthenticationProofs
         return $subject;
     }
 
-    private function canonical(AuthenticationEvidence $evidence): Model&Authenticatable
+    private function canonical(#[\SensitiveParameter] AuthenticationVerification $verification): Model&Authenticatable
     {
+        $evidence = $verification->evidence;
         $candidate = $this->subjects->resolve($evidence->subject);
         if (! $candidate instanceof Model) {
             throw $this->invalid();
@@ -134,7 +162,7 @@ final readonly class AuthenticationProofs
         if (! $subject instanceof Model || SubjectReference::fromAuthenticatable($subject) != $evidence->subject
             || $subject->getConnection() !== (new Challenge)->getConnection()
             || $this->security->lock($subject)->revision !== $evidence->revision
-            || $evidence->method === AuthenticationMethod::Password && ! hash_equals((string) $evidence->passwordBinding, $this->hasher->hash('native-password-proof', $subject->getAuthPassword()))) {
+            || $evidence->method === AuthenticationMethod::Password && ! $verification->matchesPasswordBinding($this->hasher->hash('native-password-proof', $subject->getAuthPassword()))) {
             throw $this->invalid();
         }
 
@@ -147,7 +175,7 @@ final readonly class AuthenticationProofs
         try {
             $challenge = $this->find($proof);
             $subject = $this->subject($challenge);
-            $subject->getConnection()->transaction(fn () => $this->recheck(AuthenticationEvidence::fromChallenge($challenge), assurance: false));
+            $subject->getConnection()->transaction(fn () => $this->recheck(AuthenticationVerification::fromChallenge($challenge), assurance: false));
 
             return true;
         } catch (AuthException) {
@@ -169,15 +197,16 @@ final readonly class AuthenticationProofs
         return $challenge;
     }
 
-    private function evidence(Challenge $challenge, AuthenticationDestination $destination, AuthenticationRequestContext $context): AuthenticationEvidence
+    private function verification(#[\SensitiveParameter] Challenge $challenge, AuthenticationDestination $destination, AuthenticationRequestContext $context): AuthenticationVerification
     {
         $context->assertBound($destination);
-        $evidence = AuthenticationEvidence::fromChallenge($challenge);
+        $verification = AuthenticationVerification::fromChallenge($challenge);
+        $evidence = $verification->evidence;
         if ($evidence->destination !== $destination || $evidence->context->facts() !== $context->facts()) {
             throw $this->invalid();
         }
 
-        return $evidence;
+        return $verification;
     }
 
     private function subject(Challenge $challenge): Model&Authenticatable
