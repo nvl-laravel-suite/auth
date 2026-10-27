@@ -24,6 +24,7 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\PrincipalAttribute;
+use Nvl\Auth\Enums\PrincipalMutation;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Enums\UserBulkOperation;
 use Nvl\Auth\Events\PrincipalChanged;
@@ -44,7 +45,7 @@ use Nvl\Support\Events\DomainEventDispatcher;
 final readonly class AuthUsers
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private MutationAuthorizer $authorization, private UserLocator $users, private AuthAuditRecorder $audits, private PrincipalAttributeMapper $attributes, private PrincipalSessionContainment $sessions, private AuthMemberships $owners, private AuthOwnershipState $ownershipState, private DomainEventDispatcher $domainEvents, private ManagementAuthorizer $createAuthorization, private AuthModelRegistry $models, private Container $container, private AuthOperationBoundary $operations, private ManagementAuthorizer $updateAuthorization, private PasswordUpdater $passwords, private PasswordValidationRules $passwordPolicy, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private AuthenticationSessions $browserSessions, private AuthEmailVerification $emailVerification) {}
+    public function __construct(private FeatureGate $features, private MutationAuthorizer $authorization, private UserLocator $users, private AuthAuditRecorder $audits, private PrincipalAttributeMapper $attributes, private PrincipalSessionContainment $sessions, private AuthMemberships $owners, private AuthOwnershipState $ownershipState, private DomainEventDispatcher $domainEvents, private ManagementAuthorizer $createAuthorization, private AuthModelRegistry $models, private Container $container, private AuthOperationBoundary $operations, private ManagementAuthorizer $updateAuthorization, private PasswordUpdater $passwords, private PasswordValidationRules $passwordPolicy, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private AuthenticationSessions $browserSessions, private AuthEmailVerification $emailVerification, private PrincipalExtensions $extensions) {}
 
     /**
      * Apply one operation to at most one hundred principals.
@@ -166,13 +167,17 @@ final readonly class AuthUsers
         $class = $this->models->userClass();
         $prototype = new $class;
         if ($data['emailVerified']) {
-            $prototype->forceFill($this->attributes->map(array_diff_key($data, array_flip(['roles', 'permissions', 'password']))));
+            $prototype->forceFill($this->attributes->map(array_diff_key($data, array_flip(['roles', 'permissions', 'password', 'extensions']))));
             $this->createAuthorization->authorize($actor, 'nvl.auth.users.verifyEmail', $prototype);
         }
         $connection = $prototype->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($actor, $class, $data): User {
-            $user = $class::query()->create($this->attributes->map(array_diff_key($data, array_flip(['roles', 'permissions', 'password']))));
+            $mapped = $this->attributes->map(array_diff_key($data, array_flip(['roles', 'permissions', 'password', 'extensions'])));
+            if ($data['extensions'] !== null) {
+                $mapped += $this->extensions->map(PrincipalMutation::ManagementCreate, $data['extensions'], occupiedColumns: array_keys($mapped));
+            }
+            $user = $class::query()->create($mapped);
             if (is_string($data['password'])) {
                 $this->passwords->update($user, $data['password']);
                 $user->setRememberToken(Str::random(60));
@@ -350,7 +355,7 @@ final readonly class AuthUsers
             $this->security->lock($user);
             $this->security->lockChallenges($user);
             $user = $this->users->query()->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
-            $attributes = array_diff_key($data, array_flip(['currentPassword']));
+            $attributes = array_diff_key($data, array_flip(['extensions']));
             $submittedEmail = $attributes['email'] ?? null;
             $currentEmail = $this->attributes->value($user, PrincipalAttribute::Email);
             $emailChanged = is_string($submittedEmail) && is_string($currentEmail) && PrincipalEmailIdentity::normalize($submittedEmail) !== PrincipalEmailIdentity::normalize($currentEmail);
@@ -363,7 +368,11 @@ final readonly class AuthUsers
                 }
                 $attributes['emailVerified'] = false;
             }
-            $user->update($this->attributes->map($attributes));
+            $mapped = $this->attributes->map($attributes);
+            if (array_key_exists('extensions', $data)) {
+                $mapped += $this->extensions->map(PrincipalMutation::Profile, $data['extensions'], $user, array_keys($mapped));
+            }
+            $user->update($mapped);
             $reference = SubjectReference::fromAuthenticatable($user);
             $this->audits->record('profile.updated', subject: $reference, actor: $user, metadata: ['attributes' => array_keys($attributes)]);
             $this->domainEvents->dispatch(new PrincipalChanged($this->attributes->identifier($user), 'profile_updated', ['attributes' => array_keys($attributes)], AuthEventContext::centralIdentity()), $user->getConnection());
@@ -416,6 +425,7 @@ final readonly class AuthUsers
                 $this->updateAuthorization->authorize($actor, 'nvl.auth.users.verifyEmail', $user);
             }
             $attributes = $data;
+            unset($attributes['extensions']);
             if (array_key_exists('email', $attributes)) {
                 $attributes['email'] = PrincipalEmailIdentity::normalize($attributes['email']);
                 $current = $this->attributes->value($user, PrincipalAttribute::Email);
@@ -425,7 +435,11 @@ final readonly class AuthUsers
             }
             $oldEmail = $this->attributes->value($user, PrincipalAttribute::Email);
             unset($attributes['password']);
-            $user->update($this->attributes->map($attributes));
+            $mapped = $this->attributes->map($attributes);
+            if (array_key_exists('extensions', $data)) {
+                $mapped += $this->extensions->map(PrincipalMutation::ManagementUpdate, $data['extensions'], $user, array_keys($mapped));
+            }
+            $user->update($mapped);
             $emailChanged = array_key_exists('email', $data) && is_string($oldEmail) && PrincipalEmailIdentity::normalize($oldEmail) !== PrincipalEmailIdentity::normalize($data['email']);
             if (! array_key_exists('password', $data) && $emailChanged) {
                 $this->security->advance($user, 'email_changed');
@@ -500,12 +514,20 @@ final readonly class AuthUsers
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{name: string, email: string, password: string|null, active: bool, locale: string, timezone: string, profile: array<array-key, mixed>, preferences: array<array-key, mixed>, roles: list<string>, permissions: list<string>, emailVerified: bool}
+     * @return array{name: string, email: string, password: string|null, active: bool, locale: string, timezone: string, profile: array<array-key, mixed>, preferences: array<array-key, mixed>, roles: list<string>, permissions: list<string>, emailVerified: bool, extensions: array<array-key, mixed>|null}
      */
     private function validateStoreUser(#[\SensitiveParameter] array $data): array
     {
-        if (array_diff(array_keys($data), ['name', 'email', 'password', 'active', 'locale', 'timezone', 'profile', 'preferences', 'roles', 'permissions', 'emailVerified']) !== []) {
+        if (array_diff(array_keys($data), ['name', 'email', 'password', 'active', 'locale', 'timezone', 'profile', 'preferences', 'roles', 'permissions', 'emailVerified', 'extensions']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');
+        }
+        $extensionInput = null;
+        if (array_key_exists('extensions', $data)) {
+            if (! is_array($data['extensions'])) {
+                throw new InvalidArgumentException('Invalid Auth input [extensions].');
+            }
+            $extensionInput = $data['extensions'];
+            unset($data['extensions']);
         }
         if (! is_string($data['name'] ?? null)) {
             throw new InvalidArgumentException('Invalid Auth input [name].');
@@ -585,19 +607,38 @@ final readonly class AuthUsers
         $this->validateStoreUserAssertStringListIsBounded($data['roles'], 100, 'roles');
         $this->validateStoreUserAssertStringListIsBounded($data['permissions'], 250, 'permissions');
 
-        return $data;
+        return [
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => $data['password'],
+            'active' => $data['active'],
+            'locale' => $data['locale'],
+            'timezone' => $data['timezone'],
+            'profile' => $data['profile'],
+            'preferences' => $data['preferences'],
+            'roles' => $data['roles'],
+            'permissions' => $data['permissions'],
+            'emailVerified' => $data['emailVerified'],
+            'extensions' => $extensionInput,
+        ];
     }
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{name?: string, email?: string, locale?: string, timezone?: string, profile?: array<array-key, mixed>, preferences?: array<array-key, mixed>}
+     * @return array{name?: string, email?: string, locale?: string, timezone?: string, profile?: array<array-key, mixed>, preferences?: array<array-key, mixed>, extensions?: array<array-key, mixed>}
      */
     private function validateUpdateProfile(#[\SensitiveParameter] array $data): array
     {
-        if (array_diff(array_keys($data), ['name', 'email', 'locale', 'timezone', 'profile', 'preferences']) !== []) {
+        if (array_diff(array_keys($data), ['name', 'email', 'locale', 'timezone', 'profile', 'preferences', 'extensions']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');
         }
         $validated = [];
+        if (array_key_exists('extensions', $data)) {
+            if (! is_array($data['extensions'])) {
+                throw new InvalidArgumentException('Invalid Auth input [extensions].');
+            }
+            $validated['extensions'] = $data['extensions'];
+        }
         if (array_key_exists('name', $data)) {
             if (! is_string($data['name'])) {
                 throw new InvalidArgumentException('Invalid Auth input [name].');
@@ -660,14 +701,20 @@ final readonly class AuthUsers
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{name?: string, email?: string, password?: string|null, locale?: string, timezone?: string, profile?: array<array-key, mixed>, preferences?: array<array-key, mixed>, emailVerified?: bool}
+     * @return array{name?: string, email?: string, password?: string|null, locale?: string, timezone?: string, profile?: array<array-key, mixed>, preferences?: array<array-key, mixed>, emailVerified?: bool, extensions?: array<array-key, mixed>}
      */
     private function validateUpdateUser(#[\SensitiveParameter] array $data): array
     {
-        if (array_diff(array_keys($data), ['name', 'email', 'password', 'locale', 'timezone', 'profile', 'preferences', 'emailVerified']) !== []) {
+        if (array_diff(array_keys($data), ['name', 'email', 'password', 'locale', 'timezone', 'profile', 'preferences', 'emailVerified', 'extensions']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');
         }
         $validated = [];
+        if (array_key_exists('extensions', $data)) {
+            if (! is_array($data['extensions'])) {
+                throw new InvalidArgumentException('Invalid Auth input [extensions].');
+            }
+            $validated['extensions'] = $data['extensions'];
+        }
         if (array_key_exists('name', $data)) {
             if (! is_string($data['name'])) {
                 throw new InvalidArgumentException('Invalid Auth input [name].');

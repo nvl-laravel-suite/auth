@@ -31,6 +31,7 @@ use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Contracts\PasswordPolicy;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Contracts\PrincipalExtensionMapper;
 use Nvl\Auth\Contracts\SecurityTokenContainment;
 use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
@@ -139,6 +140,7 @@ final class AuthDoctor
             $checks[] = $this->check('contract.authentication_eligibility', $this->integration($container, AuthenticationEligibility::class) instanceof AuthenticationEligibility, 'Authentication operations require a valid eligibility policy.');
         }
         if ($configuration->featureEnabled(AuthFeature::PrincipalManagement)) {
+            $checks[] = $this->check('contract.principal_extension_mapper', $this->integration($container, PrincipalExtensionMapper::class) instanceof PrincipalExtensionMapper, 'Principal extensions require a valid mapper.');
             $checks[] = $this->check('contract.account_confirmation', $this->integration($container, AccountConfirmation::class) instanceof AccountConfirmation, 'Sensitive self-service mutations require a valid account confirmation policy.');
         }
         if ($configuration->featureEnabled(AuthFeature::Audit)) {

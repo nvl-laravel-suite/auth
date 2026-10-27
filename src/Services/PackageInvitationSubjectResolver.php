@@ -11,6 +11,7 @@ use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\PrincipalAttribute;
+use Nvl\Auth\Enums\PrincipalMutation;
 use Nvl\Auth\Models\Invitation;
 
 /**
@@ -29,14 +30,20 @@ final readonly class PackageInvitationSubjectResolver implements InvitationSubje
         private InvitationRegistrationMapper $registration,
         private PrincipalAttributeMapper $attributes,
         private PasswordUpdater $passwords,
+        private PrincipalExtensions $extensions,
     ) {}
 
     /** {@inheritDoc} */
     public function resolve(Invitation $invitation, #[\SensitiveParameter] array $input): Authenticatable
     {
         $class = $this->models->userClass();
-        $mapped = $this->registration->map($invitation, $input);
+        $mapped = $this->registration->map($invitation, array_diff_key($input, ['extensions' => true]));
         unset($mapped[$this->attributes->column(PrincipalAttribute::Password)]);
+        $extensions = $input['extensions'] ?? [];
+        if (! is_array($extensions)) {
+            throw new \InvalidArgumentException('Invalid Auth input [extensions].');
+        }
+        $mapped += $this->extensions->map(PrincipalMutation::InvitationRegistration, $extensions, occupiedColumns: array_keys($mapped));
         $user = $class::query()->create($mapped);
         if (is_string($input['password'] ?? null)) {
             $this->passwords->update($user, $input['password']);

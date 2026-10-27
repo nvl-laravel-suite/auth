@@ -534,7 +534,7 @@ it('supports a host-mapped social registration variant inside the invitation tra
                 'is_active' => true,
                 'locale' => 'en',
                 'timezone' => 'UTC',
-                'profile' => $validated['extensions'],
+                'profile' => ['provider' => 'github', 'provider_user_id' => 'github-123'],
             ];
         }
     });
@@ -544,7 +544,7 @@ it('supports a host-mapped social registration variant inside the invitation tra
         $actor,
     );
 
-    $registered = app(AuthInvitations::class)->register(['token' => $issued['token'], 'name' => 'Social Invitee', 'registrationMethod' => 'social', 'extensions' => ['provider' => 'github', 'provider_user_id' => 'github-123']]);
+    $registered = app(AuthInvitations::class)->register(['token' => $issued['token'], 'name' => 'Social Invitee', 'registrationMethod' => 'social']);
 
     expect($registered['subject'])->toBeInstanceOf(User::class)
         ->and($registered['subject']->profile)->toBe([

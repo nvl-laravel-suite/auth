@@ -102,7 +102,7 @@ return [
 
             'models' => ['user' => User::class],
             'services' => [
-                'attribute_mapper' => ConfiguredPrincipalAttributeMapper::class,
+                'attribute_mapper' => ConfiguredPrincipalAttributeMapper::class, 'extension_mapper' => null,
                 'account_confirmation' => null,
                 'session_containment' => LaravelPrincipalSessionContainment::class,
             ],

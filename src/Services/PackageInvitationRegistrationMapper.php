@@ -47,9 +47,7 @@ final readonly class PackageInvitationRegistrationMapper implements InvitationRe
                 ?? $this->configuration->string('features.principal_management.settings.default_locale', 'en'),
             PrincipalAttribute::Timezone->value => $this->boundedString($validated['timezone'] ?? null, 64)
                 ?? $this->configuration->string('features.principal_management.settings.default_timezone', 'UTC'),
-            PrincipalAttribute::Profile->value => is_array($validated['extensions'] ?? null)
-                ? $validated['extensions']
-                : [],
+            PrincipalAttribute::Profile->value => [],
         ]);
     }
 

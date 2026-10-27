@@ -174,6 +174,15 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\PrincipalExtensionMapper": {
+            "kind": "interface",
+            "file": "src/Contracts/PrincipalExtensionMapper.php",
+            "methods": [
+                "validateAndMap"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\PrincipalSessionContainment": {
             "kind": "interface",
             "file": "src/Contracts/PrincipalSessionContainment.php",
@@ -834,6 +843,26 @@
                 "RememberToken",
                 "Timezone",
                 "UpdatedAt"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\PrincipalMutation": {
+            "kind": "enum",
+            "file": "src/Enums/PrincipalMutation.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "InvitationRegistration",
+                "ManagementCreate",
+                "ManagementUpdate",
+                "Profile",
+                "Registration"
             ]
         },
         "Nvl\\Auth\\Enums\\RecentAuthenticationPurpose": {
