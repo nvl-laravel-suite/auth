@@ -70,8 +70,16 @@ final readonly class AuthOwnerSchema
                 if (! $schema->hasColumn($name, 'owner_scope_key')) {
                     $schema->table($name, static fn (Blueprint $table) => $table->string('owner_scope_key', 191)->nullable());
                 }
-                foreach ($schema->getIndexes($name) as $index) {
+                $indexes = $schema->getIndexes($name);
+                foreach ($indexes as $index) {
                     if ($index['primary'] && ! in_array('owner_scope_key', $index['columns'], true)) {
+                        if (in_array($roleModel->getConnection()->getDriverName(), ['mysql', 'mariadb'], true)
+                            && ! array_any($indexes, static fn (array $candidate): bool => ! $candidate['primary'] && ($candidate['columns'][0] ?? null) === $foreign)) {
+                            $schema->table($name, static fn (Blueprint $table) => $table->index(
+                                [$foreign],
+                                'auth_owner_fk_'.substr(hash('sha256', $name.':'.$foreign), 0, 20),
+                            ));
+                        }
                         $schema->table($name, static fn (Blueprint $table) => $table->dropPrimary($index['name']));
                     }
                 }

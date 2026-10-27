@@ -31,6 +31,7 @@ final class AuthMembershipRace
         /** @var list<non-falsy-string> $ready */
         /** @var list<non-falsy-string> $results */
         $children = [];
+        DB::disconnect($connectionName);
         try {
             foreach ($workers as $index => $worker) {
                 $pid = pcntl_fork();
