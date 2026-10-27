@@ -18,6 +18,7 @@ use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\InvitationRegistrationMapper;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
+use Nvl\Auth\Contracts\PasswordPolicy;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
@@ -40,7 +41,7 @@ use Throwable;
 final class AuthConfigurationCommand extends Command
 {
     /** @var list<class-string> */
-    private const ADAPTERS = [AuthManagementAccess::class, SystemMutationAccess::class, AuthSubjectResolver::class, AuthIdentifierResolver::class, AuthenticationEligibility::class, SuccessfulLoginMetadataRecorder::class, PasswordUpdater::class, PrincipalAttributeMapper::class, AccountConfirmation::class, PrincipalSessionContainment::class, RbacPrincipalAccess::class, ApiTokenManager::class, ApiTokenAbilityProvider::class, InvitationSubjectResolver::class, InvitationRegistrationMapper::class, SocialIdentityProviderFactory::class, SocialSubjectResolver::class, PasskeyCeremony::class, AuthAuditRecorder::class, AuthAuditContextProvider::class];
+    private const ADAPTERS = [AuthManagementAccess::class, SystemMutationAccess::class, AuthSubjectResolver::class, AuthIdentifierResolver::class, AuthenticationEligibility::class, SuccessfulLoginMetadataRecorder::class, PasswordUpdater::class, PasswordPolicy::class, PrincipalAttributeMapper::class, AccountConfirmation::class, PrincipalSessionContainment::class, RbacPrincipalAccess::class, ApiTokenManager::class, ApiTokenAbilityProvider::class, InvitationSubjectResolver::class, InvitationRegistrationMapper::class, SocialIdentityProviderFactory::class, SocialSubjectResolver::class, PasskeyCeremony::class, AuthAuditRecorder::class, AuthAuditContextProvider::class];
 
     /** @var string */
     protected $signature = 'nvl:auth:configuration
@@ -121,7 +122,7 @@ final class AuthConfigurationCommand extends Command
     private function adapterRequired(AuthConfiguration $configuration, string $contract): bool
     {
         $feature = match ($contract) {
-            PasswordUpdater::class => AuthFeature::Password,
+            PasswordUpdater::class, PasswordPolicy::class => AuthFeature::Password,
             PrincipalAttributeMapper::class, AccountConfirmation::class, PrincipalSessionContainment::class => AuthFeature::PrincipalManagement,
             RbacPrincipalAccess::class => AuthFeature::Rbac,
             ApiTokenManager::class, ApiTokenAbilityProvider::class => AuthFeature::ApiTokens,

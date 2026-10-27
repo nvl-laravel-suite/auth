@@ -24,13 +24,13 @@ final readonly class PackageInvitationRegistrationMapper implements InvitationRe
     ) {}
 
     /** {@inheritDoc} */
-    public function map(Invitation $invitation, array $validated): array
+    public function map(Invitation $invitation, #[\SensitiveParameter] array $validated): array
     {
         $name = $validated['name'] ?? null;
         $password = $validated['password'] ?? null;
 
         if (! is_string($name) || trim($name) === '' || mb_strlen($name) > 160
-            || ! is_string($password) || mb_strlen($password) < 8) {
+            || ! is_string($password)) {
             throw new AuthException(
                 'invitation_registration_invalid',
                 'Invitation registration requires a valid name and password.',

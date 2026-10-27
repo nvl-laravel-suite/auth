@@ -17,5 +17,5 @@ interface InvitationRegistrationMapper
      * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
-    public function map(Invitation $invitation, array $validated): array;
+    public function map(Invitation $invitation, #[\SensitiveParameter] array $validated): array;
 }

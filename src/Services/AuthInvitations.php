@@ -48,7 +48,7 @@ final readonly class AuthInvitations
     private AuthCommittedAudit $committedAudits;
 
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private MutationAuthorizer $mutations, private OwnerInvitations $owned, private SecretHasher $hasher, private InvitationRecipientProof $recipientProof, private Container $container, private OwnershipBoundary $boundary, private OwnerMembershipAssignments $assignments, private ManagementAuthorizer $authorization, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, AuthCommittedAudit $committedAudits, private DomainEventDispatcher $domainEvents, private OwnershipContext $ownerContext, private AuthConfiguration $configuration, private OpaqueTokenFactory $tokens, private InvitationSubjectResolver $subjects, private AuthModelRegistry $models, private PrincipalAttributeMapper $attributes, private ?InvitationDeliveryMetadataPolicy $deliveryMetadata = null)
+    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private MutationAuthorizer $mutations, private OwnerInvitations $owned, private SecretHasher $hasher, private InvitationRecipientProof $recipientProof, private Container $container, private OwnershipBoundary $boundary, private OwnerMembershipAssignments $assignments, private ManagementAuthorizer $authorization, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, AuthCommittedAudit $committedAudits, private DomainEventDispatcher $domainEvents, private OwnershipContext $ownerContext, private AuthConfiguration $configuration, private OpaqueTokenFactory $tokens, private InvitationSubjectResolver $subjects, private AuthModelRegistry $models, private PrincipalAttributeMapper $attributes, private PasswordValidationRules $passwordPolicy, private ?InvitationDeliveryMetadataPolicy $deliveryMetadata = null)
     {
         $this->committedAudits = $committedAudits->withRecorder($this->audits);
     }
@@ -95,7 +95,7 @@ final readonly class AuthInvitations
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public function create(array $data, Authenticatable|SystemMutationContext $authority, ?InvitationIssuanceContext $context = null): array
+    public function create(#[\SensitiveParameter] array $data, Authenticatable|SystemMutationContext $authority, ?InvitationIssuanceContext $context = null): array
     {
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Issue);
         $data = $this->validateStoreInvitation($data);
@@ -286,7 +286,7 @@ final readonly class AuthInvitations
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public function register(array $data, ?Authenticatable $authenticatedRecipient = null): array
+    public function register(#[\SensitiveParameter] array $data, ?Authenticatable $authenticatedRecipient = null): array
     {
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Use);
         $data = $this->validateAcceptInvitation($data);
@@ -301,7 +301,7 @@ final readonly class AuthInvitations
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function registerRegister(array $data, ?Authenticatable $authenticatedRecipient): array
+    private function registerRegister(#[\SensitiveParameter] array $data, ?Authenticatable $authenticatedRecipient): array
     {
         $data = $this->validateAcceptInvitation($data);
         $connection = (new Invitation)->getConnectionName();
@@ -348,7 +348,7 @@ final readonly class AuthInvitations
     /** Resolve a new identity or require proof before reusing a global identity.
      * @param  array<string, mixed>  $data
      */
-    private function registerResolveSubject(Invitation $invitation, array $data, ?Authenticatable $authenticatedRecipient): Authenticatable
+    private function registerResolveSubject(Invitation $invitation, #[\SensitiveParameter] array $data, ?Authenticatable $authenticatedRecipient): Authenticatable
     {
         $data = $this->validateAcceptInvitation($data);
         $principalClass = $this->models->userClass();
@@ -459,7 +459,7 @@ final readonly class AuthInvitations
      * @param  array<string, mixed>  $data
      * @return array{token: string, name: string, registrationMethod: string, password?: string|null, passwordConfirmation?: string|null, locale: string|null, timezone: string|null, extensions: array<array-key, mixed>}
      */
-    private function validateAcceptInvitation(array $data): array
+    private function validateAcceptInvitation(#[\SensitiveParameter] array $data): array
     {
         if (array_diff(array_keys($data), ['token', 'name', 'registrationMethod', 'password', 'passwordConfirmation', 'locale', 'timezone', 'extensions']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');
@@ -500,7 +500,7 @@ final readonly class AuthInvitations
         if (! is_array($data['extensions'] ?? null)) {
             throw new InvalidArgumentException('Invalid Auth input [extensions].');
         }
-        Validator::make($data, ['token' => ['required', 'string', 'max:128'], 'registrationMethod' => ['sometimes', 'in:password,social'], 'password' => ['nullable', 'required_unless:registrationMethod,social', 'nullable', 'string', 'min:8', 'max:4096', 'confirmed:passwordConfirmation'], 'name' => ['required', 'string', 'max:160'], 'locale' => ['nullable', 'sometimes', 'nullable', 'string', 'max:12'], 'timezone' => ['nullable', 'sometimes', 'nullable', 'timezone:all'], 'extensions' => ['sometimes', 'array']])->validate();
+        Validator::make($data, ['token' => ['required', 'string', 'max:128'], 'registrationMethod' => ['sometimes', 'in:password,social'], 'password' => ['nullable', 'required_unless:registrationMethod,social', 'nullable', 'string', 'confirmed:passwordConfirmation', ...$this->passwordPolicy->rules()], 'name' => ['required', 'string', 'max:160'], 'locale' => ['nullable', 'sometimes', 'nullable', 'string', 'max:12'], 'timezone' => ['nullable', 'sometimes', 'nullable', 'timezone:all'], 'extensions' => ['sometimes', 'array']])->validate();
         $validated = ['token' => $data['token'], 'name' => $data['name'], 'registrationMethod' => $data['registrationMethod'], 'locale' => $data['locale'], 'timezone' => $data['timezone'], 'extensions' => $data['extensions']];
         foreach (['password', 'passwordConfirmation'] as $field) {
             if (array_key_exists($field, $data)) {
@@ -540,7 +540,7 @@ final readonly class AuthInvitations
      * @param  array<string, mixed>  $data
      * @return array{recipient: string, type: string, purpose: string, roles: list<string>, permissions: list<string>, metadata: array<array-key, mixed>, locale: string|null, context: string|null}
      */
-    private function validateStoreInvitation(array $data): array
+    private function validateStoreInvitation(#[\SensitiveParameter] array $data): array
     {
         if (array_diff(array_keys($data), ['recipient', 'type', 'purpose', 'roles', 'permissions', 'metadata', 'locale', 'context']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');
@@ -636,7 +636,7 @@ final readonly class AuthInvitations
      * @param  array<string, mixed>  $data
      * @return array{recipient: string|null, type: string|null, purpose: string|null, lifecycle: string|null, expiresAfter: string|null, expiresBefore: string|null, context: string|null, per_page: int|null, types: array<array-key, mixed>|null}
      */
-    private function validateInvitationIndexQuery(array $data): array
+    private function validateInvitationIndexQuery(#[\SensitiveParameter] array $data): array
     {
         if (array_diff(array_keys($data), ['recipient', 'type', 'purpose', 'lifecycle', 'expiresAfter', 'expiresBefore', 'context', 'per_page', 'types']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');

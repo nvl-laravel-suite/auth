@@ -142,7 +142,7 @@ return [
         'password' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_PASSWORD_ENABLED', true),
 
-            'services' => ['updater' => null],
+            'services' => ['updater' => null, 'policy' => null],
             'settings' => ['reset_ttl_minutes' => 60],
         ],
         'email_verification' => [

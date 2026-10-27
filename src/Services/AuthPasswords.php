@@ -6,6 +6,7 @@ namespace Nvl\Auth\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Auth\Passwords\DatabaseTokenRepository;
 use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Auth\Passwords\PasswordBrokerManager;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -13,6 +14,7 @@ use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Contracts\Auth\PasswordBroker as PasswordBrokerContract;
 use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Contracts\Session\Session;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -31,6 +33,7 @@ use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Auth\CanonicalActorResolver;
 use Nvl\Support\Events\ConnectionCommitCallbacks;
 use Nvl\Support\Events\DomainEventDispatcher;
 use SensitiveParameter;
@@ -43,7 +46,7 @@ use SensitiveParameter;
 final readonly class AuthPasswords
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private Hasher $hasher, private AuthAuditRecorder $audits, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private PasswordBrokerManager $brokers, private AuthPipeline $pipeline, private AuthenticationEligibility $eligibility, private DomainEventDispatcher $domainEvents, private PasswordUpdater $passwords, private ConnectionCommitCallbacks $eventCommits) {}
+    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private Hasher $hasher, private AuthAuditRecorder $audits, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private PasswordBrokerManager $brokers, private AuthPipeline $pipeline, private AuthenticationEligibility $eligibility, private DomainEventDispatcher $domainEvents, private PasswordUpdater $passwords, private ConnectionCommitCallbacks $eventCommits, private CanonicalActorResolver $canonical, private PasswordValidationRules $policy) {}
 
     /**
      * Verify the current password and timestamp the active session.
@@ -59,13 +62,20 @@ final readonly class AuthPasswords
         $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Use);
         $data = $this->validateConfirmPassword($data);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Use);
-        $reference = SubjectReference::fromAuthenticatable($subject);
-        if (! $this->hasher->check($data['password'], (string) $subject->getAuthPassword())) {
-            $this->audits->record('password.confirmation_failed', outcome: 'failure', subject: $reference, actor: $subject);
-            throw new AuthException('password_invalid', 'The current password is invalid.', 422);
+        if (! $subject instanceof Model) {
+            throw AuthException::invalidConfiguration('Password confirmation requires an Eloquent principal.');
         }
-        $session->put('auth.password_confirmed_at', time());
-        $this->audits->record('password.confirmed', subject: $reference, actor: $subject);
+        $prototype = new ($subject::class);
+        $prototype->getConnection()->transaction(function () use ($subject, $data, $session): void {
+            $subject = $this->canonical->resolve($subject, true);
+            $reference = SubjectReference::fromAuthenticatable($subject);
+            if (! $this->hasher->check($data['password'], (string) $subject->getAuthPassword())) {
+                $this->audits->record('password.confirmation_failed', outcome: 'failure', subject: $reference, actor: $subject);
+                throw new AuthException('password_invalid', 'The current password is invalid.', 422);
+            }
+            $session->put('auth.password_confirmed_at', time());
+            $this->audits->record('password.confirmed', subject: $reference, actor: $subject);
+        });
     }
 
     /**
@@ -94,6 +104,11 @@ final readonly class AuthPasswords
                 $this->audits->record('password.reset_requested', metadata: ['matched' => false]);
 
                 return;
+            }
+            $this->resetConnection($broker, $subject);
+            $subject = $this->canonical->resolve($subject);
+            if (! $subject instanceof CanResetPassword) {
+                throw AuthException::invalidConfiguration('Password reset requires a resettable principal.');
             }
             try {
                 $this->eligibility->assertEligible($subject, AuthenticationPurpose::PasswordReset);
@@ -125,43 +140,68 @@ final readonly class AuthPasswords
         $status = $this->pipeline->run('password_reset', new AuthPipelineContext('password_reset', ['identifier_name' => $identifierName]), function () use ($data, $identifierName): string {
             $brokerName = $this->configuration->get('password_broker');
             $broker = $this->brokers->broker(is_string($brokerName) ? $brokerName : null);
-            $status = $broker->reset([$identifierName => $data['identifier'], 'token' => $data['token'], 'password' => $data['password']], function (CanResetPassword $subject, string $newPassword): void {
-                if (! $subject instanceof Authenticatable) {
-                    throw AuthException::invalidConfiguration('Password reset subjects must implement Laravel Authenticatable.');
-                }
-                try {
-                    $this->eligibility->assertEligible($subject, AuthenticationPurpose::PasswordReset);
-                } catch (AuthException $exception) {
-                    $this->audits->record('password.reset_rejected', outcome: 'failure', subject: SubjectReference::fromAuthenticatable($subject), metadata: ['reason' => $exception->errorCode]);
-                    throw $exception;
-                }
-                $update = function () use ($subject, $newPassword): void {
-                    $this->passwords->update($subject, $newPassword);
-                    $event = new PasswordReset($subject);
-                    if ($this->passwords instanceof EloquentPasswordUpdater && $subject instanceof Model) {
-                        $this->eventCommits->afterCommit($subject->getConnection(), static function () use ($event): void {
-                            event($event);
-                        });
-                    } else {
-                        event($event);
-                    }
-                    $this->audits->record('password.reset', subject: SubjectReference::fromAuthenticatable($subject));
-                };
-                if ($this->passwords instanceof EloquentPasswordUpdater && $subject instanceof Model) {
-                    $subject->getConnection()->transaction($update);
-                } else {
-                    $update();
-                }
-            });
-            if (! is_string($status)) {
-                throw AuthException::invalidConfiguration('Laravel password broker returned an invalid status.');
+            if (! $broker instanceof PasswordBroker) {
+                throw AuthException::invalidConfiguration('Password reset requires Laravel’s password broker.');
             }
+            $candidate = $broker->getUser([$identifierName => $data['identifier']]);
+            if ($candidate === null) {
+                return PasswordBrokerContract::INVALID_USER;
+            }
+            if (! $candidate instanceof Authenticatable) {
+                throw AuthException::invalidConfiguration('Atomic password reset requires an authenticatable principal.');
+            }
+            $connection = $this->resetConnection($broker, $candidate);
+            $status = $connection->transaction(function () use ($broker, $candidate, $data, $identifierName): string {
+                $locked = $this->canonical->resolve($candidate, true);
+                if (! $locked instanceof CanResetPassword || ! $locked instanceof Model) {
+                    throw AuthException::invalidConfiguration('Password reset requires a resettable Eloquent principal.');
+                }
+
+                return $broker->reset([$identifierName => $data['identifier'], 'token' => $data['token'], 'password' => $data['password']], function (CanResetPassword $subject, #[SensitiveParameter] string $newPassword) use ($locked): void {
+                    if (! $subject instanceof Model || $subject::class !== $locked::class || ! $subject->is($locked)) {
+                        throw AuthException::invalidConfiguration('Password broker returned a different principal.');
+                    }
+                    $this->eligibility->assertEligible($locked, AuthenticationPurpose::PasswordReset);
+                    $this->passwords->update($locked, $newPassword);
+                    $locked->setRememberToken(Str::random(60));
+                    $locked->save();
+                    $event = new PasswordReset($locked);
+                    $this->eventCommits->afterCommit($locked->getConnection(), static function () use ($event): void {
+                        event($event);
+                    });
+                    $this->audits->record('password.reset', subject: SubjectReference::fromAuthenticatable($locked));
+                });
+            });
 
             return $status;
         });
         if ($status !== PasswordBrokerContract::PASSWORD_RESET) {
             throw new AuthException('password_reset_invalid', 'The password reset token is invalid or expired.', 422);
         }
+    }
+
+    /** Require the broker, principal, and audit to share their actual transactional source. */
+    private function resetConnection(PasswordBroker $broker, Authenticatable $candidate): ConnectionInterface
+    {
+        if (! $candidate instanceof Model) {
+            throw AuthException::invalidConfiguration('Atomic password reset requires an Eloquent principal.');
+        }
+        $repository = $broker->getRepository();
+        if ($repository::class !== DatabaseTokenRepository::class) {
+            throw AuthException::invalidConfiguration('Atomic password reset requires a database token repository.');
+        }
+        try {
+            $repositoryConnection = (new \ReflectionProperty(DatabaseTokenRepository::class, 'connection'))->getValue($repository);
+        } catch (\ReflectionException) {
+            throw AuthException::invalidConfiguration('Password reset token repository connection is unavailable.');
+        }
+        $prototype = new ($candidate::class);
+        $connection = $prototype->getConnection();
+        if (! $repositoryConnection instanceof ConnectionInterface || $repositoryConnection !== $connection || (new AuthAudit)->getConnection() !== $connection) {
+            throw AuthException::invalidConfiguration('Password reset principal, token, and audit storage must share the same connection.');
+        }
+
+        return $connection;
     }
 
     /**
@@ -176,18 +216,30 @@ final readonly class AuthPasswords
     ): void {
         $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Update);
         $data = $this->validateUpdatePassword($data);
-        if (! $this->hasher->check($data['currentPassword'], (string) $subject->getAuthPassword())) {
-            throw new AuthException('password_invalid', 'The current password is invalid.', 422);
+        if (! $subject instanceof Model) {
+            throw AuthException::invalidConfiguration('Password updates require an Eloquent principal.');
         }
-        $this->passwords->update($subject, $data['password']);
-        $this->audits->record('password.updated', subject: SubjectReference::fromAuthenticatable($subject), actor: $subject);
+        $prototype = new ($subject::class);
+        $prototype->getConnection()->transaction(function () use ($subject, $data): void {
+            $subject = $this->canonical->resolve($subject, true);
+            if (! $subject instanceof CanResetPassword) {
+                throw AuthException::invalidConfiguration('Password updates require a resettable principal.');
+            }
+            if (! $this->hasher->check($data['currentPassword'], (string) $subject->getAuthPassword())) {
+                throw new AuthException('password_invalid', 'The current password is invalid.', 422);
+            }
+            $this->passwords->update($subject, $data['password']);
+            $subject->setRememberToken(Str::random(60));
+            $subject->save();
+            $this->audits->record('password.updated', subject: SubjectReference::fromAuthenticatable($subject), actor: $subject);
+        });
     }
 
     /**
      * @param  array<string, mixed>  $data
      * @return array{password: string}
      */
-    private function validateConfirmPassword(array $data): array
+    private function validateConfirmPassword(#[SensitiveParameter] array $data): array
     {
         if (array_diff(array_keys($data), ['password']) !== []) {
             throw new \InvalidArgumentException('Unknown or protected Auth input fields.');
@@ -221,7 +273,7 @@ final readonly class AuthPasswords
      * @param  array<string, mixed>  $data
      * @return array{identifier: string, token: string, password: string, passwordConfirmation: string}
      */
-    private function validateResetPassword(array $data): array
+    private function validateResetPassword(#[SensitiveParameter] array $data): array
     {
         if (array_diff(array_keys($data), ['identifier', 'token', 'password', 'passwordConfirmation']) !== []) {
             throw new \InvalidArgumentException('Unknown or protected Auth input fields.');
@@ -238,7 +290,7 @@ final readonly class AuthPasswords
         if (! is_string($data['passwordConfirmation'] ?? null)) {
             throw new \InvalidArgumentException('Invalid Auth input [passwordConfirmation].');
         }
-        Validator::make($data, ['identifier' => ['required', 'string', 'max:255'], 'token' => ['required', 'string', 'max:128'], 'password' => ['required', 'string', 'min:8', 'max:4096', 'confirmed:passwordConfirmation']])->validate();
+        Validator::make($data, ['identifier' => ['required', 'string', 'max:255'], 'token' => ['required', 'string', 'max:128'], 'password' => ['required', 'string', 'confirmed:passwordConfirmation', ...$this->policy->rules()]])->validate();
 
         return $data;
     }
@@ -247,7 +299,7 @@ final readonly class AuthPasswords
      * @param  array<string, mixed>  $data
      * @return array{currentPassword: string, password: string, passwordConfirmation: string}
      */
-    private function validateUpdatePassword(array $data): array
+    private function validateUpdatePassword(#[SensitiveParameter] array $data): array
     {
         if (array_diff(array_keys($data), ['currentPassword', 'password', 'passwordConfirmation']) !== []) {
             throw new \InvalidArgumentException('Unknown or protected Auth input fields.');
@@ -261,7 +313,7 @@ final readonly class AuthPasswords
         if (! is_string($data['passwordConfirmation'] ?? null)) {
             throw new \InvalidArgumentException('Invalid Auth input [passwordConfirmation].');
         }
-        Validator::make($data, ['currentPassword' => ['required', 'string', 'max:4096'], 'password' => ['required', 'string', 'min:8', 'max:4096', 'confirmed:passwordConfirmation']])->validate();
+        Validator::make($data, ['currentPassword' => ['required', 'string', 'max:4096'], 'password' => ['required', 'string', 'confirmed:passwordConfirmation', ...$this->policy->rules()]])->validate();
 
         return $data;
     }

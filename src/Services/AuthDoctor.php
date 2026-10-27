@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Illuminate\Auth\Passwords\DatabaseTokenRepository;
+use Illuminate\Auth\Passwords\PasswordBroker;
+use Illuminate\Auth\Passwords\PasswordBrokerManager;
 use Illuminate\Contracts\Auth\Access\Gate as GateContract;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Container\Container;
@@ -24,6 +27,7 @@ use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\InvitationRegistrationMapper;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
+use Nvl\Auth\Contracts\PasswordPolicy;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
@@ -109,6 +113,8 @@ final class AuthDoctor
             }
         }
         if ($configuration->featureEnabled(AuthFeature::Password)) {
+            $checks[] = $this->check('contract.password_policy', $this->integration($container, PasswordPolicy::class) instanceof PasswordPolicy, 'Password operations require a valid password policy.');
+            $checks[] = $this->check('contract.password_reset_repository', $this->passwordResetRepositoryReady(), 'Password reset requires Laravel database token storage; its actual connection is checked against the principal and audit storage at runtime.');
             $checks[] = $this->check('contract.password_updater', $this->integration($container, PasswordUpdater::class) instanceof PasswordUpdater, 'Password operations require a valid password updater.');
         }
         if ($configuration->featureEnabled(AuthFeature::Authentication)) {
@@ -440,6 +446,19 @@ final class AuthDoctor
         $superAdminRole = $configuration->get('features.rbac.settings.super_admin_role');
 
         return $configuration->featureEnabled(AuthFeature::Rbac) && is_string($superAdminRole) && trim($superAdminRole) !== '';
+    }
+
+    /** Check repository capability without claiming its principal connection is already known. */
+    private function passwordResetRepositoryReady(): bool
+    {
+        try {
+            $name = $this->configuration->get('password_broker');
+            $broker = $this->container->make(PasswordBrokerManager::class)->broker(is_string($name) ? $name : null);
+
+            return $broker instanceof PasswordBroker && $broker->getRepository()::class === DatabaseTokenRepository::class;
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     /**

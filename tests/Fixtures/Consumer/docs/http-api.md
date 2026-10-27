@@ -54,6 +54,8 @@ with `nvl.auth.` and response envelopes use `data`, `code`, and `message`.
 |---|---|---|
 | users | list, suggestions, create, show, update, enable/disable, restore, delete, bulk operations | `nvl.auth.users.viewAny`, `.view`, `.create`, `.update`, `.delete`, `.restore` |
 | user access | replace direct roles or permissions | `nvl.auth.users.manageAccess` |
+| credentials | change or remove a password | `nvl.auth.users.manageCredentials` |
+| verified email | explicitly mark an email verified | `nvl.auth.users.verifyEmail` |
 | invitations | list, create, resend, revoke | `nvl.auth.invitations.*` |
 | clients | list, show, create, update, activate/deactivate, delete | `nvl.auth.clients.*` |
 | roles | list, show, create, update, delete, clone, hierarchy, templates, apply template, analytics | `nvl.auth.rbac.view`, `.manageRoles` |

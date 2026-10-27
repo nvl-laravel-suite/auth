@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Nvl\Auth\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Str;
 use Nvl\Auth\Contracts\InvitationRegistrationMapper;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
+use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Models\Invitation;
@@ -27,10 +29,11 @@ final readonly class PackageInvitationSubjectResolver implements InvitationSubje
         private AuthModelRegistry $models,
         private InvitationRegistrationMapper $registration,
         private PrincipalAttributeMapper $attributes,
+        private PasswordUpdater $passwords,
     ) {}
 
     /** {@inheritDoc} */
-    public function resolve(Invitation $invitation, array $input): Authenticatable
+    public function resolve(Invitation $invitation, #[\SensitiveParameter] array $input): Authenticatable
     {
         $email = mb_strtolower(trim($invitation->recipient));
         $class = $this->models->userClass();
@@ -42,6 +45,15 @@ final readonly class PackageInvitationSubjectResolver implements InvitationSubje
             return $existing;
         }
 
-        return $class::query()->create($this->registration->map($invitation, $input));
+        $mapped = $this->registration->map($invitation, $input);
+        unset($mapped[$this->attributes->column(PrincipalAttribute::Password)]);
+        $user = $class::query()->create($mapped);
+        if (is_string($input['password'] ?? null)) {
+            $this->passwords->update($user, $input['password']);
+            $user->setRememberToken(Str::random(60));
+            $user->save();
+        }
+
+        return $user;
     }
 }

@@ -130,3 +130,7 @@ Disabling a feature blocks normal read/enroll/issue/use/update admission and
 closes new service admission. Data remains. Revoke retained credentials
 before disablement if later re-enablement must not reactivate them. Revoke and
 cleanup operations remain admitted as containment operations.
+
+New passwords use the configured `PasswordPolicy` (minimum 12 characters by default), bounded input and the selected bcrypt engine's 72-byte limit. Existing hashes remain valid without meeting the new policy. Password changes rotate the native remember token; they do not delete unrelated application tokens or database sessions. Future revision and managed-session enforcement is separate.
+
+Atomic password reset requires an Eloquent principal and Laravel's database token repository on the same actual connection as the principal and audit storage. Non-Eloquent or nontransactional external stores need a host-owned flow; they are not covered by this atomicity guarantee. Reset events are emitted after the outer commit.
