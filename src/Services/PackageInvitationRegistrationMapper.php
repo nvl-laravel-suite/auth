@@ -40,7 +40,7 @@ final readonly class PackageInvitationRegistrationMapper implements InvitationRe
 
         return $this->attributes->map([
             PrincipalAttribute::Name->value => trim($name),
-            PrincipalAttribute::Email->value => mb_strtolower(trim($invitation->recipient)),
+            PrincipalAttribute::Email->value => PrincipalEmailIdentity::normalize($invitation->recipient),
             PrincipalAttribute::Password->value => $password,
             PrincipalAttribute::Active->value => true,
             PrincipalAttribute::Locale->value => $this->boundedString($validated['locale'] ?? null, 12)

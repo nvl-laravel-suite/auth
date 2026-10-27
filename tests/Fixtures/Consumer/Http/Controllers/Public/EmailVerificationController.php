@@ -13,7 +13,7 @@ use Nvl\Auth\Services\AuthEmailVerification;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 /**
- * Handles signed public email verification links.
+ * Handles native one-use public email verification links.
  */
 final class EmailVerificationController
 {
@@ -23,7 +23,7 @@ final class EmailVerificationController
     public function verify(
         Request $request,
         string $id,
-        string $hash,
+
         AuthSubjectResolver $subjects,
         AuthEmailVerification $action,
     ): JsonResponse {
@@ -35,12 +35,12 @@ final class EmailVerificationController
 
         $subject = $subjects->resolve(new SubjectReference($type, $id));
 
-        if (! $subject instanceof MustVerifyEmail
-            || ! hash_equals(sha1($subject->getEmailForVerification()), $hash)) {
+        $token = $request->query('token');
+        if (! $subject instanceof MustVerifyEmail || ! is_string($token)) {
             throw new AuthException('verification_invalid', 'The email verification link is invalid.', 403);
         }
 
-        $changed = $action->verify($subject);
+        $changed = $action->verify($subject, $token);
 
         return response()->json([
             'data' => ['changed' => $changed],

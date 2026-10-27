@@ -110,6 +110,12 @@ final class AuthDoctor
         } catch (Throwable) {
             $sourceReady = false;
         }
+        try {
+            $emailReady = $this->container->make(PrincipalEmailIdentityAdoption::class)->plan()['ready'];
+        } catch (Throwable) {
+            $emailReady = false;
+        }
+        $checks[] = $this->check('security.email_identity', $emailReady, 'Canonical email identities require collision-free keys and finalized non-null unique schema; explicitly plan/apply adoption.');
         $checks[] = $this->check('security.principal_source', $sourceReady, 'Canonical principal and mandatory security state must share the same actual connection.');
         $appKey = config('app.key');
         $checks[] = $this->check('security.app_key', is_string($appKey) && $appKey !== '', 'APP_KEY is required for hashing and encrypted casts.');

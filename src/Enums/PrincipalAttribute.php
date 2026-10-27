@@ -14,6 +14,7 @@ enum PrincipalAttribute: string
     case Id = 'id';
     case Name = 'name';
     case Email = 'email';
+    case EmailIdentityHash = 'email_identity_hash';
     case EmailVerifiedAt = 'email_verified_at';
     case Password = 'password';
     case Active = 'active';

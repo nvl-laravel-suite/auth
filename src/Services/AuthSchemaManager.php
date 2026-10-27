@@ -25,7 +25,7 @@ final readonly class AuthSchemaManager
     private const array REQUIRED_INDEXES = [AuthTables::PrincipalSecurityStates => ['nvl_auth_principal_security_states_subject_unique'], AuthTables::Invitations => ['nvl_auth_invitations_context_hash_index', 'nvl_auth_invitations_delivery_status_index'], AuthTables::Challenges => ['nvl_auth_challenges_secondary_secret_hash_unique']];
 
     /** Native Auth operation. */
-    public function __construct(private AuthConfiguration $configuration) {}
+    public function __construct(private AuthConfiguration $configuration, private AuthModelRegistry $models) {}
 
     /**
      * Plan or repair the schema required by enabled Auth features.
@@ -53,6 +53,7 @@ final readonly class AuthSchemaManager
             $this->migration('2026_08_28_000000_nvl_auth_add_invitation_delivery_outcomes.php')->up();
             $this->migration('2026_10_27_000001_nvl_auth_create_principal_security_states.php')->up();
             $this->migration('2026_10_27_000002_nvl_auth_ensure_authentication_challenges.php')->up();
+            $this->migration('2026_10_27_000003_nvl_auth_add_normalized_email_identity.php')->up();
         }
         $remaining = array_values(array_filter($required, static fn (string $table): bool => ! $schema->hasTable($table)));
         $remainingOutdated = $this->outdatedTables($schema, $required);
@@ -74,6 +75,9 @@ final readonly class AuthSchemaManager
     {
         $outdated = [];
         $requirements = self::REQUIRED_COLUMNS;
+        $class = $this->models->userClass();
+        $model = new $class;
+        $requirements[$model->getTable()] = [$model->getEmailIdentityHashName()];
         foreach ($requirements as $table => $columns) {
             if (! in_array($table, $required, true) || ! $schema->hasTable($table)) {
                 continue;
@@ -96,11 +100,15 @@ final readonly class AuthSchemaManager
     private function missingIndexes(Builder $schema, array $required): array
     {
         $missingIndexes = [];
-        foreach (self::REQUIRED_INDEXES as $table => $indexes) {
+        $requirements = self::REQUIRED_INDEXES;
+        $class = $this->models->userClass();
+        $model = new $class;
+        $requirements[$model->getTable()] = [PrincipalEmailIdentity::INDEX];
+        foreach ($requirements as $table => $indexes) {
             if (! in_array($table, $required, true) || ! $schema->hasTable($table)) {
                 continue;
             }
-            $missing = array_values(array_filter($indexes, static fn (string $index): bool => $table === AuthTables::PrincipalSecurityStates ? ! PrincipalSecuritySchema::indexReady($schema) : ! $schema->hasIndex($table, $index)));
+            $missing = array_values(array_filter($indexes, static fn (string $index): bool => $table === $model->getTable() ? ! PrincipalEmailIdentity::indexReady($model) : ($table === AuthTables::PrincipalSecurityStates ? ! PrincipalSecuritySchema::indexReady($schema) : ! $schema->hasIndex($table, $index))));
             if ($missing !== []) {
                 $missingIndexes[$table] = $missing;
             }

@@ -410,6 +410,7 @@
             "kind": "class",
             "file": "database/factories/UserFactory.php",
             "methods": [
+                "configure",
                 "definition",
                 "disabled",
                 "modelName",
@@ -819,6 +820,7 @@
                 "CreatedAt",
                 "DeletedAt",
                 "Email",
+                "EmailIdentityHash",
                 "EmailVerifiedAt",
                 "Id",
                 "LastLoginAt",
@@ -1492,6 +1494,7 @@
                 "getDeletedAtColumn",
                 "getEmailForPasswordReset",
                 "getEmailForVerification",
+                "getEmailIdentityHashName",
                 "getFillable",
                 "getHidden",
                 "getKeyName",
@@ -1505,6 +1508,7 @@
                 "performedAuthAudits",
                 "preferredLocale",
                 "recoveryCodes",
+                "save",
                 "scopeAuthenticationAllowed",
                 "sentInvitations",
                 "socialIdentities",
@@ -1949,6 +1953,30 @@
                 "__construct",
                 "consume",
                 "issue"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\PrincipalEmailIdentity": {
+            "kind": "class",
+            "file": "src/Services/PrincipalEmailIdentity.php",
+            "methods": [
+                "__construct",
+                "key",
+                "normalize"
+            ],
+            "properties": [],
+            "constants": [
+                "INDEX"
+            ]
+        },
+        "Nvl\\Auth\\Services\\PrincipalEmailIdentityAdoption": {
+            "kind": "class",
+            "file": "src/Services/PrincipalEmailIdentityAdoption.php",
+            "methods": [
+                "__construct",
+                "apply",
+                "plan"
             ],
             "properties": [],
             "constants": []

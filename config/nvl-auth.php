@@ -118,6 +118,7 @@ return [
                     'name' => 'name',
                     'email' => 'email',
                     'email_verified_at' => 'email_verified_at',
+                    'email_identity_hash' => 'email_identity_hash',
                     'password' => 'password',
                     'active' => 'is_active',
                     'locale' => 'locale',

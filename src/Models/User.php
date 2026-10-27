@@ -21,6 +21,7 @@ use Illuminate\Notifications\Notifiable;
 use Nvl\Auth\Database\Factories\UserFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\PrincipalAttribute;
+use Nvl\Auth\Services\PrincipalEmailIdentity;
 use Nvl\Support\Config\PackageStorage;
 
 /**
@@ -185,7 +186,7 @@ class User extends Authenticatable implements CanResetPasswordContract, HasLocal
         ]);
 
         return array_values(array_unique([
-            ...parent::getFillable(),
+            ...array_diff(parent::getFillable(), ['email_identity_hash', $this->getEmailIdentityHashName()]),
             ...$canonical,
         ]));
     }
@@ -202,6 +203,7 @@ class User extends Authenticatable implements CanResetPasswordContract, HasLocal
             ...array_map($this->principalColumn(...), [
                 PrincipalAttribute::Password,
                 PrincipalAttribute::RememberToken,
+                PrincipalAttribute::EmailIdentityHash,
                 PrincipalAttribute::LastLoginIp,
             ]),
         ]));
@@ -235,6 +237,22 @@ class User extends Authenticatable implements CanResetPasswordContract, HasLocal
     public function getAuthPasswordName(): string
     {
         return $this->principalColumn(PrincipalAttribute::Password);
+    }
+
+    /** The identity key is computed from final attributes, including factory overrides and quiet writes. */
+    public function save(array $options = []): bool
+    {
+        if (! $this->exists || $this->isDirty($this->principalColumn(PrincipalAttribute::Email)) || $this->isDirty($this->getEmailIdentityHashName())) {
+            PrincipalEmailIdentity::assertReady($this);
+            $this->attributes[$this->getEmailIdentityHashName()] = PrincipalEmailIdentity::key($this->getEmailForVerification());
+        }
+
+        return parent::save($options);
+    }
+
+    public function getEmailIdentityHashName(): string
+    {
+        return $this->principalColumn(PrincipalAttribute::EmailIdentityHash);
     }
 
     public function getEmailForVerification(): string

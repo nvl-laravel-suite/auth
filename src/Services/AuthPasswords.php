@@ -48,7 +48,7 @@ use SensitiveParameter;
 final readonly class AuthPasswords
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private Hasher $hasher, private AuthAuditRecorder $audits, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private PasswordBrokerManager $brokers, private AuthPipeline $pipeline, private AuthenticationEligibility $eligibility, private DomainEventDispatcher $domainEvents, private PasswordUpdater $passwords, private ConnectionCommitCallbacks $eventCommits, private CanonicalActorResolver $canonical, private PasswordValidationRules $policy, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent) {}
+    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private Hasher $hasher, private AuthAuditRecorder $audits, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private PasswordBrokerManager $brokers, private AuthPipeline $pipeline, private AuthenticationEligibility $eligibility, private DomainEventDispatcher $domainEvents, private PasswordUpdater $passwords, private ConnectionCommitCallbacks $eventCommits, private CanonicalActorResolver $canonical, private PasswordValidationRules $policy, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private PrincipalEmailIdentity $emails) {}
 
     /**
      * Verify the current password and timestamp the active session.
@@ -104,7 +104,7 @@ final readonly class AuthPasswords
             if (! $broker instanceof PasswordBroker) {
                 throw new \LogicException('The configured password broker must use Laravel\'s password broker implementation.');
             }
-            $subject = $broker->getUser([$identifierName => $data['identifier']]);
+            $subject = $broker->getUser($this->emails->brokerCredentials($identifierName, $data['identifier']));
             if (! $subject instanceof CanResetPassword) {
                 $this->audits->record('password.reset_requested', metadata: ['matched' => false]);
 
@@ -153,7 +153,7 @@ final readonly class AuthPasswords
             if (! $broker instanceof PasswordBroker) {
                 throw AuthException::invalidConfiguration('Password reset requires Laravel’s password broker.');
             }
-            $candidate = $broker->getUser([$identifierName => $data['identifier']]);
+            $candidate = $broker->getUser($this->emails->brokerCredentials($identifierName, $data['identifier']));
             if ($candidate === null) {
                 return PasswordBrokerContract::INVALID_USER;
             }
@@ -175,7 +175,7 @@ final readonly class AuthPasswords
                         throw AuthException::invalidConfiguration('Password reset requires a resettable Eloquent principal.');
                     }
 
-                    return $broker->reset([$identifierName => $data['identifier'], 'token' => $data['token'], 'password' => $data['password']], function (CanResetPassword $subject, #[SensitiveParameter] string $newPassword) use ($locked, $rejection): void {
+                    return $broker->reset($this->emails->brokerCredentials($identifierName, $data['identifier']) + ['token' => $data['token'], 'password' => $data['password']], function (CanResetPassword $subject, #[SensitiveParameter] string $newPassword) use ($locked, $rejection): void {
                         if (! $subject instanceof Model || $subject::class !== $locked::class || ! $subject->is($locked)) {
                             throw AuthException::invalidConfiguration('Password broker returned a different principal.');
                         }

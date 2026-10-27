@@ -87,7 +87,13 @@ final class PrincipalAdoptionManifest
 
         $normalized = [];
 
+        if (array_key_exists(PrincipalAttribute::EmailIdentityHash->value, $columns)) {
+            throw new InvalidArgumentException('Email identity keys are derived, never imported from a legacy claim.');
+        }
         foreach (PrincipalAttribute::cases() as $attribute) {
+            if ($attribute === PrincipalAttribute::EmailIdentityHash) {
+                continue;
+            }
             if (! array_key_exists($attribute->value, $columns)) {
                 throw new InvalidArgumentException(
                     "Auth principal adoption columns must explicitly map [{$attribute->value}].",

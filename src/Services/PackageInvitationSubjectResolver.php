@@ -34,7 +34,6 @@ final readonly class PackageInvitationSubjectResolver implements InvitationSubje
     /** {@inheritDoc} */
     public function resolve(Invitation $invitation, #[\SensitiveParameter] array $input): Authenticatable
     {
-        $email = mb_strtolower(trim($invitation->recipient));
         $class = $this->models->userClass();
         $mapped = $this->registration->map($invitation, $input);
         unset($mapped[$this->attributes->column(PrincipalAttribute::Password)]);

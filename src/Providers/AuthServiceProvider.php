@@ -14,6 +14,7 @@ use Nvl\Auth\Adapters\Laravel\EloquentAuthSubjectResolver;
 use Nvl\Auth\Adapters\Laravel\LaravelGuardIdentifierResolver;
 use Nvl\Auth\Adapters\Laravel\LaravelPrincipalSessionContainment;
 use Nvl\Auth\Adapters\Passkeys\WebauthnPasskeyCeremony;
+use Nvl\Auth\Console\Commands\AdoptEmailIdentitiesCommand;
 use Nvl\Auth\Console\Commands\AdoptPrincipalsCommand;
 use Nvl\Auth\Console\Commands\AuthConfigurationCommand;
 use Nvl\Auth\Console\Commands\AuthConfigureCommand;
@@ -204,7 +205,7 @@ final class AuthServiceProvider extends ServiceProvider implements OwnershipInte
             Sanctum::usePersonalAccessTokenModel($models->personalAccessTokenClass());
         }
         if ($this->app->runningInConsole()) {
-            $this->commands([AdoptPrincipalsCommand::class, AuthConfigurationCommand::class, AuthConfigureCommand::class, AuthDoctorCommand::class, InstallAuthSchemaCommand::class, ListAuthFeaturesCommand::class, PruneAuthStateCommand::class]);
+            $this->commands([AdoptEmailIdentitiesCommand::class, AdoptPrincipalsCommand::class, AuthConfigurationCommand::class, AuthConfigureCommand::class, AuthDoctorCommand::class, InstallAuthSchemaCommand::class, ListAuthFeaturesCommand::class, PruneAuthStateCommand::class]);
         }
     }
 

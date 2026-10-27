@@ -11,6 +11,7 @@ use Illuminate\Contracts\Auth\UserProvider;
 use Nvl\Auth\Contracts\AuthIdentifierResolver;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\PrincipalEmailIdentity;
 
 /**
  * Resolves identifiers through the configured Laravel guard's user provider.
@@ -23,6 +24,7 @@ final readonly class LaravelGuardIdentifierResolver implements AuthIdentifierRes
     public function __construct(
         private AuthManager $auth,
         private AuthConfiguration $configuration,
+        private PrincipalEmailIdentity $emails,
     ) {}
 
     /** {@inheritDoc} */
@@ -31,7 +33,7 @@ final readonly class LaravelGuardIdentifierResolver implements AuthIdentifierRes
         $guard = $this->auth->guard($this->configuration->string('guard', 'web'));
         $provider = $this->provider($guard);
 
-        return $provider->retrieveByCredentials([$identifierName => $identifier]);
+        return $provider->retrieveByCredentials($this->emails->credentials($provider, $identifierName, $identifier));
     }
 
     /**

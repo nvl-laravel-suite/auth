@@ -62,6 +62,7 @@
                 "features.principal_management.settings.attributes.deleted_at",
                 "features.principal_management.settings.attributes.email",
                 "features.principal_management.settings.attributes.email_verified_at",
+                "features.principal_management.settings.attributes.email_identity_hash",
                 "features.principal_management.settings.attributes.id",
                 "features.principal_management.settings.attributes.last_login_at",
                 "features.principal_management.settings.attributes.last_login_ip",

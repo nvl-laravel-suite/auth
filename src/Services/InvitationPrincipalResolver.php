@@ -29,10 +29,11 @@ final readonly class InvitationPrincipalResolver
     public function lockExisting(Invitation $invitation): void
     {
         $class = $this->models->userClass();
+        PrincipalEmailIdentity::assertReady(new $class);
         if ((new $class)->getConnection() !== $invitation->getConnection()) {
             throw AuthException::invalidConfiguration('Invitation and canonical principal must share their actual source.');
         }
-        $existing = $class::query()->where($this->attributes->column(PrincipalAttribute::Email), mb_strtolower(trim($invitation->recipient)))->first();
+        $existing = $class::query()->withTrashed()->where($this->attributes->column(PrincipalAttribute::EmailIdentityHash), PrincipalEmailIdentity::key($invitation->recipient))->first();
         if ($existing !== null) {
             $this->security->lock($existing);
         }
@@ -44,13 +45,17 @@ final readonly class InvitationPrincipalResolver
     public function resolve(Invitation $invitation, #[\SensitiveParameter] array $data, ?Authenticatable $authenticated): Authenticatable
     {
         $class = $this->models->userClass();
+        PrincipalEmailIdentity::assertReady(new $class);
         $prototype = new $class;
         if ($prototype->getConnection() !== $invitation->getConnection()) {
             throw AuthException::invalidConfiguration('Invitation and canonical principal must share their actual source.');
         }
         $email = $this->attributes->column(PrincipalAttribute::Email);
-        $recipient = mb_strtolower(trim($invitation->recipient));
-        $existing = $class::query()->where($email, $recipient)->first();
+        $recipient = PrincipalEmailIdentity::normalize($invitation->recipient);
+        $existing = $class::query()->withTrashed()->where($this->attributes->column(PrincipalAttribute::EmailIdentityHash), PrincipalEmailIdentity::key($recipient))->first();
+        if ($existing !== null && $existing->trashed()) {
+            throw new AuthException('invitation_principal_conflict', 'The invited identity is unavailable.', 409);
+        }
         if ($existing !== null) {
             $this->security->lock($existing);
             $this->assertRecipient($invitation, $existing, $authenticated);
@@ -74,7 +79,7 @@ final readonly class InvitationPrincipalResolver
             throw AuthException::invalidConfiguration('The invitation resolver must persist the canonical invited identity on the same source.');
         }
         $fresh = $class::query()->useWritePdo()->whereKey($subject->getKey())->first();
-        if ($fresh === null || ! is_string($fresh->getAttribute($email)) || mb_strtolower(trim($fresh->getAttribute($email))) !== $recipient) {
+        if ($fresh === null || $fresh->getAttribute($fresh->getEmailIdentityHashName()) !== PrincipalEmailIdentity::key($recipient) || ! is_string($fresh->getAttribute($email)) || PrincipalEmailIdentity::normalize($fresh->getAttribute($email)) !== $recipient) {
             throw AuthException::invalidConfiguration('The invitation resolver must persist the canonical invited recipient.');
         }
         if (! $receipt->contains($fresh)) {

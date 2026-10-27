@@ -43,7 +43,7 @@ final readonly class Authentication
 
     private const string PendingFactorLogin = 'nvl-auth.credential_login';
 
-    public function __construct(private FeatureGate $features, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private AuthManager $auth, private AuthAuditRecorder $audits, private AuthenticationEligibility $eligibility, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private AuthTokens $tokens, private SecretHasher $hasher, private AuthIdentityChallenges $records, private PrincipalSecurity $security, private AuthenticationSessions $sessions, private AuthenticationProofs $proofs) {}
+    public function __construct(private FeatureGate $features, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private AuthManager $auth, private AuthAuditRecorder $audits, private AuthenticationEligibility $eligibility, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private AuthTokens $tokens, private SecretHasher $hasher, private AuthIdentityChallenges $records, private PrincipalSecurity $security, private AuthenticationSessions $sessions, private AuthenticationProofs $proofs, private PrincipalEmailIdentity $emails) {}
 
     /** Verify native password credentials into a browser-bound bearer capability.
      * @param  array{identifier?: mixed, password?: mixed}  $credentials
@@ -211,7 +211,7 @@ final readonly class Authentication
         if ($provider === null) {
             throw AuthException::invalidConfiguration('A credential provider is required.');
         }
-        $native = [$identifier => $credentials['identifier'], 'password' => $credentials['password']];
+        $native = $this->emails->credentials($provider, $identifier, $credentials['identifier']) + ['password' => $credentials['password']];
         $subject = $provider->retrieveByCredentials($native);
         if (! $subject instanceof Model) {
             throw new AuthException('credentials_invalid', 'The supplied credentials are invalid.', 422);

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Events\UserAuthenticated;
+use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Services\AuthCommittedAudit;
 use Nvl\Auth\Services\AuthEmailVerification;
@@ -44,9 +45,10 @@ it('emits verification data without sending and marks the host email verified', 
             && $event->request->payload['subject_id'] === (string) $user->getKey();
     });
 
-    expect(app(AuthEmailVerification::class)->verify($user))->toBeTrue()
-        ->and($user->refresh()->hasVerifiedEmail())->toBeTrue()
-        ->and(app(AuthEmailVerification::class)->verify($user))->toBeFalse();
+    $token = Event::dispatched(AuthDeliveryRequested::class)->first()[0]->request->payload['token'];
+    expect(app(AuthEmailVerification::class)->verify($user, $token))->toBeTrue()
+        ->and($user->refresh()->hasVerifiedEmail())->toBeTrue();
+    expect(fn () => app(AuthEmailVerification::class)->verify($user, $token))->toThrow(AuthException::class);
 });
 
 it('uses laravel password broker storage and emits delivery instead of notifications', function (): void {

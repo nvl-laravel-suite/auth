@@ -31,6 +31,8 @@ use Nvl\Auth\Services\AuthenticationProofs;
 use Nvl\Auth\Services\AuthenticationSessions;
 use Nvl\Auth\Services\AuthSecondFactor;
 use Nvl\Auth\Services\AuthTokens;
+use Nvl\Auth\Services\PrincipalEmailIdentity;
+use Nvl\Auth\Services\PrincipalEmailIdentityAdoption;
 use Nvl\Auth\Tests\Fixtures\RejectLoginStage;
 use Nvl\Auth\Traits\IssuesAuthenticationProofs;
 use Nvl\Auth\ValueObjects\AuthenticationEvidence;
@@ -529,9 +531,10 @@ it('rejects skipped or repeated native login terminal calls', function (string $
 
 it('publishes native proof contracts and complete credential operations without internal issuance or bare establishment', function (): void {
     $catalog = json_decode(file_get_contents(__DIR__.'/../../resources/consumer-api.json'), true, flags: JSON_THROW_ON_ERROR)['symbols'];
-    foreach ([Authentication::class, AuthenticationSessions::class, AuthenticationRequestContext::class, AuthenticationProofs::class, AuthenticationAssurancePolicy::class, AuthenticationMethod::class, AuthenticationDestination::class, AuthenticationEvidence::class, IssuedAuthenticationProof::class] as $symbol) {
+    foreach ([PrincipalEmailIdentity::class, PrincipalEmailIdentityAdoption::class, Authentication::class, AuthenticationSessions::class, AuthenticationRequestContext::class, AuthenticationProofs::class, AuthenticationAssurancePolicy::class, AuthenticationMethod::class, AuthenticationDestination::class, AuthenticationEvidence::class, IssuedAuthenticationProof::class] as $symbol) {
         expect($catalog)->toHaveKey($symbol);
     }
+    expect($catalog[PrincipalEmailIdentity::class]['methods'])->toContain('normalize', 'key')->not->toContain('credentials', 'brokerCredentials', 'assertReady', 'schemaReady', 'indexReady');
     expect($catalog[Authentication::class]['methods'])->toContain('login', 'loginWithToken', 'proveCredentials', 'proveCredentialsForToken')
         ->and($catalog[AuthenticationSessions::class]['methods'])->toContain('establishFromProof')->not->toContain('establish', 'establishForPurpose')
         ->and($catalog[Authentication::class]['methods'])->not->toContain('passwordProof', 'issueNativeProof')

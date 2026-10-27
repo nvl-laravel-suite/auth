@@ -169,7 +169,7 @@ final readonly class AuthMaintenance
         $seenEmails = [];
         foreach ($rows as $row) {
             $id = $this->adoptPrincipalsRequiredString($this->adoptPrincipalsValue($row, $mapping->columns, PrincipalAttribute::Id), 'principal id');
-            $email = mb_strtolower($this->adoptPrincipalsRequiredString($this->adoptPrincipalsValue($row, $mapping->columns, PrincipalAttribute::Email), "principal {$id} email"));
+            $email = PrincipalEmailIdentity::normalize($this->adoptPrincipalsRequiredString($this->adoptPrincipalsValue($row, $mapping->columns, PrincipalAttribute::Email), "principal {$id} email"));
             if (! Str::isUuid($id) || isset($seenIds[$id])) {
                 throw new InvalidArgumentException("Auth principal identity [{$id}] is invalid or duplicated.");
             }
@@ -200,7 +200,7 @@ final readonly class AuthMaintenance
         $tokens = [];
         $seen = [];
         foreach ($rows as $row) {
-            $email = mb_strtolower($this->adoptPrincipalsRequiredString($row->{$mapping->columns['email']} ?? null, 'password-reset email'));
+            $email = PrincipalEmailIdentity::normalize($this->adoptPrincipalsRequiredString($row->{$mapping->columns['email']} ?? null, 'password-reset email'));
             if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || isset($seen[$email])) {
                 throw new InvalidArgumentException("Auth password-reset email [{$email}] is invalid or duplicated.");
             }

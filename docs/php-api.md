@@ -77,7 +77,7 @@ public function update( Authenticatable&CanResetPassword $subject, #[SensitivePa
 ## AuthEmailVerification
 
 ```php
-public function verify(Authenticatable&MustVerifyEmail $subject): bool;
+public function verify(Authenticatable&MustVerifyEmail $subject, #[SensitiveParameter] string $token): bool;
 ```
 
 ## AuthInvitations
@@ -300,3 +300,7 @@ Confirmation runs outside the principal source transaction. The grant binds the 
 `AuthenticationSessions::assertCanTransition(?Authenticatable $subject = null): void` is the narrow preflight for immediate browser compositions. Call it before native primary verification, OAuth/session-map mutation or SDK work; then use the complete native finalizer. It checks actual configured principal/provider, proof and audit source connections. `login`, `establishFromProof`, pending-factor completion, logout and self-deletion enforce this themselves before their effects. Pure proof issuance and ordinary domain mutations may join the caller transaction. Commit registration before login. Do not wrap self-delete-with-logout in a host transaction.
 
 The rejection is `stateful_transaction_unsupported` with status409. No testing-transaction exception exists. Browser failure cleanup invalidates the session/CSRF and clears partial authentication; native success facts remain on their source commit. Framework guard events and consumer external side effects cannot be un-fired by SQL rollback.
+
+### Canonical email identity adoption
+
+`PrincipalEmailIdentity::normalize(string $email): string` and `key(string $email): string` use exact UTF-8 lowercase/trim semantics without provider-specific rewriting. `PrincipalEmailIdentityAdoption::plan()` returns `missing`, bounded `collisions` (`key`, `subjectIds`), and `ready`. `apply(SystemMutationContext $authority)` returns `updated` and `finalized`; explicit system authorization and drained legacy workers are required. Host-owned DDL remains the host's responsibility.

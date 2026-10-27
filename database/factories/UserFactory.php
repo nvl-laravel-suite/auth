@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Services\PrincipalEmailIdentity;
 
 /**
  * Builds package-owned principals for consumers and package tests.
@@ -21,6 +22,14 @@ final class UserFactory extends Factory
 {
     /** @var class-string<User> */
     protected $model = User::class;
+
+    /** Derive the protected key after all caller factory states are applied. */
+    public function configure(): static
+    {
+        return $this->afterMaking(static function (User $user): void {
+            $user->forceFill([$user->getEmailIdentityHashName() => PrincipalEmailIdentity::key($user->getEmailForVerification())]);
+        });
+    }
 
     /** @return class-string<User> */
     public function modelName(): string

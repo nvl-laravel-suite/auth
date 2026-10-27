@@ -12,6 +12,8 @@ use Nvl\Auth\Enums\AuthMessageType;
 
 /**
  * Carries a transport-neutral message request to host delivery listeners.
+ * Native initial email verification payloads contain subject_type, subject_id and a one-use token.
+ * Deliver the token privately; never put it in audit metadata or generic logs.
  *
  * @api
  */
@@ -24,7 +26,7 @@ final readonly class AuthDeliveryRequest
      * @param  array<string, mixed>  $metadata
      * @param  array<string, mixed>|null  $invitation
      */
-    public function __construct(public string $messageId, public AuthFeature $feature, public AuthMessageType $type, public string $recipient, public array $payload, public CarbonImmutable $expiresAt, public ?string $locale = null, public array $metadata = [], public ?SubjectReference $subject = null, public ?array $invitation = null)
+    public function __construct(public string $messageId, public AuthFeature $feature, public AuthMessageType $type, public string $recipient, #[\SensitiveParameter] public array $payload, public CarbonImmutable $expiresAt, public ?string $locale = null, public array $metadata = [], public ?SubjectReference $subject = null, public ?array $invitation = null)
     {
         $supportedType = match ($this->feature) {
             AuthFeature::Invitations => AuthMessageType::Invitation,

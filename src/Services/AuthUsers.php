@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
-use Carbon\CarbonImmutable;
 use DateTimeZone;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -23,16 +22,13 @@ use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
-use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Enums\UserBulkOperation;
-use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\User;
-use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthEventContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -48,7 +44,7 @@ use Nvl\Support\Events\DomainEventDispatcher;
 final readonly class AuthUsers
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private MutationAuthorizer $authorization, private UserLocator $users, private AuthAuditRecorder $audits, private PrincipalAttributeMapper $attributes, private PrincipalSessionContainment $sessions, private AuthMemberships $owners, private AuthOwnershipState $ownershipState, private DomainEventDispatcher $domainEvents, private ManagementAuthorizer $createAuthorization, private AuthModelRegistry $models, private Container $container, private AuthConfiguration $configuration, private AuthOperationBoundary $operations, private ManagementAuthorizer $updateAuthorization, private PasswordUpdater $passwords, private PasswordValidationRules $passwordPolicy, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private AuthenticationSessions $browserSessions) {}
+    public function __construct(private FeatureGate $features, private MutationAuthorizer $authorization, private UserLocator $users, private AuthAuditRecorder $audits, private PrincipalAttributeMapper $attributes, private PrincipalSessionContainment $sessions, private AuthMemberships $owners, private AuthOwnershipState $ownershipState, private DomainEventDispatcher $domainEvents, private ManagementAuthorizer $createAuthorization, private AuthModelRegistry $models, private Container $container, private AuthOperationBoundary $operations, private ManagementAuthorizer $updateAuthorization, private PasswordUpdater $passwords, private PasswordValidationRules $passwordPolicy, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private AuthenticationSessions $browserSessions, private AuthEmailVerification $emailVerification) {}
 
     /**
      * Apply one operation to at most one hundred principals.
@@ -357,12 +353,12 @@ final readonly class AuthUsers
             $attributes = array_diff_key($data, array_flip(['currentPassword']));
             $submittedEmail = $attributes['email'] ?? null;
             $currentEmail = $this->attributes->value($user, PrincipalAttribute::Email);
-            $emailChanged = is_string($submittedEmail) && is_string($currentEmail) && mb_strtolower(trim($submittedEmail)) !== mb_strtolower(trim($currentEmail));
+            $emailChanged = is_string($submittedEmail) && is_string($currentEmail) && PrincipalEmailIdentity::normalize($submittedEmail) !== PrincipalEmailIdentity::normalize($currentEmail);
             if ($emailChanged) {
                 $this->recent->consume($user, $grant, RecentAuthenticationPurpose::EmailChange, $context);
                 $this->features->assertAllowed(AuthFeature::EmailVerification, FeatureOperation::Issue);
-                $normalizedEmail = mb_strtolower(trim($submittedEmail));
-                if ($user::query()->where($this->attributes->column(PrincipalAttribute::Email), $normalizedEmail)->whereKeyNot($user->getKey())->exists()) {
+                $normalizedEmail = PrincipalEmailIdentity::normalize($submittedEmail);
+                if ($user::query()->withTrashed()->where($this->attributes->column(PrincipalAttribute::EmailIdentityHash), PrincipalEmailIdentity::key($normalizedEmail))->whereKeyNot($user->getKey())->exists()) {
                     throw new AuthException('email_unavailable', 'The email address is unavailable.', 422);
                 }
                 $attributes['emailVerified'] = false;
@@ -386,10 +382,7 @@ final readonly class AuthUsers
     private function updateProfileRequestEmailVerification(User $user, #[\SensitiveParameter] array $data): void
     {
         $data = $this->validateUpdateProfile($data);
-        $expiresAt = CarbonImmutable::now()->addMinutes($this->configuration->integerBetween('features.email_verification.settings.ttl_minutes', 60, 1, 10080));
-        $reference = SubjectReference::fromAuthenticatable($user);
-        $this->domainEvents->dispatch(new AuthDeliveryRequested(new AuthDeliveryRequest(messageId: (string) Str::uuid(), feature: AuthFeature::EmailVerification, type: AuthMessageType::EmailVerification, recipient: $user->getEmailForVerification(), payload: ['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'email_hash' => sha1($user->getEmailForVerification())], expiresAt: $expiresAt, locale: ! array_key_exists('locale', $data) ? null : $data['locale']), $this->deliveryContext->capture(true)), $user->getConnection());
-        $this->audits->record('email_verification.requested', subject: $reference, actor: $user);
+        $this->emailVerification->request($user, ! array_key_exists('locale', $data) ? null : $data['locale']);
     }
 
     /** Persist a partial principal mutation.
@@ -424,16 +417,16 @@ final readonly class AuthUsers
             }
             $attributes = $data;
             if (array_key_exists('email', $attributes)) {
-                $attributes['email'] = mb_strtolower(trim($attributes['email']));
+                $attributes['email'] = PrincipalEmailIdentity::normalize($attributes['email']);
                 $current = $this->attributes->value($user, PrincipalAttribute::Email);
-                if (is_string($current) && mb_strtolower(trim($current)) !== $attributes['email'] && ! array_key_exists('emailVerified', $attributes)) {
+                if (is_string($current) && PrincipalEmailIdentity::normalize($current) !== $attributes['email'] && ! array_key_exists('emailVerified', $attributes)) {
                     $attributes['emailVerified'] = false;
                 }
             }
             $oldEmail = $this->attributes->value($user, PrincipalAttribute::Email);
             unset($attributes['password']);
             $user->update($this->attributes->map($attributes));
-            $emailChanged = array_key_exists('email', $data) && is_string($oldEmail) && mb_strtolower(trim($oldEmail)) !== mb_strtolower(trim($data['email']));
+            $emailChanged = array_key_exists('email', $data) && is_string($oldEmail) && PrincipalEmailIdentity::normalize($oldEmail) !== PrincipalEmailIdentity::normalize($data['email']);
             if (! array_key_exists('password', $data) && $emailChanged) {
                 $this->security->advance($user, 'email_changed');
             }
@@ -574,7 +567,7 @@ final readonly class AuthUsers
         if (trim($data['name']) === '' || mb_strlen($data['name']) > 160) {
             throw new InvalidArgumentException('User names must contain between one and 160 characters.');
         }
-        $data['email'] = mb_strtolower(trim($data['email']));
+        $data['email'] = PrincipalEmailIdentity::normalize($data['email']);
         if (filter_var($data['email'], FILTER_VALIDATE_EMAIL) === false || mb_strlen($data['email']) > 254) {
             throw new InvalidArgumentException('A valid user email address is required.');
         }
@@ -643,7 +636,7 @@ final readonly class AuthUsers
         }
 
         if (isset($validated['email'])) {
-            $validated['email'] = mb_strtolower(trim($validated['email']));
+            $validated['email'] = PrincipalEmailIdentity::normalize($validated['email']);
         }
         Validator::make($validated, ['name' => ['sometimes', 'string', 'max:160'], 'email' => ['sometimes', 'email:rfc', 'max:254'], 'locale' => ['sometimes', 'string', 'regex:/^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$/'], 'timezone' => ['sometimes', 'timezone:all'], 'profile' => ['sometimes', 'array'], 'preferences' => ['sometimes', 'array']])->validate();
 
@@ -727,7 +720,7 @@ final readonly class AuthUsers
             throw new InvalidArgumentException('User names must contain between one and 160 characters.');
         }
         if (isset($validated['email'])) {
-            $validated['email'] = mb_strtolower(trim($validated['email']));
+            $validated['email'] = PrincipalEmailIdentity::normalize($validated['email']);
         }
         if (isset($validated['email']) && (filter_var($validated['email'], FILTER_VALIDATE_EMAIL) === false || mb_strlen($validated['email']) > 254)) {
             throw new InvalidArgumentException('A valid user email address is required.');

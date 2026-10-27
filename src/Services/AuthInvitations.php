@@ -106,7 +106,7 @@ final readonly class AuthInvitations
         if ($data['roles'] !== [] || $data['permissions'] !== []) {
             $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
         }
-        $recipient = mb_strtolower(trim($data['recipient']));
+        $recipient = PrincipalEmailIdentity::normalize($data['recipient']);
         $recipientHash = $this->hasher->hash('invitation-recipient', $recipient);
         $ownershipKey = $nativeOwner?->scopeKey() ?? (is_string($ownership['ownership_key'] ?? null) ? $ownership['ownership_key'] : 'platform');
         $activeKey = $this->hasher->hash('active-invitation', $ownershipKey."\x00".$recipientHash."\x00".$data['purpose']);
@@ -162,7 +162,7 @@ final readonly class AuthInvitations
             throw new AuthException('forbidden', 'Invitation lookup requires explicit authority.', 403);
         }
         $this->mutations->authorize($authority, 'nvl.auth.invitations.viewAny');
-        $recipient = mb_strtolower(trim($recipient));
+        $recipient = PrincipalEmailIdentity::normalize($recipient);
         $purpose = trim($purpose);
         $context = $context === null ? null : trim($context);
         if ($recipient === '' || mb_strlen($recipient) > 320) {
@@ -194,7 +194,7 @@ final readonly class AuthInvitations
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Read);
         $filters = $this->validateInvitationIndexQuery($filters);
         $this->authorization->authorize($actor, 'nvl.auth.invitations.viewAny');
-        $query = $this->boundary->query(Invitation::query(), 'auth.invitations')->when($filters['recipient'] !== null, fn ($query) => $query->where('recipient_hash', $this->hasher->hash('invitation-recipient', mb_strtolower(trim((string) $filters['recipient'])))))->when($filters['type'] !== null, fn ($query) => $query->where('type', $filters['type']))->when($filters['types'] !== null, fn ($query) => $query->whereIn('type', $filters['types']))->when($filters['purpose'] !== null, fn ($query) => $query->where('purpose', $filters['purpose']))->when($filters['expiresAfter'] !== null, fn ($query) => $query->where('expires_at', '>=', CarbonImmutable::parse($filters['expiresAfter'])->utc()))->when($filters['expiresBefore'] !== null, fn ($query) => $query->where('expires_at', '<=', CarbonImmutable::parse($filters['expiresBefore'])->utc()))->when($filters['context'] !== null, fn ($query) => $query->where('context_hash', $this->hasher->hash('invitation-context', trim((string) $filters['context']))));
+        $query = $this->boundary->query(Invitation::query(), 'auth.invitations')->when($filters['recipient'] !== null, fn ($query) => $query->where('recipient_hash', $this->hasher->hash('invitation-recipient', PrincipalEmailIdentity::normalize((string) $filters['recipient']))))->when($filters['type'] !== null, fn ($query) => $query->where('type', $filters['type']))->when($filters['types'] !== null, fn ($query) => $query->whereIn('type', $filters['types']))->when($filters['purpose'] !== null, fn ($query) => $query->where('purpose', $filters['purpose']))->when($filters['expiresAfter'] !== null, fn ($query) => $query->where('expires_at', '>=', CarbonImmutable::parse($filters['expiresAfter'])->utc()))->when($filters['expiresBefore'] !== null, fn ($query) => $query->where('expires_at', '<=', CarbonImmutable::parse($filters['expiresBefore'])->utc()))->when($filters['context'] !== null, fn ($query) => $query->where('context_hash', $this->hasher->hash('invitation-context', trim((string) $filters['context']))));
         match ($filters['lifecycle']) {
             'active' => $query->whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '>', CarbonImmutable::now('UTC')),
             'accepted' => $query->whereNotNull('accepted_at'),

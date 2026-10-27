@@ -10,7 +10,7 @@ with `nvl.auth.` and response envelopes use `data`, `code`, and `message`.
 | `POST login` | `public.login` | authentication/use |
 | `POST password/forgot` | `public.password.request` | password/issue |
 | `POST password/reset` | `public.password.reset` | password/use |
-| `GET email/verify/{id}/{hash}` | `public.email.verify` | email verification/use |
+| `GET email/verify/{id}` | `public.email.verify` | email verification/use |
 | `POST magic-links` | `public.magic_links.request` | magic links/issue |
 | `POST magic-links/consume` | `public.magic_links.consume` | magic links/use |
 | `POST security-codes` | `public.security_codes.request` | security codes/issue |

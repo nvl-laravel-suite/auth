@@ -168,7 +168,7 @@ final readonly class PrincipalSecurity
         $model = new Challenge;
 
         return $model->getConnection()->table($model->getTable())->where('subject_type', $subject->type)->where('subject_id', $subject->identifier)
-            ->whereIn('type', ['passkey_authentication', 'passkey_registration', 'credential_second_factor', 'authentication_proof', 'native_email_link', 'native_email_code'])
+            ->whereIn('type', ['passkey_authentication', 'passkey_registration', 'credential_second_factor', 'authentication_proof', 'native_email_link', 'native_email_code', 'native_email_verification'])
             ->whereNull('consumed_at')->whereNull('revoked_at');
     }
 }
