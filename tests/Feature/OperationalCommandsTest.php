@@ -239,7 +239,7 @@ it('does not resolve invalid dormant adapters during readiness checks', function
     config()->set('nvl-auth.features.passkeys.enabled', false);
     config()->set('nvl-auth.features.passkeys.services.ceremony', stdClass::class);
     config()->set('nvl-auth.features.social_identities.enabled', false);
-    config()->set('nvl-auth.features.social_identities.services.provider', stdClass::class);
+    config()->set('nvl-auth.features.social_identities.services.provider_factory', stdClass::class);
 
     $this->artisan('nvl:auth:doctor')->assertSuccessful();
     $this->artisan('nvl:auth:doctor', ['--strict' => true])

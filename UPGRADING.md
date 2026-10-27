@@ -4,7 +4,7 @@ This is a breaking API conversion staged ahead of the coordinated major release.
 
 Move HTTP routing, controllers, validation extraction, CSRF, throttles, headers, cookies, redirects, exception presentation and OAuth Request/session acquisition into the application. Package installation no longer changes guards or password-broker configuration. Pass the guard and session explicitly for login/logout/session establishment. Credential verification alone is not login.
 
-Use a host User subclass with optional Sanctum/Permission traits when enabling those adapters. Install selected adapter engines explicitly. Bind Socialite using an explicit SDK driver. Keep audited SDK validation, TOTP/WebAuthn proofs, replay checks and canonical principal resolution intact.
+Use a host User subclass with optional Sanctum/Permission traits when enabling those adapters. Install selected adapter engines explicitly. Replace the old SocialIdentityProvider binding and features.social_identities.services.provider setting with a scoped SocialIdentityProviderFactory binding (or provider_factory setting). Construct a new SDK driver from the current request for every make call; see the [factory example](README.md). Keep audited SDK validation, TOTP/WebAuthn proofs, replay checks and canonical principal resolution intact.
 
 Retired Tenancy configuration, model branches and automatic legacy-table conversion have no compatibility path. Preserve old data, drain or expire pending old proofs and queued payloads, and use reviewed native Ownership adoption before accepting scoped traffic. Native same-table ownership adoption does not copy or delete legacy tenant tables. Do not disable Ownership to escape persisted partition checks.
 

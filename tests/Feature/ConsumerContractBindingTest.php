@@ -31,7 +31,7 @@ use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
 use Nvl\Auth\Contracts\RbacPrincipalAccess;
-use Nvl\Auth\Contracts\SocialIdentityProvider;
+use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Contracts\SystemMutationAccess;
@@ -234,7 +234,7 @@ function authPublicExtensionContracts(): array
         [AuthenticationEligibility::class, false],
         [ApiTokenManager::class, false],
         [ApiTokenAbilityProvider::class, false],
-        [SocialIdentityProvider::class, false],
+        [SocialIdentityProviderFactory::class, true],
         [SocialSubjectResolver::class, false],
         [PasskeyCeremony::class, false],
         [InvitationSubjectResolver::class, false],
@@ -244,3 +244,18 @@ function authPublicExtensionContracts(): array
         [InvitationRecipientProof::class, false],
     ];
 }
+
+it('preserves a consumer provider factory binding', function (): void {
+    $consumer = authContractConsumer($this->app);
+    $contract = SocialIdentityProviderFactory::class;
+    $host = Mockery::mock(SocialIdentityProviderFactory::class);
+    try {
+        $consumer->instance($contract, $host);
+        (new AuthServiceProvider($consumer))->register();
+        expect($consumer->make($contract))->toBe($host)
+            ->and(interface_exists($contract))->toBeTrue();
+    } finally {
+        Container::setInstance($this->app);
+        $consumer->flush();
+    }
+});

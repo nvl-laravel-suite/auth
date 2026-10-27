@@ -2,12 +2,13 @@
 
 declare(strict_types=1);
 
-use Nvl\Auth\Contracts\SocialIdentityProvider;
+use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\SocialIdentity;
 use Nvl\Auth\Services\AuthSocialIdentities;
 use Nvl\Auth\Tests\Fixtures\TestSocialIdentityProvider;
+use Nvl\Auth\Tests\Fixtures\TestSocialIdentityProviderFactory;
 use Nvl\Auth\Tests\Fixtures\TestSocialSubjectResolver;
 
 it('acquires, links, encrypts, and revokes an allowlisted social identity', function (): void {
@@ -18,7 +19,7 @@ it('acquires, links, encrypts, and revokes an allowlisted social identity', func
         'parameters' => [],
     ]);
     $user = $this->user();
-    $this->app->singleton(SocialIdentityProvider::class, TestSocialIdentityProvider::class);
+    $this->app->instance(SocialIdentityProviderFactory::class, new TestSocialIdentityProviderFactory);
     $this->app->instance(SocialSubjectResolver::class, new TestSocialSubjectResolver($user));
 
     expect(app(AuthSocialIdentities::class)->startAuthorization('github'))
@@ -44,7 +45,7 @@ it('normalizes provider failures without leaking adapter details', function (): 
         'parameters' => [],
     ]);
 
-    $this->app->instance(SocialIdentityProvider::class, new TestSocialIdentityProvider(failRedirect: true));
+    $this->app->instance(SocialIdentityProviderFactory::class, new TestSocialIdentityProviderFactory(new TestSocialIdentityProvider(failRedirect: true)));
 
     try {
         app(AuthSocialIdentities::class)->startAuthorization('github');
@@ -55,7 +56,7 @@ it('normalizes provider failures without leaking adapter details', function (): 
             ->and($exception->getPrevious()?->getMessage())->toContain('credential leaked');
     }
 
-    $this->app->instance(SocialIdentityProvider::class, new TestSocialIdentityProvider(failUser: true));
+    $this->app->instance(SocialIdentityProviderFactory::class, new TestSocialIdentityProviderFactory(new TestSocialIdentityProvider(failUser: true)));
 
     try {
         app(AuthSocialIdentities::class)->completeAuthorization('github', $this->user());

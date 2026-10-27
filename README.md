@@ -17,7 +17,33 @@ For stateless password authentication, use `Authentication::loginWithToken()`: i
 
 Management requires an explicit actor and an AuthManagementAccess decision; system mutations require an explicit SystemMutationContext and configured SystemMutationAccess. Defaults deny. Ambient Request/Auth state is never management authority or audit metadata. Configure the principal model, attribute mapper and narrow identity adapters for host principals. The base User has no Sanctum or Permission traits; opt into those traits on a consumer subclass when selecting those adapters.
 
-Optional adapters retain Sanctum, Spatie Permission, Socialite, Google2FA and WebAuthn's audited engines. Install only selected engines and enable their feature flags. Bind SocialiteIdentityProvider with an explicitly constructed SDK driver and its provider name; the consumer owns Request/session acquisition and the SDK validates OAuth state. Never fabricate a verified external identity from untrusted callback fields. Passkey and second-factor verification retain challenge binding, expiry, replay and attempt/counter checks.
+Optional adapters retain Sanctum, Spatie Permission, Socialite, Google2FA and WebAuthn's audited engines. Install only selected engines and enable their feature flags. Bind SocialIdentityProviderFactory as a scoped host service before the Auth provider registers. Its make method must construct a fresh SocialiteIdentityProvider and SDK driver for every operation, obtaining the current Request and session at that time; the SDK validates OAuth state. Do not return cached Socialite manager drivers. Never fabricate a verified external identity from untrusted callback fields. For example, a GitHub-only host factory can construct a driver directly instead of using Socialite's cached manager:
+
+```php
+use Laravel\Socialite\Two\GithubProvider;
+use Nvl\Auth\Adapters\Socialite\SocialiteIdentityProvider;
+use Nvl\Auth\Contracts\SocialIdentityProvider;
+use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
+
+final class GithubIdentityProviderFactory implements SocialIdentityProviderFactory
+{
+    public function make(string $provider): SocialIdentityProvider
+    {
+        if ($provider !== 'github') {
+            throw new InvalidArgumentException('Unsupported social provider.');
+        }
+
+        $config = config('services.github');
+        $driver = new GithubProvider(request(), $config['client_id'], $config['client_secret'], $config['redirect']);
+
+        return new SocialiteIdentityProvider($driver, $provider);
+    }
+}
+
+$this->app->scopedIf(SocialIdentityProviderFactory::class, GithubIdentityProviderFactory::class);
+```
+
+Passkey and second-factor verification retain challenge binding, expiry, replay and attempt/counter checks.
 
 Native Ownership is optional. Declare and adopt the native owner graph before scoped traffic; use canonical owners and explicit membership/system authority. Owner selection proofs bind owner, purpose, browser session, subject when applicable and provider. Successful global authentication does not itself authorize owner entry or create membership. Old NVL Tenancy branches and automatic legacy-schema conversion are retired; retain old data and migration history and perform reviewed native adoption separately.
 

@@ -100,7 +100,7 @@
                 "features.sessions.enabled",
                 "features.sessions.settings",
                 "features.social_identities.enabled",
-                "features.social_identities.services.provider",
+                "features.social_identities.services.provider_factory",
                 "features.social_identities.services.subject_resolver",
                 "features.social_identities.settings.providers",
                 "features.totp.enabled",

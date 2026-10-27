@@ -213,7 +213,7 @@ return [
         'social_identities' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_SOCIAL_IDENTITIES_ENABLED', false),
 
-            'services' => ['provider' => null, 'subject_resolver' => null],
+            'services' => ['provider_factory' => null, 'subject_resolver' => null],
             'settings' => ['providers' => []],
         ],
         'clients' => [

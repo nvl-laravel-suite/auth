@@ -208,6 +208,15 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\SocialIdentityProviderFactory": {
+            "kind": "interface",
+            "file": "src/Contracts/SocialIdentityProviderFactory.php",
+            "methods": [
+                "make"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\SocialSubjectResolver": {
             "kind": "interface",
             "file": "src/Contracts/SocialSubjectResolver.php",

@@ -26,7 +26,7 @@ use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
-use Nvl\Auth\Contracts\SocialIdentityProvider;
+use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
@@ -150,9 +150,9 @@ final class AuthDoctor
             }
         }
         if ($configuration->featureEnabled(AuthFeature::SocialIdentities)) {
-            $socialIdentities = $this->integration($container, SocialIdentityProvider::class);
+            $socialIdentities = $this->integration($container, SocialIdentityProviderFactory::class);
             $socialSubjects = $this->integration($container, SocialSubjectResolver::class);
-            $checks[] = $this->check('adapter.social_identities', $socialIdentities !== null && ! $socialIdentities instanceof UnavailableSocialIdentityProvider, 'Social identities require a configured acquisition adapter.');
+            $checks[] = $this->check('adapter.social_identities', $socialIdentities !== null && ! $socialIdentities instanceof UnavailableSocialIdentityProviderFactory, 'Social identities require a configured acquisition adapter.');
             $checks[] = $this->check('contract.social_subject_resolver', $socialSubjects !== null && ! $socialSubjects instanceof UnavailableSocialSubjectResolver, 'Social login requires a configured principal resolver.');
             $checks[] = $this->check('social.providers', $this->hasConfiguredSocialProvider($configuration, $container), 'Social identities require at least one configured provider.');
         }

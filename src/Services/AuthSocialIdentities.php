@@ -8,7 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
-use Nvl\Auth\Contracts\SocialIdentityProvider;
+use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
@@ -27,7 +27,7 @@ use Throwable;
 final readonly class AuthSocialIdentities
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private SocialProviderConfiguration $configuration, private SocialIdentityProvider $provider, private AuthOperationBoundary $operations, private SocialSubjectResolver $subjects, private AuthAuditRecorder $audits, private SecretHasher $hasher) {}
+    public function __construct(private FeatureGate $features, private SocialProviderConfiguration $configuration, private SocialIdentityProviderFactory $providerFactory, private AuthOperationBoundary $operations, private SocialSubjectResolver $subjects, private AuthAuditRecorder $audits, private SecretHasher $hasher) {}
 
     /**
      * Return the provider redirect URL.
@@ -38,7 +38,7 @@ final readonly class AuthSocialIdentities
         $this->operations->central(AuthIdentityOperation::SocialIdentity);
         $configuration = $this->configuration->provider($provider);
         try {
-            $url = $this->provider->redirectUrl($provider, $configuration['callback_url'], $configuration['scopes'], $configuration['parameters']);
+            $url = $this->providerFactory->make($provider)->redirectUrl($provider, $configuration['callback_url'], $configuration['scopes'], $configuration['parameters']);
         } catch (AuthException $exception) {
             throw $exception;
         } catch (Throwable $exception) {
@@ -61,7 +61,7 @@ final readonly class AuthSocialIdentities
         $this->operations->central(AuthIdentityOperation::SocialIdentity, $subject);
         $configuration = $this->configuration->provider($provider);
         try {
-            $identity = $this->provider->user($provider, $configuration['callback_url']);
+            $identity = $this->providerFactory->make($provider)->user($provider, $configuration['callback_url']);
         } catch (AuthException $exception) {
             throw $exception;
         } catch (Throwable $exception) {
