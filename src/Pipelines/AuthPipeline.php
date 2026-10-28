@@ -102,7 +102,7 @@ final readonly class AuthPipeline
                 $snapshot[$key] = $this->identitySnapshot($value);
             }
 
-return $snapshot;
+            return $snapshot;
         }
         if (! $result instanceof Model) {
             return null;
