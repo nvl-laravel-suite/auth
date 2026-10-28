@@ -10,13 +10,10 @@ use Illuminate\Database\Eloquent\Model;
 use Laravel\Sanctum\TransientToken;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\InvitationRecipientProof;
-use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Contracts\OwnerBoundApiTokenManager;
-use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
-use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Events\InvitationAccepted;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
@@ -40,7 +37,7 @@ use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 final readonly class OwnerInvitations
 {
     /** Native Auth operation. */
-    public function __construct(private Container $container, private SecretHasher $hasher, private FeatureGate $features, private OwnershipReadiness $readiness, private OwnershipBoundary $boundary, private InvitationRecipientProof $proof, private MembershipPrincipalResolver $principals, private AuthMemberships $memberships, private AuthModelRegistry $models, private ManagementAuthorizer $authorization, private AuthPipeline $pipeline, private AuthCommittedAudit $audits, private DomainEventDispatcher $events, private ApiTokenManager $tokens, private InvitationSubjectResolver $subjects, private PrincipalAttributeMapper $attributes) {}
+    public function __construct(private Container $container, private SecretHasher $hasher, private FeatureGate $features, private OwnershipReadiness $readiness, private OwnershipBoundary $boundary, private InvitationRecipientProof $proof, private MembershipPrincipalResolver $principals, private AuthMemberships $memberships, private AuthModelRegistry $models, private ManagementAuthorizer $authorization, private AuthPipeline $pipeline, private AuthCommittedAudit $audits, private DomainEventDispatcher $events, private ApiTokenManager $tokens, private InvitationPrincipalResolver $principalResolver) {}
 
     /** Return only public invitation context to its bearer, without entering any owner. */
     public function preview(string $token): Invitation
@@ -94,7 +91,7 @@ final readonly class OwnerInvitations
         $issuer = $this->principals->resolve($issuerReference);
         $owner = $this->container->make(OwnerIdentityResolver::class)->resolve($reference);
 
-        return $this->container->make(OwnershipRunner::class)->run($owner, $issuer, function () use ($token, $subject, $issuer, $issuerReference, $registration): array {
+        return $this->container->make(OwnershipRunner::class)->run($owner, $issuer, function () use ($token, $subject, $issuer, $issuerReference, $registration, $candidate): array {
             $model = new Invitation;
             $membership = new ($this->models->ownerMembershipClass())();
             $principal = new ($this->models->rbacPrincipalClass())();
@@ -103,7 +100,8 @@ final readonly class OwnerInvitations
             }
             $this->authorization->authorize($issuer, 'nvl.auth.invitations.create');
 
-            return $model->getConnection()->transaction(function () use ($model, $token, $subject, $issuer, $issuerReference, $registration): array {
+            return $model->getConnection()->transaction(function () use ($model, $token, $subject, $issuer, $issuerReference, $registration, $candidate): array {
+                $this->principalResolver->lockExisting($candidate);
                 $this->memberships->lock();
                 $fresh = $this->boundary->query(Invitation::query(), 'auth.invitations')->where('token_hash', $this->hasher->hash('invitation-token', $token))->lockForUpdate()->first();
                 if (! $fresh instanceof Invitation || ! $fresh->isUsable() || $fresh->inviter_type !== $issuerReference->type || $fresh->inviter_id !== $issuerReference->identifier) {
@@ -135,26 +133,7 @@ final readonly class OwnerInvitations
      */
     private function resolveSubject(Invitation $invitation, array $data, ?Authenticatable $authenticated): Authenticatable
     {
-        $class = $this->models->userClass();
-        $email = $this->attributes->column(PrincipalAttribute::Email);
-        $existing = $class::query()->where($email, mb_strtolower(trim($invitation->recipient)))->first();
-        if ($existing instanceof Authenticatable) {
-            if ($authenticated === null) {
-                throw new AuthException('invitation_identity_proof_required', 'The invitation recipient identity could not be verified.', 403);
-            }
-            $this->proof->assertMatches($invitation, $authenticated);
-            if (SubjectReference::fromAuthenticatable($existing) != SubjectReference::fromAuthenticatable($authenticated)) {
-                throw new AuthException('invitation_identity_proof_required', 'The invitation recipient identity could not be verified.', 403);
-            }
-
-            return $existing;
-        }
-        $created = $this->subjects->resolve($invitation, array_diff_key($data, ['token' => true]) + ['password_confirmation' => $data['passwordConfirmation'] ?? null]);
-        if (! $created instanceof Model || ! $created instanceof $class || ! $created->exists || $created->getConnection() !== $invitation->getConnection() || ! is_string($created->getAttribute($email)) || mb_strtolower(trim($created->getAttribute($email))) !== mb_strtolower(trim($invitation->recipient))) {
-            throw AuthException::invalidConfiguration('The invitation resolver must persist the canonical invited identity on the same source.');
-        }
-
-        return $created;
+        return $this->principalResolver->resolve($invitation, $data, $authenticated);
     }
 
     /** Look up only an exact secret before owner admission; it grants no other resource access.

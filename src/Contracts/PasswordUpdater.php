@@ -16,5 +16,5 @@ interface PasswordUpdater
     /**
      * Persist a hashed replacement password for a host subject.
      */
-    public function update(CanResetPassword $subject, string $password): void;
+    public function update(CanResetPassword $subject, #[\SensitiveParameter] string $password): void;
 }

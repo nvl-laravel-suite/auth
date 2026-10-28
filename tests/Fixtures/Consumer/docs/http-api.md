@@ -10,7 +10,7 @@ with `nvl.auth.` and response envelopes use `data`, `code`, and `message`.
 | `POST login` | `public.login` | authentication/use |
 | `POST password/forgot` | `public.password.request` | password/issue |
 | `POST password/reset` | `public.password.reset` | password/use |
-| `GET email/verify/{id}/{hash}` | `public.email.verify` | email verification/use |
+| `GET email/verify/{id}` | `public.email.verify` | email verification/use |
 | `POST magic-links` | `public.magic_links.request` | magic links/issue |
 | `POST magic-links/consume` | `public.magic_links.consume` | magic links/use |
 | `POST security-codes` | `public.security_codes.request` | security codes/issue |
@@ -34,6 +34,7 @@ with `nvl.auth.` and response envelopes use `data`, `code`, and `message`.
 | `POST logout` | `account.logout` | authentication/revoke |
 | `PUT password` | `account.password.update` | password/update |
 | `POST password/confirm` | `account.password.confirm` | password/use |
+| `POST reauthenticate` | `account.reauthenticate` | password/use; requires sessions; returns an operation-bound grant |
 | `POST email/verification` | `account.email.request` | email verification/issue |
 | `POST totp/enroll` | `account.totp.enroll` | TOTP/enroll |
 | `POST totp/{credential}/confirm` | `account.totp.confirm` | TOTP/enroll |
@@ -54,6 +55,8 @@ with `nvl.auth.` and response envelopes use `data`, `code`, and `message`.
 |---|---|---|
 | users | list, suggestions, create, show, update, enable/disable, restore, delete, bulk operations | `nvl.auth.users.viewAny`, `.view`, `.create`, `.update`, `.delete`, `.restore` |
 | user access | replace direct roles or permissions | `nvl.auth.users.manageAccess` |
+| credentials | change or remove a password | `nvl.auth.users.manageCredentials` |
+| verified email | explicitly mark an email verified | `nvl.auth.users.verifyEmail` |
 | invitations | list, create, resend, revoke | `nvl.auth.invitations.*` |
 | clients | list, show, create, update, activate/deactivate, delete | `nvl.auth.clients.*` |
 | roles | list, show, create, update, delete, clone, hierarchy, templates, apply template, analytics | `nvl.auth.rbac.view`, `.manageRoles` |

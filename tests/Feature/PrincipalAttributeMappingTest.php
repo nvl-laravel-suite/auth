@@ -4,19 +4,25 @@ declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Nvl\Auth\Adapters\Laravel\EloquentAuthSubjectResolver;
+use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Services\Authentication;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\AuthUsers;
+use Nvl\Auth\Services\PrincipalEmailIdentity;
 use Nvl\Auth\Tests\Fixtures\MappedPrincipal;
 use Nvl\Auth\Tests\Fixtures\MappedPrincipalProfile;
 
 beforeEach(function (): void {
+    Schema::table(AuthTables::Users, fn (Blueprint $table) => $table->dropUnique(PrincipalEmailIdentity::INDEX));
     Schema::create('mapped_principals', function (Blueprint $table): void {
         $table->uuid('id')->primary();
         $table->string('name');
         $table->string('auth_email')->unique();
+        $table->string('auth_email_key', 64)->unique(PrincipalEmailIdentity::INDEX);
         $table->timestamp('email_verified_at')->nullable();
         $table->string('password')->nullable();
         $table->boolean('active')->default(true);
@@ -45,11 +51,13 @@ beforeEach(function (): void {
     config()->set('nvl-auth.features.principal_management.models.user', MappedPrincipal::class);
     config()->set('auth.providers.users.model', MappedPrincipal::class);
     config()->set('nvl-auth.features.principal_management.settings.attributes.email', 'auth_email');
+    config()->set('nvl-auth.features.principal_management.settings.attributes.email_identity_hash', 'auth_email_key');
     config()->set('nvl-auth.features.principal_management.settings.attributes.active', 'active');
     config()->set('nvl-auth.features.principal_management.settings.attributes.profile', 'auth_profile');
     config()->set('nvl-auth.features.principal_management.settings.attributes.preferences', 'auth_preferences');
     app()->forgetInstance(AuthModelRegistry::class);
     app()->forgetInstance(PrincipalAttributeMapper::class);
+    app()->singleton(AuthSubjectResolver::class, EloquentAuthSubjectResolver::class);
 });
 
 it('preserves host fillable extensions alongside mapped principal attributes', function (): void {

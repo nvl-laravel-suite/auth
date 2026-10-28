@@ -13,6 +13,7 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Services\AuthAuditReader;
 use Nvl\Auth\Services\AuthAuditRecorder;
+use Nvl\Auth\Services\AuthChallenges;
 use Nvl\Auth\Services\Authentication;
 use Nvl\Auth\Services\AuthenticationSessions;
 use Nvl\Auth\Services\AuthPasswords;
@@ -116,10 +117,15 @@ it('runs the login pipeline after credential resolution and logs out rejected su
 
 it('applies shared eligibility and rejection semantics to passwordless sessions', function (): void {
     $user = $this->user();
+    $context = $this->authenticationContext();
+    config(['nvl-auth.features.magic_links.enabled' => true]);
+    $challenges = app(AuthChallenges::class);
+    $issued = $challenges->requestMagicLinkAuthentication(['recipient' => $user->email], $context);
+    $proof = $challenges->consumeMagicLinkAuthentication(['recipient' => $user->email, 'token' => $issued['secret']], $context);
     $user->forceFill(['is_active' => false])->save();
     Event::fake([AuthenticationRejected::class]);
 
-    expect(fn () => app(AuthenticationSessions::class)->establish($user, auth()->guard('web'), app('session')->driver()))->toThrow(AuthException::class, 'cannot be completed');
+    expect(fn () => app(AuthenticationSessions::class)->establishFromProof($proof->reveal(), auth()->guard('web'), app('session')->driver(), $context))->toThrow(AuthException::class, 'cannot be completed');
 
     expect(Auth::guard('web')->check())->toBeFalse()
         ->and($user->refresh()->last_login_at)->toBeNull()

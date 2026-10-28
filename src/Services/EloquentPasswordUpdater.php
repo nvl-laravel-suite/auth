@@ -26,7 +26,7 @@ final readonly class EloquentPasswordUpdater implements PasswordUpdater
     /**
      * Persist a replacement password and rotate the remember token.
      */
-    public function update(CanResetPassword $subject, string $password): void
+    public function update(CanResetPassword $subject, #[\SensitiveParameter] string $password): void
     {
         if (! $subject instanceof Model) {
             throw AuthException::invalidConfiguration(

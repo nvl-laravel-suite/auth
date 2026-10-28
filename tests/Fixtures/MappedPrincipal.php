@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Nvl\Auth\Tests\Fixtures;
 
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Laravel\Sanctum\HasApiTokens;
 use Nvl\Auth\Models\User;
 use Spatie\Permission\Traits\HasRoles;
 
 /** Host principal fixture whose domain profile relation must remain usable. */
 final class MappedPrincipal extends User
 {
+    use HasApiTokens;
     use HasRoles;
 
     /** @var list<string> */

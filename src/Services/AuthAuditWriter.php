@@ -26,11 +26,20 @@ use Nvl\Support\Ownership\Enums\OwnershipContextMode;
 final readonly class AuthAuditWriter
 {
     /** Native Auth operation. */
-    public function __construct(private AuthConfiguration $configuration, private AuthAuditContextProvider $request, private DomainEventDispatcher $domainEvents, private OwnershipReadiness $readiness) {}
+    public function __construct(private AuthConfiguration $configuration, private AuthAuditContextProvider $request, private DomainEventDispatcher $domainEvents, private OwnershipReadiness $readiness, private AuthExecutionContext $execution) {}
 
-    /** @param array<string, mixed> $metadata */
-    public function write(AuthEventContext $context, string $action, string $outcome, ?SubjectReference $subject, ?Authenticatable $actor, ?string $clientId, array $metadata): ?AuthAudit
+    /** @param array<string, mixed> $metadata
+     * @param  array{}|array{actor_type: string, actor_id: string, effective_subject_type: string, effective_subject_id: string, impersonation_id: string}|null  $attribution
+     */
+    public function write(AuthEventContext $context, string $action, string $outcome, ?SubjectReference $subject, ?Authenticatable $actor, ?string $clientId, array $metadata, ?array $attribution = null): ?AuthAudit
     {
+        if (array_intersect(array_keys($metadata), ['effective_subject_type', 'effective_subject_id', 'impersonation_id']) !== []) {
+            throw new AuthException('reserved_audit_metadata', 'Impersonation attribution is reserved for the verified native context.', 422);
+        }
+        $attribution ??= $this->execution->facts() ?? [];
+        if ($attribution !== []) {
+            $metadata += ['effective_subject_type' => $attribution['effective_subject_type'], 'effective_subject_id' => $attribution['effective_subject_id'], 'impersonation_id' => $attribution['impersonation_id']];
+        }
         if (! $this->configuration->featureEnabled(AuthFeature::Audit)) {
             return null;
         }
@@ -47,7 +56,7 @@ final readonly class AuthAuditWriter
         if (strlen($encoded) > 32768) {
             throw new AuthException('invalid_audit_metadata', 'Auth audit metadata exceeds 32 KiB.', 500);
         }
-        $actorReference = $actor instanceof Authenticatable ? SubjectReference::fromAuthenticatable($actor) : null;
+        $actorReference = $attribution !== [] ? new SubjectReference($attribution['actor_type'], $attribution['actor_id']) : ($actor instanceof Authenticatable ? SubjectReference::fromAuthenticatable($actor) : null);
 
         return (new AuthAudit)->getConnection()->transaction(function () use ($context, $action, $outcome, $subject, $actorReference, $clientId, $metadata): AuthAudit {
             $audit = $this->persist($context, ['action' => $action, 'outcome' => $outcome, 'subject_type' => $subject?->type, 'subject_id' => $subject?->identifier, 'actor_type' => $actorReference?->type, 'actor_id' => $actorReference?->identifier, 'client_id' => $clientId, 'ip_address' => $this->configuration->boolean('features.audit.settings.capture_ip', true) ? $this->bounded($this->request->ipAddress(), 64) : null, 'user_agent' => $this->configuration->boolean('features.audit.settings.capture_user_agent', true) ? $this->bounded($this->request->userAgent(), 1024) : null, 'request_id' => $this->bounded($this->request->requestId(), 128), 'metadata' => $metadata]);
@@ -66,7 +75,7 @@ final readonly class AuthAuditWriter
             return AuthAudit::query()->create($attributes);
         }
         $action = $attributes['action'] ?? null;
-        $allowed = ['authentication.', 'session.', 'client.', 'password.', 'magic_link.', 'magic_links.', 'security_code.', 'security_codes.', 'email_verification.', 'profile.', 'account.', 'totp.', 'passkey.', 'recovery_code.', 'social_identity.', 'membership.discovery'];
+        $allowed = ['impersonation.', 'registration.', 'authentication.', 'session.', 'client.', 'password.', 'magic_link.', 'magic_links.', 'security_code.', 'security_codes.', 'email_verification.', 'email_change.', 'profile.', 'account.', 'totp.', 'passkey.', 'recovery_code.', 'social_identity.', 'membership.discovery'];
         if (! is_string($action) || ($attributes['client_id'] ?? null) !== null || ! array_any($allowed, static fn (string $prefix): bool => str_starts_with($action, $prefix))) {
             throw AuthException::invalidConfiguration('Only the closed central identity audit families can use this writer.');
         }

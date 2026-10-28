@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Routing\Router;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\RecoveryCode;
@@ -18,13 +20,9 @@ use PragmaRX\Google2FA\Google2FA;
 it('enrolls verifies and replay-protects totp credentials', function (): void {
     config()->set('nvl-auth.features.totp.enabled', true);
     $user = $this->user();
-    $enrollment = app(AuthSecondFactor::class)->startEnrollment($user, ['accountName' => $user->email]);
+    $enrollment = app(AuthSecondFactor::class)->startEnrollment($user, ['accountName' => $user->email], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
     $code = app(Google2FA::class)->getCurrentOtp($enrollment->secret);
-    $credential = app(AuthSecondFactor::class)->confirmEnrollment(
-        $user,
-        $enrollment->credential,
-        ['code' => $code],
-    );
+    $credential = app(AuthSecondFactor::class)->confirmEnrollment($user, $enrollment->credential, ['code' => $code], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
 
     expect($credential->confirmed_at)->not->toBeNull()
         ->and(fn () => app(AuthSecondFactor::class)->verify($user, ['code' => $code]))
@@ -37,7 +35,7 @@ it('enrolls verifies and replay-protects totp credentials', function (): void {
 it('returns recovery codes once and consumes each hash once', function (): void {
     config()->set('nvl-auth.features.recovery_codes.enabled', true);
     $user = $this->user();
-    $generated = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user);
+    $generated = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
 
     expect($generated->codes)->toHaveCount(8)
         ->and(RecoveryCode::query()->count())->toBe(8);
@@ -123,14 +121,15 @@ it('exposes totp state only for the authenticated subject with private read-only
 });
 
 it('restarts pending enrollment with fresh one-time material and preserves confirmed and other subject credentials', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-01-01 12:00:05 UTC'));
     config()->set('nvl-auth.features.totp.enabled', true);
     $user = $this->user();
     $other = $this->user('other-restart@example.test');
     $confirmed = TotpCredential::factory()->forSubject($user)->state(['subject_type' => $user->getMorphClass()])->create();
     $revokedPending = TotpCredential::factory()->forSubject($user)->state(['subject_type' => $user->getMorphClass()])->create(['confirmed_at' => null, 'revoked_at' => now()]);
     $foreign = TotpCredential::factory()->forSubject($other)->state(['subject_type' => $other->getMorphClass()])->create(['confirmed_at' => null]);
-    $original = app(AuthSecondFactor::class)->startEnrollment($user, ['accountName' => $user->email]);
-    $replacement = app(AuthSecondFactor::class)->startEnrollment($user, ['accountName' => $user->email]);
+    $original = app(AuthSecondFactor::class)->startEnrollment($user, ['accountName' => $user->email], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $replacement = app(AuthSecondFactor::class)->startEnrollment($user, ['accountName' => $user->email], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
 
     expect($replacement->credential->getKey())->not->toBe($original->credential->getKey())
         ->and($replacement->secret)->not->toBe($original->secret)
@@ -138,11 +137,7 @@ it('restarts pending enrollment with fresh one-time material and preserves confi
         ->and($confirmed->fresh())->not->toBeNull()
         ->and($revokedPending->fresh())->not->toBeNull()
         ->and($foreign->fresh())->not->toBeNull();
-    expect(fn () => app(AuthSecondFactor::class)->confirmEnrollment(
-        $user,
-        $original->credential,
-        ['code' => app(Google2FA::class)->getCurrentOtp($original->secret)],
-    ))->toThrow(ModelNotFoundException::class);
+    expect(fn () => app(AuthSecondFactor::class)->confirmEnrollment($user, $original->credential, ['code' => app(Google2FA::class)->getCurrentOtp($original->secret)], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext()))->toThrow(ModelNotFoundException::class);
 });
 
 it('uses the configured auth guard for totp state without falling back to a different signed-in principal', function (array $middleware, bool $requiresWeb): void {

@@ -21,6 +21,10 @@ use Nvl\Support\Ownership\Enums\OwnershipContextMode;
 
 uses(OwnerScopeTestCase::class);
 
+beforeEach(function (): void {
+    config(['nvl-auth.features.registration.enabled' => true, 'nvl-auth.features.registration.settings.mode' => 'invitation_only']);
+});
+
 it('accepts an owner invitation only for its verified recipient and canonical role grants', function (): void {
     $inviter = User::factory()->create();
     $recipient = User::factory()->create();

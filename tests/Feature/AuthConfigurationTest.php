@@ -93,6 +93,8 @@ it('catalogs every package management ability with policy mapping metadata', fun
         'users.view',
         'users.create',
         'users.update',
+        'users.manageCredentials',
+        'users.verifyEmail',
         'users.delete',
         'users.restore',
         'users.manageAccess',
@@ -131,7 +133,7 @@ it('catalogs every package management ability with policy mapping metadata', fun
 
     expect(array_keys($catalog->definitions()))->toBe($expectedAliases)
         ->and($catalogAbilities)->toBe($manifestAbilities)
-        ->and($catalog->definitions())->toHaveCount(29)
+        ->and($catalog->definitions())->toHaveCount(31)
         ->and($catalog->definition('users.update'))->toMatchArray([
             'ability' => 'nvl.auth.users.update',
             'feature' => AuthFeature::PrincipalManagement,

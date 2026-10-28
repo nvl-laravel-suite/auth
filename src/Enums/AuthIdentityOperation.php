@@ -7,6 +7,8 @@ namespace Nvl\Auth\Enums;
 /** Enumerates the narrow central-identity operations admitted with Tenancy enabled. */
 enum AuthIdentityOperation: string
 {
+    case Impersonation = 'impersonation';
+    case Registration = 'registration';
     case Login = 'login';
     case Logout = 'logout';
     case Recovery = 'recovery';

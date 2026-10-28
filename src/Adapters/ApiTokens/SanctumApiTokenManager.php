@@ -18,17 +18,19 @@ use Laravel\Sanctum\NewAccessToken;
 use Laravel\Sanctum\PersonalAccessToken;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\OwnerBoundApiTokenManager;
+use Nvl\Auth\Contracts\SecurityTokenContainment;
 use Nvl\Auth\Contracts\TransactionalApiTokenManager;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Results\IssuedApiToken;
 use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 
 /**
  * Manages personal access tokens directly in Sanctum's authoritative table.
  */
-final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiTokenManager, TransactionalApiTokenManager
+final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiTokenManager, SecurityTokenContainment, TransactionalApiTokenManager
 {
     /**
      * Create the namespaced Sanctum adapter.
@@ -38,7 +40,38 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
     /** {@inheritDoc} */
     public function connection(Authenticatable $subject): Connection
     {
-        return $this->tokens($this->subject($subject))->getModel()->getConnection();
+        $model = $this->subject($subject);
+        $related = $this->tokens($model)->getModel();
+        $class = app(AuthModelRegistry::class)->personalAccessTokenClass();
+        $prototype = new $class;
+        if ($related::class !== $class || $related->getTable() !== $prototype->getTable() || $related->getConnection() !== $prototype->getConnection()) {
+            throw AuthException::invalidConfiguration('Token operations require canonical configured storage.');
+        }
+
+        return $prototype->getConnection();
+    }
+
+    /** Revoke the exact package namespace across native owners on canonical token storage. */
+    public function revokeForSecurity(Authenticatable $subject): int
+    {
+        $model = $this->subject($subject);
+        $related = $this->tokens($model)->getModel();
+        $class = app(AuthModelRegistry::class)->personalAccessTokenClass();
+        $prototype = new $class;
+        if ($related::class !== $class || $related->getConnection() !== $prototype->getConnection()
+            || $related->getTable() !== $prototype->getTable() || $prototype->getConnection() !== $model->getConnection()) {
+            throw AuthException::invalidConfiguration('Security token containment requires canonical token storage on the principal source.');
+        }
+        $prefix = $this->namespace().':';
+
+        $query = $prototype->getConnection()->table($prototype->getTable())
+            ->where('tokenable_type', $model->getMorphClass())->where('tokenable_id', $model->getKey())
+            ->whereRaw('SUBSTR(name, 1, ?) = ?', [strlen($prefix), $prefix]);
+        $identifiers = $query->orderBy($prototype->getKeyName())->lockForUpdate()->get([$prototype->getKeyName(), 'name'])
+            ->filter(static fn (object $token): bool => is_string($token->name) && str_starts_with($token->name, $prefix))
+            ->pluck($prototype->getKeyName())->all();
+
+        return $prototype->getConnection()->table($prototype->getTable())->whereIn($prototype->getKeyName(), $identifiers)->delete();
     }
 
     /**

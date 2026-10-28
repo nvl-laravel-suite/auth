@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Illuminate\Auth\Passwords\DatabaseTokenRepository;
+use Illuminate\Auth\Passwords\PasswordBroker;
+use Illuminate\Auth\Passwords\PasswordBrokerManager;
 use Illuminate\Contracts\Auth\Access\Gate as GateContract;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Container\Container;
@@ -16,21 +19,28 @@ use Nvl\Auth\Contracts\AccountConfirmation;
 use Nvl\Auth\Contracts\ApiTokenAbilityProvider;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthAuditContextProvider;
+use Nvl\Auth\Contracts\AuthenticationAssurancePolicy;
 use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\AuthIdentifierResolver;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\AuthPipelineStage;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
+use Nvl\Auth\Contracts\ImpersonationAccess;
 use Nvl\Auth\Contracts\InvitationRegistrationMapper;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
+use Nvl\Auth\Contracts\PasswordPolicy;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
-use Nvl\Auth\Contracts\SocialIdentityProvider;
-use Nvl\Auth\Contracts\SocialSubjectResolver;
+use Nvl\Auth\Contracts\PrincipalExtensionMapper;
+use Nvl\Auth\Contracts\RegistrationAdmission;
+use Nvl\Auth\Contracts\SecurityTokenContainment;
+use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\PrincipalAttribute;
+use Nvl\Auth\Models\PrincipalSecurityState;
+use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Support\Config\PackageOptions;
 use ReflectionMethod;
 use ReflectionNamedType;
@@ -43,14 +53,14 @@ use Throwable;
  */
 final class AuthDoctor
 {
-    private const PIPELINES = ['login', 'logout', 'password_reset_requested', 'password_reset', 'invitation_issued', 'invitation_accepted', 'client_started', 'api_token_issued'];
+    private const PIPELINES = AuthPipeline::NAMES;
 
     private const CONFIGURABLE_TABLES = [AuthTables::Users => 'users', AuthTables::Permissions => 'permissions', AuthTables::Roles => 'roles', AuthTables::ModelHasPermissions => 'model_has_permissions', AuthTables::ModelHasRoles => 'model_has_roles', AuthTables::RoleHasPermissions => 'role_has_permissions', AuthTables::PersonalAccessTokens => 'personal_access_tokens', AuthTables::PasswordResetTokens => 'password_reset_tokens'];
 
-    private const TABLE_COLUMNS = [AuthTables::Users => ['id', 'name', 'email', 'email_verified_at', 'password', 'is_active', 'locale', 'timezone', 'profile', 'preferences', 'last_login_at', 'last_login_ip', 'locked_until', 'remember_token', 'created_at', 'updated_at', 'deleted_at'], AuthTables::Permissions => ['id', 'name', 'guard_name', 'display_name', 'description', 'group', 'is_system', 'metadata', 'created_at', 'updated_at'], AuthTables::Roles => ['id', 'name', 'guard_name', 'display_name', 'description', 'parent_id', 'priority', 'is_system', 'metadata', 'created_at', 'updated_at'], AuthTables::ModelHasPermissions => ['permission_id', 'model_type', 'model_id'], AuthTables::ModelHasRoles => ['role_id', 'model_type', 'model_id'], AuthTables::RoleHasPermissions => ['permission_id', 'role_id'], AuthTables::PersonalAccessTokens => ['id', 'tokenable_type', 'tokenable_id', 'name', 'token', 'abilities', 'last_used_at', 'expires_at', 'created_at', 'updated_at'], AuthTables::PasswordResetTokens => ['email', 'token', 'created_at'], AuthTables::Clients => ['id', 'name', 'surface', 'base_url', 'return_paths', 'allowed_origins', 'allowed_flows', 'metadata', 'is_active', 'last_used_at', 'created_at', 'updated_at'], AuthTables::ClientSessions => ['id', 'client_id', 'subject_type', 'subject_id', 'session_id_hash', 'ip_address', 'user_agent', 'metadata', 'authenticated_at', 'last_seen_at', 'ended_at', 'end_reason', 'created_at', 'updated_at'], AuthTables::Invitations => ['id', 'token_hash', 'active_key', 'recipient', 'recipient_hash', 'context_hash', 'type', 'purpose', 'inviter_type', 'inviter_id', 'accepted_by_type', 'accepted_by_id', 'roles', 'permissions', 'metadata', 'resend_count', 'current_delivery_message_id', 'delivery_status', 'delivery_attempted_at', 'delivered_at', 'delivery_failed_at', 'delivery_failure_code', 'last_sent_at', 'expires_at', 'accepted_at', 'revoked_at', 'created_at', 'updated_at'], AuthTables::Challenges => ['id', 'type', 'purpose', 'subject_type', 'subject_id', 'recipient_hash', 'secret_hash', 'secondary_secret_hash', 'active_key', 'payload', 'attempts', 'max_attempts', 'expires_at', 'consumed_at', 'revoked_at', 'created_at', 'updated_at'], AuthTables::TotpCredentials => ['id', 'subject_type', 'subject_id', 'name', 'secret', 'algorithm', 'digits', 'period', 'allowed_drift', 'last_accepted_timestep', 'confirmed_at', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'], AuthTables::Passkeys => ['id', 'subject_type', 'subject_id', 'name', 'credential_id', 'credential_id_hash', 'public_key', 'user_handle', 'signature_counter', 'transports', 'backup_eligible', 'backed_up', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'], AuthTables::RecoveryCodes => ['id', 'batch_id', 'subject_type', 'subject_id', 'code_hash', 'used_at', 'revoked_at', 'created_at', 'updated_at'], AuthTables::SocialIdentities => ['id', 'subject_type', 'subject_id', 'provider', 'provider_user_id', 'provider_user_id_hash', 'email', 'profile', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'], AuthTables::Audits => ['id', 'action', 'outcome', 'subject_type', 'subject_id', 'actor_type', 'actor_id', 'client_id', 'ip_address', 'user_agent', 'request_id', 'metadata', 'created_at', 'updated_at']];
+    private const TABLE_COLUMNS = [AuthTables::Impersonations => ['id', 'actor_type', 'actor_id', 'effective_subject_type', 'effective_subject_id', 'browser_session_id', 'guard_name', 'actor_revision', 'target_revision', 'reason', 'owner_reference', 'active_session_key', 'started_at', 'expires_at', 'stopped_at', 'stop_reason'], AuthTables::RememberCredentials => ['id', 'selector', 'secret_hash', 'subject_type', 'subject_id', 'guard_name', 'provider_hash', 'session_family_id', 'security_revision', 'absolute_expires_at', 'consumed_at', 'revoked_at', 'rotated_to_id'], AuthTables::BrowserSessions => ['id', 'subject_type', 'subject_id', 'guard_name', 'provider_hash', 'binding_hash', 'security_revision', 'session_family_id', 'method', 'assurance', 'authenticated_at', 'last_seen_at', 'absolute_expires_at', 'revoked_at'], AuthTables::PendingEmailChanges => ['id', 'subject_type', 'subject_id', 'new_email', 'email_hash', 'token_hash', 'security_revision', 'active_key', 'context', 'expires_at', 'consumed_at', 'revoked_at'], AuthTables::PrincipalSecurityStates => ['id', 'subject_type', 'subject_id', 'revision', 'created_at', 'updated_at'], AuthTables::Users => ['id', 'name', 'email', 'email_verified_at', 'password', 'is_active', 'locale', 'timezone', 'profile', 'preferences', 'last_login_at', 'last_login_ip', 'locked_until', 'remember_token', 'created_at', 'updated_at', 'deleted_at'], AuthTables::Permissions => ['id', 'name', 'guard_name', 'display_name', 'description', 'group', 'is_system', 'metadata', 'created_at', 'updated_at'], AuthTables::Roles => ['id', 'name', 'guard_name', 'display_name', 'description', 'parent_id', 'priority', 'is_system', 'metadata', 'created_at', 'updated_at'], AuthTables::ModelHasPermissions => ['permission_id', 'model_type', 'model_id'], AuthTables::ModelHasRoles => ['role_id', 'model_type', 'model_id'], AuthTables::RoleHasPermissions => ['permission_id', 'role_id'], AuthTables::PersonalAccessTokens => ['id', 'tokenable_type', 'tokenable_id', 'name', 'token', 'abilities', 'last_used_at', 'expires_at', 'created_at', 'updated_at'], AuthTables::PasswordResetTokens => ['email', 'token', 'created_at'], AuthTables::Clients => ['id', 'name', 'surface', 'base_url', 'return_paths', 'allowed_origins', 'allowed_flows', 'metadata', 'is_active', 'last_used_at', 'created_at', 'updated_at'], AuthTables::ClientSessions => ['id', 'client_id', 'subject_type', 'subject_id', 'session_id_hash', 'ip_address', 'user_agent', 'metadata', 'authenticated_at', 'last_seen_at', 'ended_at', 'end_reason', 'created_at', 'updated_at'], AuthTables::Invitations => ['id', 'token_hash', 'active_key', 'recipient', 'recipient_hash', 'context_hash', 'type', 'purpose', 'inviter_type', 'inviter_id', 'accepted_by_type', 'accepted_by_id', 'roles', 'permissions', 'metadata', 'resend_count', 'current_delivery_message_id', 'delivery_status', 'delivery_attempted_at', 'delivered_at', 'delivery_failed_at', 'delivery_failure_code', 'last_sent_at', 'expires_at', 'accepted_at', 'revoked_at', 'created_at', 'updated_at'], AuthTables::Challenges => ['id', 'type', 'purpose', 'subject_type', 'subject_id', 'recipient_hash', 'secret_hash', 'secondary_secret_hash', 'active_key', 'payload', 'attempts', 'max_attempts', 'expires_at', 'consumed_at', 'revoked_at', 'created_at', 'updated_at'], AuthTables::TotpCredentials => ['id', 'subject_type', 'subject_id', 'name', 'secret', 'algorithm', 'digits', 'period', 'allowed_drift', 'last_accepted_timestep', 'confirmed_at', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'], AuthTables::Passkeys => ['id', 'subject_type', 'subject_id', 'name', 'credential_id', 'credential_id_hash', 'public_key', 'user_handle', 'signature_counter', 'transports', 'backup_eligible', 'backed_up', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'], AuthTables::RecoveryCodes => ['id', 'batch_id', 'subject_type', 'subject_id', 'code_hash', 'used_at', 'revoked_at', 'created_at', 'updated_at'], AuthTables::SocialIdentities => ['id', 'subject_type', 'subject_id', 'provider', 'provider_user_id', 'provider_user_id_hash', 'email', 'profile', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'], AuthTables::Audits => ['id', 'action', 'outcome', 'subject_type', 'subject_id', 'actor_type', 'actor_id', 'client_id', 'ip_address', 'user_agent', 'request_id', 'metadata', 'created_at', 'updated_at']];
 
     /** @var array<string, array<string, bool>> */
-    private const TABLE_INDEXES = [AuthTables::Invitations => ['nvl_auth_invitations_context_hash_index' => false, 'nvl_auth_invitations_delivery_status_index' => false], AuthTables::Challenges => ['nvl_auth_challenges_secondary_secret_hash_unique' => true]];
+    private const TABLE_INDEXES = [AuthTables::Impersonations => ['nvl_auth_impersonation_active_unique' => true], AuthTables::RememberCredentials => ['nvl_auth_remember_selector_unique' => true], AuthTables::BrowserSessions => ['nvl_auth_browser_binding_unique' => true], AuthTables::PendingEmailChanges => ['nvl_auth_pending_email_active_unique' => true], AuthTables::PrincipalSecurityStates => ['nvl_auth_principal_security_states_subject_unique' => true], AuthTables::Invitations => ['nvl_auth_invitations_context_hash_index' => false, 'nvl_auth_invitations_delivery_status_index' => false], AuthTables::Challenges => ['nvl_auth_challenges_secondary_secret_hash_unique' => true]];
 
     private const LEGACY_TABLES = ['auth_clients', 'auth_client_sessions', 'auth_invitations', 'auth_challenges', 'auth_totp_credentials', 'auth_passkeys', 'auth_recovery_codes', 'auth_social_identities', 'auth_audits', 'auth_principals', 'auth_contacts', 'auth_flows', 'auth_sessions', 'auth_api_tokens', 'auth_deliveries', 'auth_delivery_attempts', 'auth_delivery_payloads', 'auth_security_events', 'auth_security_event_contexts', 'auth_outbox_messages', 'auth_maintenance_checkpoints', 'auth_recovery_password_updates'];
 
@@ -96,8 +106,49 @@ final class AuthDoctor
                 $checks[] = $this->check("legacy.{$table}", false, "Legacy overreaching table [{$table}] still exists.");
             }
         }
+        try {
+            $class = $this->container->make(AuthModelRegistry::class)->userClass();
+            $principal = new $class;
+            $sourceReady = $principal->getConnection() === (new PrincipalSecurityState)->getConnection();
+        } catch (Throwable) {
+            $sourceReady = false;
+        }
+        try {
+            $emailReady = $this->container->make(PrincipalEmailIdentityAdoption::class)->plan()['ready'];
+        } catch (Throwable) {
+            $emailReady = false;
+        }
+        $checks[] = $this->check('security.email_identity', $emailReady, 'Canonical email identities require collision-free keys and finalized non-null unique schema; explicitly plan/apply adoption.');
+        $checks[] = $this->check('security.principal_source', $sourceReady, 'Canonical principal and mandatory security state must share the same actual connection.');
         $appKey = config('app.key');
         $checks[] = $this->check('security.app_key', is_string($appKey) && $appKey !== '', 'APP_KEY is required for hashing and encrypted casts.');
+        if ($configuration->featureEnabled(AuthFeature::SocialIdentities)) {
+            try {
+                $registry = $container->make(SocialProviderRegistry::class);
+                foreach ($registry->providers() as $name => $provider) {
+                    if (! $provider['enabled']) {
+                        continue;
+                    }
+                    try {
+                        $registry->assertAvailable($name);
+                        $ready = true;
+                    } catch (Throwable) {
+                        $ready = false;
+                    }
+                    $checks[] = $this->check('social.connection.'.$name, $ready, 'Social connection requires a usable factory and stable realm.');
+                }
+            } catch (Throwable) {
+                $checks[] = $this->check('social.connections', false, 'Invalid social connection configuration.');
+            }
+        }
+        if ($configuration->featureEnabled(AuthFeature::Impersonation)) {
+            $policy = $this->integration($container, ImpersonationAccess::class);
+            $checks[] = $this->check('impersonation.access', $policy instanceof ImpersonationAccess && ! $policy instanceof DenyImpersonationAccess, 'Impersonation requires an explicit consumer permission policy; the default denies access.');
+        }
+        if ($configuration->featureEnabled(AuthFeature::ManagedSessions)) {
+            $checks[] = $this->check('managed_sessions.admission', $configuration->boolean('features.managed_sessions.settings.admission_integrated', false), 'Declare host managed-session admission after session/auth and before authorization; doctor cannot prove every host route.');
+            $checks[] = $this->check('managed_sessions.driver', in_array(config('session.driver'), ['file', 'database', 'redis', 'memcached', 'dynamodb'], true), 'Managed sessions require a server-side session driver.');
+        }
         $checks[] = $this->check('configuration.pipelines', $this->pipelinesReady($configuration, $container), 'Auth pipelines contain an unknown pipeline or invalid stage.');
         $checks[] = $this->check('configuration.models', $this->ownedModelsReady($container), 'An enabled native Auth model does not extend its package model.');
         $principalTable = $this->configuredTable($configuration, AuthTables::Users);
@@ -109,12 +160,20 @@ final class AuthDoctor
             }
         }
         if ($configuration->featureEnabled(AuthFeature::Password)) {
+            $checks[] = $this->check('contract.password_policy', $this->integration($container, PasswordPolicy::class) instanceof PasswordPolicy, 'Password operations require a valid password policy.');
+            $checks[] = $this->check('contract.password_reset_repository', $this->passwordResetRepositoryReady(), 'Password reset requires Laravel database token storage; its actual connection is checked against the principal and audit storage at runtime.');
             $checks[] = $this->check('contract.password_updater', $this->integration($container, PasswordUpdater::class) instanceof PasswordUpdater, 'Password operations require a valid password updater.');
         }
         if ($configuration->featureEnabled(AuthFeature::Authentication)) {
+            $checks[] = $this->check('contract.authentication_assurance', $this->integration($container, AuthenticationAssurancePolicy::class) instanceof AuthenticationAssurancePolicy, 'Authentication requires a valid assurance policy.');
             $checks[] = $this->check('contract.authentication_eligibility', $this->integration($container, AuthenticationEligibility::class) instanceof AuthenticationEligibility, 'Authentication operations require a valid eligibility policy.');
         }
+        if ($configuration->featureEnabled(AuthFeature::Registration)) {
+            $checks[] = $this->check('contract.registration_admission', $this->integration($container, RegistrationAdmission::class) instanceof RegistrationAdmission, 'Registration requires a valid admission policy.');
+            $checks[] = $this->check('configuration.registration_mode', in_array($configuration->get('features.registration.settings.mode'), ['closed', 'invitation_only', 'open'], true), 'Registration requires a closed mode value.');
+        }
         if ($configuration->featureEnabled(AuthFeature::PrincipalManagement)) {
+            $checks[] = $this->check('contract.principal_extension_mapper', $this->integration($container, PrincipalExtensionMapper::class) instanceof PrincipalExtensionMapper, 'Principal extensions require a valid mapper.');
             $checks[] = $this->check('contract.account_confirmation', $this->integration($container, AccountConfirmation::class) instanceof AccountConfirmation, 'Sensitive self-service mutations require a valid account confirmation policy.');
         }
         if ($configuration->featureEnabled(AuthFeature::Audit)) {
@@ -140,6 +199,7 @@ final class AuthDoctor
         }
         if ($configuration->featureEnabled(AuthFeature::ApiTokens)) {
             $apiTokens = $this->integration($container, ApiTokenManager::class);
+            $checks[] = $this->check('contract.security_token_containment', $apiTokens instanceof SecurityTokenContainment, 'Enabled API tokens require same-source SecurityTokenContainment for native credential mutations.');
             $abilityProvider = $this->integration($container, ApiTokenAbilityProvider::class);
             $checks[] = $this->check('adapter.api_tokens', $apiTokens !== null && ! $apiTokens instanceof UnavailableApiTokenManager, 'API tokens require a configured provider adapter.');
             $checks[] = $this->check('contract.api_token_abilities', $this->apiTokenAbilitiesReady($configuration, $abilityProvider), 'API tokens require a non-empty static ability catalog or a custom ability provider.');
@@ -150,10 +210,8 @@ final class AuthDoctor
             }
         }
         if ($configuration->featureEnabled(AuthFeature::SocialIdentities)) {
-            $socialIdentities = $this->integration($container, SocialIdentityProvider::class);
-            $socialSubjects = $this->integration($container, SocialSubjectResolver::class);
-            $checks[] = $this->check('adapter.social_identities', $socialIdentities !== null && ! $socialIdentities instanceof UnavailableSocialIdentityProvider, 'Social identities require a configured acquisition adapter.');
-            $checks[] = $this->check('contract.social_subject_resolver', $socialSubjects !== null && ! $socialSubjects instanceof UnavailableSocialSubjectResolver, 'Social login requires a configured principal resolver.');
+            $socialIdentities = $this->integration($container, SocialIdentityProviderFactory::class);
+            $checks[] = $this->check('adapter.social_identities', $socialIdentities !== null && ! $socialIdentities instanceof UnavailableSocialIdentityProviderFactory, 'Social identities require a configured acquisition adapter.');
             $checks[] = $this->check('social.providers', $this->hasConfiguredSocialProvider($configuration, $container), 'Social identities require at least one configured provider.');
         }
         if ($configuration->featureEnabled(AuthFeature::Passkeys)) {
@@ -442,6 +500,19 @@ final class AuthDoctor
         return $configuration->featureEnabled(AuthFeature::Rbac) && is_string($superAdminRole) && trim($superAdminRole) !== '';
     }
 
+    /** Check repository capability without claiming its principal connection is already known. */
+    private function passwordResetRepositoryReady(): bool
+    {
+        try {
+            $name = $this->configuration->get('password_broker');
+            $broker = $this->container->make(PasswordBrokerManager::class)->broker(is_string($name) ? $name : null);
+
+            return $broker instanceof PasswordBroker && $broker->getRepository()::class === DatabaseTokenRepository::class;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
     /**
      * Validate every configured alias, host operation, and policy model.
      */
@@ -598,6 +669,10 @@ final class AuthDoctor
      */
     private function indexReady(Builder $schema, string $table, string $name, bool $unique): bool
     {
+        if ($table === AuthTables::PrincipalSecurityStates) {
+            return PrincipalSecuritySchema::indexReady($schema);
+        }
+
         return collect($schema->getIndexes($table))->contains(static fn (array $index): bool => $index['name'] === $name && $index['unique'] === $unique);
     }
 

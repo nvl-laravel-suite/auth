@@ -16,20 +16,19 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\InvitationRecipientProof;
-use Nvl\Auth\Contracts\InvitationSubjectResolver;
-use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\InvitationDeliveryStatus;
-use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Events\InvitationAccepted;
 use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
+use Nvl\Auth\Models\User;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -48,7 +47,7 @@ final readonly class AuthInvitations
     private AuthCommittedAudit $committedAudits;
 
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private MutationAuthorizer $mutations, private OwnerInvitations $owned, private SecretHasher $hasher, private InvitationRecipientProof $recipientProof, private Container $container, private OwnershipBoundary $boundary, private OwnerMembershipAssignments $assignments, private ManagementAuthorizer $authorization, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, AuthCommittedAudit $committedAudits, private DomainEventDispatcher $domainEvents, private OwnershipContext $ownerContext, private AuthConfiguration $configuration, private OpaqueTokenFactory $tokens, private InvitationSubjectResolver $subjects, private AuthModelRegistry $models, private PrincipalAttributeMapper $attributes, private ?InvitationDeliveryMetadataPolicy $deliveryMetadata = null)
+    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private MutationAuthorizer $mutations, private OwnerInvitations $owned, private SecretHasher $hasher, private InvitationRecipientProof $recipientProof, private Container $container, private OwnershipBoundary $boundary, private OwnerMembershipAssignments $assignments, private ManagementAuthorizer $authorization, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, AuthCommittedAudit $committedAudits, private DomainEventDispatcher $domainEvents, private OwnershipContext $ownerContext, private AuthConfiguration $configuration, private OpaqueTokenFactory $tokens, private AuthModelRegistry $models, private PasswordValidationRules $passwordPolicy, private InvitationPrincipalResolver $principalResolver, private ?InvitationDeliveryMetadataPolicy $deliveryMetadata = null)
     {
         $this->committedAudits = $committedAudits->withRecorder($this->audits);
     }
@@ -95,7 +94,7 @@ final readonly class AuthInvitations
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public function create(array $data, Authenticatable|SystemMutationContext $authority, ?InvitationIssuanceContext $context = null): array
+    public function create(#[\SensitiveParameter] array $data, Authenticatable|SystemMutationContext $authority, ?InvitationIssuanceContext $context = null): array
     {
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Issue);
         $data = $this->validateStoreInvitation($data);
@@ -109,7 +108,7 @@ final readonly class AuthInvitations
         if ($data['roles'] !== [] || $data['permissions'] !== []) {
             $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
         }
-        $recipient = mb_strtolower(trim($data['recipient']));
+        $recipient = PrincipalEmailIdentity::normalize($data['recipient']);
         $recipientHash = $this->hasher->hash('invitation-recipient', $recipient);
         $ownershipKey = $nativeOwner?->scopeKey() ?? (is_string($ownership['ownership_key'] ?? null) ? $ownership['ownership_key'] : 'platform');
         $activeKey = $this->hasher->hash('active-invitation', $ownershipKey."\x00".$recipientHash."\x00".$data['purpose']);
@@ -165,7 +164,7 @@ final readonly class AuthInvitations
             throw new AuthException('forbidden', 'Invitation lookup requires explicit authority.', 403);
         }
         $this->mutations->authorize($authority, 'nvl.auth.invitations.viewAny');
-        $recipient = mb_strtolower(trim($recipient));
+        $recipient = PrincipalEmailIdentity::normalize($recipient);
         $purpose = trim($purpose);
         $context = $context === null ? null : trim($context);
         if ($recipient === '' || mb_strlen($recipient) > 320) {
@@ -197,7 +196,7 @@ final readonly class AuthInvitations
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Read);
         $filters = $this->validateInvitationIndexQuery($filters);
         $this->authorization->authorize($actor, 'nvl.auth.invitations.viewAny');
-        $query = $this->boundary->query(Invitation::query(), 'auth.invitations')->when($filters['recipient'] !== null, fn ($query) => $query->where('recipient_hash', $this->hasher->hash('invitation-recipient', mb_strtolower(trim((string) $filters['recipient'])))))->when($filters['type'] !== null, fn ($query) => $query->where('type', $filters['type']))->when($filters['types'] !== null, fn ($query) => $query->whereIn('type', $filters['types']))->when($filters['purpose'] !== null, fn ($query) => $query->where('purpose', $filters['purpose']))->when($filters['expiresAfter'] !== null, fn ($query) => $query->where('expires_at', '>=', CarbonImmutable::parse($filters['expiresAfter'])->utc()))->when($filters['expiresBefore'] !== null, fn ($query) => $query->where('expires_at', '<=', CarbonImmutable::parse($filters['expiresBefore'])->utc()))->when($filters['context'] !== null, fn ($query) => $query->where('context_hash', $this->hasher->hash('invitation-context', trim((string) $filters['context']))));
+        $query = $this->boundary->query(Invitation::query(), 'auth.invitations')->when($filters['recipient'] !== null, fn ($query) => $query->where('recipient_hash', $this->hasher->hash('invitation-recipient', PrincipalEmailIdentity::normalize((string) $filters['recipient']))))->when($filters['type'] !== null, fn ($query) => $query->where('type', $filters['type']))->when($filters['types'] !== null, fn ($query) => $query->whereIn('type', $filters['types']))->when($filters['purpose'] !== null, fn ($query) => $query->where('purpose', $filters['purpose']))->when($filters['expiresAfter'] !== null, fn ($query) => $query->where('expires_at', '>=', CarbonImmutable::parse($filters['expiresAfter'])->utc()))->when($filters['expiresBefore'] !== null, fn ($query) => $query->where('expires_at', '<=', CarbonImmutable::parse($filters['expiresBefore'])->utc()))->when($filters['context'] !== null, fn ($query) => $query->where('context_hash', $this->hasher->hash('invitation-context', trim((string) $filters['context']))));
         match ($filters['lifecycle']) {
             'active' => $query->whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '>', CarbonImmutable::now('UTC')),
             'accepted' => $query->whereNotNull('accepted_at'),
@@ -286,7 +285,7 @@ final readonly class AuthInvitations
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public function register(array $data, ?Authenticatable $authenticatedRecipient = null): array
+    public function register(#[\SensitiveParameter] array $data, ?Authenticatable $authenticatedRecipient = null): array
     {
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Use);
         $data = $this->validateAcceptInvitation($data);
@@ -297,21 +296,36 @@ final readonly class AuthInvitations
         return $this->registerRegister($data, $authenticatedRecipient);
     }
 
+    /** @param array<string, mixed> $data
+     * @return array{invitation: Invitation, subject: User}
+     */
+    public function registerSocial(#[\SensitiveParameter] string $invitationToken, #[\SensitiveParameter] string $continuation, array $data, AuthenticationRequestContext $context): array
+    {
+        $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Use);
+
+        return $this->container->make(AuthRegistration::class)->registerInvitedSocial($invitationToken, $continuation, $data, $context);
+    }
+
     /** Perform registration in the already-selected ownership boundary.
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function registerRegister(array $data, ?Authenticatable $authenticatedRecipient): array
+    private function registerRegister(#[\SensitiveParameter] array $data, ?Authenticatable $authenticatedRecipient): array
     {
         $data = $this->validateAcceptInvitation($data);
         $connection = (new Invitation)->getConnectionName();
         $principalClass = $this->models->userClass();
-        $principalConnection = (new $principalClass)->getConnectionName();
-        if ($principalConnection !== $connection) {
+        $principalConnection = (new $principalClass)->getConnection();
+        if ($principalConnection !== (new Invitation)->getConnection()) {
             throw AuthException::invalidConfiguration('Invitation registration requires principal and invitation storage on one connection.');
         }
         try {
-            return DB::connection($connection)->transaction(function () use ($authenticatedRecipient, $connection, $data): array {
+            $candidate = Invitation::query()->where('token_hash', $this->hasher->hash('invitation-token', $data['token']))->first();
+
+            return DB::connection($connection)->transaction(function () use ($authenticatedRecipient, $connection, $data, $candidate): array {
+                if ($candidate instanceof Invitation) {
+                    $this->principalResolver->lockExisting($candidate);
+                }
                 $query = Invitation::query();
                 /** @var Invitation|null $invitation */
                 $invitation = $query->where('token_hash', $this->hasher->hash('invitation-token', $data['token']))->lockForUpdate()->first();
@@ -348,31 +362,9 @@ final readonly class AuthInvitations
     /** Resolve a new identity or require proof before reusing a global identity.
      * @param  array<string, mixed>  $data
      */
-    private function registerResolveSubject(Invitation $invitation, array $data, ?Authenticatable $authenticatedRecipient): Authenticatable
+    private function registerResolveSubject(Invitation $invitation, #[\SensitiveParameter] array $data, ?Authenticatable $authenticatedRecipient): Authenticatable
     {
-        $data = $this->validateAcceptInvitation($data);
-        $principalClass = $this->models->userClass();
-        /** @var Authenticatable|null $existing */
-        $existing = $principalClass::query()->where($this->attributes->column(PrincipalAttribute::Email), mb_strtolower(trim($invitation->recipient)))->first();
-        if ($existing instanceof Authenticatable) {
-            if (! $authenticatedRecipient instanceof Authenticatable) {
-                throw new AuthException('invitation_identity_proof_required', 'The invitation recipient identity could not be verified.', 403);
-            }
-            $this->recipientProof->assertMatches($invitation, $authenticatedRecipient);
-            $existingReference = SubjectReference::fromAuthenticatable($existing);
-            $authenticatedReference = SubjectReference::fromAuthenticatable($authenticatedRecipient);
-            if ($existingReference->type !== $authenticatedReference->type || $existingReference->identifier !== $authenticatedReference->identifier) {
-                throw new AuthException('invitation_identity_proof_required', 'The invitation recipient identity could not be verified.', 403);
-            }
-
-            return $existing;
-        }
-        $subject = $this->subjects->resolve($invitation, array_diff_key($data, ['token' => true]) + ['password_confirmation' => $data['passwordConfirmation'] ?? null]);
-        if (! $subject instanceof Model) {
-            throw AuthException::invalidConfiguration('Invitation subjects must be persistent Eloquent principals.');
-        }
-
-        return $subject;
+        return $this->principalResolver->resolve($invitation, $this->validateAcceptInvitation($data), $authenticatedRecipient);
     }
 
     /**
@@ -459,7 +451,7 @@ final readonly class AuthInvitations
      * @param  array<string, mixed>  $data
      * @return array{token: string, name: string, registrationMethod: string, password?: string|null, passwordConfirmation?: string|null, locale: string|null, timezone: string|null, extensions: array<array-key, mixed>}
      */
-    private function validateAcceptInvitation(array $data): array
+    private function validateAcceptInvitation(#[\SensitiveParameter] array $data): array
     {
         if (array_diff(array_keys($data), ['token', 'name', 'registrationMethod', 'password', 'passwordConfirmation', 'locale', 'timezone', 'extensions']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');
@@ -500,7 +492,7 @@ final readonly class AuthInvitations
         if (! is_array($data['extensions'] ?? null)) {
             throw new InvalidArgumentException('Invalid Auth input [extensions].');
         }
-        Validator::make($data, ['token' => ['required', 'string', 'max:128'], 'registrationMethod' => ['sometimes', 'in:password,social'], 'password' => ['nullable', 'required_unless:registrationMethod,social', 'nullable', 'string', 'min:8', 'max:4096', 'confirmed:passwordConfirmation'], 'name' => ['required', 'string', 'max:160'], 'locale' => ['nullable', 'sometimes', 'nullable', 'string', 'max:12'], 'timezone' => ['nullable', 'sometimes', 'nullable', 'timezone:all'], 'extensions' => ['sometimes', 'array']])->validate();
+        Validator::make($data, ['token' => ['required', 'string', 'max:128'], 'registrationMethod' => ['sometimes', 'in:password,social'], 'password' => ['nullable', 'required_unless:registrationMethod,social', 'nullable', 'string', 'confirmed:passwordConfirmation', ...$this->passwordPolicy->rules()], 'name' => ['required', 'string', 'max:160'], 'locale' => ['nullable', 'sometimes', 'nullable', 'string', 'max:12'], 'timezone' => ['nullable', 'sometimes', 'nullable', 'timezone:all'], 'extensions' => ['sometimes', 'array']])->validate();
         $validated = ['token' => $data['token'], 'name' => $data['name'], 'registrationMethod' => $data['registrationMethod'], 'locale' => $data['locale'], 'timezone' => $data['timezone'], 'extensions' => $data['extensions']];
         foreach (['password', 'passwordConfirmation'] as $field) {
             if (array_key_exists($field, $data)) {
@@ -540,7 +532,7 @@ final readonly class AuthInvitations
      * @param  array<string, mixed>  $data
      * @return array{recipient: string, type: string, purpose: string, roles: list<string>, permissions: list<string>, metadata: array<array-key, mixed>, locale: string|null, context: string|null}
      */
-    private function validateStoreInvitation(array $data): array
+    private function validateStoreInvitation(#[\SensitiveParameter] array $data): array
     {
         if (array_diff(array_keys($data), ['recipient', 'type', 'purpose', 'roles', 'permissions', 'metadata', 'locale', 'context']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');
@@ -636,7 +628,7 @@ final readonly class AuthInvitations
      * @param  array<string, mixed>  $data
      * @return array{recipient: string|null, type: string|null, purpose: string|null, lifecycle: string|null, expiresAfter: string|null, expiresBefore: string|null, context: string|null, per_page: int|null, types: array<array-key, mixed>|null}
      */
-    private function validateInvitationIndexQuery(array $data): array
+    private function validateInvitationIndexQuery(#[\SensitiveParameter] array $data): array
     {
         if (array_diff(array_keys($data), ['recipient', 'type', 'purpose', 'lifecycle', 'expiresAfter', 'expiresBefore', 'context', 'per_page', 'types']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');

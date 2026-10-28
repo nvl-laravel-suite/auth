@@ -2,10 +2,16 @@
 
 declare(strict_types=1);
 
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
+use Nvl\Auth\Models\PrincipalSecurityState;
+use Nvl\Auth\Services\AuthPasswords;
+use Nvl\Auth\Services\AuthReauthentication;
 use Nvl\Auth\Services\AuthUserReader;
 use Nvl\Auth\Services\AuthUsers;
+use Nvl\Auth\Services\PrincipalSecurity;
 use Nvl\Auth\Tests\Fixtures\AuthOwnerScenario;
 use Nvl\Auth\Tests\Fixtures\TestUser;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
 
@@ -30,4 +36,24 @@ it('permits global principal administration only in explicit platform context', 
     $deleted = $scenario->platform(fn () => app(AuthUsers::class)->delete($actor, $target));
 
     expect($deleted)->toBeTrue()->and(TestUser::query()->find($target->id))->toBeNull();
+});
+
+it('contains package tokens in every owner while preserving unrelated namespaces', function (): void {
+    $scenario = new AuthOwnerScenario;
+    $user = $this->user('global-credential@example.test');
+    expect(app(PrincipalSecurity::class)->revision($user))->toBe(1);
+    expect($scenario->run($scenario->a(), fn () => app(PrincipalSecurity::class)->revision($user)))->toBe(1);
+    $tokens = [];
+    foreach ([$scenario->a(), $scenario->b()] as $owner) {
+        $tokens[] = $scenario->run($owner, fn () => $user->createToken('nvl-auth:managed')->accessToken);
+        $unrelated = $scenario->run($owner, fn () => $user->createToken('consumer:unrelated')->accessToken);
+    }
+    $context = new AuthenticationRequestContext(guardName: 'web', sessionBinding: app('session.store')->getId());
+    $grant = $scenario->platform(fn () => app(AuthReauthentication::class)->confirm($user, ['password' => 'correct-password'], RecentAuthenticationPurpose::PasswordChange, $context));
+    $scenario->platform(fn () => app(AuthPasswords::class)->update($user, ['password' => 'new-password-123', 'passwordConfirmation' => 'new-password-123'], $grant->reveal(), $context));
+    $table = $tokens[0]->getTable();
+    expect($user->getConnection()->table($table)->whereIn('id', array_map(fn ($token) => $token->getKey(), $tokens))->count())->toBe(0)
+        ->and($user->getConnection()->table($table)->where('id', $unrelated->getKey())->exists())->toBeTrue();
+    $state = PrincipalSecurityState::query()->sole();
+    expect($state->revision)->toBe(2)->and($state->getAttribute('owner_scope_key'))->toBeNull();
 });

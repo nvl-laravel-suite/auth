@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace Nvl\Auth\Ownership;
 
 use Nvl\Auth\Models\AuthAudit;
+use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\Challenge;
+use Nvl\Auth\Models\Impersonation;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\OwnerAuthenticationIntent;
 use Nvl\Auth\Models\OwnerMembership;
 use Nvl\Auth\Models\OwnerMembershipLock;
+use Nvl\Auth\Models\PendingEmailChange;
 use Nvl\Auth\Models\PersonalAccessToken;
+use Nvl\Auth\Models\PrincipalSecurityState;
+use Nvl\Auth\Models\RememberCredential;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Support\Models\ConfiguredModelResolver;
@@ -48,6 +53,11 @@ final readonly class AuthResourceRegistrar
             'auth.invitations' => [Invitation::class, $owned, true],
             ...(class_exists(\Laravel\Sanctum\PersonalAccessToken::class) ? ['auth.tokens' => [$this->models->personalAccessTokenClass(), $owned, true]] : []),
             'auth.challenges' => [Challenge::class, $owned, true],
+            'auth.impersonations' => [Impersonation::class, false, true],
+            'auth.remember_credentials' => [RememberCredential::class, false, true],
+            'auth.browser_sessions' => [BrowserSession::class, false, true],
+            'auth.pending_email_changes' => [PendingEmailChange::class, false, true],
+            'auth.security_states' => [PrincipalSecurityState::class, false, true],
             'auth.audits' => [AuthAudit::class, $owned, true],
         ] as $key => [$model, $captured, $central]) {
             $immutable = match ($key) {

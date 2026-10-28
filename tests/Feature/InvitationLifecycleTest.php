@@ -26,6 +26,10 @@ beforeEach(function (): void {
     config()->set('nvl-auth.features.invitations.enabled', true);
 });
 
+beforeEach(function (): void {
+    config(['nvl-auth.features.registration.enabled' => true, 'nvl-auth.features.registration.settings.mode' => 'invitation_only']);
+});
+
 it('issues consumes and audits a simple invitation without delivery persistence', function (): void {
     Event::fake([AuthDeliveryRequested::class, InvitationAccepted::class]);
     config()->set('nvl-auth.features.invitations.settings.delivery_metadata_keys', [
@@ -522,34 +526,20 @@ it('rolls principal creation back when an invitation acceptance hook rejects', f
     Event::assertNotDispatched(InvitationAccepted::class);
 });
 
-it('supports a host-mapped social registration variant inside the invitation transaction', function (): void {
+it('rejects caller asserted social registration before the host mapper', function (): void {
     $actor = $this->user('social.owner@example.test');
     $this->app->instance(InvitationRegistrationMapper::class, new class implements InvitationRegistrationMapper
     {
         public function map(Invitation $invitation, array $validated): array
         {
-            return [
-                'name' => $validated['name'],
-                'email' => $invitation->recipient,
-                'is_active' => true,
-                'locale' => 'en',
-                'timezone' => 'UTC',
-                'profile' => $validated['extensions'],
-            ];
+            throw new LogicException('Unverified social input reached the mapper.');
         }
     });
-
-    $issued = app(AuthInvitations::class)->create(
-        ['recipient' => 'social.invitee@example.test'],
-        $actor,
-    );
-
-    $registered = app(AuthInvitations::class)->register(['token' => $issued['token'], 'name' => 'Social Invitee', 'registrationMethod' => 'social', 'extensions' => ['provider' => 'github', 'provider_user_id' => 'github-123']]);
-
-    expect($registered['subject'])->toBeInstanceOf(User::class)
-        ->and($registered['subject']->profile)->toBe([
-            'provider' => 'github',
-            'provider_user_id' => 'github-123',
-        ])
-        ->and($registered['invitation']->accepted_at)->not->toBeNull();
+    $issued = app(AuthInvitations::class)->create(['recipient' => 'social.invitee@example.test'], $actor);
+    $successful = AuthAudit::query()->where('action', 'invitation.accepted')->count();
+    expect(fn () => app(AuthInvitations::class)->register(['token' => $issued['token'], 'name' => 'Social Invitee', 'registrationMethod' => 'social']))
+        ->toThrow(AuthException::class, 'Verified social registration');
+    expect(User::query()->where('email', 'social.invitee@example.test')->exists())->toBeFalse()
+        ->and(AuthAudit::query()->where('action', 'invitation.accepted')->count())->toBe($successful)
+        ->and($issued['invitation']->refresh()->accepted_at)->toBeNull();
 });

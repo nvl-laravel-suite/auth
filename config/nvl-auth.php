@@ -85,6 +85,11 @@ return [
     |
     */
     'features' => [
+        'registration' => [
+            'enabled' => PackageEnvironment::get('NVL_AUTH_REGISTRATION_ENABLED', false),
+            'services' => ['admission' => null],
+            'settings' => ['mode' => 'closed'],
+        ],
         'authentication' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_AUTHENTICATION_ENABLED', true),
 
@@ -93,6 +98,7 @@ return [
                 'identifier_resolver' => null,
                 'login_metadata_recorder' => null,
                 'eligibility' => null,
+                'assurance' => null,
             ],
             'settings' => ['owner_intent_ttl_minutes' => 10],
         ],
@@ -101,8 +107,8 @@ return [
 
             'models' => ['user' => User::class],
             'services' => [
-                'attribute_mapper' => ConfiguredPrincipalAttributeMapper::class,
-                'account_confirmation' => null,
+                'attribute_mapper' => ConfiguredPrincipalAttributeMapper::class, 'extension_mapper' => null,
+                'account_confirmation' => null, 'authentication_policy' => null,
                 'session_containment' => LaravelPrincipalSessionContainment::class,
             ],
             'settings' => [
@@ -117,6 +123,7 @@ return [
                     'name' => 'name',
                     'email' => 'email',
                     'email_verified_at' => 'email_verified_at',
+                    'email_identity_hash' => 'email_identity_hash',
                     'password' => 'password',
                     'active' => 'is_active',
                     'locale' => 'locale',
@@ -142,7 +149,7 @@ return [
         'password' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_PASSWORD_ENABLED', true),
 
-            'services' => ['updater' => null],
+            'services' => ['updater' => null, 'policy' => null],
             'settings' => ['reset_ttl_minutes' => 60],
         ],
         'email_verification' => [
@@ -213,7 +220,7 @@ return [
         'social_identities' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_SOCIAL_IDENTITIES_ENABLED', false),
 
-            'services' => ['provider' => null, 'subject_resolver' => null],
+            'services' => ['provider_factory' => null],
             'settings' => ['providers' => []],
         ],
         'clients' => [
@@ -221,6 +228,8 @@ return [
 
             'settings' => [],
         ],
+        'impersonation' => ['enabled' => false, 'services' => ['access' => null], 'settings' => ['duration_seconds' => 900]],
+        'managed_sessions' => ['enabled' => false, 'settings' => ['absolute_lifetime_seconds' => 43200, 'admission_integrated' => false]],
         'sessions' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_SESSIONS_ENABLED', true),
 
@@ -284,6 +293,14 @@ return [
         'invitation_accepted' => [],
         'client_started' => [],
         'api_token_issued' => [],
+        'registration' => [],
+        'profile_update' => [],
+        'credential_change' => [],
+        'email_change' => [],
+        'social_link_change' => [],
+        'impersonation_started' => [],
+        'impersonation_stopped' => [],
+
     ],
 
     'cleanup' => [

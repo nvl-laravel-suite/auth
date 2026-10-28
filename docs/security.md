@@ -62,13 +62,21 @@ user-verification policy before a passkey-enabled deployment is ready.
 
 ## Social identities
 
-Provider identity is `(provider, immutable provider user ID)`. Email is a claim,
-not ownership authority. The configured `SocialSubjectResolver` decides whether to
-resolve, provision, or reject a subject. Auth does not persist OAuth access or
-refresh tokens and does not auto-link by email. The Socialite adapter requires a
-true raw `email_verified` or `verified_email` claim whenever an email is
-returned, and `ExternalIdentity` carries the normalized boolean plus provenance.
-Custom resolvers matching by email must enforce both.
+Provider identity is a configured connection alias and immutable provider ID. A
+validated, fixed issuer can be supplied as provenance; existing links reject issuer
+changes, so changing a connection realm requires an explicit migration. Email is
+an optional claim, not ownership authority. An authenticated subject can link a
+proved provider identity without verified email. For an unauthenticated callback,
+an active immutable link can resolve its subject without email; unknown identities
+return a server-held registration continuation. Native explicit registration requires provider-verified email provenance or a separate bounded local mailbox proof. No callback may resolve or merge a principal by email.
+
+The Socialite adapter recognizes Google's boolean `email_verified` userinfo claim.
+For the unmodified GitHub SDK driver, it recognizes the SDK's verified-primary
+email endpoint only when `user:email` is in the effective driver scopes. Other
+drivers fail closed unless the host explicitly supplies a
+`SocialiteEmailVerification` policy backed by that provider's proof. The host is
+responsible for matching its policy to the driver and its returned claims. OAuth
+protocol parameters are reserved. No access or refresh tokens enter the identity.
 
 ## API tokens and RBAC
 
@@ -121,3 +129,36 @@ Disabling a feature blocks normal read/enroll/issue/use/update admission and
 closes new service admission. Data remains. Revoke retained credentials
 before disablement if later re-enablement must not reactivate them. Revoke and
 cleanup operations remain admitted as containment operations.
+
+New passwords use the configured `PasswordPolicy` (minimum 12 characters by default), bounded input and the selected bcrypt engine's 72-byte limit. Existing hashes remain valid without meeting the new policy. Password changes rotate the native remember token; they do not delete unrelated application tokens or database sessions. Future revision and managed-session enforcement is separate.
+
+Atomic password reset requires an Eloquent principal and Laravel's database token repository on the same actual connection as the principal and audit storage. Non-Eloquent or nontransactional external stores need a host-owned flow; they are not covered by this atomicity guarantee. Reset events are emitted after the outer commit.
+
+## Principal security revisions
+
+Native password changes/resets, administrative credential reset, TOTP enrollment/restart/revocation, recovery replacement/revocation, passkey enrollment/revocation, new social links/revocation, email changes and principal disable/delete/restore advance a central monotonic revision. Initial principal creation starts at 1. Ordinary profile changes and idempotent revocations do not advance it. Revision, credentials, native challenge invalidation and committed facts obey enclosing transaction rollback. Consumers never submit a revision as proof or mutate this internal store.
+
+Mutations lock canonical principals in stable order, their security states, native challenges, then credentials. Passkey provider verification runs before these locks and the final write revalidates the stored ceremony, credential and revision. Both MySQL and PostgreSQL use current locking reads for unique state creation/reload.
+
+Current invalidation covers subject-bound `passkey_authentication`, `passkey_registration` and `credential_second_factor` challenges across owners. Generic magic-link/security-code business purposes retain their own lifecycle; they are not current-revision native authentication proofs. Remember tokens rotate on security changes. Password mutations revoke every package-managed API token across native owners while preserving unrelated token namespaces.
+
+
+## Native proof provenance and assurance
+
+Every native login method enforces required enrolled MFA independently of optional method flags. Password/email/ordinary social/non-UV passkey evidence is single factor; native verified passkey UV satisfies MFA. Social profile amr/acr claims never grant MFA. Enrolled credentials remain central facts under ambient owner scopes; owner access remains separate from identity proof.
+
+Native email/passkey/social initiation captures trusted destination and browser/guard context before redemption. Generic business challenge APIs cannot mint native login evidence. Passwords capture credential fingerprint and revision before provider verification, then compare canonical persistence under lock before rehash/issuance. Social provider I/O precedes native locks, including within a host transaction. Proof completion reconstructs encrypted native evidence under canonical locks and rechecks persistence around hooks, even when a consumer resolver supplies stale models.
+
+Proofs use purpose-separated HMAC indexes, encrypted facts, 300-second lifetime, five shared failed factor attempts and one-use final consumption. Token proofs bind a client namespace and per-flow nonce without browser state. Issued proof secrets redact debug output and reject serialization. No supported public generic issuer or bare-principal session establishment remains.
+
+Account method inventory is a safe projection of usable native credentials. Removals lock the canonical principal and recheck credential ownership from storage. The native policy always preserves a primary method; recovery codes never count as primary. Bind `AccountAuthenticationPolicy` for additional business requirements, including organization-mandated factors. Explicit factor removal requires native recent authentication with the enrolled factor; the default permits a deliberate MFA opt-out after that proof. Consumer policy can prohibit it. Listen for committed `AccountSecurityChanged` facts to send security notifications.
+
+Passwordless accounts use `AuthPasswords::setInitial` with native PasswordChange recent proof from a linked social identity or user-verified passkey. An existing password is rejected under lock. `remove` preserves a usable primary and enforces consumer policy. `AuthAccountRecovery::recover` requires explicit human/SystemMutationContext authority and the separate users.recover ability. It accepts a bounded reason and selected native credential IDs, preserves a usable primary and performs complete managed containment; false revokeSessions/revokeTokens instructions are rejected. Support identity proof remains host policy. Recovery cannot verify a mailbox, activate an account or grant roles. Consumers deliver committed AccountSecurityChanged notifications.
+
+### Impersonation
+
+Impersonation defaults off and its access policy denies by default. Enable it only with managed admission, audit storage and a consumer `ImpersonationAccess`. Start requires an original browser and ImpersonationStart recent grant, a reason (1–500 characters), and 60–1800 seconds (default 900). The target must be active and admitted to the captured current owner; payload cannot select owner or actor. Every request rechecks both revisions, permissions, owner membership, browser/guard and expiry.
+
+Use `LaravelImpersonation::start/stop` for browser binding and CSRF rotation, and `run`/consumer middleware for the target overlay. The Laravel session/recaller identity remains the original human. Start/stop POST endpoints require CSRF/auth/throttling and execute outside the overlay. An admitted callback temporarily uses the target, then restores guard, owner principal and permission caches after success or exception. Unsafe restoration logs out. No target token or remember cookie is created. Native auth mutations, token issuance, recovery, RBAC/membership administration and nested impersonation are denied during an overlay before host policy. Stop requires the matching original session, without another fresh grant. Forced revocation has a separate management/system ability.
+
+A transport failure after durable grant creation compensates by stopping the grant and revoking the browser before logout; retry requires fresh authentication. Pre-grant denials roll back grant consumption and successful facts. Native audit actor columns retain the original human; reserved effective_subject_type/effective_subject_id/impersonation_id metadata comes from verified scope and rejects caller overrides. Deferred native writes capture immutable attribution at source. Consumer audit adapters read `AuthExecutionContext::facts()` and preserve those facts at their source boundary. The execution context cannot be serialized into jobs; consumers must separately authorize background actor context, rather than capturing the browser overlay.

@@ -29,7 +29,7 @@ final readonly class SocialProviderConfiguration
             "features.social_identities.settings.providers.{$provider}",
         );
 
-        if (! is_array($configured)) {
+        if (! is_array($configured) || ($configured['enabled'] ?? true) !== true) {
             throw new AuthException('social_provider_unavailable', 'The social provider is unavailable.', 404);
         }
 
@@ -60,6 +60,10 @@ final readonly class SocialProviderConfiguration
         foreach ($parameters as $key => $value) {
             if (! is_string($key) || (! is_string($value) && ! is_int($value) && ! is_float($value) && ! is_bool($value))) {
                 throw AuthException::invalidConfiguration("Social provider [{$provider}] parameters must be scalar.");
+            }
+
+            if (in_array(strtolower($key), ['state', 'client_id', 'client_secret', 'redirect_uri', 'response_type', 'scope', 'nonce', 'code_challenge', 'code_challenge_method', 'code_verifier'], true)) {
+                throw AuthException::invalidConfiguration("Social provider [{$provider}] parameters contain a reserved OAuth parameter.");
             }
 
             $normalizedParameters[$key] = $value;

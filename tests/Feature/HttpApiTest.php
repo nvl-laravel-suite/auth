@@ -62,6 +62,7 @@ it('timeboxes known and unknown account requests while keeping responses neutral
     app()->instance('routes.cached', false);
     config()->set('nvl-auth.routes.enabled', true);
     config()->set('nvl-auth.routes.public.enabled', true);
+    config()->set('nvl-auth.routes.middleware', ['web']);
     config()->set("nvl-auth.features.{$feature->value}.enabled", true);
     config()->set("nvl-auth.features.{$feature->value}.routes.public.enabled", true);
     Event::fake([AuthDeliveryRequested::class]);
@@ -101,6 +102,7 @@ it('rejects oversized magic-link purposes identically for known and unknown acco
     app()->instance('routes.cached', false);
     config()->set('nvl-auth.routes.enabled', true);
     config()->set('nvl-auth.routes.public.enabled', true);
+    config()->set('nvl-auth.routes.middleware', ['web']);
     config()->set('nvl-auth.features.magic_links.enabled', true);
     config()->set('nvl-auth.features.magic_links.routes.public.enabled', true);
     Event::fake([AuthDeliveryRequested::class]);

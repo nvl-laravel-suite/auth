@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
-use Carbon\CarbonImmutable;
 use DateTimeZone;
+use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Contracts\Container\Container;
@@ -16,24 +16,27 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use InvalidArgumentException;
 use JsonException;
-use Nvl\Auth\Contracts\AccountConfirmation;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
+use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
-use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\PrincipalAttribute;
+use Nvl\Auth\Enums\PrincipalMutation;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Enums\UserBulkOperation;
-use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\User;
-use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
+use Nvl\Auth\Pipelines\AuthPipeline;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthEventContext;
+use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
+use Nvl\Support\Auth\CanonicalActorResolver;
 use Nvl\Support\Events\DomainEventDispatcher;
 
 /**
@@ -44,7 +47,7 @@ use Nvl\Support\Events\DomainEventDispatcher;
 final readonly class AuthUsers
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private MutationAuthorizer $authorization, private UserLocator $users, private AuthAuditRecorder $audits, private PrincipalAttributeMapper $attributes, private PrincipalSessionContainment $sessions, private AuthMemberships $owners, private AuthOwnershipState $ownershipState, private DomainEventDispatcher $domainEvents, private ManagementAuthorizer $createAuthorization, private AuthModelRegistry $models, private Container $container, private AuthConfiguration $configuration, private AccountConfirmation $confirmation, private AuthOperationBoundary $operations, private ManagementAuthorizer $updateAuthorization) {}
+    public function __construct(private FeatureGate $features, private MutationAuthorizer $authorization, private UserLocator $users, private AuthAuditRecorder $audits, private PrincipalAttributeMapper $attributes, private PrincipalSessionContainment $sessions, private AuthMemberships $owners, private AuthOwnershipState $ownershipState, private DomainEventDispatcher $domainEvents, private ManagementAuthorizer $createAuthorization, private AuthModelRegistry $models, private Container $container, private AuthOperationBoundary $operations, private ManagementAuthorizer $updateAuthorization, private PasswordUpdater $passwords, private PasswordValidationRules $passwordPolicy, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private AuthenticationSessions $browserSessions, private PrincipalExtensions $extensions, private AuthPipeline $pipeline) {}
 
     /**
      * Apply one operation to at most one hundred principals.
@@ -73,7 +76,16 @@ final readonly class AuthUsers
         $connection = $this->users->query(true)->getModel()->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($ability, $actor, $authority, $context, $metadata, $operation, $userIds): array {
-            $users = $this->users->query(true)->whereKey($userIds)->lockForUpdate()->get();
+            $users = $this->users->query(true)->whereKey($userIds)->orderBy($this->users->query(true)->getModel()->getKeyName())->lockForUpdate()->get();
+            foreach ($users as $user) {
+                $this->security->assertTokenContainment($user);
+            }
+            foreach ($users as $user) {
+                $this->security->lock($user);
+            }
+            foreach ($users as $user) {
+                $this->security->lockChallenges($user);
+            }
             /** @var User $user */
             foreach ($users as $user) {
                 if ($authority instanceof Authenticatable) {
@@ -97,9 +109,13 @@ final readonly class AuthUsers
     /** Apply validated active state and contain credentials when disabling.
      * @param  array<string, mixed>  $data
      */
-    private function bulkUpdateSetActive(User $user, array $data, ?SystemMutationContext $context = null): bool
+    private function bulkUpdateSetActive(User $user, #[\SensitiveParameter] array $data, ?SystemMutationContext $context = null): bool
     {
         $data = $this->validateUpdateUserStatus($data);
+        if ($this->attributes->value($user, PrincipalAttribute::Active) === $data['active']) {
+            return true;
+        }
+        $this->security->advance($user, $data['active'] ? 'principal_enabled' : 'principal_disabled');
         if (! $data['active']) {
             if ($this->ownershipState->native()) {
                 $this->owners->assertPrincipalCanBeDisabled(SubjectReference::fromAuthenticatable($user));
@@ -113,6 +129,10 @@ final readonly class AuthUsers
     /** Soft-delete one principal and revoke its tokens. */
     private function bulkUpdateDelete(User $user, ?SystemMutationContext $context): bool
     {
+        if ($user->trashed()) {
+            return true;
+        }
+        $this->security->advance($user, 'principal_deleted');
         if ($this->ownershipState->native()) {
             $this->owners->assertPrincipalCanBeDisabled(SubjectReference::fromAuthenticatable($user));
         }
@@ -124,6 +144,10 @@ final readonly class AuthUsers
     /** Restore one principal after invalidating any pre-deletion credentials. */
     private function bulkUpdateRestore(User $user, ?SystemMutationContext $context): bool
     {
+        if (! $user->trashed()) {
+            return true;
+        }
+        $this->security->advance($user, 'principal_restored');
         $restored = (bool) $user->restore();
         $this->sessions->contain($user, 'restored', $context);
 
@@ -133,7 +157,7 @@ final readonly class AuthUsers
     /** Persist a principal and optional RBAC assignment atomically.
      * @param  array<string, mixed>  $data
      */
-    public function create(Authenticatable $actor, array $data): User
+    public function create(Authenticatable $actor, #[\SensitiveParameter] array $data): User
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Issue);
         $data = $this->validateStoreUser($data);
@@ -143,13 +167,29 @@ final readonly class AuthUsers
             $this->createAuthorization->authorize($actor, 'nvl.auth.users.manageAccess');
         }
         $class = $this->models->userClass();
-        $connection = (new $class)->getConnectionName();
+        $prototype = new $class;
+        if ($data['emailVerified']) {
+            $prototype->forceFill($this->attributes->map(array_diff_key($data, array_flip(['roles', 'permissions', 'password', 'extensions']))));
+            $this->createAuthorization->authorize($actor, 'nvl.auth.users.verifyEmail', $prototype);
+        }
+        $connection = $prototype->getConnectionName();
 
         return DB::connection($connection)->transaction(function () use ($actor, $class, $data): User {
-            $user = $class::query()->create($this->attributes->map(array_diff_key($data, array_flip(['roles', 'permissions']))));
+            $mapped = $this->attributes->map(array_diff_key($data, array_flip(['roles', 'permissions', 'password', 'extensions'])));
+            if ($data['extensions'] !== null) {
+                $mapped += $this->extensions->map(PrincipalMutation::ManagementCreate, $data['extensions'], occupiedColumns: array_keys($mapped));
+            }
+            $user = $class::query()->create($mapped);
+            if (is_string($data['password'])) {
+                $this->passwords->update($user, $data['password']);
+                $user->setRememberToken(Str::random(60));
+                $user->save();
+            }
             if ($data['roles'] !== [] || $data['permissions'] !== []) {
                 $this->container->make(RbacManager::class)->assign($user, $data['roles'], $data['permissions']);
             }
+            $this->security->lock($user);
+            $this->security->lockChallenges($user);
             $reference = SubjectReference::fromAuthenticatable($user);
             $this->audits->record('user.created', subject: $reference, actor: $actor);
             $this->domainEvents->dispatch(new PrincipalChanged($this->attributes->identifier($user), 'created', ['email' => $this->attributes->value($user, PrincipalAttribute::Email)], AuthEventContext::centralIdentity()), $user->getConnection());
@@ -161,19 +201,26 @@ final readonly class AuthUsers
     /** Delete the authenticated package principal and revoke every active credential.
      * @param  array<string, mixed>  $data
      */
-    public function deleteOwnAccount(Authenticatable $subject, array $data, StatefulGuard $guard, Session $session): bool
+    public function deleteOwnAccount(Authenticatable $subject, #[\SensitiveParameter] array $data, StatefulGuard $guard, Session $session, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): bool
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Revoke);
+        $this->browserSessions->assertCanTransition($subject);
+        $this->recent->assertValid($subject, $grant, RecentAuthenticationPurpose::AccountDeletion, $context);
         $data = $this->validateDeleteOwnAccount($data);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Revoke);
         $this->operations->central(AuthIdentityOperation::Profile, $subject);
-        $user = $this->users->authenticated($subject);
-        $this->confirmation->assertConfirmed($user, $data['currentPassword']);
-        $deleted = DB::connection($user->getConnectionName())->transaction(function () use ($user): bool {
+        $user = $this->users->authenticated($this->canonical->resolve($subject));
+        $deleted = DB::connection($user->getConnectionName())->transaction(function () use (&$user, $grant, $context): bool {
+            $this->recent->consume($user, $grant, RecentAuthenticationPurpose::AccountDeletion, $context);
+            $this->security->assertTokenContainment($user);
+            $user = $this->users->query()->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
+            $this->security->lock($user);
+            $this->security->lockChallenges($user);
             $reference = SubjectReference::fromAuthenticatable($user);
             if ($this->ownershipState->native()) {
                 $this->owners->assertPrincipalCanBeDisabled($reference);
             }
+            $this->security->advance($user, 'principal_deleted');
             $this->sessions->contain($user, 'self_deleted');
             $deleted = (bool) $user->delete();
             $this->audits->record('user.self_deleted', subject: $reference, actor: $user);
@@ -181,9 +228,18 @@ final readonly class AuthUsers
 
             return $deleted;
         }, 3);
-        $guard->logout();
-        $session->invalidate();
-        $session->regenerateToken();
+        try {
+            $guard->logout();
+        } finally {
+            if ($guard instanceof SessionGuard) {
+                $guard->forgetUser();
+            }
+            try {
+                $session->invalidate();
+            } finally {
+                $session->regenerateToken();
+            }
+        }
         if ($subject instanceof User) {
             $subject->setRawAttributes($user->getAttributes(), true);
         }
@@ -204,10 +260,14 @@ final readonly class AuthUsers
         }
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $context, $metadata, $user): bool {
+            $this->security->assertTokenContainment($user);
+            $this->security->lock($user);
+            $this->security->lockChallenges($user);
             $reference = SubjectReference::fromAuthenticatable($user);
             if ($this->ownershipState->native()) {
                 $this->owners->assertPrincipalCanBeDisabled($reference);
             }
+            $this->security->advance($user, 'principal_deleted');
             $this->sessions->contain($user, 'deleted', $context);
             $deleted = (bool) $user->delete();
             $this->audits->record('user.deleted', subject: $reference, actor: $actor, metadata: $metadata);
@@ -227,6 +287,14 @@ final readonly class AuthUsers
         $user = $this->users->find($user, true);
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $context, $metadata, $user): User {
+            $this->security->assertTokenContainment($user);
+            $this->security->lock($user);
+            $this->security->lockChallenges($user);
+            $user = $this->users->query(true)->whereKey($user->getKey())->firstOrFail();
+            if (! $user->trashed()) {
+                return $user;
+            }
+            $this->security->advance($user, 'principal_restored');
             $user->restore();
             $this->sessions->contain($user, 'restored', $context);
             $this->audits->record('user.restored', subject: SubjectReference::fromAuthenticatable($user), actor: $actor, metadata: $metadata);
@@ -239,7 +307,7 @@ final readonly class AuthUsers
     /** Persist the principal activation state.
      * @param  array<string, mixed>  $data
      */
-    public function setActive(Authenticatable|SystemMutationContext $authority, User|string $user, array $data): User
+    public function setActive(Authenticatable|SystemMutationContext $authority, User|string $user, #[\SensitiveParameter] array $data): User
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Update);
         $data = $this->validateUpdateUserStatus($data);
@@ -252,6 +320,14 @@ final readonly class AuthUsers
         }
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $context, $data, $metadata, $user): User {
+            $this->security->assertTokenContainment($user);
+            $this->security->lock($user);
+            $this->security->lockChallenges($user);
+            $user = $this->users->query()->whereKey($user->getKey())->firstOrFail();
+            if ($this->attributes->value($user, PrincipalAttribute::Active) === $data['active']) {
+                return $user;
+            }
+            $this->security->advance($user, $data['active'] ? 'principal_enabled' : 'principal_disabled');
             if (! $data['active']) {
                 $this->owners->assertPrincipalCanBeDisabled(SubjectReference::fromAuthenticatable($user));
             }
@@ -270,67 +346,99 @@ final readonly class AuthUsers
     /** Persist self-service profile changes.
      * @param  array<string, mixed>  $data
      */
-    public function updateProfile(Authenticatable $subject, array $data): User
+    public function updateProfile(Authenticatable $subject, #[\SensitiveParameter] array $data, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): User
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Update);
         $data = $this->validateUpdateProfile($data);
         $this->operations->central(AuthIdentityOperation::Profile, $subject);
-        $user = $this->users->authenticated($subject);
+        $user = $this->users->authenticated($this->canonical->resolve($subject));
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($data, $user): User {
-            $attributes = array_diff_key($data, array_flip(['currentPassword']));
-            $submittedEmail = $attributes['email'] ?? null;
-            $currentEmail = $this->attributes->value($user, PrincipalAttribute::Email);
-            $emailChanged = is_string($submittedEmail) && is_string($currentEmail) && mb_strtolower(trim($submittedEmail)) !== mb_strtolower(trim($currentEmail));
-            if ($emailChanged) {
-                if (! array_key_exists('currentPassword', $data)) {
-                    throw new AuthException('account_confirmation_required', 'Email changes require account confirmation.', 422);
+            return $this->pipeline->run('profile_update', new AuthPipelineContext('profile_update', ['attributes' => array_keys($data)], SubjectReference::fromAuthenticatable($user)), function () use ($data, $user): User {
+                $this->security->lock($user);
+                $this->security->lockChallenges($user);
+                $user = $this->users->query()->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
+                $attributes = array_diff_key($data, array_flip(['extensions']));
+                $submittedEmail = $attributes['email'] ?? null;
+                $currentEmail = $this->attributes->value($user, PrincipalAttribute::Email);
+                $emailChanged = is_string($submittedEmail) && is_string($currentEmail) && PrincipalEmailIdentity::normalize($submittedEmail) !== PrincipalEmailIdentity::normalize($currentEmail);
+                if ($emailChanged) {
+                    throw new AuthException('email_change_verification_required', 'Use AuthEmailChanges to prove the new mailbox before replacement.', 422);
                 }
-                $this->confirmation->assertConfirmed($user, $data['currentPassword']);
-                $this->features->assertAllowed(AuthFeature::EmailVerification, FeatureOperation::Issue);
-                $normalizedEmail = mb_strtolower(trim($submittedEmail));
-                if ($user::query()->where($this->attributes->column(PrincipalAttribute::Email), $normalizedEmail)->whereKeyNot($user->getKey())->exists()) {
-                    throw new AuthException('email_unavailable', 'The email address is unavailable.', 422);
+                $mapped = $this->attributes->map($attributes);
+                if (array_key_exists('extensions', $data)) {
+                    $mapped += $this->extensions->map(PrincipalMutation::Profile, $data['extensions'], $user, array_keys($mapped));
                 }
-                $attributes['emailVerified'] = false;
-            }
-            $user->update($this->attributes->map($attributes));
-            $reference = SubjectReference::fromAuthenticatable($user);
-            $this->audits->record('profile.updated', subject: $reference, actor: $user, metadata: ['attributes' => array_keys($attributes)]);
-            $this->domainEvents->dispatch(new PrincipalChanged($this->attributes->identifier($user), 'profile_updated', ['attributes' => array_keys($attributes)], AuthEventContext::centralIdentity()), $user->getConnection());
-            if ($emailChanged) {
-                $this->updateProfileRequestEmailVerification($user, $data);
-            }
+                $user->update($mapped);
+                $reference = SubjectReference::fromAuthenticatable($user);
+                $this->audits->record('profile.updated', subject: $reference, actor: $user, metadata: ['attributes' => array_keys($attributes)]);
+                $this->domainEvents->dispatch(new PrincipalChanged($this->attributes->identifier($user), 'profile_updated', ['attributes' => array_keys($attributes)], AuthEventContext::centralIdentity()), $user->getConnection());
 
-            return $user->refresh();
+                return $user->refresh();
+            });
         }, 3);
-    }
-
-    /** Emit the post-commit verification delivery for one changed email address.
-     * @param  array<string, mixed>  $data
-     */
-    private function updateProfileRequestEmailVerification(User $user, array $data): void
-    {
-        $data = $this->validateUpdateProfile($data);
-        $expiresAt = CarbonImmutable::now()->addMinutes($this->configuration->integerBetween('features.email_verification.settings.ttl_minutes', 60, 1, 10080));
-        $reference = SubjectReference::fromAuthenticatable($user);
-        $this->domainEvents->dispatch(new AuthDeliveryRequested(new AuthDeliveryRequest(messageId: (string) Str::uuid(), feature: AuthFeature::EmailVerification, type: AuthMessageType::EmailVerification, recipient: $user->getEmailForVerification(), payload: ['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'email_hash' => sha1($user->getEmailForVerification())], expiresAt: $expiresAt, locale: ! array_key_exists('locale', $data) ? null : $data['locale']), $this->deliveryContext->capture(true)), $user->getConnection());
-        $this->audits->record('email_verification.requested', subject: $reference, actor: $user);
     }
 
     /** Persist a partial principal mutation.
      * @param  array<string, mixed>  $data
      */
-    public function update(Authenticatable $actor, User|string $user, array $data): User
+    public function update(Authenticatable $actor, User|string $user, #[\SensitiveParameter] array $data): User
     {
         $this->features->assertAllowed(AuthFeature::PrincipalManagement, FeatureOperation::Update);
         $data = $this->validateUpdateUser($data);
+        if ($user instanceof User) {
+            $canonical = $this->canonical->resolve($user);
+            if (! $canonical instanceof User) {
+                throw AuthException::invalidConfiguration('Principal management requires a package user.');
+            }
+            $user = $canonical;
+        }
         $user = $this->users->find($user, true);
-        $this->updateAuthorization->authorize($actor, 'nvl.auth.users.update', $user);
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($actor, $data, $user): User {
+            if (array_key_exists('password', $data)) {
+                $this->security->assertTokenContainment($user);
+            }
+            $this->security->lock($user);
+            $this->security->lockChallenges($user);
+            $user = $this->users->query(true)->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
+            $this->updateAuthorization->authorize($actor, 'nvl.auth.users.update', $user);
+            if (array_key_exists('password', $data)) {
+                $this->updateAuthorization->authorize($actor, 'nvl.auth.users.manageCredentials', $user);
+            }
+            if (($data['emailVerified'] ?? false) === true) {
+                $this->updateAuthorization->authorize($actor, 'nvl.auth.users.verifyEmail', $user);
+            }
             $attributes = $data;
-            $user->update($this->attributes->map($attributes));
+            unset($attributes['extensions']);
+            if (array_key_exists('email', $attributes)) {
+                $attributes['email'] = PrincipalEmailIdentity::normalize($attributes['email']);
+                $current = $this->attributes->value($user, PrincipalAttribute::Email);
+                if (is_string($current) && PrincipalEmailIdentity::normalize($current) !== $attributes['email'] && ! array_key_exists('emailVerified', $attributes)) {
+                    $attributes['emailVerified'] = false;
+                }
+            }
+            $oldEmail = $this->attributes->value($user, PrincipalAttribute::Email);
+            unset($attributes['password']);
+            $mapped = $this->attributes->map($attributes);
+            if (array_key_exists('extensions', $data)) {
+                $mapped += $this->extensions->map(PrincipalMutation::ManagementUpdate, $data['extensions'], $user, array_keys($mapped));
+            }
+            $user->update($mapped);
+            $emailChanged = array_key_exists('email', $data) && is_string($oldEmail) && PrincipalEmailIdentity::normalize($oldEmail) !== PrincipalEmailIdentity::normalize($data['email']);
+            if (! array_key_exists('password', $data) && $emailChanged) {
+                $this->security->advance($user, 'email_changed');
+            }
+            if (array_key_exists('password', $data)) {
+                if ($data['password'] === null) {
+                    $user->forceFill([$this->attributes->column(PrincipalAttribute::Password) => null]);
+                } else {
+                    $this->passwords->update($user, $data['password']);
+                }
+                $user->setRememberToken(Str::random(60));
+                $user->save();
+                $this->security->advance($user, 'password_admin_reset');
+            }
             $reference = SubjectReference::fromAuthenticatable($user);
             $this->audits->record('user.updated', subject: $reference, actor: $actor, metadata: ['attributes' => array_keys($attributes)]);
             $this->domainEvents->dispatch(new PrincipalChanged($this->attributes->identifier($user), 'updated', ['attributes' => array_keys($attributes)], AuthEventContext::centralIdentity()), $user->getConnection());
@@ -341,19 +449,15 @@ final readonly class AuthUsers
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{currentPassword: string}
+     * @return array{}
      */
-    private function validateDeleteOwnAccount(array $data): array
+    private function validateDeleteOwnAccount(#[\SensitiveParameter] array $data): array
     {
-        if (array_diff(array_keys($data), ['currentPassword']) !== []) {
-            throw new InvalidArgumentException('Unknown or protected Auth input fields.');
+        if ($data !== []) {
+            throw new InvalidArgumentException('Account deletion takes its opaque grant separately.');
         }
-        if (! is_string($data['currentPassword'] ?? null)) {
-            throw new InvalidArgumentException('Invalid Auth input [currentPassword].');
-        }
-        Validator::make($data, ['currentPassword' => ['required', 'string', 'max:4096']])->validate();
 
-        return $data;
+        return [];
     }
 
     /** Native Auth operation.
@@ -395,12 +499,20 @@ final readonly class AuthUsers
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{name: string, email: string, password: string|null, active: bool, locale: string, timezone: string, profile: array<array-key, mixed>, preferences: array<array-key, mixed>, roles: list<string>, permissions: list<string>, emailVerified: bool}
+     * @return array{name: string, email: string, password: string|null, active: bool, locale: string, timezone: string, profile: array<array-key, mixed>, preferences: array<array-key, mixed>, roles: list<string>, permissions: list<string>, emailVerified: bool, extensions: array<array-key, mixed>|null}
      */
-    private function validateStoreUser(array $data): array
+    private function validateStoreUser(#[\SensitiveParameter] array $data): array
     {
-        if (array_diff(array_keys($data), ['name', 'email', 'password', 'active', 'locale', 'timezone', 'profile', 'preferences', 'roles', 'permissions', 'emailVerified']) !== []) {
+        if (array_diff(array_keys($data), ['name', 'email', 'password', 'active', 'locale', 'timezone', 'profile', 'preferences', 'roles', 'permissions', 'emailVerified', 'extensions']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');
+        }
+        $extensionInput = null;
+        if (array_key_exists('extensions', $data)) {
+            if (! is_array($data['extensions'])) {
+                throw new InvalidArgumentException('Invalid Auth input [extensions].');
+            }
+            $extensionInput = $data['extensions'];
+            unset($data['extensions']);
         }
         if (! is_string($data['name'] ?? null)) {
             throw new InvalidArgumentException('Invalid Auth input [name].');
@@ -462,11 +574,12 @@ final readonly class AuthUsers
         if (trim($data['name']) === '' || mb_strlen($data['name']) > 160) {
             throw new InvalidArgumentException('User names must contain between one and 160 characters.');
         }
+        $data['email'] = PrincipalEmailIdentity::normalize($data['email']);
         if (filter_var($data['email'], FILTER_VALIDATE_EMAIL) === false || mb_strlen($data['email']) > 254) {
             throw new InvalidArgumentException('A valid user email address is required.');
         }
-        if ($data['password'] !== null && mb_strlen($data['password']) < 12) {
-            throw new InvalidArgumentException('User passwords must contain at least 12 characters.');
+        if ($data['password'] !== null) {
+            Validator::make($data, ['password' => ['required', 'string', ...$this->passwordPolicy->rules()]])->validate();
         }
         if (! preg_match('/^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$/', $data['locale'])) {
             throw new InvalidArgumentException('A valid user locale is required.');
@@ -479,19 +592,38 @@ final readonly class AuthUsers
         $this->validateStoreUserAssertStringListIsBounded($data['roles'], 100, 'roles');
         $this->validateStoreUserAssertStringListIsBounded($data['permissions'], 250, 'permissions');
 
-        return $data;
+        return [
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => $data['password'],
+            'active' => $data['active'],
+            'locale' => $data['locale'],
+            'timezone' => $data['timezone'],
+            'profile' => $data['profile'],
+            'preferences' => $data['preferences'],
+            'roles' => $data['roles'],
+            'permissions' => $data['permissions'],
+            'emailVerified' => $data['emailVerified'],
+            'extensions' => $extensionInput,
+        ];
     }
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{name?: string, email?: string, locale?: string, timezone?: string, profile?: array<array-key, mixed>, preferences?: array<array-key, mixed>, currentPassword?: string}
+     * @return array{name?: string, email?: string, locale?: string, timezone?: string, profile?: array<array-key, mixed>, preferences?: array<array-key, mixed>, extensions?: array<array-key, mixed>}
      */
-    private function validateUpdateProfile(array $data): array
+    private function validateUpdateProfile(#[\SensitiveParameter] array $data): array
     {
-        if (array_diff(array_keys($data), ['name', 'email', 'locale', 'timezone', 'profile', 'preferences', 'currentPassword']) !== []) {
+        if (array_diff(array_keys($data), ['name', 'email', 'locale', 'timezone', 'profile', 'preferences', 'extensions']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');
         }
         $validated = [];
+        if (array_key_exists('extensions', $data)) {
+            if (! is_array($data['extensions'])) {
+                throw new InvalidArgumentException('Invalid Auth input [extensions].');
+            }
+            $validated['extensions'] = $data['extensions'];
+        }
         if (array_key_exists('name', $data)) {
             if (! is_string($data['name'])) {
                 throw new InvalidArgumentException('Invalid Auth input [name].');
@@ -528,16 +660,17 @@ final readonly class AuthUsers
             }
             $validated['preferences'] = $data['preferences'];
         }
-        if (array_key_exists('currentPassword', $data)) {
-            if (! is_string($data['currentPassword'])) {
-                throw new InvalidArgumentException('Invalid Auth input [currentPassword].');
-            }
-            $validated['currentPassword'] = $data['currentPassword'];
-        }
+
         if (isset($validated['email'])) {
-            $validated['email'] = mb_strtolower(trim($validated['email']));
+            $validated['email'] = PrincipalEmailIdentity::normalize($validated['email']);
         }
-        Validator::make($validated, ['name' => ['sometimes', 'string', 'max:160'], 'email' => ['sometimes', 'email:rfc', 'max:320'], 'locale' => ['sometimes', 'string', 'regex:/^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$/'], 'timezone' => ['sometimes', 'timezone:all'], 'profile' => ['sometimes', 'array'], 'preferences' => ['sometimes', 'array'], 'currentPassword' => ['sometimes', 'string', 'max:4096']])->validate();
+        Validator::make($validated, ['name' => ['sometimes', 'string', 'max:160'], 'email' => ['sometimes', 'email:rfc', 'max:254'], 'locale' => ['sometimes', 'string', 'regex:/^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$/'], 'timezone' => ['sometimes', 'timezone:all'], 'profile' => ['sometimes', 'array'], 'preferences' => ['sometimes', 'array']])->validate();
+
+        foreach (['profile', 'preferences'] as $field) {
+            if (isset($validated[$field])) {
+                $this->validateUpdateUserAssertJsonPayloadIsBounded($validated[$field], $field);
+            }
+        }
 
         return $validated;
     }
@@ -559,14 +692,20 @@ final readonly class AuthUsers
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array{name?: string, email?: string, password?: string|null, locale?: string, timezone?: string, profile?: array<array-key, mixed>, preferences?: array<array-key, mixed>, emailVerified?: bool}
+     * @return array{name?: string, email?: string, password?: string|null, locale?: string, timezone?: string, profile?: array<array-key, mixed>, preferences?: array<array-key, mixed>, emailVerified?: bool, extensions?: array<array-key, mixed>}
      */
-    private function validateUpdateUser(array $data): array
+    private function validateUpdateUser(#[\SensitiveParameter] array $data): array
     {
-        if (array_diff(array_keys($data), ['name', 'email', 'password', 'locale', 'timezone', 'profile', 'preferences', 'emailVerified']) !== []) {
+        if (array_diff(array_keys($data), ['name', 'email', 'password', 'locale', 'timezone', 'profile', 'preferences', 'emailVerified', 'extensions']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');
         }
         $validated = [];
+        if (array_key_exists('extensions', $data)) {
+            if (! is_array($data['extensions'])) {
+                throw new InvalidArgumentException('Invalid Auth input [extensions].');
+            }
+            $validated['extensions'] = $data['extensions'];
+        }
         if (array_key_exists('name', $data)) {
             if (! is_string($data['name'])) {
                 throw new InvalidArgumentException('Invalid Auth input [name].');
@@ -618,11 +757,14 @@ final readonly class AuthUsers
         if (isset($validated['name']) && (trim($validated['name']) === '' || mb_strlen($validated['name']) > 160)) {
             throw new InvalidArgumentException('User names must contain between one and 160 characters.');
         }
+        if (isset($validated['email'])) {
+            $validated['email'] = PrincipalEmailIdentity::normalize($validated['email']);
+        }
         if (isset($validated['email']) && (filter_var($validated['email'], FILTER_VALIDATE_EMAIL) === false || mb_strlen($validated['email']) > 254)) {
             throw new InvalidArgumentException('A valid user email address is required.');
         }
-        if (isset($validated['password']) && mb_strlen($validated['password']) < 12) {
-            throw new InvalidArgumentException('User passwords must contain at least 12 characters.');
+        if (isset($validated['password'])) {
+            Validator::make($validated, ['password' => ['required', 'string', ...$this->passwordPolicy->rules()]])->validate();
         }
         if (isset($validated['locale']) && ! preg_match('/^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$/', $validated['locale'])) {
             throw new InvalidArgumentException('A valid user locale is required.');
@@ -644,7 +786,7 @@ final readonly class AuthUsers
      * @param  array<string, mixed>  $data
      * @return array{active: bool}
      */
-    private function validateUpdateUserStatus(array $data): array
+    private function validateUpdateUserStatus(#[\SensitiveParameter] array $data): array
     {
         if (array_diff(array_keys($data), ['active']) !== []) {
             throw new InvalidArgumentException('Unknown or protected Auth input fields.');

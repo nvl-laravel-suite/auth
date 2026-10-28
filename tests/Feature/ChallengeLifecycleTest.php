@@ -34,11 +34,11 @@ it('binds public login links to resolved subjects and stays neutral for unknown 
     Event::fake([AuthDeliveryRequested::class]);
     $user = $this->user();
 
-    $issued = app(AuthChallenges::class)->requestMagicLinkAuthentication(['recipient' => $user->email]);
+    $issued = app(AuthChallenges::class)->requestMagicLinkAuthentication(['recipient' => $user->email], $this->authenticationContext());
 
     expect($issued)->not->toBeNull()
         ->and($issued['challenge']->subject_id)->toBe((string) $user->getKey())
-        ->and(app(AuthChallenges::class)->requestMagicLinkAuthentication(['recipient' => 'unknown@example.test']))->toBeNull();
+        ->and(app(AuthChallenges::class)->requestMagicLinkAuthentication(['recipient' => 'unknown@example.test'], $this->authenticationContext()))->toBeNull();
 
     Event::assertDispatchedTimes(AuthDeliveryRequested::class, 1);
     Event::assertDispatched(

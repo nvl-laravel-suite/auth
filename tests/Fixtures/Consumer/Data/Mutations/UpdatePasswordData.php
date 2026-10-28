@@ -23,9 +23,6 @@ final class UpdatePasswordData extends Data
     public function __construct(
         #[Hidden]
         #[SensitiveParameter]
-        public readonly string $currentPassword,
-        #[Hidden]
-        #[SensitiveParameter]
         public readonly string $password,
         #[Hidden]
         #[SensitiveParameter]
@@ -36,7 +33,6 @@ final class UpdatePasswordData extends Data
     public static function rules(): array
     {
         return [
-            'currentPassword' => ['required', 'string', 'max:4096'],
             'password' => ['required', 'string', 'min:8', 'max:4096', 'confirmed'],
         ];
     }

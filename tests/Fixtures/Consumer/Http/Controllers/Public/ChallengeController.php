@@ -8,10 +8,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Timebox;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
-use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Services\AuthChallenges;
 use Nvl\Auth\Services\AuthenticationSessions;
-use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 
 /** Host transport fixture: validation, throttling, sessions and response secrecy. */
 final class ChallengeController
@@ -19,22 +18,18 @@ final class ChallengeController
     public function requestMagicLink(Request $request, AuthChallenges $challenges, Timebox $timebox): JsonResponse
     {
         $data = $request->validate(['recipient' => ['required', 'email'], 'purpose' => ['sometimes', 'string']]);
-        $timebox->dontReturnEarly()->call(fn () => $challenges->requestMagicLinkAuthentication($data, $request->getPreferredLanguage()), 200000);
+        $timebox->dontReturnEarly()->call(fn () => $challenges->requestMagicLinkAuthentication($data, $this->context($request), $request->getPreferredLanguage()), 200000);
 
         return $this->response('magic_link_requested', 202);
     }
 
     public function consumeMagicLink(Request $request, AuthChallenges $challenges, AuthenticationSessions $sessions, AuthSubjectResolver $subjects): JsonResponse
     {
+        $sessions->assertCanTransition();
         $data = $request->validate(['recipient' => ['nullable', 'email'], 'token' => ['required', 'string'], 'challengeId' => ['nullable', 'string']]);
-        $challenge = $challenges->consumeMagicLink(['recipient' => null, ...$data]);
-        if (is_string($challenge->subject_type) && is_string($challenge->subject_id)) {
-            $subject = $subjects->resolve(new SubjectReference($challenge->subject_type, $challenge->subject_id));
-            if ($subject === null) {
-                throw new AuthException('subject_unavailable', 'The authentication subject is unavailable.', 404);
-            }
-            $sessions->establish($subject, auth()->guard('web'), $request->session());
-        }
+        $context = $this->context($request);
+        $proof = $challenges->consumeMagicLinkAuthentication(['recipient' => null, ...$data], $context);
+        $sessions->establishFromProof($proof->reveal(), auth()->guard('web'), $request->session(), $context);
 
         return $this->response('magic_link_consumed');
     }
@@ -56,16 +51,21 @@ final class ChallengeController
     public function requestSecurityCodeAuthentication(Request $request, AuthChallenges $challenges, Timebox $timebox): JsonResponse
     {
         $data = $request->validate(['recipient' => ['required', 'email'], 'purpose' => ['required', 'string']]);
-        $timebox->dontReturnEarly()->call(fn () => $challenges->requestSecurityCodeAuthentication($data, $request->getPreferredLanguage()), 200000);
+        $timebox->dontReturnEarly()->call(fn () => $challenges->requestSecurityCodeAuthentication($data, $this->context($request), $request->getPreferredLanguage()), 200000);
 
         return $this->response('security_code_authentication_requested', 202);
     }
 
     public function verifySecurityCodeAuthentication(Request $request, AuthChallenges $challenges): JsonResponse
     {
-        $challenge = $challenges->verifySecurityCodeAuthentication($request->validate(['recipient' => ['required', 'email'], 'purpose' => ['required', 'string'], 'code' => ['required', 'string']]), auth()->guard('web'), $request->session());
+        $challenge = $challenges->verifySecurityCodeAuthentication($request->validate(['recipient' => ['required', 'email'], 'purpose' => ['required', 'string'], 'code' => ['required', 'string']]), auth()->guard('web'), $request->session(), $this->context($request));
 
-        return $this->response('security_code_authenticated', data: ['challenge_id' => $challenge->identifier()]);
+        return $this->response('security_code_authenticated', data: ['subject_id' => (string) $challenge->getAuthIdentifier()]);
+    }
+
+    private function context(Request $request): AuthenticationRequestContext
+    {
+        return new AuthenticationRequestContext(guardName: 'web', sessionBinding: $request->session()->getId());
     }
 
     /** @param array<string, string>|null $data */

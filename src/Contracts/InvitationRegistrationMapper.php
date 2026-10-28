@@ -12,10 +12,10 @@ use Nvl\Auth\Models\Invitation;
 interface InvitationRegistrationMapper
 {
     /**
-     * Return model-ready attributes, including any host-owned extension fields.
+     * Return model-ready attributes, for canonical invitation registration fields. Host extensions are separately validated by PrincipalExtensionMapper.
      *
      * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
-    public function map(Invitation $invitation, array $validated): array;
+    public function map(Invitation $invitation, #[\SensitiveParameter] array $validated): array;
 }

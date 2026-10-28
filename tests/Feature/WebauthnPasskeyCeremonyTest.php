@@ -6,6 +6,7 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Route;
 use Nvl\Auth\Adapters\Passkeys\WebauthnPasskeyCeremony;
 use Nvl\Auth\Contracts\PasskeyCeremony;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthPasskeys;
@@ -24,7 +25,7 @@ beforeEach(function (): void {
 
 it('provides complete browser registration options through the built-in adapter', function (): void {
     $user = $this->user();
-    $registration = app(AuthPasskeys::class)->beginRegistration($user);
+    $registration = app(AuthPasskeys::class)->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
     $adapter = app(PasskeyCeremony::class);
 
     expect($adapter)->toBeInstanceOf(WebauthnPasskeyCeremony::class)
@@ -52,18 +53,14 @@ it('provides complete browser registration options through the built-in adapter'
 it('registers and authenticates a real ES256 WebAuthn credential end to end', function (): void {
     $user = $this->user();
     $authenticator = new TestWebauthnAuthenticator;
-    $registration = app(AuthPasskeys::class)->beginRegistration($user);
-    $passkey = app(AuthPasskeys::class)->finishRegistration(
-        $user,
-        ['ceremonyId' => $registration->ceremonyId, 'response' => $authenticator->registrationResponse($registration->options), 'name' => 'Platform authenticator']
-    );
-    $authentication = app(AuthPasskeys::class)->beginAuthentication();
+    $registration = app(AuthPasskeys::class)->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $passkey = app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => $authenticator->registrationResponse($registration->options), 'name' => 'Platform authenticator'], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $authentication = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
     $completed = app(AuthPasskeys::class)->finishAuthentication(
         ['ceremonyId' => $authentication->ceremonyId, 'response' => $authenticator->authenticationResponse(
             $authentication->options,
             $registration->options['user']['id']
-        )]
-    );
+        )], sessionBinding: app('session.store')->getId());
 
     expect($passkey->credential_id)->toBe($authenticator->credentialId())
         ->and($passkey->transports)->toBe(['internal'])
@@ -76,15 +73,11 @@ it('registers and authenticates a real ES256 WebAuthn credential end to end', fu
 it('supports subject-scoped assertions without a returned user handle', function (): void {
     $user = $this->user();
     $authenticator = new TestWebauthnAuthenticator;
-    $registration = app(AuthPasskeys::class)->beginRegistration($user);
-    app(AuthPasskeys::class)->finishRegistration(
-        $user,
-        ['ceremonyId' => $registration->ceremonyId, 'response' => $authenticator->registrationResponse($registration->options)]
-    );
-    $authentication = app(AuthPasskeys::class)->beginAuthentication($user);
+    $registration = app(AuthPasskeys::class)->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => $authenticator->registrationResponse($registration->options)], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $authentication = app(AuthPasskeys::class)->beginAuthentication($user, context: $this->authenticationContext());
     $completed = app(AuthPasskeys::class)->finishAuthentication(
-        ['ceremonyId' => $authentication->ceremonyId, 'response' => $authenticator->authenticationResponse($authentication->options, null)]
-    );
+        ['ceremonyId' => $authentication->ceremonyId, 'response' => $authenticator->authenticationResponse($authentication->options, null)], sessionBinding: app('session.store')->getId());
 
     expect($authentication->options['allowCredentials'])->toHaveCount(1)
         ->and($completed['subject']->identifier)->toBe((string) $user->getKey());
@@ -93,19 +86,15 @@ it('supports subject-scoped assertions without a returned user handle', function
 it('accepts authenticators that do not implement signature counters', function (): void {
     $user = $this->user();
     $authenticator = new TestWebauthnAuthenticator;
-    $registration = app(AuthPasskeys::class)->beginRegistration($user);
-    $passkey = app(AuthPasskeys::class)->finishRegistration(
-        $user,
-        ['ceremonyId' => $registration->ceremonyId, 'response' => $authenticator->registrationResponse($registration->options)]
-    );
-    $authentication = app(AuthPasskeys::class)->beginAuthentication();
+    $registration = app(AuthPasskeys::class)->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $passkey = app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => $authenticator->registrationResponse($registration->options)], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $authentication = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
     $completed = app(AuthPasskeys::class)->finishAuthentication(
         ['ceremonyId' => $authentication->ceremonyId, 'response' => $authenticator->authenticationResponse(
             $authentication->options,
             $registration->options['user']['id'],
             signatureCounter: 0,
-        )]
-    );
+        )], sessionBinding: app('session.store')->getId());
 
     expect($completed['subject']->identifier)->toBe((string) $user->getKey())
         ->and($passkey->refresh()->signature_counter)->toBe(0);
@@ -114,12 +103,9 @@ it('accepts authenticators that do not implement signature counters', function (
 it('rejects wrong origins and invalid assertion signatures behind stable errors', function (): void {
     $user = $this->user();
     $authenticator = new TestWebauthnAuthenticator;
-    $registration = app(AuthPasskeys::class)->beginRegistration($user);
-    app(AuthPasskeys::class)->finishRegistration(
-        $user,
-        ['ceremonyId' => $registration->ceremonyId, 'response' => $authenticator->registrationResponse($registration->options)]
-    );
-    $wrongOrigin = app(AuthPasskeys::class)->beginAuthentication();
+    $registration = app(AuthPasskeys::class)->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => $authenticator->registrationResponse($registration->options)], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $wrongOrigin = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
 
     try {
         app(AuthPasskeys::class)->finishAuthentication(
@@ -127,8 +113,7 @@ it('rejects wrong origins and invalid assertion signatures behind stable errors'
                 $wrongOrigin->options,
                 $registration->options['user']['id'],
                 origin: 'https://attacker.example',
-            )]
-        );
+            )], sessionBinding: app('session.store')->getId());
 
         throw new RuntimeException('The wrong WebAuthn origin was accepted.');
     } catch (AuthException $exception) {
@@ -136,54 +121,46 @@ it('rejects wrong origins and invalid assertion signatures behind stable errors'
             ->and($exception->getMessage())->not->toContain('origin');
     }
 
-    $invalidSignature = app(AuthPasskeys::class)->beginAuthentication();
+    $invalidSignature = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
 
     expect(fn () => app(AuthPasskeys::class)->finishAuthentication(
         ['ceremonyId' => $invalidSignature->ceremonyId, 'response' => $authenticator->authenticationResponse(
             $invalidSignature->options,
             $registration->options['user']['id'],
             validSignature: false,
-        )]
-    ))->toThrow(
-        AuthException::class,
-        'The passkey assertion was rejected.',
-    );
+        )], sessionBinding: app('session.store')->getId()))->toThrow(
+            AuthException::class,
+            'The passkey assertion was rejected.',
+        );
 });
 
 it('rejects invalid challenges RP hashes and required user verification', function (): void {
     $authenticator = new TestWebauthnAuthenticator;
     $unverifiedUser = $this->user('unverified-passkey@example.test');
-    $unverifiedRegistration = app(AuthPasskeys::class)->beginRegistration($unverifiedUser);
+    $unverifiedRegistration = app(AuthPasskeys::class)->beginRegistration($unverifiedUser, grant: $this->recentGrant($unverifiedUser, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
 
-    expect(fn () => app(AuthPasskeys::class)->finishRegistration(
-        $unverifiedUser,
-        ['ceremonyId' => $unverifiedRegistration->ceremonyId, 'response' => $authenticator->registrationResponse(
-            $unverifiedRegistration->options,
-            userVerified: false,
-        )]
-    ))->toThrow(AuthException::class, 'The passkey registration was rejected.');
+    expect(fn () => app(AuthPasskeys::class)->finishRegistration($unverifiedUser, ['ceremonyId' => $unverifiedRegistration->ceremonyId, 'response' => $authenticator->registrationResponse(
+        $unverifiedRegistration->options,
+        userVerified: false,
+    )], grant: $this->recentGrant($unverifiedUser, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext()))->toThrow(AuthException::class, 'The passkey registration was rejected.');
 
     $user = $this->user();
-    $registration = app(AuthPasskeys::class)->beginRegistration($user);
-    app(AuthPasskeys::class)->finishRegistration(
-        $user,
-        ['ceremonyId' => $registration->ceremonyId, 'response' => $authenticator->registrationResponse($registration->options)]
-    );
+    $registration = app(AuthPasskeys::class)->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => $authenticator->registrationResponse($registration->options)], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
 
     foreach ([
         ['challengeOverride' => 'aW52YWxpZC1jaGFsbGVuZ2U'],
         ['relyingPartyIdOverride' => 'attacker.example'],
         ['userVerified' => false],
     ] as $overrides) {
-        $authentication = app(AuthPasskeys::class)->beginAuthentication();
+        $authentication = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
 
         expect(fn () => app(AuthPasskeys::class)->finishAuthentication(
             ['ceremonyId' => $authentication->ceremonyId, 'response' => $authenticator->authenticationResponse(
                 $authentication->options,
                 $registration->options['user']['id'],
                 ...$overrides,
-            )]
-        ))->toThrow(AuthException::class, 'The passkey assertion was rejected.');
+            )], sessionBinding: app('session.store')->getId()))->toThrow(AuthException::class, 'The passkey assertion was rejected.');
     }
 });
 
@@ -205,6 +182,8 @@ it('serves the complete built-in registration and authentication HTTP flow', fun
     $user = $this->user();
     $authenticator = new TestWebauthnAuthenticator;
     $this->actingAs($user, 'web');
+    $this->withCredentials()->withCookie(config('session.cookie'), app('session.store')->getId());
+    $this->withHeader('X-Recent-Authentication', $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment)->reveal());
     $registration = $this->postJson('/nvl/api/v1/auth/passkeys/registration/options')
         ->assertOk()
         ->assertJsonPath('code', 'passkey_registration_started');
@@ -214,6 +193,7 @@ it('serves the complete built-in registration and authentication HTTP flow', fun
     expect($registrationOptions)->toBeArray()
         ->and($registrationId)->toBeString();
 
+    $this->withHeader('X-Recent-Authentication', $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment)->reveal());
     $this->postJson('/nvl/api/v1/auth/passkeys/registration', [
         'ceremonyId' => $registrationId,
         'response' => $authenticator->registrationResponse($registrationOptions),
@@ -223,6 +203,7 @@ it('serves the complete built-in registration and authentication HTTP flow', fun
     $authentication = $this->postJson('/nvl/api/v1/auth/passkeys/authentication/options')
         ->assertOk()
         ->assertJsonPath('code', 'passkey_authentication_started');
+    $this->withCredentials()->withCookie(config('session.cookie'), app('session.store')->getId());
     $authenticationOptions = $authentication->json('data.options');
     $authenticationId = $authentication->json('data.ceremony_id');
 

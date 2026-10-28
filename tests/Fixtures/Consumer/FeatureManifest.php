@@ -40,6 +40,7 @@ final class FeatureManifest
             FeatureOperation::Cleanup,
         ];
         $definitions = [
+            new FeatureDefinition(AuthFeature::Registration, [FeatureOperation::Read, FeatureOperation::Issue], [AuthFeature::Authentication, AuthFeature::PrincipalManagement]),
             new FeatureDefinition(
                 AuthFeature::Authentication,
                 $readWrite,
@@ -88,7 +89,7 @@ final class FeatureManifest
                 $readWrite,
                 [AuthFeature::Authentication],
                 ['public' => 'passwords', 'account' => 'passwords'],
-                ['public' => ['password.request', 'password.reset'], 'account' => ['password.update', 'password.confirm']],
+                ['public' => ['password.request', 'password.reset'], 'account' => ['password.update', 'password.confirm', 'reauthenticate']],
                 ['account' => [AuthFeature::Sessions]],
             ),
             new FeatureDefinition(

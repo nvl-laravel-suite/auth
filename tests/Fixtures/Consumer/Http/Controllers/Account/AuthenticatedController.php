@@ -7,7 +7,9 @@ namespace Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Account;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Services\AuthBrowserSessions;
 use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Concerns\InteractsWithValidatedInput;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 
 /**
  * Resolves the account surface's authenticated host subject.
@@ -15,6 +17,19 @@ use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Concerns\InteractsWithVali
 abstract class AuthenticatedController
 {
     use InteractsWithValidatedInput;
+
+    protected function recentGrant(Request $request): ?string
+    {
+        return $request->header('X-Recent-Authentication');
+    }
+
+    protected function authenticationContext(Request $request): AuthenticationRequestContext
+    {
+        $guard = config('nvl-auth.guard', 'web');
+        $key = AuthBrowserSessions::bindingKey($guard);
+
+        return new AuthenticationRequestContext(guardName: $guard, sessionBinding: $request->session()->getId(), browserSessionId: $request->session()->get($key.'-id'), browserBinding: $request->session()->get($key));
+    }
 
     /**
      * Require an authenticated request subject.

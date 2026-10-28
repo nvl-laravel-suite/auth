@@ -23,6 +23,7 @@ final readonly class MutationAuthorizer
         private ManagementAuthorizer $management,
         private SystemMutationAccess $systems,
         private AuthOperationBoundary $operations,
+        private AuthExecutionContext $execution,
     ) {}
 
     /**
@@ -33,6 +34,7 @@ final readonly class MutationAuthorizer
         string $ability,
         mixed $target = null,
     ): ?Authenticatable {
+        $this->execution->assertNativeMutationAllowed();
         if (str_starts_with($ability, 'nvl.auth.users.')) {
             $this->operations->requirePlatformAdministration();
         }

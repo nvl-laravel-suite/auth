@@ -6,18 +6,21 @@ namespace Nvl\Auth\Adapters\Laravel;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
-use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
+use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
+use Nvl\Auth\Contracts\SecurityTokenContainment;
 use Nvl\Auth\Exceptions\AuthException;
-use Nvl\Auth\Services\AuthModelRegistry;
+use Nvl\Auth\Models\BrowserSession;
+use Nvl\Auth\Models\RememberCredential;
+use Nvl\Auth\Services\PrincipalSecurity;
+use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
-use Nvl\Support\Ownership\Contracts\OwnershipReadiness;
 
 /**
- * Contains Sanctum tokens, remember credentials, and Laravel database sessions.
+ * Contains native tokens, remember credentials and managed browser authority.
  */
 final readonly class LaravelPrincipalSessionContainment implements PrincipalSessionContainment
 {
@@ -26,9 +29,8 @@ final readonly class LaravelPrincipalSessionContainment implements PrincipalSess
      */
     public function __construct(
         private ConfigRepository $configuration,
-        private DatabaseManager $database,
-        private OwnershipReadiness $readiness,
-        private AuthModelRegistry $models,
+        private ApiTokenManager $tokens,
+        private PrincipalSecurity $security,
     ) {}
 
     /**
@@ -43,52 +45,36 @@ final readonly class LaravelPrincipalSessionContainment implements PrincipalSess
             throw AuthException::invalidConfiguration('Session containment requires an Eloquent principal.');
         }
 
-        if (method_exists($principal, 'tokens')) {
-            $tokens = (new \ReflectionMethod($principal, 'tokens'))->invoke($principal);
-            if (! $tokens instanceof MorphMany) {
+        $principal->getConnection()->transaction(function () use ($principal): void {
+            $this->security->lock($principal);
+            if ($this->configuration->get('nvl-auth.features.managed_sessions.enabled') === true) {
+                $sessions = new BrowserSession;
+                if ($sessions->getConnection() !== $principal->getConnection()) {
+                    throw AuthException::invalidConfiguration('Managed session containment requires one source.');
+                }
+                $reference = SubjectReference::fromAuthenticatable($principal);
+                $sessions->newQuery()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+                RememberCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+            }
+            if (method_exists($principal, 'tokens') && ! (new \ReflectionMethod($principal, 'tokens'))->invoke($principal) instanceof MorphMany) {
                 throw AuthException::invalidConfiguration('Session containment requires a Sanctum token relationship.');
             }
-            if ($this->configuration->get('nvl-auth.ownership.scoped') === true) {
-                $this->readiness->assertActive('auth.tokens');
-                $class = $this->models->personalAccessTokenClass();
-                $model = new $class;
-                if ($tokens->getRelated()::class !== $class || $tokens->getRelated()->getConnection() !== $model->getConnection() || $tokens->getRelated()->getTable() !== $model->getTable()) {
-                    throw AuthException::invalidConfiguration('Global containment requires canonical token storage.');
+            if ($this->configuration->get('nvl-auth.features.api_tokens.enabled') === true) {
+                $tokens = $this->tokens;
+                if (! $tokens instanceof SecurityTokenContainment || $tokens->connection($principal) !== $principal->getConnection()) {
+                    throw AuthException::invalidConfiguration('Account containment requires same-source SecurityTokenContainment.');
                 }
-                $model->getConnection()->table($model->getTable())->where('tokenable_type', $principal->getMorphClass())->where('tokenable_id', $principal->getKey())->delete();
-            } else {
-                $tokens->delete();
+                $tokens->revokeForSecurity($principal);
             }
-        }
 
-        $rememberTokenName = $principal->getRememberTokenName();
+            $rememberTokenName = $principal->getRememberTokenName();
 
-        if ($rememberTokenName !== '') {
-            $principal->setRememberToken(Str::random(60));
-            $principal->saveQuietly();
-        }
+            if ($rememberTokenName !== '') {
+                $principal->setRememberToken(Str::random(60));
+                $principal->saveQuietly();
+            }
 
-        if ($this->configuration->get('session.driver') !== 'database') {
-            return;
-        }
-
-        $table = $this->configuration->get('session.table', 'sessions');
-        $connection = $this->configuration->get('session.connection');
-
-        if (! is_string($table) || trim($table) === '') {
-            throw AuthException::invalidConfiguration('Laravel database session containment requires a session table.');
-        }
-
-        $connection = is_string($connection) && trim($connection) !== '' ? trim($connection) : null;
-        $identifier = $principal->getAuthIdentifier();
-
-        if (! is_string($identifier) && ! is_int($identifier)) {
-            throw AuthException::invalidConfiguration('Session containment requires a string-compatible principal identifier.');
-        }
-
-        $this->database->connection($connection)
-            ->table(trim($table))
-            ->where('user_id', (string) $identifier)
-            ->delete();
+        });
+        // Laravel expiry/GC owns physical payload cleanup; native revision/registry owns denial.
     }
 }

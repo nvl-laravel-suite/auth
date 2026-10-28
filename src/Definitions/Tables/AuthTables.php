@@ -11,6 +11,16 @@ use Nvl\Support\Config\PackageStorage;
  */
 final class AuthTables
 {
+    public const string Impersonations = 'nvl_auth_impersonations';
+
+    public const string RememberCredentials = 'nvl_auth_remember_credentials';
+
+    public const string BrowserSessions = 'nvl_auth_browser_sessions';
+
+    public const string PendingEmailChanges = 'nvl_auth_pending_email_changes';
+
+    public const string PrincipalSecurityStates = 'nvl_auth_principal_security_states';
+
     public const string Users = 'nvl_auth_users';
 
     public const string Roles = 'nvl_auth_roles';

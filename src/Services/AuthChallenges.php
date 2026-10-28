@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Nvl\Auth\Services;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Contracts\Session\Session;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -16,6 +18,8 @@ use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthIdentifierResolver;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Enums\AuthenticationDestination;
+use Nvl\Auth\Enums\AuthenticationMethod;
 use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
@@ -23,9 +27,13 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
+use Nvl\Auth\Traits\IssuesAuthenticationProofs;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
+use Nvl\Auth\ValueObjects\IssuedAuthenticationProof;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Events\DomainEventDispatcher;
+use Throwable;
 
 /**
  * Complete native AuthChallenges operations.
@@ -34,8 +42,10 @@ use Nvl\Support\Events\DomainEventDispatcher;
  */
 final readonly class AuthChallenges
 {
+    use IssuesAuthenticationProofs;
+
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private AuthSubjectResolver $subjects, private AuthenticationSessions $sessions, private AuthIdentityChallenges $records, private OpaqueTokenFactory $tokens, private SecretHasher $hasher, private AuthAuditRecorder $audits, private DomainEventDispatcher $domainEvents, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private AuthIdentifierResolver $identifiers) {}
+    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private AuthSubjectResolver $subjects, private AuthenticationSessions $sessions, private AuthIdentityChallenges $records, private OpaqueTokenFactory $tokens, private SecretHasher $hasher, private AuthAuditRecorder $audits, private DomainEventDispatcher $domainEvents, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private AuthIdentifierResolver $identifiers, private PrincipalSecurity $security, private AuthCommittedAudit $committedAudits) {}
 
     /**
      * Issue a token or numeric-code challenge.
@@ -52,6 +62,7 @@ final readonly class AuthChallenges
             AuthMessageType::SecurityCode => AuthFeature::SecurityCodes,
             AuthMessageType::PasswordReset => AuthFeature::Password,
             AuthMessageType::EmailVerification => AuthFeature::EmailVerification,
+            default => null,
         } !== $feature) {
             throw new AuthException('challenge_invalid', 'The authentication challenge is invalid or expired.', 422);
         }
@@ -104,6 +115,7 @@ final readonly class AuthChallenges
             AuthMessageType::SecurityCode => AuthFeature::SecurityCodes,
             AuthMessageType::PasswordReset => AuthFeature::Password,
             AuthMessageType::EmailVerification => AuthFeature::EmailVerification,
+            default => null,
         } !== $feature) {
             throw new AuthException('challenge_invalid', 'The authentication challenge is invalid or expired.', 422);
         }
@@ -153,6 +165,7 @@ final readonly class AuthChallenges
             AuthMessageType::SecurityCode => AuthFeature::SecurityCodes,
             AuthMessageType::PasswordReset => AuthFeature::Password,
             AuthMessageType::EmailVerification => AuthFeature::EmailVerification,
+            default => null,
         } !== $feature) {
             throw new AuthException('challenge_invalid', 'The authentication challenge is invalid or expired.', 422);
         }
@@ -223,20 +236,14 @@ final readonly class AuthChallenges
      * @param  array<string, mixed>  $data
      * @return array{challenge: Challenge, secret: string, fallbackCode: string|null}|null
      */
-    public function requestMagicLinkAuthentication(array $data, ?string $locale = null): ?array
+    public function requestMagicLinkAuthentication(array $data, AuthenticationRequestContext $context, ?string $locale = null): ?array
     {
-        $this->features->assertAllowed(AuthFeature::MagicLinks, FeatureOperation::Issue);
         $data = $this->validateRequestMagicLink($data);
-        $identifierName = $this->principalAttributes->identifierColumn($this->configuration->string('identifier', 'email'));
-        $subject = $this->identifiers->resolve($identifierName, $data['recipient']);
-        if ($subject === null) {
-            $this->audits->record('magic_links.requested', metadata: ['matched' => false]);
 
-            return null;
-        }
-        $reference = SubjectReference::fromAuthenticatable($subject);
-        $issued = $this->requestMagicLink($data, subject: $reference, locale: $locale);
-        $this->audits->record('magic_links.requested', subject: $reference, metadata: ['matched' => true, 'challenge_id' => $issued['challenge']->identifier()]);
+        $issued = $this->issueNativeEmail($data['recipient'], AuthenticationMethod::EmailLink, $context, $locale);
+        $reference = $issued === null ? null : new SubjectReference((string) $issued['challenge']->subject_type, (string) $issued['challenge']->subject_id);
+        $metadata = $issued === null ? ['matched' => false] : ['matched' => true, 'challenge_id' => $issued['challenge']->identifier()];
+        $this->committedAudits->withRecorder($this->audits)->record((new Challenge)->getConnection(), 'magic_links.requested', subject: $reference, metadata: $metadata);
 
         return $issued;
     }
@@ -260,22 +267,14 @@ final readonly class AuthChallenges
      * @param  array<string, mixed>  $data
      * @return array{challenge: Challenge, secret: string, fallbackCode: string|null}|null
      */
-    public function requestSecurityCodeAuthentication(array $data, ?string $locale = null): ?array
+    public function requestSecurityCodeAuthentication(array $data, AuthenticationRequestContext $context, ?string $locale = null): ?array
     {
-        $this->features->assertAllowed(AuthFeature::SecurityCodes, FeatureOperation::Issue);
         $data = $this->validateRequestSecurityCode($data);
         if ($data['purpose'] !== AuthenticationPurpose::PasswordlessLogin->value) {
             throw new AuthException('security_code_authentication_purpose_invalid', 'Security-code authentication requires the passwordless login purpose.', 422);
         }
-        $identifierName = $this->principalAttributes->identifierColumn($this->configuration->string('identifier', 'email'));
-        $subject = $this->identifiers->resolve($identifierName, $data['recipient']);
-        if ($subject === null) {
-            return null;
-        }
-        $reference = SubjectReference::fromAuthenticatable($subject);
-        $issued = $this->requestSecurityCode($data, $reference, locale: $locale);
 
-        return $issued;
+        return $this->issueNativeEmail($data['recipient'], AuthenticationMethod::EmailCode, $context, $locale);
     }
 
     /**
@@ -383,24 +382,145 @@ final readonly class AuthChallenges
         return $data;
     }
 
-    /** Verify a passwordless code and complete an explicitly supplied host session.
-     * @param  array{recipient: string, purpose: string, code: string}  $data
-     */
-    public function verifySecurityCodeAuthentication(array $data, StatefulGuard $guard, Session $session): Challenge
+    /** @param array<string, mixed> $data */
+    public function consumeMagicLinkAuthentication(#[\SensitiveParameter] array $data, AuthenticationRequestContext $context): IssuedAuthenticationProof
     {
+        $data = $this->validateConsumeMagicLink($data);
+
+        return $this->consumeNativeEmail(AuthenticationMethod::EmailLink, $context, $data['token'], $data['recipient'], $data['challengeId']);
+    }
+
+    /** @param array<string, mixed> $data */
+    public function proveSecurityCodeAuthentication(#[\SensitiveParameter] array $data, AuthenticationRequestContext $context): IssuedAuthenticationProof
+    {
+        $data = $this->validateVerifySecurityCode($data);
         if ($data['purpose'] !== AuthenticationPurpose::PasswordlessLogin->value) {
             throw new AuthException('security_code_authentication_purpose_invalid', 'Security-code authentication requires the passwordless login purpose.', 422);
         }
-        $challenge = $this->verifySecurityCode($data);
-        if (! is_string($challenge->subject_type) || ! is_string($challenge->subject_id)) {
-            throw new AuthException('subject_unavailable', 'The authentication subject is unavailable.', 404);
-        }
-        $subject = $this->subjects->resolve(new SubjectReference($challenge->subject_type, $challenge->subject_id));
-        if ($subject === null) {
-            throw new AuthException('subject_unavailable', 'The authentication subject is unavailable.', 404);
-        }
-        $this->sessions->establish($subject, $guard, $session);
 
-        return $challenge;
+        return $this->consumeNativeEmail(AuthenticationMethod::EmailCode, $context, $data['code'], $data['recipient']);
+    }
+
+    /** Verify native delivery and complete the consumer-supplied browser transport.
+     * @param  array<string, mixed>  $data
+     */
+    public function verifySecurityCodeAuthentication(#[\SensitiveParameter] array $data, StatefulGuard $guard, Session $session, AuthenticationRequestContext $context): Authenticatable
+    {
+        $this->sessions->assertCanTransition();
+        $proof = $this->proveSecurityCodeAuthentication($data, $context);
+
+        return $this->sessions->establishFromProof($proof->reveal(), $guard, $session, $context);
+    }
+
+    /** @return array{challenge: Challenge, secret: string, fallbackCode: string|null}|null */
+    private function issueNativeEmail(string $recipient, AuthenticationMethod $method, AuthenticationRequestContext $context, ?string $locale): ?array
+    {
+        $context->assertBound(AuthenticationDestination::Session);
+        $feature = $method === AuthenticationMethod::EmailLink ? AuthFeature::MagicLinks : AuthFeature::SecurityCodes;
+        $message = $method === AuthenticationMethod::EmailLink ? AuthMessageType::MagicLink : AuthMessageType::SecurityCode;
+        $this->features->assertAllowed($feature, FeatureOperation::Issue);
+        $subject = $this->identifiers->resolve($this->principalAttributes->identifierColumn($this->configuration->string('identifier', 'email')), $recipient);
+        if ($subject === null) {
+            return null;
+        }
+        if (! $subject instanceof Model || $subject->getConnection() !== (new Challenge)->getConnection()) {
+            throw AuthException::invalidConfiguration('Native delivery and principal require one source.');
+        }
+
+        return $subject->getConnection()->transaction(function () use ($subject, $recipient, $method, $context, $locale, $feature, $message): array {
+            $revision = $this->security->lock($subject)->revision;
+            $this->security->lockChallenges($subject);
+            $reference = SubjectReference::fromAuthenticatable($subject);
+            $recipient = mb_strtolower(trim($recipient));
+            $recipientHash = $this->hasher->hash('native-email-recipient', $recipient);
+            $type = 'native_'.$method->value;
+            $digits = $this->configuration->integerBetween('features.'.$feature->value.'.settings.'.($method === AuthenticationMethod::EmailLink ? 'fallback_code_digits' : 'digits'), 6, 4, 10);
+            $ttlMinutes = $this->configuration->integerBetween('features.'.$feature->value.'.settings.ttl_minutes', $method === AuthenticationMethod::EmailLink ? 15 : 10, 1, 10080);
+            $maximumAttempts = $this->configuration->integerBetween('features.'.$feature->value.'.settings.max_attempts', 5, 1, 100);
+            $secret = $method === AuthenticationMethod::EmailLink ? bin2hex(random_bytes(32)) : str_pad((string) random_int(0, 10 ** $digits - 1), $digits, '0', STR_PAD_LEFT);
+            $fallback = $method === AuthenticationMethod::EmailLink ? str_pad((string) random_int(0, 10 ** $digits - 1), $digits, '0', STR_PAD_LEFT) : null;
+            $expiresAt = CarbonImmutable::now('UTC')->addMinutes($ttlMinutes);
+            $active = $this->nativeEmailKey($type, $recipientHash, $context);
+            $secretNamespace = (string) Str::uuid();
+            $this->records->query()->where('active_key', $active)->update(['active_key' => null, 'revoked_at' => now()]);
+            $challenge = $this->records->create(['type' => $type, 'purpose' => $method->purpose()->value, 'subject_type' => $reference->type, 'subject_id' => $reference->identifier,
+                'recipient_hash' => $recipientHash, 'secret_hash' => $this->hasher->hash($type.':'.$secretNamespace, $secret), 'secondary_secret_hash' => $fallback === null ? null : $this->hasher->hash($type.':'.$secretNamespace, $fallback),
+                'active_key' => $active, 'payload' => ['revision' => $revision, 'context' => $context->facts(), 'secretNamespace' => $secretNamespace], 'max_attempts' => $maximumAttempts, 'expires_at' => $expiresAt]);
+            $this->domainEvents->dispatch(new AuthDeliveryRequested(new AuthDeliveryRequest(messageId: (string) Str::uuid(), feature: $feature, type: $message, recipient: $recipient,
+                payload: ['challenge_id' => $challenge->identifier(), 'secret' => $secret, 'code' => $fallback, 'purpose' => $method->purpose()->value], expiresAt: $expiresAt, locale: $locale,
+                metadata: ['challenge_id' => $challenge->identifier()], subject: $reference), $this->deliveryContext->capture(true)), $challenge->getConnection());
+            $this->committedAudits->withRecorder($this->audits)->record($challenge->getConnection(), $feature->value.'.issued', subject: $reference, metadata: ['challenge_id' => $challenge->identifier(), 'purpose' => $method->purpose()->value]);
+
+            return ['challenge' => $challenge, 'secret' => $secret, 'fallbackCode' => $fallback];
+        });
+    }
+
+    private function consumeNativeEmail(AuthenticationMethod $method, AuthenticationRequestContext $context, #[\SensitiveParameter] string $secret, ?string $recipient, ?string $challengeId = null): IssuedAuthenticationProof
+    {
+        $context->assertBound(AuthenticationDestination::Session);
+        $this->features->assertAllowed($method === AuthenticationMethod::EmailLink ? AuthFeature::MagicLinks : AuthFeature::SecurityCodes, FeatureOperation::Use);
+        $type = 'native_'.$method->value;
+        $query = $this->records->query()->where('type', $type)->whereNull('consumed_at')->whereNull('revoked_at');
+        if ($challengeId !== null) {
+            $query->whereKey($challengeId);
+        } else {
+            $recipientHash = $this->hasher->hash('native-email-recipient', mb_strtolower(trim((string) $recipient)));
+            $query->where('active_key', $this->nativeEmailKey($type, $recipientHash, $context));
+        }
+        $snapshot = $query->latest()->first();
+        if (! $snapshot instanceof Challenge || ! is_string($snapshot->subject_type) || ! is_string($snapshot->subject_id)) {
+            $this->recordNativeEmailFailure($method, $challengeId);
+            throw new AuthException('challenge_invalid', 'The authentication challenge is invalid or expired.', 422);
+        }
+        $reference = new SubjectReference($snapshot->subject_type, $snapshot->subject_id);
+        $subject = $this->subjects->resolve($reference);
+        if (! $subject instanceof Model || SubjectReference::fromAuthenticatable($subject) != $reference || $subject->getConnection() !== $snapshot->getConnection()) {
+            $this->recordNativeEmailFailure($method, $challengeId);
+            throw new AuthException('challenge_invalid', 'The authentication challenge is invalid or expired.', 422);
+        }
+        $result = $subject->getConnection()->transaction(function () use ($subject, $snapshot, $context, $method, $type, $secret): IssuedAuthenticationProof|Throwable {
+            $revision = $this->security->lock($subject)->revision;
+            $this->security->lockChallenges($subject);
+            $challenge = $this->records->query()->whereKey($snapshot->identifier())->where('type', $type)->lockForUpdate()->first();
+            if (! $challenge instanceof Challenge || ! $challenge->isUsable() || $challenge->payload !== $snapshot->payload || ($challenge->payload['revision'] ?? null) !== $revision || ($challenge->payload['context'] ?? null) !== $context->facts() || ! is_string($challenge->payload['secretNamespace'] ?? null)) {
+                return new AuthException('challenge_invalid', 'The authentication challenge is invalid or expired.', 422);
+            }
+            if (! hash_equals($challenge->secret_hash, $this->hasher->hash($type.':'.$challenge->payload['secretNamespace'], $secret)) && ! hash_equals((string) $challenge->secondary_secret_hash, $this->hasher->hash($type.':'.$challenge->payload['secretNamespace'], $secret))) {
+                $challenge->attempts++;
+                $this->records->save($challenge);
+
+                return new AuthException('challenge_invalid', 'The authentication challenge is invalid or expired.', 422);
+            }
+            $challenge->consumed_at = CarbonImmutable::now('UTC');
+            $challenge->active_key = null;
+            $this->records->save($challenge);
+
+            $proof = $this->issueNativeProof($subject, $method, AuthenticationDestination::Session, $context, $revision);
+            $message = $method === AuthenticationMethod::EmailLink ? AuthMessageType::MagicLink : AuthMessageType::SecurityCode;
+            $this->committedAudits->withRecorder($this->audits)->record($challenge->getConnection(), $message->value.'.consumed', subject: SubjectReference::fromAuthenticatable($subject), metadata: ['challenge_id' => $challenge->identifier(), 'purpose' => $method->purpose()->value]);
+
+            return $proof;
+        });
+        if ($result instanceof Throwable) {
+            $this->recordNativeEmailFailure($method, $challengeId);
+            throw $result;
+        }
+
+        return $result;
+    }
+
+    private function recordNativeEmailFailure(AuthenticationMethod $method, ?string $challengeId): void
+    {
+        $message = $method === AuthenticationMethod::EmailLink ? AuthMessageType::MagicLink : AuthMessageType::SecurityCode;
+        $metadata = ['purpose' => $method->purpose()->value];
+        if ($challengeId !== null) {
+            $metadata['challenge_id'] = $challengeId;
+        }
+        $this->committedAudits->withRecorder($this->audits)->record((new Challenge)->getConnection(), $message->value.'.failed', outcome: 'failure', metadata: $metadata);
+    }
+
+    private function nativeEmailKey(string $type, string $recipientHash, AuthenticationRequestContext $context): string
+    {
+        return $this->hasher->hash('native-email-active', json_encode([$type, $recipientHash, $context->guardName, $context->sessionBinding], JSON_THROW_ON_ERROR));
     }
 }

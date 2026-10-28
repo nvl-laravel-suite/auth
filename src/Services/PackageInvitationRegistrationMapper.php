@@ -24,13 +24,13 @@ final readonly class PackageInvitationRegistrationMapper implements InvitationRe
     ) {}
 
     /** {@inheritDoc} */
-    public function map(Invitation $invitation, array $validated): array
+    public function map(Invitation $invitation, #[\SensitiveParameter] array $validated): array
     {
         $name = $validated['name'] ?? null;
         $password = $validated['password'] ?? null;
 
         if (! is_string($name) || trim($name) === '' || mb_strlen($name) > 160
-            || ! is_string($password) || mb_strlen($password) < 8) {
+            || ! is_string($password)) {
             throw new AuthException(
                 'invitation_registration_invalid',
                 'Invitation registration requires a valid name and password.',
@@ -40,16 +40,14 @@ final readonly class PackageInvitationRegistrationMapper implements InvitationRe
 
         return $this->attributes->map([
             PrincipalAttribute::Name->value => trim($name),
-            PrincipalAttribute::Email->value => mb_strtolower(trim($invitation->recipient)),
+            PrincipalAttribute::Email->value => PrincipalEmailIdentity::normalize($invitation->recipient),
             PrincipalAttribute::Password->value => $password,
             PrincipalAttribute::Active->value => true,
             PrincipalAttribute::Locale->value => $this->boundedString($validated['locale'] ?? null, 12)
                 ?? $this->configuration->string('features.principal_management.settings.default_locale', 'en'),
             PrincipalAttribute::Timezone->value => $this->boundedString($validated['timezone'] ?? null, 64)
                 ?? $this->configuration->string('features.principal_management.settings.default_timezone', 'UTC'),
-            PrincipalAttribute::Profile->value => is_array($validated['extensions'] ?? null)
-                ? $validated['extensions']
-                : [],
+            PrincipalAttribute::Profile->value => [],
         ]);
     }
 

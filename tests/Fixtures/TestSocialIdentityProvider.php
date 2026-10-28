@@ -19,6 +19,7 @@ final class TestSocialIdentityProvider implements SocialIdentityProvider
     public function __construct(
         private readonly bool $failRedirect = false,
         private readonly bool $failUser = false,
+        private readonly ?ExternalIdentity $identity = null,
     ) {}
 
     /** {@inheritDoc} */
@@ -42,7 +43,7 @@ final class TestSocialIdentityProvider implements SocialIdentityProvider
             throw new RuntimeException('fixture callback credential leaked');
         }
 
-        return new ExternalIdentity(
+        return $this->identity ?? new ExternalIdentity(
             provider: $provider,
             providerUserId: 'provider-user-123',
             email: 'claim@example.test',

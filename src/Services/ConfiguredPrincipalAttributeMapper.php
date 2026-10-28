@@ -51,7 +51,7 @@ final class ConfiguredPrincipalAttributeMapper implements PrincipalAttributeMapp
                 ? PrincipalAttribute::EmailVerifiedAt
                 : PrincipalAttribute::tryFrom($canonical);
 
-            if (! $attribute instanceof PrincipalAttribute) {
+            if (! $attribute instanceof PrincipalAttribute || $attribute === PrincipalAttribute::EmailIdentityHash) {
                 throw AuthException::invalidConfiguration(
                     "Unknown principal attribute [{$canonical}].",
                 );
@@ -62,6 +62,10 @@ final class ConfiguredPrincipalAttributeMapper implements PrincipalAttributeMapp
                 $canonical,
                 $value,
             );
+        }
+
+        if (is_string($canonicalAttributes['email'] ?? null)) {
+            $mapped[$this->column(PrincipalAttribute::EmailIdentityHash)] = PrincipalEmailIdentity::key($canonicalAttributes['email']);
         }
 
         return $mapped;
@@ -147,7 +151,7 @@ final class ConfiguredPrincipalAttributeMapper implements PrincipalAttributeMapp
         }
 
         return match ($attribute) {
-            PrincipalAttribute::Email => mb_strtolower(trim($value)),
+            PrincipalAttribute::Email => PrincipalEmailIdentity::normalize($value),
             PrincipalAttribute::Name,
             PrincipalAttribute::Locale,
             PrincipalAttribute::Timezone => trim($value),

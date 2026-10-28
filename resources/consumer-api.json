@@ -6,6 +6,71 @@
         "Nvl\\Auth\\Database\\Factories\\": "database/factories"
     },
     "symbols": {
+        "Nvl\\Auth\\Adapters\\Laravel\\LaravelImpersonation": {
+            "kind": "class",
+            "file": "src/Adapters/Laravel/LaravelImpersonation.php",
+            "methods": [
+                "__construct",
+                "run",
+                "start",
+                "stop"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Adapters\\Laravel\\LaravelSessionAdmission": {
+            "kind": "class",
+            "file": "src/Adapters/Laravel/LaravelSessionAdmission.php",
+            "methods": [
+                "__construct",
+                "admit"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Adapters\\Laravel\\ManagedSessionGuard": {
+            "kind": "class",
+            "file": "src/Adapters/Laravel/ManagedSessionGuard.php",
+            "methods": [
+                "__debugInfo",
+                "assertCookieConfiguration",
+                "getRecallerName",
+                "login",
+                "logout",
+                "setRequest",
+                "user"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Adapters\\Socialite\\Contracts\\SocialiteDriverFactory": {
+            "kind": "interface",
+            "file": "src/Adapters/Socialite/Contracts/SocialiteDriverFactory.php",
+            "methods": [
+                "make"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Adapters\\Socialite\\SocialiteProviderFactory": {
+            "kind": "class",
+            "file": "src/Adapters/Socialite/SocialiteProviderFactory.php",
+            "methods": [
+                "__construct",
+                "make"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\AccountAuthenticationPolicy": {
+            "kind": "interface",
+            "file": "src/Contracts/AccountAuthenticationPolicy.php",
+            "methods": [
+                "assertRemovalAllowed"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\AccountConfirmation": {
             "kind": "interface",
             "file": "src/Contracts/AccountConfirmation.php",
@@ -94,11 +159,29 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\AuthenticationAssurancePolicy": {
+            "kind": "interface",
+            "file": "src/Contracts/AuthenticationAssurancePolicy.php",
+            "methods": [
+                "assertSatisfied"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\AuthenticationEligibility": {
             "kind": "interface",
             "file": "src/Contracts/AuthenticationEligibility.php",
             "methods": [
                 "assertEligible"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\ImpersonationAccess": {
+            "kind": "interface",
+            "file": "src/Contracts/ImpersonationAccess.php",
+            "methods": [
+                "assertAllowed"
             ],
             "properties": [],
             "constants": []
@@ -165,6 +248,15 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\PrincipalExtensionMapper": {
+            "kind": "interface",
+            "file": "src/Contracts/PrincipalExtensionMapper.php",
+            "methods": [
+                "validateAndMap"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\PrincipalSessionContainment": {
             "kind": "interface",
             "file": "src/Contracts/PrincipalSessionContainment.php",
@@ -189,11 +281,36 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Contracts\\RegistrationAdmission": {
+            "kind": "interface",
+            "file": "src/Contracts/RegistrationAdmission.php",
+            "methods": [
+                "assertAllowed"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Contracts\\RoleTemplateProvider": {
             "kind": "interface",
             "file": "src/Contracts/RoleTemplateProvider.php",
             "methods": [
                 "roles"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Contracts\\SecurityTokenContainment": {
+            "kind": "interface",
+            "file": "src/Contracts/SecurityTokenContainment.php",
+            "methods": [
+                "connection",
+                "create",
+                "list",
+                "revoke",
+                "revokeAll",
+                "revokeForSecurity",
+                "rotate",
+                "update"
             ],
             "properties": [],
             "constants": []
@@ -208,11 +325,11 @@
             "properties": [],
             "constants": []
         },
-        "Nvl\\Auth\\Contracts\\SocialSubjectResolver": {
+        "Nvl\\Auth\\Contracts\\SocialIdentityProviderFactory": {
             "kind": "interface",
-            "file": "src/Contracts/SocialSubjectResolver.php",
+            "file": "src/Contracts/SocialIdentityProviderFactory.php",
             "methods": [
-                "resolve"
+                "make"
             ],
             "properties": [],
             "constants": []
@@ -376,6 +493,7 @@
             "kind": "class",
             "file": "database/factories/UserFactory.php",
             "methods": [
+                "configure",
                 "definition",
                 "disabled",
                 "modelName",
@@ -402,14 +520,17 @@
                 "Authentication",
                 "Clients",
                 "EmailVerification",
+                "Impersonation",
                 "Invitations",
                 "MagicLinks",
+                "ManagedSessions",
                 "Memberships",
                 "Passkeys",
                 "Password",
                 "PrincipalManagement",
                 "Rbac",
                 "RecoveryCodes",
+                "Registration",
                 "SecurityCodes",
                 "Sessions",
                 "SocialIdentities",
@@ -429,10 +550,13 @@
                 "value"
             ],
             "constants": [
+                "EmailChangeNotification",
+                "EmailChangeVerification",
                 "EmailVerification",
                 "Invitation",
                 "MagicLink",
                 "PasswordReset",
+                "RegistrationEmailVerification",
                 "SecurityCode"
             ]
         },
@@ -629,6 +753,46 @@
                 "VerificationInvalid"
             ]
         },
+        "Nvl\\Auth\\Enums\\AuthenticationDestination": {
+            "kind": "enum",
+            "file": "src/Enums/AuthenticationDestination.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "ApiToken",
+                "Reauthentication",
+                "Session"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\AuthenticationMethod": {
+            "kind": "enum",
+            "file": "src/Enums/AuthenticationMethod.php",
+            "methods": [
+                "cases",
+                "from",
+                "purpose",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "EmailCode",
+                "EmailLink",
+                "Passkey",
+                "Password",
+                "Remember",
+                "Social"
+            ]
+        },
         "Nvl\\Auth\\Enums\\AuthenticationPurpose": {
             "kind": "enum",
             "file": "src/Enums/AuthenticationPurpose.php",
@@ -746,6 +910,7 @@
                 "CreatedAt",
                 "DeletedAt",
                 "Email",
+                "EmailIdentityHash",
                 "EmailVerifiedAt",
                 "Id",
                 "LastLoginAt",
@@ -759,6 +924,107 @@
                 "RememberToken",
                 "Timezone",
                 "UpdatedAt"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\PrincipalMutation": {
+            "kind": "enum",
+            "file": "src/Enums/PrincipalMutation.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "InvitationRegistration",
+                "ManagementCreate",
+                "ManagementUpdate",
+                "Profile",
+                "Registration"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\RecentAuthenticationPurpose": {
+            "kind": "enum",
+            "file": "src/Enums/RecentAuthenticationPurpose.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "AccountDeletion",
+                "EmailChange",
+                "FactorEnrollment",
+                "FactorRemoval",
+                "ImpersonationStart",
+                "PasswordChange",
+                "RecoveryRegeneration",
+                "SessionRevocation",
+                "SocialLink",
+                "SocialReconnect",
+                "SocialUnlink"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\RegistrationMethod": {
+            "kind": "enum",
+            "file": "src/Enums/RegistrationMethod.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "Password",
+                "Social"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\RegistrationMode": {
+            "kind": "enum",
+            "file": "src/Enums/RegistrationMode.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "Closed",
+                "InvitationOnly",
+                "Open"
+            ]
+        },
+        "Nvl\\Auth\\Enums\\SocialIntentPurpose": {
+            "kind": "enum",
+            "file": "src/Enums/SocialIntentPurpose.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "Link",
+                "Login",
+                "Reauthentication",
+                "Reconnect",
+                "Registration"
             ]
         },
         "Nvl\\Auth\\Enums\\UserBulkOperation": {
@@ -779,6 +1045,21 @@
                 "Enable",
                 "Restore"
             ]
+        },
+        "Nvl\\Auth\\Events\\AccountSecurityChanged": {
+            "kind": "class",
+            "file": "src/Events/AccountSecurityChanged.php",
+            "methods": [
+                "__construct",
+                "schemaVersion"
+            ],
+            "properties": [
+                "credentialId",
+                "operation",
+                "schemaVersion",
+                "subject"
+            ],
+            "constants": []
         },
         "Nvl\\Auth\\Events\\AuthAuditRecorded": {
             "kind": "class",
@@ -837,6 +1118,24 @@
             ],
             "constants": []
         },
+        "Nvl\\Auth\\Events\\ImpersonationChanged": {
+            "kind": "class",
+            "file": "src/Events/ImpersonationChanged.php",
+            "methods": [
+                "__construct",
+                "schemaVersion"
+            ],
+            "properties": [
+                "effectiveSubject",
+                "expiresAt",
+                "impersonationId",
+                "operation",
+                "operator",
+                "originalActor",
+                "schemaVersion"
+            ],
+            "constants": []
+        },
         "Nvl\\Auth\\Events\\InvitationAccepted": {
             "kind": "class",
             "file": "src/Events/InvitationAccepted.php",
@@ -870,6 +1169,21 @@
                 "payload",
                 "schemaVersion",
                 "userId"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\Events\\PrincipalRegistered": {
+            "kind": "class",
+            "file": "src/Events/PrincipalRegistered.php",
+            "methods": [
+                "__construct",
+                "schemaVersion"
+            ],
+            "properties": [
+                "classification",
+                "method",
+                "schemaVersion",
+                "subject"
             ],
             "constants": []
         },
@@ -1047,6 +1361,38 @@
                 "TABLE"
             ]
         },
+        "Nvl\\Auth\\Models\\BrowserSession": {
+            "kind": "class",
+            "file": "src/Models/BrowserSession.php",
+            "methods": [
+                "getConnectionName",
+                "identifier",
+                "isCurrent"
+            ],
+            "properties": [
+                "absolute_expires_at",
+                "assurance",
+                "authenticated_at",
+                "binding_hash",
+                "created_at",
+                "guard_name",
+                "id",
+                "ip_address",
+                "last_seen_at",
+                "method",
+                "provider_hash",
+                "revoked_at",
+                "security_revision",
+                "session_family_id",
+                "subject_id",
+                "subject_type",
+                "updated_at",
+                "user_agent"
+            ],
+            "constants": [
+                "TABLE"
+            ]
+        },
         "Nvl\\Auth\\Models\\Challenge": {
             "kind": "class",
             "file": "src/Models/Challenge.php",
@@ -1081,6 +1427,37 @@
                 "subject_id",
                 "subject_type",
                 "type",
+                "updated_at"
+            ],
+            "constants": [
+                "TABLE"
+            ]
+        },
+        "Nvl\\Auth\\Models\\Impersonation": {
+            "kind": "class",
+            "file": "src/Models/Impersonation.php",
+            "methods": [
+                "getConnectionName",
+                "identifier"
+            ],
+            "properties": [
+                "active_session_key",
+                "actor_id",
+                "actor_revision",
+                "actor_type",
+                "browser_session_id",
+                "created_at",
+                "effective_subject_id",
+                "effective_subject_type",
+                "expires_at",
+                "guard_name",
+                "id",
+                "owner_reference",
+                "reason",
+                "started_at",
+                "stop_reason",
+                "stopped_at",
+                "target_revision",
                 "updated_at"
             ],
             "constants": [
@@ -1215,6 +1592,33 @@
                 "TABLE"
             ]
         },
+        "Nvl\\Auth\\Models\\PendingEmailChange": {
+            "kind": "class",
+            "file": "src/Models/PendingEmailChange.php",
+            "methods": [
+                "getConnectionName",
+                "identifier"
+            ],
+            "properties": [
+                "active_key",
+                "consumed_at",
+                "context",
+                "created_at",
+                "email_hash",
+                "expires_at",
+                "id",
+                "new_email",
+                "revoked_at",
+                "security_revision",
+                "subject_id",
+                "subject_type",
+                "token_hash",
+                "updated_at"
+            ],
+            "constants": [
+                "TABLE"
+            ]
+        },
         "Nvl\\Auth\\Models\\Permission": {
             "kind": "class",
             "file": "src/Models/Permission.php",
@@ -1284,6 +1688,34 @@
                 "subject_type",
                 "updated_at",
                 "used_at"
+            ],
+            "constants": [
+                "TABLE"
+            ]
+        },
+        "Nvl\\Auth\\Models\\RememberCredential": {
+            "kind": "class",
+            "file": "src/Models/RememberCredential.php",
+            "methods": [
+                "getConnectionName",
+                "identifier"
+            ],
+            "properties": [
+                "absolute_expires_at",
+                "consumed_at",
+                "created_at",
+                "guard_name",
+                "id",
+                "provider_hash",
+                "revoked_at",
+                "rotated_to_id",
+                "secret_hash",
+                "security_revision",
+                "selector",
+                "session_family_id",
+                "subject_id",
+                "subject_type",
+                "updated_at"
             ],
             "constants": [
                 "TABLE"
@@ -1393,6 +1825,7 @@
                 "getDeletedAtColumn",
                 "getEmailForPasswordReset",
                 "getEmailForVerification",
+                "getEmailIdentityHashName",
                 "getFillable",
                 "getHidden",
                 "getKeyName",
@@ -1406,6 +1839,7 @@
                 "performedAuthAudits",
                 "preferredLocale",
                 "recoveryCodes",
+                "save",
                 "scopeAuthenticationAllowed",
                 "sentInvitations",
                 "socialIdentities",
@@ -1482,6 +1916,26 @@
             ],
             "constants": []
         },
+        "Nvl\\Auth\\Services\\AuthAccountRecovery": {
+            "kind": "class",
+            "file": "src/Services/AuthAccountRecovery.php",
+            "methods": [
+                "__construct",
+                "recover"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\AuthAccountSecurity": {
+            "kind": "class",
+            "file": "src/Services/AuthAccountSecurity.php",
+            "methods": [
+                "__construct",
+                "state"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Services\\AuthAuditReader": {
             "kind": "class",
             "file": "src/Services/AuthAuditReader.php",
@@ -1489,6 +1943,21 @@
                 "__construct",
                 "find",
                 "paginate"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\AuthBrowserSessions": {
+            "kind": "class",
+            "file": "src/Services/AuthBrowserSessions.php",
+            "methods": [
+                "__construct",
+                "admit",
+                "bindingKey",
+                "paginate",
+                "revoke",
+                "revokeAll",
+                "revokeOthers"
             ],
             "properties": [],
             "constants": []
@@ -1501,7 +1970,9 @@
                 "consume",
                 "consumeById",
                 "consumeMagicLink",
+                "consumeMagicLinkAuthentication",
                 "issue",
+                "proveSecurityCodeAuthentication",
                 "requestMagicLink",
                 "requestMagicLinkAuthentication",
                 "requestSecurityCode",
@@ -1531,6 +2002,18 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Services\\AuthEmailChanges": {
+            "kind": "class",
+            "file": "src/Services/AuthEmailChanges.php",
+            "methods": [
+                "__construct",
+                "cancel",
+                "complete",
+                "request"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Services\\AuthEmailVerification": {
             "kind": "class",
             "file": "src/Services/AuthEmailVerification.php",
@@ -1538,6 +2021,32 @@
                 "__construct",
                 "request",
                 "verify"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\AuthExecutionContext": {
+            "kind": "class",
+            "file": "src/Services/AuthExecutionContext.php",
+            "methods": [
+                "__construct",
+                "__serialize",
+                "assertNativeMutationAllowed",
+                "facts",
+                "run"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\AuthImpersonation": {
+            "kind": "class",
+            "file": "src/Services/AuthImpersonation.php",
+            "methods": [
+                "__construct",
+                "admit",
+                "revoke",
+                "start",
+                "stop"
             ],
             "properties": [],
             "constants": []
@@ -1554,6 +2063,7 @@
                 "preview",
                 "recordDeliveryOutcome",
                 "register",
+                "registerSocial",
                 "resend",
                 "revoke"
             ],
@@ -1606,6 +2116,7 @@
             "methods": [
                 "__construct",
                 "beginAuthentication",
+                "beginReauthentication",
                 "beginRegistration",
                 "finishAuthentication",
                 "finishRegistration",
@@ -1620,8 +2131,10 @@
             "methods": [
                 "__construct",
                 "confirm",
+                "remove",
                 "requestReset",
                 "reset",
+                "setInitial",
                 "update"
             ],
             "properties": [],
@@ -1671,6 +2184,40 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Auth\\Services\\AuthReauthentication": {
+            "kind": "class",
+            "file": "src/Services/AuthReauthentication.php",
+            "methods": [
+                "__construct",
+                "confirm"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\AuthRegistration": {
+            "kind": "class",
+            "file": "src/Services/AuthRegistration.php",
+            "methods": [
+                "__construct",
+                "register",
+                "registerInvitedSocial",
+                "registerSocial",
+                "requestSocialEmailVerification",
+                "verifySocialEmail"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\AuthRememberCredentials": {
+            "kind": "class",
+            "file": "src/Services/AuthRememberCredentials.php",
+            "methods": [
+                "__construct",
+                "resume"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Auth\\Services\\AuthRoles": {
             "kind": "class",
             "file": "src/Services/AuthRoles.php",
@@ -1706,15 +2253,29 @@
             "properties": [],
             "constants": []
         },
-        "Nvl\\Auth\\Services\\AuthSocialIdentities": {
+        "Nvl\\Auth\\Services\\AuthSocialAuthentication": {
             "kind": "class",
-            "file": "src/Services/AuthSocialIdentities.php",
+            "file": "src/Services/AuthSocialAuthentication.php",
             "methods": [
                 "__construct",
-                "completeAuthorization",
-                "link",
-                "revoke",
-                "startAuthorization"
+                "beginLogin",
+                "beginReauthentication",
+                "completeLogin",
+                "completeReauthentication"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\AuthSocialLinks": {
+            "kind": "class",
+            "file": "src/Services/AuthSocialLinks.php",
+            "methods": [
+                "__construct",
+                "beginLink",
+                "beginReconnect",
+                "completeLink",
+                "completeReconnect",
+                "unlink"
             ],
             "properties": [],
             "constants": []
@@ -1725,6 +2286,7 @@
             "methods": [
                 "__construct",
                 "all",
+                "authenticateFromProof",
                 "create",
                 "revoke",
                 "revokeAll",
@@ -1773,7 +2335,21 @@
                 "hasPendingSecondFactor",
                 "login",
                 "loginWithToken",
+                "proveCredentials",
+                "proveCredentialsForToken",
                 "verifyCredentials"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\AuthenticationProofs": {
+            "kind": "class",
+            "file": "src/Services/AuthenticationProofs.php",
+            "methods": [
+                "__construct",
+                "available",
+                "completeFactor",
+                "consume"
             ],
             "properties": [],
             "constants": []
@@ -1783,8 +2359,21 @@
             "file": "src/Services/AuthenticationSessions.php",
             "methods": [
                 "__construct",
-                "establish",
+                "assertCanTransition",
+                "completeSecondFactor",
+                "establishFromProof",
+                "hasPendingSecondFactor",
                 "logout"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\EnrolledFactorAssurancePolicy": {
+            "kind": "class",
+            "file": "src/Services/EnrolledFactorAssurancePolicy.php",
+            "methods": [
+                "assertSatisfied",
+                "requiresSecondFactor"
             ],
             "properties": [],
             "constants": []
@@ -1807,6 +2396,51 @@
                 "__construct",
                 "consume",
                 "issue"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\PrincipalEmailIdentity": {
+            "kind": "class",
+            "file": "src/Services/PrincipalEmailIdentity.php",
+            "methods": [
+                "__construct",
+                "key",
+                "normalize"
+            ],
+            "properties": [],
+            "constants": [
+                "INDEX"
+            ]
+        },
+        "Nvl\\Auth\\Services\\PrincipalEmailIdentityAdoption": {
+            "kind": "class",
+            "file": "src/Services/PrincipalEmailIdentityAdoption.php",
+            "methods": [
+                "__construct",
+                "apply",
+                "plan"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\SocialProviderRegistry": {
+            "kind": "class",
+            "file": "src/Services/SocialProviderRegistry.php",
+            "methods": [
+                "__construct",
+                "assertAvailable",
+                "providers"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\Services\\UsableAccountAuthenticationPolicy": {
+            "kind": "class",
+            "file": "src/Services/UsableAccountAuthenticationPolicy.php",
+            "methods": [
+                "__construct",
+                "assertRemovalAllowed"
             ],
             "properties": [],
             "constants": []
@@ -1859,13 +2493,41 @@
             ],
             "constants": []
         },
+        "Nvl\\Auth\\ValueObjects\\AuthenticationEvidence": {
+            "kind": "class",
+            "file": "src/ValueObjects/AuthenticationEvidence.php",
+            "methods": [
+                "satisfiesMfa"
+            ],
+            "properties": [
+                "context",
+                "destination",
+                "expiresAt",
+                "factors",
+                "method",
+                "provider",
+                "revision",
+                "subject",
+                "verifiedAt"
+            ],
+            "constants": []
+        },
         "Nvl\\Auth\\ValueObjects\\AuthenticationRequestContext": {
             "kind": "class",
             "file": "src/ValueObjects/AuthenticationRequestContext.php",
             "methods": [
-                "__construct"
+                "__construct",
+                "__debugInfo",
+                "assertBound",
+                "facts",
+                "fromFacts",
+                "jsonSerialize"
             ],
             "properties": [
+                "browserBinding",
+                "browserSessionId",
+                "flowNonce",
+                "guardName",
                 "ipAddress",
                 "ownerIntentNonce",
                 "ownerIntentSubjectBound",
@@ -1874,6 +2536,8 @@
                 "ownerSessionBinding",
                 "requestId",
                 "requestedOwner",
+                "sessionBinding",
+                "tokenNamespace",
                 "userAgent"
             ],
             "constants": []
@@ -1889,6 +2553,7 @@
                 "email",
                 "emailVerificationSource",
                 "emailVerified",
+                "issuer",
                 "name",
                 "profile",
                 "provider",
@@ -1905,6 +2570,62 @@
             "properties": [
                 "expiresAt",
                 "returnPath"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\IssuedAuthenticationProof": {
+            "kind": "class",
+            "file": "src/ValueObjects/IssuedAuthenticationProof.php",
+            "methods": [
+                "__construct",
+                "__debugInfo",
+                "__serialize",
+                "jsonSerialize",
+                "reveal"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\IssuedRecentAuthentication": {
+            "kind": "class",
+            "file": "src/ValueObjects/IssuedRecentAuthentication.php",
+            "methods": [
+                "__construct",
+                "__debugInfo",
+                "__serialize",
+                "jsonSerialize",
+                "reveal"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\IssuedSocialIntent": {
+            "kind": "class",
+            "file": "src/ValueObjects/IssuedSocialIntent.php",
+            "methods": [
+                "__construct",
+                "__debugInfo",
+                "__serialize",
+                "jsonSerialize",
+                "reveal"
+            ],
+            "properties": [
+                "expiresAt"
+            ],
+            "constants": []
+        },
+        "Nvl\\Auth\\ValueObjects\\IssuedSocialRegistration": {
+            "kind": "class",
+            "file": "src/ValueObjects/IssuedSocialRegistration.php",
+            "methods": [
+                "__construct",
+                "__debugInfo",
+                "__serialize",
+                "jsonSerialize",
+                "reveal"
+            ],
+            "properties": [
+                "expiresAt"
             ],
             "constants": []
         },

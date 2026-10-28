@@ -2,13 +2,26 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
+use Nvl\Auth\Models\PrincipalSecurityState;
+use Nvl\Auth\Services\AuthDoctor;
 use Nvl\Auth\Services\AuthSchemaManager;
+use Nvl\Auth\Services\PrincipalSecurity;
 
-it('installs exactly the seventeen namespaced auth-owned tables', function (): void {
+beforeEach(function (): void {
+    $driver = getenv('NVL_C1_TEST_DRIVER');
+    if (in_array($driver, ['mysql', 'pgsql'], true)) {
+        expect(DB::connection()->getDriverName())->toBe($driver);
+    }
+});
+
+it('installs exactly the eighteen namespaced auth-owned tables', function (): void {
     $owned = [
+        'nvl_auth_principal_security_states',
         AuthTables::Users,
         AuthTables::Permissions,
         AuthTables::Roles,
@@ -78,8 +91,8 @@ it('installs only enabled feature schema and safely installs later capabilities'
     $plan = app(AuthSchemaManager::class)->execute();
     $applied = app(AuthSchemaManager::class)->execute(true);
 
-    expect($plan['missing'])->toBe([AuthTables::Users, AuthTables::TotpCredentials])
-        ->and($applied['created'])->toBe([AuthTables::Users, AuthTables::TotpCredentials])
+    expect($plan['missing'])->toBe([AuthTables::Challenges, AuthTables::Users, AuthTables::TotpCredentials])
+        ->and($applied['created'])->toBe([AuthTables::Challenges, AuthTables::Users, AuthTables::TotpCredentials])
         ->and(Schema::hasTable(AuthTables::Users))->toBeTrue()
         ->and(Schema::hasTable(AuthTables::TotpCredentials))->toBeTrue()
         ->and(Schema::hasTable(AuthTables::Passkeys))->toBeFalse();
@@ -182,3 +195,66 @@ it('uses configured identity provider table names consistently during installati
 
     $identity->up();
 });
+
+it('repairs partial mandatory security state without changing retained revisions', function (): void {
+    $user = $this->user();
+    $security = app(PrincipalSecurity::class);
+    $security->revision($user);
+    $user->getConnection()->transaction(fn () => $security->advance($user, 'security_containment'));
+    Schema::table(AuthTables::PrincipalSecurityStates, function (Blueprint $table): void {
+        $table->dropUnique('nvl_auth_principal_security_states_subject_unique');
+        $table->dropColumn('updated_at');
+    });
+    $plan = app(AuthSchemaManager::class)->execute();
+    expect($plan['outdated'][AuthTables::PrincipalSecurityStates])->toContain('updated_at');
+    config(['nvl-auth.migrations.enabled' => false]);
+    expect(fn () => app(AuthSchemaManager::class)->execute(true))->toThrow(RuntimeException::class, 'host-owned');
+    expect(PrincipalSecurityState::query()->sole()->revision)->toBe(2);
+    config(['nvl-auth.migrations.enabled' => true]);
+    app(AuthSchemaManager::class)->execute(true);
+    $migration = require dirname(__DIR__, 2).'/database/migrations/2026_10_27_000001_nvl_auth_create_principal_security_states.php';
+    $migration->down();
+    expect($security->revision($user))->toBe(2)
+        ->and(Schema::hasIndex(AuthTables::PrincipalSecurityStates, 'nvl_auth_principal_security_states_subject_unique'))->toBeTrue();
+});
+
+it('rejects a malformed named security index without changing host data or schema', function (array $columns, string $operation): void {
+    if ($columns === ['partial'] && DB::connection()->getDriverName() === 'mysql') {
+        $this->markTestSkipped('MySQL does not support partial indexes.');
+    }
+    $user = $this->user();
+    app(PrincipalSecurity::class)->revision($user);
+    $state = PrincipalSecurityState::query()->sole();
+    $state->forceFill(['revision' => 19])->save();
+    $indexName = 'nvl_auth_principal_security_states_subject_unique';
+    Schema::table(AuthTables::PrincipalSecurityStates, function (Blueprint $table) use ($columns, $indexName): void {
+        $table->dropUnique($indexName);
+        if ($columns !== ['partial']) {
+            $table->unique($columns, $indexName);
+        }
+    });
+    if ($columns === ['partial']) {
+        DB::statement('CREATE UNIQUE INDEX nvl_auth_principal_security_states_subject_unique ON nvl_auth_principal_security_states (subject_type, subject_id) WHERE revision > 1');
+    }
+    if ($operation === 'migration') {
+        Schema::table(AuthTables::PrincipalSecurityStates, fn (Blueprint $table) => $table->dropColumn('updated_at'));
+    }
+    $indexes = Schema::getIndexes(AuthTables::PrincipalSecurityStates);
+    $columnNames = Schema::getColumnListing(AuthTables::PrincipalSecurityStates);
+    $attributes = $state->refresh()->getRawOriginal();
+    $definitionQuery = DB::connection()->getDriverName() === 'pgsql' ? 'select pg_get_indexdef(oid) as definition from pg_class where relname = ?' : 'select sql as definition from sqlite_master where name = ?';
+    $definition = $columns === ['partial'] ? DB::select($definitionQuery, [$indexName]) : null;
+    if ($operation === 'migration') {
+        $migration = require dirname(__DIR__, 2).'/database/migrations/2026_10_27_000001_nvl_auth_create_principal_security_states.php';
+        expect(fn () => $migration->up())->toThrow(RuntimeException::class, 'subject index');
+    } else {
+        expect(app(AuthSchemaManager::class)->execute()['missing_indexes'][AuthTables::PrincipalSecurityStates] ?? [])->toContain($indexName);
+        expect(collect(app(AuthDoctor::class)->inspect())->firstWhere('name', 'schema.'.AuthTables::PrincipalSecurityStates.'.index.'.$indexName))->toMatchArray(['passed' => false]);
+    }
+    expect(Schema::getIndexes(AuthTables::PrincipalSecurityStates))->toBe($indexes)
+        ->and(Schema::getColumnListing(AuthTables::PrincipalSecurityStates))->toBe($columnNames)
+        ->and($state->refresh()->getRawOriginal())->toBe($attributes);
+    if ($definition !== null) {
+        expect(DB::select($definitionQuery, [$indexName]))->toEqual($definition);
+    }
+})->with(['primary id' => [['id']], 'subject id only' => [['subject_id']], 'reversed columns' => [['subject_id', 'subject_type']], 'partial constraint' => [['partial']]])->with(['migration', 'readiness']);

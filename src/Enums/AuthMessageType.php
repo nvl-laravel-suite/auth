@@ -11,6 +11,9 @@ namespace Nvl\Auth\Enums;
  */
 enum AuthMessageType: string
 {
+    case RegistrationEmailVerification = 'registration_email_verification';
+    case EmailChangeVerification = 'email_change_verification';
+    case EmailChangeNotification = 'email_change_notification';
     case Invitation = 'invitation';
     case MagicLink = 'magic_link';
     case SecurityCode = 'security_code';

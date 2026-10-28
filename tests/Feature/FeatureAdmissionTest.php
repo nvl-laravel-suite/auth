@@ -15,8 +15,9 @@ use Nvl\Auth\Services\AuthInvitations;
 use Nvl\Auth\Services\AuthPasskeys;
 use Nvl\Auth\Services\AuthPasswords;
 use Nvl\Auth\Services\AuthPermissions;
+use Nvl\Auth\Services\AuthRegistration;
 use Nvl\Auth\Services\AuthSecondFactor;
-use Nvl\Auth\Services\AuthSocialIdentities;
+use Nvl\Auth\Services\AuthSocialAuthentication;
 use Nvl\Auth\Services\AuthTokens;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
@@ -24,6 +25,7 @@ it('fails a representative Action for every disabled feature before database acc
     $user = $this->user();
     $reference = SubjectReference::fromAuthenticatable($user);
     $actions = [
+        AuthFeature::Registration->value => fn () => app(AuthRegistration::class)->register([]),
         AuthFeature::Authentication->value => fn () => app(Authentication::class)->login(['identifier' => $user->email, 'password' => 'password'], [], auth()->guard('web'), app('session')->driver()),
         AuthFeature::Password->value => fn () => app(AuthPasswords::class)->requestReset(['identifier' => $user->email]),
         AuthFeature::EmailVerification->value => fn () => app(AuthEmailVerification::class)->request($user),
@@ -33,9 +35,9 @@ it('fails a representative Action for every disabled feature before database acc
         AuthFeature::Totp->value => fn () => app(AuthSecondFactor::class)->startEnrollment($user, ['accountName' => $user->email]),
         AuthFeature::Passkeys->value => fn () => app(AuthPasskeys::class)->beginAuthentication(),
         AuthFeature::RecoveryCodes->value => fn () => app(AuthSecondFactor::class)->regenerateRecoveryCodes($user),
-        AuthFeature::SocialIdentities->value => fn () => app(AuthSocialIdentities::class)->startAuthorization('github'),
+        AuthFeature::SocialIdentities->value => fn () => app(AuthSocialAuthentication::class)->beginLogin('github', $this->authenticationContext()),
         AuthFeature::Clients->value => fn () => app(AuthClients::class)->start(['clientId' => '00000000-0000-0000-0000-000000000000', 'flow' => 'login', 'returnPath' => '/']),
-        AuthFeature::Sessions->value => fn () => app(AuthenticationSessions::class)->establish($user, auth()->guard('web'), app('session')->driver()),
+        AuthFeature::Sessions->value => fn () => app(AuthenticationSessions::class)->establishFromProof(str_repeat('a', 64), auth()->guard('web'), app('session')->driver(), $this->authenticationContext()),
         AuthFeature::ApiTokens->value => fn () => app(AuthTokens::class)->all($user),
         AuthFeature::Rbac->value => fn () => app(AuthPermissions::class)->synchronizeCatalog($user),
         AuthFeature::Audit->value => fn () => app(AuthAuditReader::class)->paginate($user),

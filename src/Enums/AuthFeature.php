@@ -11,6 +11,7 @@ namespace Nvl\Auth\Enums;
  */
 enum AuthFeature: string
 {
+    case Registration = 'registration';
     case Authentication = 'authentication';
     case PrincipalManagement = 'principal_management';
     case Memberships = 'memberships';
@@ -24,6 +25,8 @@ enum AuthFeature: string
     case RecoveryCodes = 'recovery_codes';
     case SocialIdentities = 'social_identities';
     case Clients = 'clients';
+    case Impersonation = 'impersonation';
+    case ManagedSessions = 'managed_sessions';
     case Sessions = 'sessions';
     case ApiTokens = 'api_tokens';
     case Rbac = 'rbac';

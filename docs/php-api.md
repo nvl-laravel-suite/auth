@@ -9,14 +9,16 @@ public function loginWithToken(#[SensitiveParameter] array $credentials, array $
 public function login(#[SensitiveParameter] array $credentials, array $context, StatefulGuard $guard, Session $session, #[SensitiveParameter] array $factorProof = []): Authenticatable;
 public function hasPendingSecondFactor(Session $session): bool;
 public function completeSecondFactor(#[SensitiveParameter] array $factorProof, StatefulGuard $guard, Session $session): Authenticatable;
-public function verifyCredentials( #[SensitiveParameter] array $credentials ): Authenticatable;
+public function verifyCredentials(#[SensitiveParameter] array $credentials): Authenticatable;
+public function proveCredentials(#[SensitiveParameter] array $credentials, AuthenticationRequestContext $context): IssuedAuthenticationProof;
+public function proveCredentialsForToken(#[SensitiveParameter] array $credentials, AuthenticationRequestContext $context): IssuedAuthenticationProof;
 ```
 
 `loginWithToken()` is the complete stateless password operation. Credentials contain
 `identifier` and `password`; token input contains `name`, `abilities` and optional
 `expiresAt` (`CarbonImmutable|null`). Context accepts `ipAddress`, `userAgent` and
 `requestId`. Supply either `code` or `recoveryCode` in factor proof when the
-principal has an enrolled factor and TOTP is enabled. The result is
+principal has an enrolled required factor. Disabling TOTP does not remove enrollment; unavailable factor methods fail closed. The result is
 `array{subject: Authenticatable, token: IssuedApiToken}`.
 
 The operation runs native eligibility, factor proof, the login pipeline, canonical
@@ -39,14 +41,12 @@ password is retained. The host can show its factor form when
 the proof and the same guard/session. Password changes, disabled principals,
 expired/consumed challenges and pipeline identity substitution fail closed.
 
-TOTP with browser Sessions now requires the existing challenge table even when
-Magic Links and Security Codes are disabled. Native schema planning, installation
-and repair include that feature dependency; no new table shape is introduced.
+Native authentication proof storage is mandatory even with all optional delivery/factor methods disabled. The forward proof-storage migration installs the existing challenge shape; historical migrations remain unchanged.
 
 ## AuthenticationSessions
 
 ```php
-public function establishForPurpose(Authenticatable $principal, StatefulGuard $guard, Session $session, AuthenticationPurpose $purpose, AuthenticationRequestContext $requestContext, bool $remember = false): void;
+public function establishFromProof(#[SensitiveParameter] string $proof, StatefulGuard $guard, Session $session, AuthenticationRequestContext $context, bool $remember = false): Authenticatable;
 public function logout(StatefulGuard $guard, Session $session): void;
 ```
 
@@ -57,11 +57,13 @@ public function consume(AuthFeature $feature, AuthMessageType $messageType, stri
 public function consumeById(AuthFeature $feature, AuthMessageType $messageType, string $challengeId, string $purpose, string $secret): Challenge;
 public function consumeMagicLink(array $data, string $purpose = 'login'): Challenge;
 public function requestMagicLink(array $data, ?SubjectReference $subject = null, array $payload = [], ?string $locale = null): array;
-public function requestMagicLinkAuthentication(array $data, ?string $locale = null): ?array;
+public function requestMagicLinkAuthentication(array $data, AuthenticationRequestContext $context, ?string $locale = null): ?array;
+public function consumeMagicLinkAuthentication(#[SensitiveParameter] array $data, AuthenticationRequestContext $context): IssuedAuthenticationProof;
 public function requestSecurityCode(array $data, ?SubjectReference $subject = null, array $payload = [], ?string $locale = null): array;
-public function requestSecurityCodeAuthentication(array $data, ?string $locale = null): ?array;
+public function requestSecurityCodeAuthentication(array $data, AuthenticationRequestContext $context, ?string $locale = null): ?array;
+public function proveSecurityCodeAuthentication(#[SensitiveParameter] array $data, AuthenticationRequestContext $context): IssuedAuthenticationProof;
 public function verifySecurityCode(array $data): Challenge;
-public function verifySecurityCodeAuthentication(array $data, StatefulGuard $guard, Session $session): Challenge;
+public function verifySecurityCodeAuthentication(#[SensitiveParameter] array $data, StatefulGuard $guard, Session $session, AuthenticationRequestContext $context): Authenticatable;
 ```
 
 ## AuthPasswords
@@ -69,13 +71,13 @@ public function verifySecurityCodeAuthentication(array $data, StatefulGuard $gua
 ```php
 public function requestReset(array $data, ?string $locale = null): void;
 public function reset( #[SensitiveParameter] array $data ): void;
-public function update( Authenticatable&CanResetPassword $subject, #[SensitiveParameter] array $data ): void;
+public function update( Authenticatable&CanResetPassword $subject, #[SensitiveParameter] array $data, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): void;
 ```
 
 ## AuthEmailVerification
 
 ```php
-public function verify(Authenticatable&MustVerifyEmail $subject): bool;
+public function verify(Authenticatable&MustVerifyEmail $subject, #[SensitiveParameter] string $token): bool;
 ```
 
 ## AuthInvitations
@@ -94,13 +96,13 @@ public function revoke(Invitation|string $invitation, Authenticatable $actor): I
 ## AuthUsers
 
 ```php
-public function create(Authenticatable $actor, array $data): User;
-public function deleteOwnAccount(Authenticatable $subject, array $data, StatefulGuard $guard, Session $session): bool;
+public function create(Authenticatable $actor, #[\SensitiveParameter] array $data): User;
+public function deleteOwnAccount(Authenticatable $subject, #[\SensitiveParameter] array $data, StatefulGuard $guard, Session $session, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): bool;
 public function delete(Authenticatable|SystemMutationContext $authority, User|string $user): bool;
 public function restore(Authenticatable|SystemMutationContext $authority, User|string $user): User;
-public function setActive(Authenticatable|SystemMutationContext $authority, User|string $user, array $data): User;
-public function updateProfile(Authenticatable $subject, array $data): User;
-public function update(Authenticatable $actor, User|string $user, array $data): User;
+public function setActive(Authenticatable|SystemMutationContext $authority, User|string $user, #[\SensitiveParameter] array $data): User;
+public function updateProfile(Authenticatable $subject, #[\SensitiveParameter] array $data, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): User;
+public function update(Authenticatable $actor, User|string $user, #[\SensitiveParameter] array $data): User;
 ```
 
 ## AuthUserReader
@@ -225,30 +227,88 @@ public function suggestRoles(Authenticatable $actor, ?string $search = null, ?in
 ## AuthSecondFactor
 
 ```php
-public function confirmEnrollment( Authenticatable $subject, TotpCredential $credential, #[SensitiveParameter] array $data, ): TotpCredential;
-public function verify( Authenticatable $subject, #[SensitiveParameter] array $data, ): TotpCredential;
-public function revoke( Authenticatable $subject, TotpCredential $credential, ): TotpCredential;
+public function confirmEnrollment( Authenticatable $subject, TotpCredential $credential, #[SensitiveParameter] array $data, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): TotpCredential;
+public function verify( Authenticatable $subject, #[SensitiveParameter] array $data ): TotpCredential;
+public function revoke(Authenticatable $subject, TotpCredential $credential, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): TotpCredential;
 public function state(Authenticatable $subject): array;
-public function regenerateRecoveryCodes(Authenticatable $subject): GeneratedRecoveryCodes;
-public function consumeRecoveryCode( Authenticatable $subject, #[SensitiveParameter] array $data, ): RecoveryCode;
-public function revokeRecoveryCodes(Authenticatable $subject): int;
+public function regenerateRecoveryCodes(Authenticatable $subject, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): GeneratedRecoveryCodes;
+public function consumeRecoveryCode( Authenticatable $subject, #[SensitiveParameter] array $data ): RecoveryCode;
+public function revokeRecoveryCodes(Authenticatable $subject, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): int;
 ```
 
 ## AuthPasskeys
 
 ```php
-public function beginRegistration(Authenticatable $subject): PasskeyCeremonyOptions;
-public function finishAuthentication( array $data, ?OwnerReference $requestedOwner = null, ?string $sessionBinding = null, ): array;
-public function finishRegistration( Authenticatable $subject, array $data, ): Passkey;
-public function revoke(Authenticatable $subject, Passkey $passkey): Passkey;
+public function beginAuthentication(?Authenticatable $subject = null, ?OwnerReference $owner = null, ?string $sessionBinding = null, ?AuthenticationRequestContext $context = null): PasskeyCeremonyOptions;
+public function beginReauthentication(Authenticatable $subject, AuthenticationRequestContext $context): PasskeyCeremonyOptions;
+public function beginRegistration(Authenticatable $subject, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): PasskeyCeremonyOptions;
+public function finishAuthentication(#[\SensitiveParameter] array $data, ?OwnerReference $requestedOwner = null, ?string $sessionBinding = null): array;
+public function finishRegistration(Authenticatable $subject, #[\SensitiveParameter] array $data, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): Passkey;
+public function revoke(Authenticatable $subject, Passkey $passkey, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): Passkey;
 ```
 
-## AuthSocialIdentities
+## Explicit social workflows
+
+`AuthSocialAuthentication::beginLogin(provider, context, destination)` returns an authorization URL and redacted intent. Retain intent/context privately in the initiating browser. `completeLogin(provider, intent, context)` returns either `authenticated` with subject/proof, or `registration_required` with a redacted continuation. Only active exact immutable links authenticate; no email matching occurs. Subject-bound `beginReauthentication`/`completeReauthentication` issue social primary proof for `AuthReauthentication::confirm(['socialProof' => ...])`; native MFA remains mandatory.
+
+`AuthSocialLinks::beginLink(subject, provider, recentProof, context)` and `beginReconnect` consume purpose-specific recent grants before redirect. Their matching completions acquire verified SDK claims and perform the native locked mutation. `unlink(subject, identityId, recentProof, context)` enforces ownership and the final usable primary method. Raw `ExternalIdentity` input cannot create a link. Reconnect is explicit and cannot transfer ownership.
+
+`AuthRegistration::registerSocial(continuation, data, context)` and `registerInvitedSocial(invitationToken, continuation, data, context)` create without logging in. Use `requestSocialEmailVerification` / `verifySocialEmail` when provider claims lack mailbox proof. Continuations expire after 300 seconds; replacement local proof retains the original deadline and has bounded attempts/issuance. Profile/extensions remain allowlisted and consumer-mapped.
+
+## Account security and browser authority
+
+`AuthAccountSecurity::state(subject)` projects usable methods without secrets. `AuthPasswords::setInitial` and `revoke` require PasswordChange grants; removal preserves a usable primary. `AuthAccountRecovery::recover(authority, subject, data)` requires separate recovery authority, reason and closed credential selections with complete session/token containment.
+
+`AuthEmailChanges::request(subject, newEmail, recentProof, context)` stages a pending mailbox. Deliver its typed verification token privately; `complete(subject, token, context)` proves and replaces once within 60 minutes. `cancel(subject, changeId)` revokes a pending request. Generic profile updates reject replacement email.
+
+`AuthBrowserSessions::paginate`, `admit`, `revoke`, `revokeOthers` and `revokeAll` manage authoritative browser grants. Enrollment is private to successful native authentication; arbitrary principals/evidence cannot enroll. `AuthRememberCredentials::resume` consumes a rotating per-device selector/secret into native primary proof, followed by normal MFA and browser admission.
+
+`AuthImpersonation::start`, `admit`, `stop` and separately authorized `revoke` manage short-lived grants. `LaravelImpersonation` handles binding/session rotation and temporary guard identity with safe restoration. `AuthExecutionContext::facts` is a bounded read seam for consumer audit attribution and cannot confer queue authority. See [security](security.md) for restrictions.
+
+## Proof-backed completion
+
+Raw-principal `establish` and `establishForPurpose` are removed. Use complete `login` / `loginWithToken`, or optionally compose native verified proof initiation and completion:
 
 ```php
-public function completeAuthorization(string $provider, ?Authenticatable $subject = null): SocialIdentity;
-public function link(Authenticatable $subject, ExternalIdentity $identity): SocialIdentity;
-public function revoke(Authenticatable $subject, SocialIdentity $identity): SocialIdentity;
+$context = new AuthenticationRequestContext(
+    guardName: 'web', sessionBinding: $request->session()->getId(),
+);
+$proof = $authentication->proveCredentials($credentials, $context);
+$subject = $sessions->establishFromProof(
+    $proof->reveal(), $guard, $request->session(), $context,
+);
 ```
 
-`AuthenticationSessions::establishForPurpose` is an internal orchestration seam for proved passwordless/social authentication. Its explicit AuthenticationPurpose and bounded AuthenticationRequestContext select the correct eligibility policy once; it is not an HTTP input selector.
+Context is trusted host transport, never credential input. Preserve it from email request to redemption and from passkey/social initiation to completion. Passkey completion returns `subject`, `proof` and native `requestContext`; use that returned context. Social initiation returns `url` and redacted `intent`; retain the intent and context in the initiating browser session, and use `completeLogin` after SDK-managed OAuth state validation. Generic delivery challenges and social identity models cannot authenticate.
+
+For enrolled principals, password, email link/code, ordinary social and non-UV passkeys require the same second-factor continuation. Native verified UV passkeys satisfy MFA. Handle `second_factor_required` with the host factor form, then call `Authentication::completeSecondFactor($factorProof, $guard, $session)`. Final verified authentication proofs/continuations expire after 300 seconds and share five failed factor attempts. Primary email delivery retains its configured digits/fallback digits, TTL and primary attempt limit; those settings do not change final proof/MFA limits. TOTP or recovery follows valid primary proof; recovery is never a primary login method. A custom `AuthenticationAssurancePolicy` can add requirements but cannot disable native enrollment enforcement.
+
+For optional stateless composition, supply a trusted `tokenNamespace` and a cryptographically random `flowNonce` of at least 32 characters to `proveCredentialsForToken`, then call `AuthTokens::authenticateFromProof($proof->reveal(), $token, $context)`. Token operations never inspect browser state. Session and token proofs reject each other's destination and reject changed guard, browser, owner intent, namespace or nonce.
+
+Only `IssuedAuthenticationProof::reveal()` discloses the bearer. Debug output is redacted; JSON/PHP serialization throws. Hooks receive method, subject and bounded operation attributes, never credentials, factor codes, proof bearers or password fingerprints. Exactly one terminal invocation with the original context is required. Native canonical/password/revision/enrollment checks surround consumer hooks.
+
+Successful proof consumption precedes configurable login/token pipelines. A later ordinary pipeline rejection leaves it consumed; explicit outer token rollback restores all transaction-participating proof/token/fact state atomically. Complete browser guard transitions outside host domain transactions.
+
+## Native recent authentication
+
+```php
+$context = new AuthenticationRequestContext(guardName: 'web', sessionBinding: $request->session()->getId());
+$grant = $reauthentication->confirm($subject, ['password' => $password, 'code' => $totp], RecentAuthenticationPurpose::PasswordChange, $context);
+$passwords->update($subject, ['password' => $newPassword, 'passwordConfirmation' => $newPassword], $grant->reveal(), $context);
+```
+
+`AuthReauthentication::confirm()` accepts exactly one primary (`password`, an opaque `passkeyProof` or `socialProof`) and at most one `code`/`recoveryCode`. Use `AuthPasskeys::beginReauthentication()` and `finishAuthentication()` for a subject-bound passkey receipt; session-login receipts cannot be reused for confirmation. Verified UV supports passwordless principals. Social receipts must come from the same subject’s active immutable link and a connection explicitly supporting reauthentication. TOTP/recovery alone is insufficient.
+
+Confirmation runs outside the principal source transaction. The grant binds the closed `RecentAuthenticationPurpose`, canonical subject, current security revision and trusted guard/session for 300 seconds. The intended mutation consumes it inside its own transaction: rollback restores grant/mutation, while the previously committed factor stays spent. Self-service password/email/deletion, factor enrollment/removal, recovery regeneration and social linking/unlinking/reconnection require the matching grant even through direct PHP calls. Enrollment begin and completion are distinct operations, each accepting an explicit grant; an operation that changes security revision requires a new confirmation for later operations.
+
+`AccountConfirmation::assertConfirmed(subject, AuthenticationEvidence, RecentAuthenticationPurpose)` adds host policy after mandatory native validation. It receives no credential, bearer or password fingerprint and cannot disable validation. Native proof/security-state schema is mandatory; optional method flags do not erase enrollment requirements. `auth.password_confirmed_at` remains presentation only. Separately authorized administration and `SystemMutationContext` keep their existing authority; consumers deliberately orchestrate any human-admin step-up.
+
+## Stateful source boundary
+
+`AuthenticationSessions::assertCanTransition(?Authenticatable $subject = null): void` is the narrow preflight for immediate browser compositions. Call it before native primary verification, OAuth/session-map mutation or SDK work; then use the complete native finalizer. It checks actual configured principal/provider, proof and audit source connections. `login`, `establishFromProof`, pending-factor completion, logout and self-deletion enforce this themselves before their effects. Pure proof issuance and ordinary domain mutations may join the caller transaction. Commit registration before login. Do not wrap self-delete-with-logout in a host transaction.
+
+The rejection is `stateful_transaction_unsupported` with status409. No testing-transaction exception exists. Browser failure cleanup invalidates the session/CSRF and clears partial authentication; native success facts remain on their source commit. Framework guard events and consumer external side effects cannot be un-fired by SQL rollback.
+
+### Canonical email identity adoption
+
+`PrincipalEmailIdentity::normalize(string $email): string` and `key(string $email): string` use exact UTF-8 lowercase/trim semantics without provider-specific rewriting. `PrincipalEmailIdentityAdoption::plan()` returns `missing`, bounded `collisions` (`key`, `subjectIds`), and `ready`. `apply(SystemMutationContext $authority)` returns `updated` and `finalized`; explicit system authorization and drained legacy workers are required. Host-owned DDL remains the host's responsibility.

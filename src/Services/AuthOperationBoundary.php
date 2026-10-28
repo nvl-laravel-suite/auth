@@ -29,6 +29,8 @@ final readonly class AuthOperationBoundary
     public function central(AuthIdentityOperation $operation, ?Authenticatable $subject = null): void
     {
         $feature = match ($operation) {
+            AuthIdentityOperation::Impersonation => AuthFeature::Impersonation,
+            AuthIdentityOperation::Registration => AuthFeature::Registration,
             AuthIdentityOperation::Login, AuthIdentityOperation::Logout => AuthFeature::Authentication,
             AuthIdentityOperation::Recovery, AuthIdentityOperation::Password => AuthFeature::Password,
             AuthIdentityOperation::VerifyEmail => AuthFeature::EmailVerification,

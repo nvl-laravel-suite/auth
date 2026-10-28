@@ -24,10 +24,14 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Models\AuthClientSession;
+use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\Challenge;
+use Nvl\Auth\Models\Impersonation;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\Passkey;
+use Nvl\Auth\Models\PendingEmailChange;
 use Nvl\Auth\Models\RecoveryCode;
+use Nvl\Auth\Models\RememberCredential;
 use Nvl\Auth\Models\SocialIdentity;
 use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\ValueObjects\LegacyPasswordResetMapping;
@@ -169,7 +173,7 @@ final readonly class AuthMaintenance
         $seenEmails = [];
         foreach ($rows as $row) {
             $id = $this->adoptPrincipalsRequiredString($this->adoptPrincipalsValue($row, $mapping->columns, PrincipalAttribute::Id), 'principal id');
-            $email = mb_strtolower($this->adoptPrincipalsRequiredString($this->adoptPrincipalsValue($row, $mapping->columns, PrincipalAttribute::Email), "principal {$id} email"));
+            $email = PrincipalEmailIdentity::normalize($this->adoptPrincipalsRequiredString($this->adoptPrincipalsValue($row, $mapping->columns, PrincipalAttribute::Email), "principal {$id} email"));
             if (! Str::isUuid($id) || isset($seenIds[$id])) {
                 throw new InvalidArgumentException("Auth principal identity [{$id}] is invalid or duplicated.");
             }
@@ -200,7 +204,7 @@ final readonly class AuthMaintenance
         $tokens = [];
         $seen = [];
         foreach ($rows as $row) {
-            $email = mb_strtolower($this->adoptPrincipalsRequiredString($row->{$mapping->columns['email']} ?? null, 'password-reset email'));
+            $email = PrincipalEmailIdentity::normalize($this->adoptPrincipalsRequiredString($row->{$mapping->columns['email']} ?? null, 'password-reset email'));
             if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || isset($seen[$email])) {
                 throw new InvalidArgumentException("Auth password-reset email [{$email}] is invalid or duplicated.");
             }
@@ -518,7 +522,7 @@ final readonly class AuthMaintenance
             $query->where('expires_at', '<', $cutoff)->orWhere('consumed_at', '<', $cutoff)->orWhere('revoked_at', '<', $cutoff);
         })];
         $queries = $ownedQueries;
-        $queries += ['totp_credentials' => TotpCredential::query()->where('revoked_at', '<', $cutoff), 'passkeys' => Passkey::query()->where('revoked_at', '<', $cutoff), 'recovery_codes' => RecoveryCode::query()->where(function (Builder $query) use ($cutoff): void {
+        $queries += ['impersonations' => Impersonation::query()->where('expires_at', '<', $cutoff), 'remember_credentials' => RememberCredential::query()->where('absolute_expires_at', '<', $cutoff), 'browser_sessions' => BrowserSession::query()->where('absolute_expires_at', '<', $cutoff), 'pending_email_changes' => PendingEmailChange::query()->where('expires_at', '<', $cutoff), 'totp_credentials' => TotpCredential::query()->where('revoked_at', '<', $cutoff), 'passkeys' => Passkey::query()->where('revoked_at', '<', $cutoff), 'recovery_codes' => RecoveryCode::query()->where(function (Builder $query) use ($cutoff): void {
             $query->where('used_at', '<', $cutoff)->orWhere('revoked_at', '<', $cutoff);
         }), 'social_identities' => SocialIdentity::query()->where('revoked_at', '<', $cutoff), 'client_sessions' => AuthClientSession::query()->where('ended_at', '<', $cutoff)];
         $connection = (new Invitation)->getConnectionName();

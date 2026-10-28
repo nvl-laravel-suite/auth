@@ -19,5 +19,5 @@ interface InvitationSubjectResolver
      *
      * @param  array<string, mixed>  $input
      */
-    public function resolve(Invitation $invitation, array $input): Authenticatable;
+    public function resolve(Invitation $invitation, #[\SensitiveParameter] array $input): Authenticatable;
 }

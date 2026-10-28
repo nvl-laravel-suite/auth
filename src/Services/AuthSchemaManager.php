@@ -19,13 +19,13 @@ use RuntimeException;
 final readonly class AuthSchemaManager
 {
     /** @var array<string, list<string>> */
-    private const array REQUIRED_COLUMNS = [AuthTables::Invitations => ['context_hash', 'current_delivery_message_id', 'delivery_status', 'delivery_attempted_at', 'delivered_at', 'delivery_failed_at', 'delivery_failure_code'], AuthTables::Challenges => ['secondary_secret_hash']];
+    private const array REQUIRED_COLUMNS = [AuthTables::Impersonations => ['id', 'actor_type', 'actor_id', 'effective_subject_type', 'effective_subject_id', 'browser_session_id', 'guard_name', 'actor_revision', 'target_revision', 'reason', 'owner_reference', 'active_session_key', 'started_at', 'expires_at', 'stopped_at', 'stop_reason'], AuthTables::RememberCredentials => ['id', 'selector', 'secret_hash', 'subject_type', 'subject_id', 'guard_name', 'provider_hash', 'session_family_id', 'security_revision', 'absolute_expires_at', 'consumed_at', 'revoked_at', 'rotated_to_id'], AuthTables::BrowserSessions => ['id', 'subject_type', 'subject_id', 'guard_name', 'provider_hash', 'binding_hash', 'security_revision', 'session_family_id', 'method', 'assurance', 'authenticated_at', 'last_seen_at', 'absolute_expires_at', 'revoked_at'], AuthTables::PendingEmailChanges => ['id', 'subject_type', 'subject_id', 'new_email', 'email_hash', 'token_hash', 'security_revision', 'active_key', 'context', 'expires_at', 'consumed_at', 'revoked_at'], AuthTables::PrincipalSecurityStates => ['id', 'subject_type', 'subject_id', 'revision', 'created_at', 'updated_at'], AuthTables::Invitations => ['context_hash', 'current_delivery_message_id', 'delivery_status', 'delivery_attempted_at', 'delivered_at', 'delivery_failed_at', 'delivery_failure_code'], AuthTables::Challenges => ['secondary_secret_hash']];
 
     /** @var array<string, list<string>> */
-    private const array REQUIRED_INDEXES = [AuthTables::Invitations => ['nvl_auth_invitations_context_hash_index', 'nvl_auth_invitations_delivery_status_index'], AuthTables::Challenges => ['nvl_auth_challenges_secondary_secret_hash_unique']];
+    private const array REQUIRED_INDEXES = [AuthTables::Impersonations => ['nvl_auth_impersonation_active_unique'], AuthTables::RememberCredentials => ['nvl_auth_remember_selector_unique'], AuthTables::BrowserSessions => ['nvl_auth_browser_binding_unique'], AuthTables::PendingEmailChanges => ['nvl_auth_pending_email_active_unique'], AuthTables::PrincipalSecurityStates => ['nvl_auth_principal_security_states_subject_unique'], AuthTables::Invitations => ['nvl_auth_invitations_context_hash_index', 'nvl_auth_invitations_delivery_status_index'], AuthTables::Challenges => ['nvl_auth_challenges_secondary_secret_hash_unique']];
 
     /** Native Auth operation. */
-    public function __construct(private AuthConfiguration $configuration) {}
+    public function __construct(private AuthConfiguration $configuration, private AuthModelRegistry $models) {}
 
     /**
      * Plan or repair the schema required by enabled Auth features.
@@ -51,6 +51,13 @@ final readonly class AuthSchemaManager
             }
             $this->migration('2026_08_12_000000_nvl_auth_add_auth_delivery_context_columns.php')->up();
             $this->migration('2026_08_28_000000_nvl_auth_add_invitation_delivery_outcomes.php')->up();
+            $this->migration('2026_10_27_000001_nvl_auth_create_principal_security_states.php')->up();
+            $this->migration('2026_10_27_000002_nvl_auth_ensure_authentication_challenges.php')->up();
+            $this->migration('2026_10_27_000003_nvl_auth_add_normalized_email_identity.php')->up();
+            $this->migration('2026_10_28_000001_nvl_auth_create_pending_email_changes.php')->up();
+            $this->migration('2026_10_28_000002_nvl_auth_create_browser_sessions.php')->up();
+            $this->migration('2026_10_28_000003_nvl_auth_create_remember_credentials.php')->up();
+            $this->migration('2026_10_28_000004_nvl_auth_create_impersonations.php')->up();
         }
         $remaining = array_values(array_filter($required, static fn (string $table): bool => ! $schema->hasTable($table)));
         $remainingOutdated = $this->outdatedTables($schema, $required);
@@ -72,6 +79,9 @@ final readonly class AuthSchemaManager
     {
         $outdated = [];
         $requirements = self::REQUIRED_COLUMNS;
+        $class = $this->models->userClass();
+        $model = new $class;
+        $requirements[$model->getTable()] = [$model->getEmailIdentityHashName()];
         foreach ($requirements as $table => $columns) {
             if (! in_array($table, $required, true) || ! $schema->hasTable($table)) {
                 continue;
@@ -94,11 +104,15 @@ final readonly class AuthSchemaManager
     private function missingIndexes(Builder $schema, array $required): array
     {
         $missingIndexes = [];
-        foreach (self::REQUIRED_INDEXES as $table => $indexes) {
+        $requirements = self::REQUIRED_INDEXES;
+        $class = $this->models->userClass();
+        $model = new $class;
+        $requirements[$model->getTable()] = [PrincipalEmailIdentity::INDEX];
+        foreach ($requirements as $table => $indexes) {
             if (! in_array($table, $required, true) || ! $schema->hasTable($table)) {
                 continue;
             }
-            $missing = array_values(array_filter($indexes, static fn (string $index): bool => ! $schema->hasIndex($table, $index)));
+            $missing = array_values(array_filter($indexes, static fn (string $index): bool => $table === $model->getTable() ? ! PrincipalEmailIdentity::indexReady($model) : ($table === AuthTables::PrincipalSecurityStates ? ! PrincipalSecuritySchema::indexReady($schema) : ! $schema->hasIndex($table, $index))));
             if ($missing !== []) {
                 $missingIndexes[$table] = $missing;
             }
@@ -129,7 +143,17 @@ final readonly class AuthSchemaManager
      */
     public function requiredTables(): array
     {
-        $tables = [];
+        $tables = [AuthTables::PrincipalSecurityStates, AuthTables::get(AuthTables::Challenges)];
+        if ($this->enabled(AuthFeature::Impersonation)) {
+            $tables[] = AuthTables::Impersonations;
+        }
+        if ($this->enabled(AuthFeature::ManagedSessions)) {
+            $tables[] = AuthTables::BrowserSessions;
+            $tables[] = AuthTables::RememberCredentials;
+        }
+        if ($this->enabled(AuthFeature::EmailVerification)) {
+            $tables[] = AuthTables::PendingEmailChanges;
+        }
         if ($this->enabled(AuthFeature::PrincipalManagement)) {
             $tables[] = $this->table('users', AuthTables::get(AuthTables::Users));
         }

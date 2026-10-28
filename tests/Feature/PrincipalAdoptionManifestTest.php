@@ -13,6 +13,9 @@ function validPrincipalAdoptionManifest(): array
     $columns = [];
 
     foreach (PrincipalAttribute::cases() as $attribute) {
+        if ($attribute === PrincipalAttribute::EmailIdentityHash) {
+            continue;
+        }
         $columns[$attribute->value] = $attribute->value;
     }
 

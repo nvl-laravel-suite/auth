@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Providers;
 
+use Illuminate\Auth\AuthManager;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Contracts\Cookie\QueueingFactory;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
@@ -13,7 +16,9 @@ use Nvl\Auth\Adapters\ApiTokens\SanctumApiTokenManager;
 use Nvl\Auth\Adapters\Laravel\EloquentAuthSubjectResolver;
 use Nvl\Auth\Adapters\Laravel\LaravelGuardIdentifierResolver;
 use Nvl\Auth\Adapters\Laravel\LaravelPrincipalSessionContainment;
+use Nvl\Auth\Adapters\Laravel\ManagedSessionGuard;
 use Nvl\Auth\Adapters\Passkeys\WebauthnPasskeyCeremony;
+use Nvl\Auth\Console\Commands\AdoptEmailIdentitiesCommand;
 use Nvl\Auth\Console\Commands\AdoptPrincipalsCommand;
 use Nvl\Auth\Console\Commands\AuthConfigurationCommand;
 use Nvl\Auth\Console\Commands\AuthConfigureCommand;
@@ -21,28 +26,33 @@ use Nvl\Auth\Console\Commands\AuthDoctorCommand;
 use Nvl\Auth\Console\Commands\InstallAuthSchemaCommand;
 use Nvl\Auth\Console\Commands\ListAuthFeaturesCommand;
 use Nvl\Auth\Console\Commands\PruneAuthStateCommand;
+use Nvl\Auth\Contracts\AccountAuthenticationPolicy;
 use Nvl\Auth\Contracts\AccountConfirmation;
 use Nvl\Auth\Contracts\ApiTokenAbilityProvider;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthAuditContextProvider;
 use Nvl\Auth\Contracts\AuthAuditRecorder as AuthAuditRecorderContract;
+use Nvl\Auth\Contracts\AuthenticationAssurancePolicy;
 use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\AuthIdentifierResolver;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
+use Nvl\Auth\Contracts\ImpersonationAccess;
 use Nvl\Auth\Contracts\InvitationRecipientProof;
 use Nvl\Auth\Contracts\InvitationRegistrationMapper;
 use Nvl\Auth\Contracts\InvitationSubjectResolver;
 use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
+use Nvl\Auth\Contracts\PasswordPolicy;
 use Nvl\Auth\Contracts\PasswordUpdater;
 use Nvl\Auth\Contracts\PermissionCatalogProvider;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
+use Nvl\Auth\Contracts\PrincipalExtensionMapper;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
 use Nvl\Auth\Contracts\RbacPrincipalAccess;
+use Nvl\Auth\Contracts\RegistrationAdmission;
 use Nvl\Auth\Contracts\RoleTemplateProvider;
-use Nvl\Auth\Contracts\SocialIdentityProvider;
-use Nvl\Auth\Contracts\SocialSubjectResolver;
+use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Contracts\SystemMutationAccess;
 use Nvl\Auth\Definitions\Tables\AuthTables;
@@ -57,14 +67,20 @@ use Nvl\Auth\Services\AuthAuditWriter;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthDoctor;
 use Nvl\Auth\Services\Authentication;
+use Nvl\Auth\Services\AuthenticationSessions;
+use Nvl\Auth\Services\AuthExecutionContext;
 use Nvl\Auth\Services\AuthManagementAbilityCatalog;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\AuthOwnerContextParticipant;
 use Nvl\Auth\Services\AuthOwnershipState;
+use Nvl\Auth\Services\AuthRememberCredentials;
 use Nvl\Auth\Services\AuthSchemaManager;
 use Nvl\Auth\Services\CentralIdentityAuditRecorder;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
+use Nvl\Auth\Services\ConfiguredPasswordPolicy;
 use Nvl\Auth\Services\ConfiguredPrincipalAttributeMapper;
+use Nvl\Auth\Services\ConfiguredRegistrationAdmission;
+use Nvl\Auth\Services\DenyImpersonationAccess;
 use Nvl\Auth\Services\DenySystemMutationAccess;
 use Nvl\Auth\Services\DisabledInvitationRecipientProof;
 use Nvl\Auth\Services\EloquentMembershipPrincipalResolver;
@@ -72,6 +88,7 @@ use Nvl\Auth\Services\EloquentPasswordUpdater;
 use Nvl\Auth\Services\EloquentRbacPrincipalAccess;
 use Nvl\Auth\Services\EloquentSuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Services\EmptyAuthAuditContext;
+use Nvl\Auth\Services\EnrolledFactorAssurancePolicy;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\FeatureManifest;
 use Nvl\Auth\Services\LaravelGateAuthManagementAccess;
@@ -81,11 +98,13 @@ use Nvl\Auth\Services\PasswordAccountConfirmation;
 use Nvl\Auth\Services\PermissionCatalogRegistry;
 use Nvl\Auth\Services\PermissionRegistrarReference;
 use Nvl\Auth\Services\PermissionStorageReadiness;
+use Nvl\Auth\Services\PrincipalCreationGuard;
 use Nvl\Auth\Services\PrincipalEligibility;
 use Nvl\Auth\Services\RbacPrincipalTracker;
+use Nvl\Auth\Services\RejectPrincipalExtensions;
 use Nvl\Auth\Services\RoleTemplateRegistry;
-use Nvl\Auth\Services\UnavailableSocialIdentityProvider;
-use Nvl\Auth\Services\UnavailableSocialSubjectResolver;
+use Nvl\Auth\Services\UnavailableSocialIdentityProviderFactory;
+use Nvl\Auth\Services\UsableAccountAuthenticationPolicy;
 use Nvl\Ownership\Services\OwnershipAdoptionRegistry;
 use Nvl\Support\Doctor\PackageDoctorContributor;
 use Nvl\Support\Globals\GlobalNames;
@@ -95,6 +114,7 @@ use Nvl\Support\Ownership\Services\OwnershipResourceRegistry;
 use Nvl\Support\Traits\MergesPackageConfiguration;
 use Nvl\Support\Traits\RegistersNamespacedResources;
 use Spatie\Permission\PermissionRegistrar;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Registers the passive package layer and lazy feature integrations.
@@ -109,6 +129,12 @@ final class AuthServiceProvider extends ServiceProvider implements OwnershipInte
      */
     public function register(): void
     {
+        $this->callAfterResolving('auth', function (AuthManager $auth): void {
+            $factory = $this->createManagedGuard(...);
+            $auth->extend('nvl-managed-session', function ($app, string $name, array $config) use ($factory): ManagedSessionGuard {
+                return $factory($name, $config);
+            });
+        });
         PackageDoctorContributor::register($this->app, 'nvl/auth', fn (): array => array_map(static fn (array $check): array => ['key' => $check['name'], ...$check], $this->app->make(AuthDoctor::class)->inspect()));
         $this->mergePackageConfiguration(dirname(__DIR__, 2).'/config/nvl-auth.php', 'nvl-auth');
         $this->configureOwnedIdentityStorage();
@@ -118,6 +144,8 @@ final class AuthServiceProvider extends ServiceProvider implements OwnershipInte
         $this->app->singleton(AuthSchemaManager::class);
         $this->app->singleton(FeatureManifest::class);
         $this->app->scoped(FeatureGate::class);
+        $this->app->scoped(AuthExecutionContext::class);
+        $this->app->scoped(PrincipalCreationGuard::class);
         $this->app->scoped(AuthOwnershipState::class);
         $this->app->scoped(RbacPrincipalTracker::class);
         $this->app->scoped(AuthOwnerContextParticipant::class);
@@ -151,8 +179,13 @@ final class AuthServiceProvider extends ServiceProvider implements OwnershipInte
         $this->app->scoped(CentralIdentityAuditRecorder::class);
         $this->bindConfiguredContract(AuthAuditRecorderContract::class, 'features.audit.services.recorder', AuthAuditRecorder::class, scoped: true);
         $this->bindConfiguredContract(AuthManagementAccess::class, 'services.management_access', LaravelGateAuthManagementAccess::class);
+        $this->bindConfiguredContract(PasswordPolicy::class, 'features.password.services.policy', ConfiguredPasswordPolicy::class);
         $this->bindConfiguredContract(PasswordUpdater::class, 'features.password.services.updater', EloquentPasswordUpdater::class);
+        $this->bindConfiguredContract(RegistrationAdmission::class, 'features.registration.services.admission', ConfiguredRegistrationAdmission::class);
+        $this->bindConfiguredContract(PrincipalExtensionMapper::class, 'features.principal_management.services.extension_mapper', RejectPrincipalExtensions::class);
         $this->bindConfiguredContract(PrincipalAttributeMapper::class, 'features.principal_management.services.attribute_mapper', ConfiguredPrincipalAttributeMapper::class);
+        $this->bindConfiguredContract(AccountAuthenticationPolicy::class, 'features.principal_management.services.authentication_policy', UsableAccountAuthenticationPolicy::class);
+        $this->bindConfiguredContract(ImpersonationAccess::class, 'features.impersonation.services.access', DenyImpersonationAccess::class, scoped: true);
         $this->bindConfiguredContract(AccountConfirmation::class, 'features.principal_management.services.account_confirmation', PasswordAccountConfirmation::class);
         $this->bindConfiguredContract(PrincipalSessionContainment::class, 'features.principal_management.services.session_containment', LaravelPrincipalSessionContainment::class);
         $this->bindConfiguredContract(RbacPrincipalAccess::class, 'features.rbac.services.principal_access', EloquentRbacPrincipalAccess::class);
@@ -160,11 +193,11 @@ final class AuthServiceProvider extends ServiceProvider implements OwnershipInte
         $this->bindConfiguredContract(AuthSubjectResolver::class, 'features.authentication.services.subject_resolver', EloquentAuthSubjectResolver::class);
         $this->bindConfiguredContract(AuthIdentifierResolver::class, 'features.authentication.services.identifier_resolver', LaravelGuardIdentifierResolver::class);
         $this->bindConfiguredContract(SuccessfulLoginMetadataRecorder::class, 'features.authentication.services.login_metadata_recorder', EloquentSuccessfulLoginMetadataRecorder::class);
+        $this->bindConfiguredContract(AuthenticationAssurancePolicy::class, 'features.authentication.services.assurance', EnrolledFactorAssurancePolicy::class);
         $this->bindConfiguredContract(AuthenticationEligibility::class, 'features.authentication.services.eligibility', PrincipalEligibility::class);
         $this->bindConfiguredContract(ApiTokenManager::class, 'features.api_tokens.services.manager', SanctumApiTokenManager::class);
         $this->bindConfiguredContract(ApiTokenAbilityProvider::class, 'features.api_tokens.services.ability_provider', ConfiguredApiTokenAbilityProvider::class);
-        $this->bindConfiguredContract(SocialIdentityProvider::class, 'features.social_identities.services.provider', UnavailableSocialIdentityProvider::class);
-        $this->bindConfiguredContract(SocialSubjectResolver::class, 'features.social_identities.services.subject_resolver', UnavailableSocialSubjectResolver::class);
+        $this->bindConfiguredContract(SocialIdentityProviderFactory::class, 'features.social_identities.services.provider_factory', UnavailableSocialIdentityProviderFactory::class, scoped: true);
         $this->bindConfiguredContract(PasskeyCeremony::class, 'features.passkeys.services.ceremony', WebauthnPasskeyCeremony::class);
         $this->bindConfiguredContract(InvitationSubjectResolver::class, 'features.invitations.services.subject_resolver', PackageInvitationSubjectResolver::class);
         $this->bindConfiguredContract(InvitationRegistrationMapper::class, 'features.invitations.services.registration_mapper', PackageInvitationRegistrationMapper::class);
@@ -194,11 +227,14 @@ final class AuthServiceProvider extends ServiceProvider implements OwnershipInte
             $this->loadMigrationsFrom($root.'/database/migrations');
         }
         if ($configuration->enabled() && $configuration->featureEnabled(AuthFeature::ApiTokens)) {
+            if (! class_exists(Sanctum::class)) {
+                throw AuthException::invalidConfiguration('API tokens require laravel/sanctum.');
+            }
             $models = $this->app->make(AuthModelRegistry::class);
             Sanctum::usePersonalAccessTokenModel($models->personalAccessTokenClass());
         }
         if ($this->app->runningInConsole()) {
-            $this->commands([AdoptPrincipalsCommand::class, AuthConfigurationCommand::class, AuthConfigureCommand::class, AuthDoctorCommand::class, InstallAuthSchemaCommand::class, ListAuthFeaturesCommand::class, PruneAuthStateCommand::class]);
+            $this->commands([AdoptEmailIdentitiesCommand::class, AdoptPrincipalsCommand::class, AuthConfigurationCommand::class, AuthConfigureCommand::class, AuthDoctorCommand::class, InstallAuthSchemaCommand::class, ListAuthFeaturesCommand::class, PruneAuthStateCommand::class]);
         }
     }
 
@@ -322,5 +358,31 @@ final class AuthServiceProvider extends ServiceProvider implements OwnershipInte
         }
 
         return $extensions;
+    }
+
+    /** @param array<array-key, mixed> $config */
+    private function createManagedGuard(string $name, array $config): ManagedSessionGuard
+    {
+        if (config('nvl-auth.features.managed_sessions.enabled') !== true || ! is_string($config['provider'] ?? null)) {
+            throw AuthException::invalidConfiguration('The managed guard requires managed sessions and an explicit provider.');
+        }
+        $auth = $this->app->make(AuthManager::class);
+        $provider = $auth->createUserProvider($config['provider']);
+        $session = $this->app->make('session.store');
+        $key = config('app.key');
+        if ($provider === null || ! is_string($key)) {
+            throw AuthException::invalidConfiguration('Invalid managed guard dependencies.');
+        }
+        $guard = new ManagedSessionGuard($name, $provider, $session, hashKey: $key);
+        $guard->configureNative($this->app->make(AuthRememberCredentials::class), $this->app->make(AuthenticationSessions::class));
+        $guard->setCookieJar($this->app->make(QueueingFactory::class));
+        $guard->setDispatcher($this->app->make(Dispatcher::class));
+        $request = $this->app->refresh('request', $guard, 'setRequest');
+        if (! $request instanceof Request) {
+            throw AuthException::invalidConfiguration('The managed guard requires a current request.');
+        }
+        $guard->setRequest($request);
+
+        return $guard;
     }
 }
