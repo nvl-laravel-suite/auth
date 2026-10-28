@@ -19,10 +19,10 @@ use RuntimeException;
 final readonly class AuthSchemaManager
 {
     /** @var array<string, list<string>> */
-    private const array REQUIRED_COLUMNS = [AuthTables::PrincipalSecurityStates => ['id', 'subject_type', 'subject_id', 'revision', 'created_at', 'updated_at'], AuthTables::Invitations => ['context_hash', 'current_delivery_message_id', 'delivery_status', 'delivery_attempted_at', 'delivered_at', 'delivery_failed_at', 'delivery_failure_code'], AuthTables::Challenges => ['secondary_secret_hash']];
+    private const array REQUIRED_COLUMNS = [AuthTables::PendingEmailChanges => ['id', 'subject_type', 'subject_id', 'new_email', 'email_hash', 'token_hash', 'security_revision', 'active_key', 'context', 'expires_at', 'consumed_at', 'revoked_at'], AuthTables::PrincipalSecurityStates => ['id', 'subject_type', 'subject_id', 'revision', 'created_at', 'updated_at'], AuthTables::Invitations => ['context_hash', 'current_delivery_message_id', 'delivery_status', 'delivery_attempted_at', 'delivered_at', 'delivery_failed_at', 'delivery_failure_code'], AuthTables::Challenges => ['secondary_secret_hash']];
 
     /** @var array<string, list<string>> */
-    private const array REQUIRED_INDEXES = [AuthTables::PrincipalSecurityStates => ['nvl_auth_principal_security_states_subject_unique'], AuthTables::Invitations => ['nvl_auth_invitations_context_hash_index', 'nvl_auth_invitations_delivery_status_index'], AuthTables::Challenges => ['nvl_auth_challenges_secondary_secret_hash_unique']];
+    private const array REQUIRED_INDEXES = [AuthTables::PendingEmailChanges => ['nvl_auth_pending_email_active_unique'], AuthTables::PrincipalSecurityStates => ['nvl_auth_principal_security_states_subject_unique'], AuthTables::Invitations => ['nvl_auth_invitations_context_hash_index', 'nvl_auth_invitations_delivery_status_index'], AuthTables::Challenges => ['nvl_auth_challenges_secondary_secret_hash_unique']];
 
     /** Native Auth operation. */
     public function __construct(private AuthConfiguration $configuration, private AuthModelRegistry $models) {}
@@ -54,6 +54,7 @@ final readonly class AuthSchemaManager
             $this->migration('2026_10_27_000001_nvl_auth_create_principal_security_states.php')->up();
             $this->migration('2026_10_27_000002_nvl_auth_ensure_authentication_challenges.php')->up();
             $this->migration('2026_10_27_000003_nvl_auth_add_normalized_email_identity.php')->up();
+            $this->migration('2026_10_28_000001_nvl_auth_create_pending_email_changes.php')->up();
         }
         $remaining = array_values(array_filter($required, static fn (string $table): bool => ! $schema->hasTable($table)));
         $remainingOutdated = $this->outdatedTables($schema, $required);
@@ -140,6 +141,9 @@ final readonly class AuthSchemaManager
     public function requiredTables(): array
     {
         $tables = [AuthTables::PrincipalSecurityStates, AuthTables::get(AuthTables::Challenges)];
+        if ($this->enabled(AuthFeature::EmailVerification)) {
+            $tables[] = AuthTables::PendingEmailChanges;
+        }
         if ($this->enabled(AuthFeature::PrincipalManagement)) {
             $tables[] = $this->table('users', AuthTables::get(AuthTables::Users));
         }

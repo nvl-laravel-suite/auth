@@ -37,7 +37,7 @@ final readonly class AuthDeliveryRequest
             AuthFeature::EmailVerification => AuthMessageType::EmailVerification,
             default => null,
         };
-        if ($supportedType !== $this->type) {
+        if ($supportedType !== $this->type && ! ($this->feature === AuthFeature::EmailVerification && in_array($this->type, [AuthMessageType::EmailChangeVerification, AuthMessageType::EmailChangeNotification], true))) {
             throw new InvalidArgumentException('Auth delivery feature and message type are incompatible.');
         }
         if ($this->invitation !== null && $this->feature !== AuthFeature::Invitations) {
