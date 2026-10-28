@@ -20,6 +20,7 @@ final readonly class AuthenticateAuthGuard
     public function __construct(
         private Authenticate $authenticate,
         private AuthConfiguration $configuration,
+        private AdmitManagedAuthSession $sessions,
     ) {}
 
     /**
@@ -31,7 +32,7 @@ final readonly class AuthenticateAuthGuard
     {
         $response = $this->authenticate->handle(
             $request,
-            $next,
+            fn (Request $authenticated): Response => $this->sessions->handle($authenticated, $next),
             $this->configuration->string('guard', 'web'),
         );
 

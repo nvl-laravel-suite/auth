@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Ownership;
 
 use Nvl\Auth\Models\AuthAudit;
+use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\OwnerAuthenticationIntent;
@@ -50,6 +51,7 @@ final readonly class AuthResourceRegistrar
             'auth.invitations' => [Invitation::class, $owned, true],
             ...(class_exists(\Laravel\Sanctum\PersonalAccessToken::class) ? ['auth.tokens' => [$this->models->personalAccessTokenClass(), $owned, true]] : []),
             'auth.challenges' => [Challenge::class, $owned, true],
+            'auth.browser_sessions' => [BrowserSession::class, false, true],
             'auth.pending_email_changes' => [PendingEmailChange::class, false, true],
             'auth.security_states' => [PrincipalSecurityState::class, false, true],
             'auth.audits' => [AuthAudit::class, $owned, true],

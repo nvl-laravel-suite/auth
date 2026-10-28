@@ -228,6 +228,7 @@ return [
 
             'settings' => [],
         ],
+        'managed_sessions' => ['enabled' => false, 'settings' => ['absolute_lifetime_seconds' => 43200, 'admission_integrated' => false]],
         'sessions' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_SESSIONS_ENABLED', true),
 

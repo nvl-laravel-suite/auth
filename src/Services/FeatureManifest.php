@@ -83,6 +83,7 @@ final class FeatureManifest
                 $readWrite,
                 [AuthFeature::Authentication],
                 managementAbilities: $managementAbilities->abilitiesFor(AuthFeature::Clients), ),
+            new FeatureDefinition(AuthFeature::ManagedSessions, [FeatureOperation::Read, FeatureOperation::Use, FeatureOperation::Revoke, FeatureOperation::Cleanup], [AuthFeature::Authentication, AuthFeature::Sessions]),
             new FeatureDefinition(AuthFeature::Sessions,
                 [FeatureOperation::Read, FeatureOperation::Use, FeatureOperation::Revoke],
                 [AuthFeature::Authentication], ),

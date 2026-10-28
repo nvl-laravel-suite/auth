@@ -24,6 +24,7 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Models\AuthClientSession;
+use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\Passkey;
@@ -519,7 +520,7 @@ final readonly class AuthMaintenance
             $query->where('expires_at', '<', $cutoff)->orWhere('consumed_at', '<', $cutoff)->orWhere('revoked_at', '<', $cutoff);
         })];
         $queries = $ownedQueries;
-        $queries += ['pending_email_changes' => PendingEmailChange::query()->where('expires_at', '<', $cutoff), 'totp_credentials' => TotpCredential::query()->where('revoked_at', '<', $cutoff), 'passkeys' => Passkey::query()->where('revoked_at', '<', $cutoff), 'recovery_codes' => RecoveryCode::query()->where(function (Builder $query) use ($cutoff): void {
+        $queries += ['browser_sessions' => BrowserSession::query()->where('absolute_expires_at', '<', $cutoff), 'pending_email_changes' => PendingEmailChange::query()->where('expires_at', '<', $cutoff), 'totp_credentials' => TotpCredential::query()->where('revoked_at', '<', $cutoff), 'passkeys' => Passkey::query()->where('revoked_at', '<', $cutoff), 'recovery_codes' => RecoveryCode::query()->where(function (Builder $query) use ($cutoff): void {
             $query->where('used_at', '<', $cutoff)->orWhere('revoked_at', '<', $cutoff);
         }), 'social_identities' => SocialIdentity::query()->where('revoked_at', '<', $cutoff), 'client_sessions' => AuthClientSession::query()->where('ended_at', '<', $cutoff)];
         $connection = (new Invitation)->getConnectionName();

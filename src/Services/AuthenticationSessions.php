@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Auth\SessionGuard;
@@ -11,6 +12,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
@@ -27,8 +29,10 @@ use Nvl\Auth\Events\UserAuthenticated;
 use Nvl\Auth\Events\UserLoggedOut;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
+use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Pipelines\AuthPipeline;
+use Nvl\Auth\ValueObjects\AuthenticationEvidence;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -45,13 +49,23 @@ final readonly class AuthenticationSessions
     /**
      * Create the session establishment use case.
      */
-    public function __construct(private FeatureGate $features, private OwnerAuthenticationSelection $ownerSelection, private AuthPipeline $pipeline, private SuccessfulLoginMetadataRecorder $loginMetadata, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private AuthenticationProofs $proofs, private AuthManager $auth, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private StatefulAuthenticationBoundary $boundary, private AuthModelRegistry $models) {}
+    public function __construct(private FeatureGate $features, private OwnerAuthenticationSelection $ownerSelection, private AuthPipeline $pipeline, private SuccessfulLoginMetadataRecorder $loginMetadata, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private AuthenticationProofs $proofs, private AuthManager $auth, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private StatefulAuthenticationBoundary $boundary, private AuthModelRegistry $models, private PrincipalSecurity $security, private SecretHasher $hasher) {}
 
     private const string PendingFactorLogin = 'nvl-auth.credential_login';
 
     /** Admit an immediate browser transition before primary verifiers or transport effects. */
     public function assertCanTransition(?Authenticatable $subject = null): void
     {
+        if ($this->configuration->featureEnabled(AuthFeature::ManagedSessions)) {
+            if (config('session.driver') === 'cookie' || config('session.driver') === 'array' && config('app.env') !== 'testing') {
+                throw AuthException::invalidConfiguration('Managed sessions require a server-side driver; array is test-only.');
+            }
+            $browser = new BrowserSession;
+            $this->boundary->assertOutsideTransaction($browser->getConnection());
+            if (! $browser->getConnection()->getSchemaBuilder()->hasColumns($browser->getTable(), ['binding_hash', 'provider_hash', 'security_revision', 'absolute_expires_at'])) {
+                throw AuthException::invalidConfiguration('Managed session schema is missing; run the forward migration before enabling.');
+            }
+        }
         $this->boundary->assertOutsideTransaction((new Challenge)->getConnection());
         $this->boundary->assertOutsideTransaction((new AuthAudit)->getConnection());
         $class = $this->models->userClass();
@@ -72,6 +86,9 @@ final readonly class AuthenticationSessions
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Use);
         $this->assertCanTransition();
         $context->assertBound(AuthenticationDestination::Session);
+        if ($remember && $this->configuration->featureEnabled(AuthFeature::ManagedSessions)) {
+            throw AuthException::invalidConfiguration('Managed remember authentication requires the explicit managed guard adapter.');
+        }
         if ($context->sessionBinding !== $session->getId() || $this->auth->guard($context->guardName) !== $guard) {
             throw new AuthException('authentication_binding_invalid', 'The authentication browser binding does not match.', 422);
         }
@@ -125,6 +142,7 @@ final readonly class AuthenticationSessions
                 }
                 $this->loginMetadata->record($canonical, $requestContext);
                 $canonical = $this->proofs->recheck($verification);
+                $this->recordManagedSession($canonical, $session, $evidence);
                 $this->audits->record('authentication.succeeded', subject: $reference, actor: $canonical, metadata: ['method' => $purpose->value]);
                 $this->ownerSelection->select($canonical, $requestContext, $purpose === AuthenticationPurpose::SocialLogin ? OwnerAuthenticationPurpose::SocialLogin : $requestContext->ownerPurpose ?? OwnerAuthenticationPurpose::Login);
                 $this->domainEvents->dispatch(new UserAuthenticated($reference), $canonical->getConnection());
@@ -151,6 +169,31 @@ final readonly class AuthenticationSessions
             $this->domainEvents->dispatch(new AuthenticationRejected('subject_reference', $reference->identifier, $reason, $reference), (new AuthAudit)->getConnection());
             throw $exception;
         }
+    }
+
+    /** Private enrollment is reachable only after native proof consumption and final freshness checks. */
+    private function recordManagedSession(Authenticatable $subject, Session $session, AuthenticationEvidence $evidence): void
+    {
+        if (! $this->configuration->featureEnabled(AuthFeature::ManagedSessions)) {
+            return;
+        }
+        if (! $subject instanceof Model || $subject->getConnection() !== (new BrowserSession)->getConnection()) {
+            throw AuthException::invalidConfiguration('Managed session enrollment requires one source.');
+        }
+        $reference = SubjectReference::fromAuthenticatable($subject);
+        $guard = $evidence->context->guardName;
+        if ($guard === null) {
+            throw AuthException::invalidConfiguration('Managed session enrollment requires a selected guard.');
+        }
+        $key = AuthBrowserSessions::bindingKey($guard);
+        $old = $session->get($key);
+        if (is_string($old)) {
+            BrowserSession::query()->where('binding_hash', $this->hasher->hash('native-browser-binding', $old))->where('guard_name', $guard)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+        }
+        $binding = bin2hex(random_bytes(32));
+        $now = CarbonImmutable::now('UTC');
+        BrowserSession::query()->create(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'guard_name' => $guard, 'provider_hash' => AuthBrowserSessions::providerFingerprint($guard), 'binding_hash' => $this->hasher->hash('native-browser-binding', $binding), 'security_revision' => $this->security->lock($subject)->revision, 'session_family_id' => (string) Str::uuid(), 'method' => $evidence->method->value, 'assurance' => ['factors' => $evidence->factors], 'authenticated_at' => $now, 'last_seen_at' => $now, 'absolute_expires_at' => $now->addSeconds($this->configuration->integerBetween('features.managed_sessions.settings.absolute_lifetime_seconds', 43200, 300, 2592000)), 'ip_address' => $evidence->context->ipAddress, 'user_agent' => $evidence->context->userAgent]);
+        $session->put($key, $binding);
     }
 
     /** Native Auth operation. */

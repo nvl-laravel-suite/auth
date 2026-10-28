@@ -25,6 +25,7 @@ enum AuthFeature: string
     case RecoveryCodes = 'recovery_codes';
     case SocialIdentities = 'social_identities';
     case Clients = 'clients';
+    case ManagedSessions = 'managed_sessions';
     case Sessions = 'sessions';
     case ApiTokens = 'api_tokens';
     case Rbac = 'rbac';

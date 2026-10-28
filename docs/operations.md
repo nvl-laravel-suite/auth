@@ -1,3 +1,9 @@
 # Operations
 
 Use `nvl:auth:doctor`, `nvl:auth:features`, `nvl:auth:configuration` and `nvl:auth:schema` for native readiness. Pruning and principal adoption require explicit system authorization. Preview schema/adoption before apply. Keep source transaction commit, audit retry and queued worker isolation checks enabled. Route registration is outside package readiness.
+
+### Managed browser admission
+
+Managed sessions are opt-in (`features.managed_sessions.enabled=false`). Native proof-backed login privately creates the authoritative row and rotates the per-guard server-session binding. A raw Laravel guard login/actingAs never enrolls a trusted row. Default absolute lifetime is 12 hours; admission heartbeats persist at most once per minute. Native binding hashes and assurance state stay hidden. `AuthClientSession` remains client correlation, separate from browser authority.
+
+Place consumer middleware calling `LaravelSessionAdmission::admit` after session/authentication and before application authorization. Declare `admission_integrated=true` for doctor; this declaration is an integration promise, not automated route proof. Use a server-side driver; cookie payloads are unsupported. Existing untracked sessions must reauthenticate. Revocation is next-admission denial even when a physical payload remains. No public arbitrary-session enrollment API exists.
