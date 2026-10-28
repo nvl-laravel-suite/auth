@@ -72,7 +72,7 @@ final readonly class Authentication
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Use);
         $this->sessions->assertCanTransition();
         $remember = $context['remember'] ?? false;
-        if (! is_bool($remember) || array_intersect(array_keys($context), ['guardName', 'sessionBinding', 'tokenNamespace', 'flowNonce']) !== []) {
+        if (! is_bool($remember) || array_intersect(array_keys($context), ['guardName', 'sessionBinding', 'tokenNamespace', 'flowNonce', 'browserSessionId', 'browserBinding']) !== []) {
             throw new \InvalidArgumentException('Invalid or protected authentication context.');
         }
         unset($context['remember']);

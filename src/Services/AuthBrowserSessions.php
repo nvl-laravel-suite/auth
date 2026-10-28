@@ -8,18 +8,21 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
+use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Enums\AuthenticationPurpose;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
+use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\BrowserSession;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Auth\CanonicalActorResolver;
 
 /** Lists and admits authoritative native browser bindings. @api */
 final readonly class AuthBrowserSessions
 {
-    public function __construct(private FeatureGate $features, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private SecretHasher $hasher, private PrincipalEligibility $eligibility) {}
+    public function __construct(private FeatureGate $features, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private SecretHasher $hasher, private PrincipalEligibility $eligibility, private RecentAuthenticationProofs $recent, private AuthAuditRecorder $audits) {}
 
     public static function bindingKey(string $guardName): string
     {
@@ -71,6 +74,55 @@ final readonly class AuthBrowserSessions
             }
 
             return $entry;
+        }, 3);
+    }
+
+    public function revoke(Authenticatable $subject, string $sessionId, #[\SensitiveParameter] string $recentProof, AuthenticationRequestContext $context): BrowserSession
+    {
+        return (new BrowserSession)->getConnection()->transaction(function () use ($subject, $sessionId, $recentProof, $context): BrowserSession {
+            $this->recent->consume($subject, $recentProof, RecentAuthenticationPurpose::SessionRevocation, $context);
+            $this->security->lock($subject);
+            $reference = SubjectReference::fromAuthenticatable($subject);
+            $record = BrowserSession::query()->whereKey($sessionId)->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->lockForUpdate()->first();
+            if ($record === null) {
+                throw $this->invalid();
+            }
+            if ($record->revoked_at === null) {
+                $record->revoked_at = CarbonImmutable::now('UTC');
+                $record->save();
+            }
+            $this->audits->record('session.revoked', subject: $reference, actor: $subject, metadata: ['browser_session_id' => $record->identifier()]);
+
+            return $record;
+        }, 3);
+    }
+
+    public function revokeOthers(Authenticatable $subject, string $guardName, string $currentSessionId, #[\SensitiveParameter] string $recentProof, AuthenticationRequestContext $context): int
+    {
+        return (new BrowserSession)->getConnection()->transaction(function () use ($subject, $guardName, $currentSessionId, $recentProof, $context): int {
+            $current = $this->admit($subject, $guardName, $context->browserBinding ?? '');
+            if ($current->identifier() !== $currentSessionId || $currentSessionId !== $context->browserSessionId || $guardName !== $context->guardName) {
+                throw $this->invalid();
+            }
+            $this->recent->consume($subject, $recentProof, RecentAuthenticationPurpose::SessionRevocation, $context);
+            $reference = SubjectReference::fromAuthenticatable($subject);
+            $count = BrowserSession::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->where('guard_name', $guardName)->whereKeyNot($current->identifier())->whereNull('revoked_at')->update(['revoked_at' => now()]);
+            $this->audits->record('session.others_revoked', subject: $reference, actor: $subject, metadata: ['count' => $count, 'current_browser_session_id' => $current->identifier()]);
+
+            return $count;
+        }, 3);
+    }
+
+    public function revokeAll(Authenticatable $subject, #[\SensitiveParameter] string $recentProof, AuthenticationRequestContext $context): int
+    {
+        return (new BrowserSession)->getConnection()->transaction(function () use ($subject, $recentProof, $context): int {
+            $this->recent->consume($subject, $recentProof, RecentAuthenticationPurpose::SessionRevocation, $context);
+            $this->security->lock($subject);
+            $reference = SubjectReference::fromAuthenticatable($subject);
+            $count = BrowserSession::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+            $this->audits->record('session.all_revoked', subject: $reference, actor: $subject, metadata: ['count' => $count]);
+
+            return $count;
         }, 3);
     }
 

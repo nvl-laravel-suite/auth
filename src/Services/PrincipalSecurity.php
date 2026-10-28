@@ -15,6 +15,7 @@ use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\SecurityTokenContainment;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\PrincipalSecurityState;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -97,6 +98,14 @@ final readonly class PrincipalSecurity
         $state = $this->lock($subject);
         $this->lockChallenges($subject);
         $state->increment('revision');
+        if ($this->configuration->featureEnabled(AuthFeature::ManagedSessions)) {
+            $sessions = new BrowserSession;
+            if ($sessions->getConnection() !== $this->principal($subject)->getConnection()) {
+                throw AuthException::invalidConfiguration('Managed containment requires one source.');
+            }
+            $reference = SubjectReference::fromAuthenticatable($subject);
+            $sessions->newQuery()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+        }
         $principal = $this->principal($subject);
         if ($principal->getConnection()->getSchemaBuilder()->hasTable((new Challenge)->getTable())) {
             $this->challenges(SubjectReference::fromAuthenticatable($principal))->update(['revoked_at' => now(), 'active_key' => null]);

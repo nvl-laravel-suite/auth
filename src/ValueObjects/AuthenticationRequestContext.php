@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\ValueObjects;
 
+use Illuminate\Support\Str;
 use Nvl\Auth\Enums\AuthenticationDestination;
 use Nvl\Auth\Enums\OwnerAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
@@ -14,7 +15,7 @@ use Nvl\Support\Ownership\ValueObjects\OwnerReference;
  *
  * @api
  */
-final readonly class AuthenticationRequestContext
+final readonly class AuthenticationRequestContext implements \JsonSerializable
 {
     /**
      * Create bounded authentication request context.
@@ -33,7 +34,12 @@ final readonly class AuthenticationRequestContext
         public ?string $sessionBinding = null,
         public ?string $tokenNamespace = null,
         public ?string $flowNonce = null,
+        public ?string $browserSessionId = null,
+        #[\SensitiveParameter] public ?string $browserBinding = null,
     ) {
+        if (($browserSessionId === null) !== ($browserBinding === null) || $browserSessionId !== null && ! Str::isUuid($browserSessionId) || $browserBinding !== null && preg_match('/\A[0-9a-f]{64}\z/', $browserBinding) !== 1) {
+            throw new \InvalidArgumentException('Invalid native browser context.');
+        }
         if ($ownerProvider !== null && preg_match('/\A[a-z0-9][a-z0-9_.-]{0,79}\z/', $ownerProvider) !== 1) {
             throw new \InvalidArgumentException('Owner authentication provider is invalid.');
         }
@@ -65,7 +71,7 @@ final readonly class AuthenticationRequestContext
             'ownerIntentNonce' => $this->ownerIntentNonce, 'ownerSessionBinding' => $this->ownerSessionBinding,
             'requestedOwner' => $this->requestedOwner?->toArray(), 'ownerPurpose' => $this->ownerPurpose?->value,
             'ownerIntentSubjectBound' => $this->ownerIntentSubjectBound, 'ownerProvider' => $this->ownerProvider,
-            'guardName' => $this->guardName, 'sessionBinding' => $this->sessionBinding, 'tokenNamespace' => $this->tokenNamespace, 'flowNonce' => $this->flowNonce];
+            'guardName' => $this->guardName, 'sessionBinding' => $this->sessionBinding, 'tokenNamespace' => $this->tokenNamespace, 'flowNonce' => $this->flowNonce, 'browserSessionId' => $this->browserSessionId, 'browserBinding' => $this->browserBinding];
     }
 
     /** Restore bounded host/native context; this is not authentication evidence.
@@ -81,7 +87,7 @@ final readonly class AuthenticationRequestContext
             $named[$key] = $value;
         }
         $facts = $named;
-        $keys = ['ipAddress', 'userAgent', 'requestId', 'ownerIntentNonce', 'ownerSessionBinding', 'requestedOwner', 'ownerPurpose', 'ownerIntentSubjectBound', 'ownerProvider', 'guardName', 'sessionBinding', 'tokenNamespace', 'flowNonce'];
+        $keys = ['ipAddress', 'userAgent', 'requestId', 'ownerIntentNonce', 'ownerSessionBinding', 'requestedOwner', 'ownerPurpose', 'ownerIntentSubjectBound', 'ownerProvider', 'guardName', 'sessionBinding', 'tokenNamespace', 'flowNonce', 'browserSessionId', 'browserBinding'];
         if (array_diff(array_keys($facts), $keys) !== []) {
             throw new \InvalidArgumentException('Unknown authentication context.');
         }
@@ -101,7 +107,21 @@ final readonly class AuthenticationRequestContext
         return new self(ipAddress: self::optionalString($facts, 'ipAddress'), userAgent: self::optionalString($facts, 'userAgent'), requestId: self::optionalString($facts, 'requestId'),
             ownerIntentNonce: self::optionalString($facts, 'ownerIntentNonce'), ownerSessionBinding: self::optionalString($facts, 'ownerSessionBinding'), requestedOwner: $owner,
             ownerPurpose: $purpose, ownerIntentSubjectBound: $bound, ownerProvider: self::optionalString($facts, 'ownerProvider'), guardName: self::optionalString($facts, 'guardName'),
-            sessionBinding: self::optionalString($facts, 'sessionBinding'), tokenNamespace: self::optionalString($facts, 'tokenNamespace'), flowNonce: self::optionalString($facts, 'flowNonce'));
+            sessionBinding: self::optionalString($facts, 'sessionBinding'), tokenNamespace: self::optionalString($facts, 'tokenNamespace'), flowNonce: self::optionalString($facts, 'flowNonce'), browserSessionId: self::optionalString($facts, 'browserSessionId'), browserBinding: self::optionalString($facts, 'browserBinding'));
+    }
+
+    /** @return array<string, mixed> */
+    public function __debugInfo(): array
+    {
+        return $this->jsonSerialize();
+    }
+
+    /** Secret-bearing native bindings are deliberately absent from generic JSON.
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return ['guardName' => $this->guardName, 'browserSessionId' => $this->browserSessionId, 'binding' => '[REDACTED]', 'requestId' => $this->requestId];
     }
 
     /** @param array<string, mixed> $facts */

@@ -10,8 +10,10 @@ use Illuminate\Database\Eloquent\Model;
 use Nvl\Auth\Contracts\AccountConfirmation;
 use Nvl\Auth\Enums\AuthenticationDestination;
 use Nvl\Auth\Enums\AuthenticationMethod;
+use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthenticationVerification;
@@ -26,7 +28,7 @@ use SensitiveParameter;
  */
 final readonly class RecentAuthenticationProofs
 {
-    public function __construct(private PrincipalSecurity $security, private AuthIdentityChallenges $records, private SecretHasher $hasher, private CanonicalActorResolver $canonical, private PrincipalEligibility $eligibility, private AccountConfirmation $policy) {}
+    public function __construct(private PrincipalSecurity $security, private AuthIdentityChallenges $records, private SecretHasher $hasher, private CanonicalActorResolver $canonical, private PrincipalEligibility $eligibility, private AccountConfirmation $policy, private AuthConfiguration $configuration) {}
 
     public function consume(Authenticatable $subject, #[SensitiveParameter] ?string $grant, RecentAuthenticationPurpose $purpose, ?AuthenticationRequestContext $context): void
     {
@@ -82,6 +84,16 @@ final readonly class RecentAuthenticationProofs
             || $evidence->context->guardName !== $context->guardName || $evidence->context->sessionBinding !== $context->sessionBinding
             || $method === AuthenticationMethod::Password && ! $verification->matchesPasswordBinding($this->hasher->hash('native-password-proof', $principal->getAuthPassword()))) {
             throw $this->invalid();
+        }
+        if ($this->configuration->featureEnabled(AuthFeature::ManagedSessions)) {
+            if ($context->browserSessionId === null || $context->browserBinding === null || $evidence->context->browserSessionId !== $context->browserSessionId || $evidence->context->browserBinding !== $context->browserBinding) {
+                throw $this->invalid();
+            }
+            $query = BrowserSession::query()->whereKey($context->browserSessionId)->where('binding_hash', $this->hasher->hash('native-browser-binding', $context->browserBinding))->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->where('guard_name', $context->guardName);
+            $browser = ($lock ? $query->lockForUpdate() : $query)->first();
+            if ($browser === null || ! $browser->isCurrent($revision) || $context->guardName === null || $browser->provider_hash !== AuthBrowserSessions::providerFingerprint($context->guardName)) {
+                throw $this->invalid();
+            }
         }
         $this->eligibility->assertEligible($principal, $method->purpose());
 

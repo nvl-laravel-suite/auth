@@ -7,6 +7,7 @@ namespace Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Account;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Services\AuthBrowserSessions;
 use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Concerns\InteractsWithValidatedInput;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 
@@ -24,7 +25,10 @@ abstract class AuthenticatedController
 
     protected function authenticationContext(Request $request): AuthenticationRequestContext
     {
-        return new AuthenticationRequestContext(guardName: config('nvl-auth.guard', 'web'), sessionBinding: $request->session()->getId());
+        $guard = config('nvl-auth.guard', 'web');
+        $key = AuthBrowserSessions::bindingKey($guard);
+
+        return new AuthenticationRequestContext(guardName: $guard, sessionBinding: $request->session()->getId(), browserSessionId: $request->session()->get($key.'-id'), browserBinding: $request->session()->get($key));
     }
 
     /**

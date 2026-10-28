@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Nvl\Auth\Enums\AuthenticationDestination;
 use Nvl\Auth\Enums\AuthenticationMethod;
+use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
@@ -24,7 +25,7 @@ use SensitiveParameter;
  */
 final readonly class AuthReauthentication
 {
-    public function __construct(private Authentication $authentication, private AuthenticationProofs $proofs, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private AuthIdentityChallenges $records, private SecretHasher $hasher, private StatefulAuthenticationBoundary $boundary) {}
+    public function __construct(private Authentication $authentication, private AuthenticationProofs $proofs, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private AuthIdentityChallenges $records, private SecretHasher $hasher, private StatefulAuthenticationBoundary $boundary, private AuthConfiguration $configuration, private AuthBrowserSessions $browserSessions) {}
 
     /** @param array{password?: mixed, code?: mixed, recoveryCode?: mixed, passkeyProof?: mixed, socialProof?: mixed} $proof */
     public function confirm(Authenticatable $subject, #[SensitiveParameter] array $proof, RecentAuthenticationPurpose $purpose, AuthenticationRequestContext $context): IssuedRecentAuthentication
@@ -34,6 +35,12 @@ final readonly class AuthReauthentication
         }
         $this->boundary->assertOutsideTransaction($subject->getConnection());
         $context->assertBound(AuthenticationDestination::Reauthentication);
+        if ($this->configuration->featureEnabled(AuthFeature::ManagedSessions)) {
+            $browser = $this->browserSessions->admit($subject, (string) $context->guardName, $context->browserBinding ?? '');
+            if ($browser->identifier() !== $context->browserSessionId) {
+                throw new AuthException('browser_session_invalid', 'A current admitted browser is required.', 401);
+            }
+        }
         if (array_diff(array_keys($proof), ['password', 'code', 'recoveryCode', 'passkeyProof', 'socialProof']) !== []
             || count(array_intersect(array_keys($proof), ['password', 'passkeyProof', 'socialProof'])) !== 1
             || isset($proof['code'], $proof['recoveryCode'])) {

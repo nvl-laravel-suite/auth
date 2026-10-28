@@ -192,22 +192,33 @@ final readonly class AuthenticationSessions
         }
         $binding = bin2hex(random_bytes(32));
         $now = CarbonImmutable::now('UTC');
-        BrowserSession::query()->create(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'guard_name' => $guard, 'provider_hash' => AuthBrowserSessions::providerFingerprint($guard), 'binding_hash' => $this->hasher->hash('native-browser-binding', $binding), 'security_revision' => $this->security->lock($subject)->revision, 'session_family_id' => (string) Str::uuid(), 'method' => $evidence->method->value, 'assurance' => ['factors' => $evidence->factors], 'authenticated_at' => $now, 'last_seen_at' => $now, 'absolute_expires_at' => $now->addSeconds($this->configuration->integerBetween('features.managed_sessions.settings.absolute_lifetime_seconds', 43200, 300, 2592000)), 'ip_address' => $evidence->context->ipAddress, 'user_agent' => $evidence->context->userAgent]);
+        $entry = BrowserSession::query()->create(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'guard_name' => $guard, 'provider_hash' => AuthBrowserSessions::providerFingerprint($guard), 'binding_hash' => $this->hasher->hash('native-browser-binding', $binding), 'security_revision' => $this->security->lock($subject)->revision, 'session_family_id' => (string) Str::uuid(), 'method' => $evidence->method->value, 'assurance' => ['factors' => $evidence->factors], 'authenticated_at' => $now, 'last_seen_at' => $now, 'absolute_expires_at' => $now->addSeconds($this->configuration->integerBetween('features.managed_sessions.settings.absolute_lifetime_seconds', 43200, 300, 2592000)), 'ip_address' => $evidence->context->ipAddress, 'user_agent' => $evidence->context->userAgent]);
         $session->put($key, $binding);
+        $session->put($key.'-id', $entry->identifier());
     }
 
     /** Native Auth operation. */
-    public function logout(StatefulGuard $guard, Session $session): void
+    public function logout(StatefulGuard $guard, Session $session, ?string $guardName = null): void
     {
         $this->features->assertAllowed(AuthFeature::Authentication, FeatureOperation::Revoke);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Revoke);
         $this->assertCanTransition();
+        $guardName ??= $this->configuration->string('guard', 'web');
+        if ($this->configuration->featureEnabled(AuthFeature::ManagedSessions) && $this->auth->guard($guardName) !== $guard) {
+            throw new AuthException('authentication_binding_invalid', 'The selected logout guard does not match.', 422);
+        }
         $subject = $guard->user();
         $this->assertCanTransition($subject);
         $this->operations->central(AuthIdentityOperation::Logout);
         $reference = $subject instanceof Authenticatable ? SubjectReference::fromAuthenticatable($subject) : null;
-        $this->pipeline->run('logout', new AuthPipelineContext('logout', subject: $reference), function () use ($guard, $session, $reference, $subject): void {
+        $this->pipeline->run('logout', new AuthPipelineContext('logout', subject: $reference), function () use ($guard, $session, $reference, $subject, $guardName): void {
             $this->assertCanTransition($subject);
+            if ($this->configuration->featureEnabled(AuthFeature::ManagedSessions)) {
+                $binding = $session->get(AuthBrowserSessions::bindingKey($guardName));
+                if (is_string($binding)) {
+                    BrowserSession::query()->where('binding_hash', $this->hasher->hash('native-browser-binding', $binding))->where('guard_name', $guardName)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+                }
+            }
             try {
                 $guard->logout();
             } finally {
