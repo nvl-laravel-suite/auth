@@ -13,6 +13,7 @@ use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Nvl\Auth\Adapters\Laravel\ManagedSessionGuard;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
@@ -31,6 +32,7 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\Challenge;
+use Nvl\Auth\Models\RememberCredential;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\ValueObjects\AuthenticationEvidence;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
@@ -87,7 +89,10 @@ final readonly class AuthenticationSessions
         $this->assertCanTransition();
         $context->assertBound(AuthenticationDestination::Session);
         if ($remember && $this->configuration->featureEnabled(AuthFeature::ManagedSessions)) {
-            throw AuthException::invalidConfiguration('Managed remember authentication requires the explicit managed guard adapter.');
+            if (! $guard instanceof ManagedSessionGuard) {
+                throw AuthException::invalidConfiguration('Managed remember requires the explicitly selected managed guard.');
+            }
+            ManagedSessionGuard::assertCookieConfiguration();
         }
         if ($context->sessionBinding !== $session->getId() || $this->auth->guard($context->guardName) !== $guard) {
             throw new AuthException('authentication_binding_invalid', 'The authentication browser binding does not match.', 422);
@@ -142,7 +147,7 @@ final readonly class AuthenticationSessions
                 }
                 $this->loginMetadata->record($canonical, $requestContext);
                 $canonical = $this->proofs->recheck($verification);
-                $this->recordManagedSession($canonical, $session, $evidence);
+                $this->recordManagedSession($canonical, $session, $evidence, $guard, $remember);
                 $this->audits->record('authentication.succeeded', subject: $reference, actor: $canonical, metadata: ['method' => $purpose->value]);
                 $this->ownerSelection->select($canonical, $requestContext, $purpose === AuthenticationPurpose::SocialLogin ? OwnerAuthenticationPurpose::SocialLogin : $requestContext->ownerPurpose ?? OwnerAuthenticationPurpose::Login);
                 $this->domainEvents->dispatch(new UserAuthenticated($reference), $canonical->getConnection());
@@ -172,7 +177,7 @@ final readonly class AuthenticationSessions
     }
 
     /** Private enrollment is reachable only after native proof consumption and final freshness checks. */
-    private function recordManagedSession(Authenticatable $subject, Session $session, AuthenticationEvidence $evidence): void
+    private function recordManagedSession(Authenticatable $subject, Session $session, AuthenticationEvidence $evidence, StatefulGuard $selectedGuard, bool $remember): void
     {
         if (! $this->configuration->featureEnabled(AuthFeature::ManagedSessions)) {
             return;
@@ -192,9 +197,34 @@ final readonly class AuthenticationSessions
         }
         $binding = bin2hex(random_bytes(32));
         $now = CarbonImmutable::now('UTC');
-        $entry = BrowserSession::query()->create(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'guard_name' => $guard, 'provider_hash' => AuthBrowserSessions::providerFingerprint($guard), 'binding_hash' => $this->hasher->hash('native-browser-binding', $binding), 'security_revision' => $this->security->lock($subject)->revision, 'session_family_id' => (string) Str::uuid(), 'method' => $evidence->method->value, 'assurance' => ['factors' => $evidence->factors], 'authenticated_at' => $now, 'last_seen_at' => $now, 'absolute_expires_at' => $now->addSeconds($this->configuration->integerBetween('features.managed_sessions.settings.absolute_lifetime_seconds', 43200, 300, 2592000)), 'ip_address' => $evidence->context->ipAddress, 'user_agent' => $evidence->context->userAgent]);
+        $family = (string) Str::uuid();
+        $rememberExpiry = CarbonImmutable::now('UTC')->addDays(30);
+        $previous = null;
+        if ($evidence->method === AuthenticationMethod::Remember) {
+            $previous = RememberCredential::query()->whereKey($evidence->provider)->lockForUpdate()->first();
+            if ($previous === null || $previous->consumed_at === null || $previous->revoked_at !== null || $previous->rotated_to_id !== null || ! $previous->absolute_expires_at->isFuture()) {
+                throw new AuthException('remember_credential_invalid', 'The remembered credential is unavailable.', 401);
+            }
+            $family = $previous->session_family_id;
+            $rememberExpiry = $previous->absolute_expires_at;
+        }
+        $entry = BrowserSession::query()->create(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'guard_name' => $guard, 'provider_hash' => AuthBrowserSessions::providerFingerprint($guard), 'binding_hash' => $this->hasher->hash('native-browser-binding', $binding), 'security_revision' => $this->security->lock($subject)->revision, 'session_family_id' => $family, 'method' => $evidence->method->value, 'assurance' => ['factors' => $evidence->factors], 'authenticated_at' => $now, 'last_seen_at' => $now, 'absolute_expires_at' => $now->addSeconds($this->configuration->integerBetween('features.managed_sessions.settings.absolute_lifetime_seconds', 43200, 300, 2592000)), 'ip_address' => $evidence->context->ipAddress, 'user_agent' => $evidence->context->userAgent]);
         $session->put($key, $binding);
         $session->put($key.'-id', $entry->identifier());
+        if ($remember) {
+            if (! $selectedGuard instanceof ManagedSessionGuard) {
+                throw AuthException::invalidConfiguration('Managed remember requires its explicit driver.');
+            }
+            $selector = bin2hex(random_bytes(32));
+            $secret = bin2hex(random_bytes(32));
+            $credential = RememberCredential::query()->create(['selector' => $selector, 'secret_hash' => $this->hasher->hash('native-remember-secret', $secret), 'subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'guard_name' => $guard, 'provider_hash' => AuthBrowserSessions::providerFingerprint($guard), 'session_family_id' => $family, 'security_revision' => $entry->security_revision, 'absolute_expires_at' => $rememberExpiry]);
+            if ($previous !== null) {
+                $previous->rotated_to_id = $credential->identifier();
+                $previous->save();
+            }
+            $selectedGuard->queueManagedCookie($selector, $secret, $rememberExpiry);
+        }
+
     }
 
     /** Native Auth operation. */
@@ -216,7 +246,11 @@ final readonly class AuthenticationSessions
             if ($this->configuration->featureEnabled(AuthFeature::ManagedSessions)) {
                 $binding = $session->get(AuthBrowserSessions::bindingKey($guardName));
                 if (is_string($binding)) {
-                    BrowserSession::query()->where('binding_hash', $this->hasher->hash('native-browser-binding', $binding))->where('guard_name', $guardName)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+                    $record = BrowserSession::query()->where('binding_hash', $this->hasher->hash('native-browser-binding', $binding))->where('guard_name', $guardName)->first();
+                    if ($record !== null) {
+                        BrowserSession::query()->where('subject_type', $record->subject_type)->where('subject_id', $record->subject_id)->where('guard_name', $guardName)->where('session_family_id', $record->session_family_id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+                        RememberCredential::query()->where('subject_type', $record->subject_type)->where('subject_id', $record->subject_id)->where('guard_name', $guardName)->where('session_family_id', $record->session_family_id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+                    }
                 }
             }
             try {

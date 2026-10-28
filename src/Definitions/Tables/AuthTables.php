@@ -11,6 +11,8 @@ use Nvl\Support\Config\PackageStorage;
  */
 final class AuthTables
 {
+    public const string RememberCredentials = 'nvl_auth_remember_credentials';
+
     public const string BrowserSessions = 'nvl_auth_browser_sessions';
 
     public const string PendingEmailChanges = 'nvl_auth_pending_email_changes';

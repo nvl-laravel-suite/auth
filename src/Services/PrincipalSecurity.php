@@ -18,6 +18,7 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\PrincipalSecurityState;
+use Nvl\Auth\Models\RememberCredential;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 /** Serializes native credential mutations on the principal's actual source.
@@ -105,6 +106,7 @@ final readonly class PrincipalSecurity
             }
             $reference = SubjectReference::fromAuthenticatable($subject);
             $sessions->newQuery()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+            RememberCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => now()]);
         }
         $principal = $this->principal($subject);
         if ($principal->getConnection()->getSchemaBuilder()->hasTable((new Challenge)->getTable())) {

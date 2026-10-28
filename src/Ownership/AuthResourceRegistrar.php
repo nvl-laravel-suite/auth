@@ -14,6 +14,7 @@ use Nvl\Auth\Models\OwnerMembershipLock;
 use Nvl\Auth\Models\PendingEmailChange;
 use Nvl\Auth\Models\PersonalAccessToken;
 use Nvl\Auth\Models\PrincipalSecurityState;
+use Nvl\Auth\Models\RememberCredential;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Support\Models\ConfiguredModelResolver;
@@ -51,6 +52,7 @@ final readonly class AuthResourceRegistrar
             'auth.invitations' => [Invitation::class, $owned, true],
             ...(class_exists(\Laravel\Sanctum\PersonalAccessToken::class) ? ['auth.tokens' => [$this->models->personalAccessTokenClass(), $owned, true]] : []),
             'auth.challenges' => [Challenge::class, $owned, true],
+            'auth.remember_credentials' => [RememberCredential::class, false, true],
             'auth.browser_sessions' => [BrowserSession::class, false, true],
             'auth.pending_email_changes' => [PendingEmailChange::class, false, true],
             'auth.security_states' => [PrincipalSecurityState::class, false, true],

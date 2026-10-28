@@ -11,6 +11,7 @@ namespace Nvl\Auth\Enums;
  */
 enum AuthenticationMethod: string
 {
+    case Remember = 'remember';
     case Password = 'password';
     case EmailLink = 'email_link';
     case EmailCode = 'email_code';

@@ -16,6 +16,7 @@ use Nvl\Auth\Enums\AuthenticationDestination;
 use Nvl\Auth\Enums\AuthenticationMethod;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
+use Nvl\Auth\Models\RememberCredential;
 use Nvl\Auth\ValueObjects\AuthenticationEvidence;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthenticationVerification;
@@ -164,6 +165,13 @@ final readonly class AuthenticationProofs
             || $this->security->lock($subject)->revision !== $evidence->revision
             || $evidence->method === AuthenticationMethod::Password && ! $verification->matchesPasswordBinding($this->hasher->hash('native-password-proof', $subject->getAuthPassword()))) {
             throw $this->invalid();
+        }
+
+        if ($evidence->method === AuthenticationMethod::Remember) {
+            $remember = RememberCredential::query()->whereKey($evidence->provider)->where('subject_type', $evidence->subject->type)->where('subject_id', $evidence->subject->identifier)->where('guard_name', $evidence->context->guardName)->first();
+            if ($remember === null || $remember->consumed_at === null || $remember->revoked_at !== null || $remember->rotated_to_id !== null || ! $remember->absolute_expires_at->isFuture() || $remember->security_revision !== $evidence->revision || $evidence->context->guardName === null || $remember->provider_hash !== AuthBrowserSessions::providerFingerprint($evidence->context->guardName)) {
+                throw $this->invalid();
+            }
         }
 
         return $subject;

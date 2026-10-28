@@ -14,6 +14,7 @@ use Nvl\Auth\Contracts\PrincipalSessionContainment;
 use Nvl\Auth\Contracts\SecurityTokenContainment;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\BrowserSession;
+use Nvl\Auth\Models\RememberCredential;
 use Nvl\Auth\Services\PrincipalSecurity;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
@@ -53,6 +54,7 @@ final readonly class LaravelPrincipalSessionContainment implements PrincipalSess
                 }
                 $reference = SubjectReference::fromAuthenticatable($principal);
                 $sessions->newQuery()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+                RememberCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => now()]);
             }
             if (method_exists($principal, 'tokens') && ! (new \ReflectionMethod($principal, 'tokens'))->invoke($principal) instanceof MorphMany) {
                 throw AuthException::invalidConfiguration('Session containment requires a Sanctum token relationship.');

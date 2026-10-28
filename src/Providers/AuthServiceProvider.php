@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Providers;
 
+use Illuminate\Auth\AuthManager;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Contracts\Cookie\QueueingFactory;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
@@ -13,6 +16,7 @@ use Nvl\Auth\Adapters\ApiTokens\SanctumApiTokenManager;
 use Nvl\Auth\Adapters\Laravel\EloquentAuthSubjectResolver;
 use Nvl\Auth\Adapters\Laravel\LaravelGuardIdentifierResolver;
 use Nvl\Auth\Adapters\Laravel\LaravelPrincipalSessionContainment;
+use Nvl\Auth\Adapters\Laravel\ManagedSessionGuard;
 use Nvl\Auth\Adapters\Passkeys\WebauthnPasskeyCeremony;
 use Nvl\Auth\Console\Commands\AdoptEmailIdentitiesCommand;
 use Nvl\Auth\Console\Commands\AdoptPrincipalsCommand;
@@ -63,10 +67,12 @@ use Nvl\Auth\Services\AuthAuditWriter;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthDoctor;
 use Nvl\Auth\Services\Authentication;
+use Nvl\Auth\Services\AuthenticationSessions;
 use Nvl\Auth\Services\AuthManagementAbilityCatalog;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\AuthOwnerContextParticipant;
 use Nvl\Auth\Services\AuthOwnershipState;
+use Nvl\Auth\Services\AuthRememberCredentials;
 use Nvl\Auth\Services\AuthSchemaManager;
 use Nvl\Auth\Services\CentralIdentityAuditRecorder;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
@@ -107,6 +113,7 @@ use Nvl\Support\Ownership\Services\OwnershipResourceRegistry;
 use Nvl\Support\Traits\MergesPackageConfiguration;
 use Nvl\Support\Traits\RegistersNamespacedResources;
 use Spatie\Permission\PermissionRegistrar;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Registers the passive package layer and lazy feature integrations.
@@ -121,6 +128,12 @@ final class AuthServiceProvider extends ServiceProvider implements OwnershipInte
      */
     public function register(): void
     {
+        $this->callAfterResolving('auth', function (AuthManager $auth): void {
+            $factory = $this->createManagedGuard(...);
+            $auth->extend('nvl-managed-session', function ($app, string $name, array $config) use ($factory): ManagedSessionGuard {
+                return $factory($name, $config);
+            });
+        });
         PackageDoctorContributor::register($this->app, 'nvl/auth', fn (): array => array_map(static fn (array $check): array => ['key' => $check['name'], ...$check], $this->app->make(AuthDoctor::class)->inspect()));
         $this->mergePackageConfiguration(dirname(__DIR__, 2).'/config/nvl-auth.php', 'nvl-auth');
         $this->configureOwnedIdentityStorage();
@@ -343,5 +356,31 @@ final class AuthServiceProvider extends ServiceProvider implements OwnershipInte
         }
 
         return $extensions;
+    }
+
+    /** @param array<array-key, mixed> $config */
+    private function createManagedGuard(string $name, array $config): ManagedSessionGuard
+    {
+        if (config('nvl-auth.features.managed_sessions.enabled') !== true || ! is_string($config['provider'] ?? null)) {
+            throw AuthException::invalidConfiguration('The managed guard requires managed sessions and an explicit provider.');
+        }
+        $auth = $this->app->make(AuthManager::class);
+        $provider = $auth->createUserProvider($config['provider']);
+        $session = $this->app->make('session.store');
+        $key = config('app.key');
+        if ($provider === null || ! is_string($key)) {
+            throw AuthException::invalidConfiguration('Invalid managed guard dependencies.');
+        }
+        $guard = new ManagedSessionGuard($name, $provider, $session, hashKey: $key);
+        $guard->configureNative($this->app->make(AuthRememberCredentials::class), $this->app->make(AuthenticationSessions::class));
+        $guard->setCookieJar($this->app->make(QueueingFactory::class));
+        $guard->setDispatcher($this->app->make(Dispatcher::class));
+        $request = $this->app->refresh('request', $guard, 'setRequest');
+        if (! $request instanceof Request) {
+            throw AuthException::invalidConfiguration('The managed guard requires a current request.');
+        }
+        $guard->setRequest($request);
+
+        return $guard;
     }
 }
