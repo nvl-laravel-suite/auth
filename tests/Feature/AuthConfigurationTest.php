@@ -89,6 +89,8 @@ it('does not require a Sanctum model for a selected custom token adapter', funct
 it('catalogs every package management ability with policy mapping metadata', function (): void {
     $catalog = app(AuthManagementAbilityCatalog::class);
     $expectedAliases = [
+        'impersonations.revoke',
+        'users.recover',
         'users.viewAny',
         'users.view',
         'users.create',
@@ -133,7 +135,21 @@ it('catalogs every package management ability with policy mapping metadata', fun
 
     expect(array_keys($catalog->definitions()))->toBe($expectedAliases)
         ->and($catalogAbilities)->toBe($manifestAbilities)
-        ->and($catalog->definitions())->toHaveCount(31)
+        ->and($catalog->definitions())->toHaveCount(33)
+        ->and($catalog->definition('impersonations.revoke'))->toMatchArray([
+            'ability' => 'nvl.auth.impersonations.revoke',
+            'feature' => AuthFeature::Impersonation,
+            'operation' => 'revoke',
+            'subject' => 'target',
+            'policy' => 'impersonations',
+        ])
+        ->and($catalog->definition('users.recover'))->toMatchArray([
+            'ability' => 'nvl.auth.users.recover',
+            'feature' => AuthFeature::PrincipalManagement,
+            'operation' => 'recover',
+            'subject' => 'target',
+            'policy' => 'users',
+        ])
         ->and($catalog->definition('users.update'))->toMatchArray([
             'ability' => 'nvl.auth.users.update',
             'feature' => AuthFeature::PrincipalManagement,

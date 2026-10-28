@@ -18,13 +18,18 @@ abstract class AuthenticatedController
 {
     use InteractsWithValidatedInput;
 
-    protected function recentGrant(Request $request): ?string
+    protected function recentGrant(Request $request): string
     {
-        return $request->header('X-Recent-Authentication');
+        $grant = $request->header('X-Recent-Authentication');
+
+        return is_string($grant) ? $grant : '';
     }
 
     protected function authenticationContext(Request $request): AuthenticationRequestContext
     {
+        if (! $request->hasSession()) {
+            throw new AuthException('authentication_binding_invalid', 'A trusted browser session is required.', 422);
+        }
         $guard = config('nvl-auth.guard', 'web');
         $key = AuthBrowserSessions::bindingKey($guard);
 

@@ -3,10 +3,14 @@
 declare(strict_types=1);
 
 use Illuminate\Routing\Router;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Nvl\Auth\Models\PendingEmailChange;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Account\ProfileController;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\Middleware\RenderAuthExceptions;
 use Nvl\Auth\Tests\Fixtures\Consumer\RouteServiceProvider;
 
 it('serves configurable principal profile and RBAC APIs without Inertia', function (): void {
@@ -123,3 +127,27 @@ it('serves configurable principal profile and RBAC APIs without Inertia', functi
         ->assertOk()
         ->assertJsonPath('code', 'users_bulk_updated');
 });
+
+it('rejects unproved email changes with a neutral response', function (bool $withSession, ?string $grant): void {
+    config()->set('nvl-auth.features.email_verification.enabled', true);
+    $route = Route::patch('/consumer/profile', [ProfileController::class, 'update'])
+        ->middleware(RenderAuthExceptions::class);
+    if ($withSession) {
+        $route->middleware(StartSession::class);
+    }
+    $user = $this->user();
+    $headers = $grant === null ? [] : ['X-Recent-Authentication' => $grant];
+
+    $this->actingAs($user, 'web')
+        ->patchJson('/consumer/profile', ['email' => 'replacement@example.test'], $headers)
+        ->assertUnprocessable()
+        ->assertJsonPath('code', 'operation_failed')
+        ->assertJsonPath('data', null);
+
+    expect($user->refresh()->email)->toBe('user@example.test')
+        ->and(PendingEmailChange::query()->count())->toBe(0);
+})->with([
+    'no browser context or grant' => [false, null],
+    'grant header without browser context' => [false, str_repeat('a', 64)],
+    'browser context without grant' => [true, null],
+]);

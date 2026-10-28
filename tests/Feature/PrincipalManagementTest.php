@@ -20,6 +20,7 @@ use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Events\RbacAssignmentChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
+use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthEmailChanges;
 use Nvl\Auth\Services\Authentication;
@@ -30,16 +31,26 @@ use Nvl\Auth\Services\AuthUsers;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 it('rejects a malformed host token relationship before credential containment', function (): void {
-    $principal = new class extends Illuminate\Foundation\Auth\User
+    $stored = $this->user();
+    $stored->forceFill(['remember_token' => 'unchanged-remember-token'])->save();
+    $principal = new class extends User
     {
+        public function getMorphClass(): string
+        {
+            return User::class;
+        }
+
         public function tokens(): string
         {
             return 'invalid-token-relationship';
         }
     };
+    $principal->setRawAttributes($stored->getRawOriginal(), sync: true);
+    $principal->exists = true;
 
     expect(fn () => app(PrincipalSessionContainment::class)->contain($principal, 'deactivate'))
         ->toThrow(AuthException::class, 'token relationship');
+    expect($stored->refresh()->remember_token)->toBe('unchanged-remember-token');
 });
 
 it('owns a complete principal lifecycle and fails disabled login closed', function (): void {
@@ -177,6 +188,7 @@ it('keeps eager-loaded principal list queries independent of fixture size', func
 });
 
 it('contains browser credentials during actorless domain deactivation', function (): void {
+    config()->set('nvl-auth.features.managed_sessions.enabled', true);
     config()->set('session.driver', 'database');
     config()->set('session.connection', 'testing');
     config()->set('session.table', 'sessions');
@@ -189,6 +201,10 @@ it('contains browser credentials during actorless domain deactivation', function
     $user = $this->user('domain-transition@example.test');
     $user->forceFill(['remember_token' => 'remember-me'])->save();
     $user->createToken('nvl-auth:browser', ['profile:read']);
+    $browser = BrowserSession::factory()->create([
+        'subject_type' => $user->getMorphClass(),
+        'subject_id' => (string) $user->getKey(),
+    ]);
     DB::connection('testing')->table('sessions')->insert([
         'id' => 'existing-browser-session',
         'user_id' => $user->id,
@@ -208,7 +224,8 @@ it('contains browser credentials during actorless domain deactivation', function
         expect($updated->is_active)->toBeFalse()
             ->and($updated->remember_token)->not->toBe('remember-me')
             ->and($updated->tokens()->count())->toBe(0)
-            ->and(DB::connection('testing')->table('sessions')->where('user_id', $user->id)->exists())->toBeFalse()
+            ->and($browser->refresh()->revoked_at)->not->toBeNull()
+            ->and(DB::connection('testing')->table('sessions')->where('id', 'existing-browser-session')->value('payload'))->toBe('payload')
             ->and($audit->actor_id)->toBeNull()
             ->and($audit->metadata['system']['correlation_id'])->toBe('compliance-456');
 
