@@ -10,6 +10,7 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Nvl\Auth\Contracts\AccountAuthenticationPolicy;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
@@ -19,6 +20,7 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\OwnerAuthenticationPurpose;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
+use Nvl\Auth\Events\AccountSecurityChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\Passkey;
@@ -28,6 +30,7 @@ use Nvl\Auth\ValueObjects\IssuedAuthenticationProof;
 use Nvl\Auth\ValueObjects\PasskeyCeremonyOptions;
 use Nvl\Auth\ValueObjects\PasskeyCredential;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 use Throwable;
 
@@ -41,7 +44,7 @@ final readonly class AuthPasskeys
     use IssuesAuthenticationProofs;
 
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthConfiguration $configuration, private Container $container, private SecretHasher $hasher, private AuthAuditRecorder $audits, private OwnerAuthenticationChallengeIntents $ownerIntents, private PasskeyInputValidator $input, private PrincipalSecurity $security, private AuthSubjectResolver $subjects, private AuthIdentityChallenges $records, private RecentAuthenticationProofs $recent) {}
+    public function __construct(private FeatureGate $features, private AuthConfiguration $configuration, private Container $container, private SecretHasher $hasher, private AuthAuditRecorder $audits, private OwnerAuthenticationChallengeIntents $ownerIntents, private PasskeyInputValidator $input, private PrincipalSecurity $security, private AuthSubjectResolver $subjects, private AuthIdentityChallenges $records, private RecentAuthenticationProofs $recent, private UsableAccountAuthenticationPolicy $nativeRemoval, private AccountAuthenticationPolicy $removalPolicy, private DomainEventDispatcher $securityEvents) {}
 
     /**
      * Begin one passkey authentication ceremony.
@@ -338,10 +341,17 @@ final readonly class AuthPasskeys
             $this->security->lockChallenges($subject);
             /** @var Passkey $locked */
             $locked = Passkey::query()->whereKey($passkey->identifier())->lockForUpdate()->firstOrFail();
+            if ($locked->subject_type !== $reference->type || $locked->subject_id !== $reference->identifier) {
+                throw new AuthException('credential_unavailable', 'The credential is unavailable.', 422);
+            }
             if ($locked->revoked_at === null) {
+                $this->nativeRemoval->assertRemovalAllowed($subject, 'passkey', $locked->identifier());
+                $this->removalPolicy->assertRemovalAllowed($subject, 'passkey', $locked->identifier());
+                $this->nativeRemoval->assertRemovalAllowed($subject, 'passkey', $locked->identifier());
                 $locked->forceFill(['revoked_at' => CarbonImmutable::now()])->save();
                 $this->security->advance($subject, 'passkey_revoked');
                 $this->audits->record('passkey.revoked', subject: $reference, actor: $subject, metadata: ['passkey_id' => $locked->identifier()]);
+                $this->securityEvents->dispatch(new AccountSecurityChanged($reference, 'passkey_revoked', $locked->identifier()), (new Passkey)->getConnection());
             }
 
             return $locked;

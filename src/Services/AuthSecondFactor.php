@@ -10,11 +10,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use LogicException;
+use Nvl\Auth\Contracts\AccountAuthenticationPolicy;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthIdentityOperation;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
+use Nvl\Auth\Events\AccountSecurityChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\RecoveryCode;
 use Nvl\Auth\Models\TotpCredential;
@@ -22,6 +24,7 @@ use Nvl\Auth\Results\GeneratedRecoveryCodes;
 use Nvl\Auth\Results\TotpEnrollment;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 use SensitiveParameter;
 
 /**
@@ -32,7 +35,7 @@ use SensitiveParameter;
 final readonly class AuthSecondFactor
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private TotpEngine $totp, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private AuthConfiguration $configuration, private SecretHasher $hasher, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent) {}
+    public function __construct(private FeatureGate $features, private TotpEngine $totp, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private AuthConfiguration $configuration, private SecretHasher $hasher, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private UsableAccountAuthenticationPolicy $nativeRemoval, private AccountAuthenticationPolicy $removalPolicy, private DomainEventDispatcher $securityEvents) {}
 
     /**
      * Replace prior pending enrollments and return new provisioning material once.
@@ -167,10 +170,21 @@ final readonly class AuthSecondFactor
             $this->security->lockChallenges($subject);
             /** @var TotpCredential $locked */
             $locked = TotpCredential::query()->whereKey($credential->identifier())->lockForUpdate()->firstOrFail();
+            if ($locked->subject_type !== $reference->type || $locked->subject_id !== $reference->identifier) {
+                throw new AuthException('credential_unavailable', 'The credential is unavailable.', 422);
+            }
             if ($locked->revoked_at === null) {
+                $this->nativeRemoval->assertRemovalAllowed($subject, 'totp', $locked->identifier());
+                $this->removalPolicy->assertRemovalAllowed($subject, 'totp', $locked->identifier());
+                $this->nativeRemoval->assertRemovalAllowed($subject, 'totp', $locked->identifier());
+                $locked = TotpCredential::query()->whereKey($locked->identifier())->lockForUpdate()->firstOrFail();
+                if ($locked->subject_type !== $reference->type || $locked->subject_id !== $reference->identifier) {
+                    throw new AuthException('credential_unavailable', 'The credential is unavailable.', 422);
+                }
                 $locked->forceFill(['revoked_at' => CarbonImmutable::now()])->save();
                 $this->security->advance($subject, 'totp_revoked');
                 $this->audits->record('totp.revoked', subject: $reference, actor: $subject, metadata: ['credential_id' => $locked->identifier()]);
+                $this->securityEvents->dispatch(new AccountSecurityChanged($reference, 'totp_revoked', $locked->identifier()), (new TotpCredential)->getConnection());
             }
 
             return $locked;
@@ -275,6 +289,7 @@ final readonly class AuthSecondFactor
             $this->recent->consume($subject, $grant, RecentAuthenticationPurpose::RecoveryRegeneration, $context);
             $this->security->lock($subject);
             $this->security->lockChallenges($subject);
+            $this->removalPolicy->assertRemovalAllowed($subject, 'recovery', 'all');
             $count = RecoveryCode::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('used_at')->whereNull('revoked_at')->update(['revoked_at' => CarbonImmutable::now()]);
             if ($count > 0) {
                 $this->security->advance($subject, 'recovery_revoked');

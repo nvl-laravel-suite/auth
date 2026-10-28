@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Nvl\Auth\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Nvl\Auth\Contracts\AccountAuthenticationPolicy;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Enums\AuthenticationDestination;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Enums\SocialIntentPurpose;
+use Nvl\Auth\Events\AccountSecurityChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\SocialIdentity;
 use Nvl\Auth\Pipelines\AuthPipeline;
@@ -19,11 +21,12 @@ use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\ExternalIdentity;
 use Nvl\Auth\ValueObjects\IssuedSocialIntent;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Nvl\Support\Events\DomainEventDispatcher;
 
 /** Explicit recent-proof-before-redirect account link and reconnect operations. @api */
 final readonly class AuthSocialLinks
 {
-    public function __construct(private SocialAuthenticationIntents $intents, private SecretHasher $hasher, private PrincipalSecurity $security, private AuthAuditRecorder $audits, private AuthConfiguration $configuration, private AuthPipeline $pipeline, private RecentAuthenticationProofs $recent, private FeatureGate $features) {}
+    public function __construct(private SocialAuthenticationIntents $intents, private SecretHasher $hasher, private PrincipalSecurity $security, private AuthAuditRecorder $audits, private AuthConfiguration $configuration, private AuthPipeline $pipeline, private RecentAuthenticationProofs $recent, private FeatureGate $features, private UsableAccountAuthenticationPolicy $nativeRemoval, private AccountAuthenticationPolicy $removalPolicy, private DomainEventDispatcher $securityEvents) {}
 
     /** @return array{url: string, intent: IssuedSocialIntent} */
     public function beginLink(Authenticatable $subject, string $provider, #[\SensitiveParameter] string $recentProof, AuthenticationRequestContext $context): array
@@ -62,9 +65,13 @@ final readonly class AuthSocialLinks
                 throw new AuthException('social_identity_unavailable', 'The social identity is unavailable.', 422);
             }
             if ($link->revoked_at === null) {
+                $this->nativeRemoval->assertRemovalAllowed($subject, 'social', $identityId);
+                $this->removalPolicy->assertRemovalAllowed($subject, 'social', $identityId);
+                $this->nativeRemoval->assertRemovalAllowed($subject, 'social', $identityId);
                 $link->update(['revoked_at' => now()]);
                 $this->security->advance($subject, 'social_revoked');
                 $this->audits->record('social_identity.revoked', subject: $reference, actor: $subject, metadata: ['social_identity_id' => $identityId]);
+                $this->securityEvents->dispatch(new AccountSecurityChanged($reference, 'social_identity_revoked', $identityId), (new SocialIdentity)->getConnection());
             }
 
             return $link;
