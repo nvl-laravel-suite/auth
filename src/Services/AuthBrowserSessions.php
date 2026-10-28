@@ -36,7 +36,7 @@ final readonly class AuthBrowserSessions
         $guard = config('auth.guards.'.$guardName);
         $provider = is_array($guard) && is_string($guard['provider'] ?? null) ? config('auth.providers.'.$guard['provider']) : null;
 
-        return hash('sha256', json_encode([$guard, $provider], JSON_THROW_ON_ERROR));
+        return hash('sha256', json_encode([$guardName, $guard, $provider], JSON_THROW_ON_ERROR));
     }
 
     /** @return LengthAwarePaginator<int, BrowserSession> */
@@ -66,7 +66,7 @@ final readonly class AuthBrowserSessions
             $this->eligibility->assertEligible($subject, AuthenticationPurpose::CredentialLogin);
             $reference = SubjectReference::fromAuthenticatable($subject);
             $entry = BrowserSession::query()->where('binding_hash', $this->hasher->hash('native-browser-binding', $binding))->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->where('guard_name', $guardName)->lockForUpdate()->first();
-            if ($entry === null || ! $entry->isCurrent($revision) || $entry->provider_hash !== self::providerFingerprint($guardName)) {
+            if ($entry === null || $entry->subject_type !== $reference->type || $entry->subject_id !== $reference->identifier || $entry->guard_name !== $guardName || ! $entry->isCurrent($revision) || $entry->provider_hash !== self::providerFingerprint($guardName)) {
                 throw $this->invalid();
             }
             if ($entry->last_seen_at->lessThanOrEqualTo(CarbonImmutable::now('UTC')->subSeconds(60))) {

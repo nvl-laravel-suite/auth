@@ -28,7 +28,7 @@ use SensitiveParameter;
  */
 final readonly class RecentAuthenticationProofs
 {
-    public function __construct(private PrincipalSecurity $security, private AuthIdentityChallenges $records, private SecretHasher $hasher, private CanonicalActorResolver $canonical, private PrincipalEligibility $eligibility, private AccountConfirmation $policy, private AuthConfiguration $configuration) {}
+    public function __construct(private PrincipalSecurity $security, private AuthIdentityChallenges $records, private SecretHasher $hasher, private CanonicalActorResolver $canonical, private PrincipalEligibility $eligibility, private AccountConfirmation $policy, private AuthConfiguration $configuration, private AuthExecutionContext $execution) {}
 
     public function consume(Authenticatable $subject, #[SensitiveParameter] ?string $grant, RecentAuthenticationPurpose $purpose, ?AuthenticationRequestContext $context): void
     {
@@ -51,6 +51,7 @@ final readonly class RecentAuthenticationProofs
     /** @return array{Model&Authenticatable, Challenge, AuthenticationVerification} */
     private function validate(Authenticatable $subject, #[SensitiveParameter] ?string $grant, RecentAuthenticationPurpose $purpose, ?AuthenticationRequestContext $context, bool $lock): array
     {
+        $this->execution->assertNativeMutationAllowed();
         if ($context === null || $grant === null || preg_match('/\A[0-9a-f]{64}\z/', $grant) !== 1) {
             throw $this->invalid();
         }

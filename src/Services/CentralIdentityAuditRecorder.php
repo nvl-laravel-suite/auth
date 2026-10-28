@@ -20,7 +20,9 @@ final readonly class CentralIdentityAuditRecorder
 {
     public function __construct(private AuthAuditWriter $writer) {}
 
-    /** @param array<string, mixed> $metadata */
+    /** @param array<string, mixed> $metadata
+     * @param  array{}|array{actor_type: string, actor_id: string, effective_subject_type: string, effective_subject_id: string, impersonation_id: string}|null  $attribution
+     */
     public function record(
         AuthIdentityOperation $operation,
         string $action,
@@ -28,6 +30,7 @@ final readonly class CentralIdentityAuditRecorder
         ?SubjectReference $subject = null,
         ?Authenticatable $actor = null,
         array $metadata = [],
+        ?array $attribution = null,
     ): ?AuthAudit {
         if (! $this->allowed($operation, $action)) {
             throw AuthException::invalidConfiguration('The central identity audit action is not allowlisted for its operation.');
@@ -41,6 +44,7 @@ final readonly class CentralIdentityAuditRecorder
             $actor,
             null,
             $metadata,
+            $attribution,
         );
     }
 
@@ -50,6 +54,7 @@ final readonly class CentralIdentityAuditRecorder
             AuthIdentityOperation::Login, AuthIdentityOperation::Logout => ['authentication.', 'session.', 'client.'],
             AuthIdentityOperation::Recovery, AuthIdentityOperation::Password => ['password.', 'magic_link.', 'magic_links.', 'security_code.', 'security_codes.'],
             AuthIdentityOperation::VerifyEmail => ['email_verification.', 'email_change.'],
+            AuthIdentityOperation::Impersonation => ['impersonation.'],
             AuthIdentityOperation::Registration => ['registration.'],
             AuthIdentityOperation::Profile => ['profile.', 'account.'],
             AuthIdentityOperation::Mfa => ['totp.', 'passkey.', 'recovery_code.'],

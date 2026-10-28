@@ -51,13 +51,14 @@ final readonly class AuthenticationSessions
     /**
      * Create the session establishment use case.
      */
-    public function __construct(private FeatureGate $features, private OwnerAuthenticationSelection $ownerSelection, private AuthPipeline $pipeline, private SuccessfulLoginMetadataRecorder $loginMetadata, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private AuthenticationProofs $proofs, private AuthManager $auth, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private StatefulAuthenticationBoundary $boundary, private AuthModelRegistry $models, private PrincipalSecurity $security, private SecretHasher $hasher) {}
+    public function __construct(private FeatureGate $features, private OwnerAuthenticationSelection $ownerSelection, private AuthPipeline $pipeline, private SuccessfulLoginMetadataRecorder $loginMetadata, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private AuthenticationProofs $proofs, private AuthManager $auth, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private StatefulAuthenticationBoundary $boundary, private AuthModelRegistry $models, private PrincipalSecurity $security, private SecretHasher $hasher, private AuthExecutionContext $execution) {}
 
     private const string PendingFactorLogin = 'nvl-auth.credential_login';
 
     /** Admit an immediate browser transition before primary verifiers or transport effects. */
     public function assertCanTransition(?Authenticatable $subject = null): void
     {
+        $this->execution->assertNativeMutationAllowed();
         if ($this->configuration->featureEnabled(AuthFeature::ManagedSessions)) {
             if (config('session.driver') === 'cookie' || config('session.driver') === 'array' && config('app.env') !== 'testing') {
                 throw AuthException::invalidConfiguration('Managed sessions require a server-side driver; array is test-only.');

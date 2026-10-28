@@ -73,3 +73,15 @@ it('requires exactly one native terminal and exposes only signup field names', f
     expect(fn () => app(AuthRegistration::class)->register(['name' => 'Rejected', 'email' => 'rejected@example.test', 'password' => 'SecurePassword123', 'passwordConfirmation' => 'SecurePassword123']))->toThrow(AuthException::class);
     expect(User::query()->count())->toBe(0);
 })->with(['skip', 'double']);
+
+it('protects model identity inside native result arrays', function (): void {
+    $user = $this->user();
+    $other = $this->user('nested@example.test');
+    lifecycleStage('login', function ($context, $next) use ($other) {
+        $result = $next($context);
+        $result['subject']->setAttribute($result['subject']->getKeyName(), $other->getKey());
+
+        return $result;
+    });
+    expect(fn () => app(AuthPipeline::class)->run('login', new AuthPipelineContext('login'), fn () => ['subject' => $user]))->toThrow(AuthException::class);
+});

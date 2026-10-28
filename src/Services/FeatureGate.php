@@ -22,6 +22,7 @@ final readonly class FeatureGate
         private AuthConfiguration $configuration,
         private FeatureManifest $manifest,
         private AuthOwnershipState $ownership,
+        private AuthExecutionContext $execution,
     ) {}
 
     /**
@@ -29,6 +30,9 @@ final readonly class FeatureGate
      */
     public function allows(AuthFeature $feature, FeatureOperation $operation): bool
     {
+        if ($operation !== FeatureOperation::Read && $this->execution->facts() !== null) {
+            return false;
+        }
         $definition = $this->manifest->definition($feature);
 
         if (! $definition->supports($operation)) {
@@ -57,6 +61,9 @@ final readonly class FeatureGate
      */
     public function assertAllowed(AuthFeature $feature, FeatureOperation $operation): void
     {
+        if ($operation !== FeatureOperation::Read) {
+            $this->execution->assertNativeMutationAllowed();
+        }
         if ($this->allows($feature, $operation)) {
             $this->ownership->configured();
 

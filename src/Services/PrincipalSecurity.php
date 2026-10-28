@@ -54,6 +54,10 @@ final readonly class PrincipalSecurity
             }
         }
 
+        if ($state->subject_type !== $reference->type || $state->subject_id !== $reference->identifier) {
+            throw AuthException::invalidConfiguration('Security state subject identities require exact storage comparisons; repair case-folding collisions explicitly.');
+        }
+
         return $state;
     }
 

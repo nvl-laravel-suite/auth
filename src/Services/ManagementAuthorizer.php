@@ -25,6 +25,7 @@ final readonly class ManagementAuthorizer
         private AuthOwnerAdmission $owners,
         private OwnershipContext $ownership,
         private AuthOwnershipState $state,
+        private AuthExecutionContext $execution,
     ) {}
 
     /**
@@ -35,6 +36,9 @@ final readonly class ManagementAuthorizer
         string $ability,
         mixed $target = null,
     ): void {
+        if (! str_ends_with($ability, '.view') && ! str_ends_with($ability, '.viewAny')) {
+            $this->execution->assertNativeMutationAllowed();
+        }
         if ($this->state->configured()) {
             $snapshot = $this->ownership->snapshot();
             if ($snapshot->publicSite !== null) {
