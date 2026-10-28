@@ -39,7 +39,7 @@ final readonly class AuthSocialIdentities
     use IssuesAuthenticationProofs;
 
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private SocialProviderConfiguration $configuration, private SocialIdentityProviderFactory $providerFactory, private AuthOperationBoundary $operations, private SocialSubjectResolver $subjects, private AuthSubjectResolver $authSubjects, private AuthAuditRecorder $audits, private SecretHasher $hasher, private PrincipalSecurity $security, private AuthIdentityChallenges $records, private RecentAuthenticationProofs $recent, private AuthModelRegistry $models, private PrincipalCreationGuard $creationGuard) {}
+    public function __construct(private FeatureGate $features, private SocialProviderConfiguration $configuration, private SocialIdentityProviderFactory $providerFactory, private AuthOperationBoundary $operations, private SocialSubjectResolver $subjects, private AuthSubjectResolver $authSubjects, private AuthAuditRecorder $audits, private SecretHasher $hasher, private PrincipalSecurity $security, private AuthIdentityChallenges $records, private RecentAuthenticationProofs $recent, private AuthModelRegistry $models, private PrincipalCreationGuard $creationGuard, private SocialProviderRegistry $registry, private AuthConfiguration $authConfiguration) {}
 
     /** Begin a browser-bound native social authentication, retaining SDK-owned OAuth state.
      * @return array{url: string, intent: IssuedAuthenticationProof}
@@ -105,6 +105,7 @@ final readonly class AuthSocialIdentities
     {
         $this->features->assertAllowed(AuthFeature::SocialIdentities, FeatureOperation::Issue);
         $this->operations->central(AuthIdentityOperation::SocialIdentity);
+        $this->registry->assertAvailable($provider);
         $configuration = $this->configuration->provider($provider);
         try {
             $url = $this->providerFactory->make($provider)->redirectUrl($provider, $configuration['callback_url'], $configuration['scopes'], $configuration['parameters']);
@@ -136,6 +137,7 @@ final readonly class AuthSocialIdentities
     /** Network verification precedes native row locks, including inside a host transaction. */
     private function verifiedExternalIdentity(string $provider): ExternalIdentity
     {
+        $this->registry->assertAvailable($provider);
         $configuration = $this->configuration->provider($provider);
         try {
             $identity = $this->providerFactory->make($provider)->user($provider, $configuration['callback_url']);
@@ -144,7 +146,8 @@ final readonly class AuthSocialIdentities
         } catch (Throwable $exception) {
             throw new AuthException('social_authorization_failed', 'The social authorization could not be completed.', 422, previous: $exception);
         }
-        if ($identity->provider !== $provider) {
+        $expectedIssuer = $this->authConfiguration->get("features.social_identities.settings.providers.{$provider}.issuer");
+        if ($identity->provider !== $provider || $expectedIssuer !== null && $identity->issuer !== $expectedIssuer) {
             throw AuthException::invalidConfiguration('The social identity belongs to a different provider.');
         }
 
@@ -233,7 +236,7 @@ final readonly class AuthSocialIdentities
                 throw new AuthException('social_identity_conflict', 'The social identity issuer does not match the existing link.', 409);
             }
             $record = $existing ?? new SocialIdentity;
-            $record->fill(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'provider' => $identity->provider, 'provider_user_id' => $identity->providerUserId, 'provider_user_id_hash' => $providerUserHash, 'email' => $identity->email, 'profile' => ['name' => $identity->name, 'avatar' => $identity->avatar, ...$identity->profile, 'email_verified' => $identity->emailVerified, 'email_verification_source' => $identity->emailVerificationSource, 'issuer' => $identity->issuer], 'last_used_at' => now()])->save();
+            $record->fill(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'provider' => $identity->provider, 'provider_user_id' => $identity->providerUserId, 'provider_user_id_hash' => $providerUserHash, 'email' => $identity->email, 'profile' => ['name' => $identity->name, 'avatar' => $identity->avatar, ...$identity->profile, 'email_verified' => $identity->emailVerified, 'email_verification_source' => $identity->emailVerificationSource, 'issuer' => $identity->issuer, 'connection_realm' => $this->authConfiguration->get("features.social_identities.settings.providers.{$identity->provider}.realm")], 'last_used_at' => now()])->save();
             if ($existing === null) {
                 $this->security->advance($subject, 'social_linked');
             }

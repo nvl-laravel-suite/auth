@@ -30,8 +30,10 @@ use Nvl\Auth\Enums\UserBulkOperation;
 use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\User;
+use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthEventContext;
+use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Support\Auth\CanonicalActorResolver;
@@ -45,7 +47,7 @@ use Nvl\Support\Events\DomainEventDispatcher;
 final readonly class AuthUsers
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private MutationAuthorizer $authorization, private UserLocator $users, private AuthAuditRecorder $audits, private PrincipalAttributeMapper $attributes, private PrincipalSessionContainment $sessions, private AuthMemberships $owners, private AuthOwnershipState $ownershipState, private DomainEventDispatcher $domainEvents, private ManagementAuthorizer $createAuthorization, private AuthModelRegistry $models, private Container $container, private AuthOperationBoundary $operations, private ManagementAuthorizer $updateAuthorization, private PasswordUpdater $passwords, private PasswordValidationRules $passwordPolicy, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private AuthenticationSessions $browserSessions, private AuthEmailVerification $emailVerification, private PrincipalExtensions $extensions) {}
+    public function __construct(private FeatureGate $features, private MutationAuthorizer $authorization, private UserLocator $users, private AuthAuditRecorder $audits, private PrincipalAttributeMapper $attributes, private PrincipalSessionContainment $sessions, private AuthMemberships $owners, private AuthOwnershipState $ownershipState, private DomainEventDispatcher $domainEvents, private ManagementAuthorizer $createAuthorization, private AuthModelRegistry $models, private Container $container, private AuthOperationBoundary $operations, private ManagementAuthorizer $updateAuthorization, private PasswordUpdater $passwords, private PasswordValidationRules $passwordPolicy, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private AuthenticationSessions $browserSessions, private AuthEmailVerification $emailVerification, private PrincipalExtensions $extensions, private AuthPipeline $pipeline) {}
 
     /**
      * Apply one operation to at most one hundred principals.
@@ -352,36 +354,38 @@ final readonly class AuthUsers
         $user = $this->users->authenticated($this->canonical->resolve($subject));
 
         return DB::connection($user->getConnectionName())->transaction(function () use ($data, $user, $grant, $context): User {
-            $this->security->lock($user);
-            $this->security->lockChallenges($user);
-            $user = $this->users->query()->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
-            $attributes = array_diff_key($data, array_flip(['extensions']));
-            $submittedEmail = $attributes['email'] ?? null;
-            $currentEmail = $this->attributes->value($user, PrincipalAttribute::Email);
-            $emailChanged = is_string($submittedEmail) && is_string($currentEmail) && PrincipalEmailIdentity::normalize($submittedEmail) !== PrincipalEmailIdentity::normalize($currentEmail);
-            if ($emailChanged) {
-                $this->recent->consume($user, $grant, RecentAuthenticationPurpose::EmailChange, $context);
-                $this->features->assertAllowed(AuthFeature::EmailVerification, FeatureOperation::Issue);
-                $normalizedEmail = PrincipalEmailIdentity::normalize($submittedEmail);
-                if ($user::query()->withTrashed()->where($this->attributes->column(PrincipalAttribute::EmailIdentityHash), PrincipalEmailIdentity::key($normalizedEmail))->whereKeyNot($user->getKey())->exists()) {
-                    throw new AuthException('email_unavailable', 'The email address is unavailable.', 422);
+            return $this->pipeline->run('profile_update', new AuthPipelineContext('profile_update', ['attributes' => array_keys($data)], SubjectReference::fromAuthenticatable($user)), function () use ($data, $user, $grant, $context): User {
+                $this->security->lock($user);
+                $this->security->lockChallenges($user);
+                $user = $this->users->query()->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
+                $attributes = array_diff_key($data, array_flip(['extensions']));
+                $submittedEmail = $attributes['email'] ?? null;
+                $currentEmail = $this->attributes->value($user, PrincipalAttribute::Email);
+                $emailChanged = is_string($submittedEmail) && is_string($currentEmail) && PrincipalEmailIdentity::normalize($submittedEmail) !== PrincipalEmailIdentity::normalize($currentEmail);
+                if ($emailChanged) {
+                    $this->recent->consume($user, $grant, RecentAuthenticationPurpose::EmailChange, $context);
+                    $this->features->assertAllowed(AuthFeature::EmailVerification, FeatureOperation::Issue);
+                    $normalizedEmail = PrincipalEmailIdentity::normalize($submittedEmail);
+                    if ($user::query()->withTrashed()->where($this->attributes->column(PrincipalAttribute::EmailIdentityHash), PrincipalEmailIdentity::key($normalizedEmail))->whereKeyNot($user->getKey())->exists()) {
+                        throw new AuthException('email_unavailable', 'The email address is unavailable.', 422);
+                    }
+                    $attributes['emailVerified'] = false;
                 }
-                $attributes['emailVerified'] = false;
-            }
-            $mapped = $this->attributes->map($attributes);
-            if (array_key_exists('extensions', $data)) {
-                $mapped += $this->extensions->map(PrincipalMutation::Profile, $data['extensions'], $user, array_keys($mapped));
-            }
-            $user->update($mapped);
-            $reference = SubjectReference::fromAuthenticatable($user);
-            $this->audits->record('profile.updated', subject: $reference, actor: $user, metadata: ['attributes' => array_keys($attributes)]);
-            $this->domainEvents->dispatch(new PrincipalChanged($this->attributes->identifier($user), 'profile_updated', ['attributes' => array_keys($attributes)], AuthEventContext::centralIdentity()), $user->getConnection());
-            if ($emailChanged) {
-                $this->security->advance($user, 'email_changed');
-                $this->updateProfileRequestEmailVerification($user, $data);
-            }
+                $mapped = $this->attributes->map($attributes);
+                if (array_key_exists('extensions', $data)) {
+                    $mapped += $this->extensions->map(PrincipalMutation::Profile, $data['extensions'], $user, array_keys($mapped));
+                }
+                $user->update($mapped);
+                $reference = SubjectReference::fromAuthenticatable($user);
+                $this->audits->record('profile.updated', subject: $reference, actor: $user, metadata: ['attributes' => array_keys($attributes)]);
+                $this->domainEvents->dispatch(new PrincipalChanged($this->attributes->identifier($user), 'profile_updated', ['attributes' => array_keys($attributes)], AuthEventContext::centralIdentity()), $user->getConnection());
+                if ($emailChanged) {
+                    $this->security->advance($user, 'email_changed');
+                    $this->updateProfileRequestEmailVerification($user, $data);
+                }
 
-            return $user->refresh();
+                return $user->refresh();
+            });
         }, 3);
     }
 

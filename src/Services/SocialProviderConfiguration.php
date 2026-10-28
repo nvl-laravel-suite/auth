@@ -29,7 +29,7 @@ final readonly class SocialProviderConfiguration
             "features.social_identities.settings.providers.{$provider}",
         );
 
-        if (! is_array($configured)) {
+        if (! is_array($configured) || ($configured['enabled'] ?? true) !== true) {
             throw new AuthException('social_provider_unavailable', 'The social provider is unavailable.', 404);
         }
 

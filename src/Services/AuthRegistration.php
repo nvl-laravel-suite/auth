@@ -21,6 +21,8 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\User;
+use Nvl\Auth\Pipelines\AuthPipeline;
+use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Events\DomainEventDispatcher;
 
@@ -31,7 +33,7 @@ use Nvl\Support\Events\DomainEventDispatcher;
  */
 final readonly class AuthRegistration
 {
-    public function __construct(private AuthModelRegistry $models, private ConfiguredRegistrationAdmission $nativeAdmission, private RegistrationAdmission $admission, private PrincipalExtensions $extensions, private PrincipalAttributeMapper $attributes, private PasswordValidationRules $passwordPolicy, private PasswordUpdater $passwords, private FeatureGate $features, private AuthConfiguration $configuration, private AuthOperationBoundary $operations, private PrincipalSecurity $security, private AuthCommittedAudit $audits, private DomainEventDispatcher $events, private AuthEmailVerification $verification) {}
+    public function __construct(private AuthModelRegistry $models, private ConfiguredRegistrationAdmission $nativeAdmission, private RegistrationAdmission $admission, private PrincipalExtensions $extensions, private PrincipalAttributeMapper $attributes, private PasswordValidationRules $passwordPolicy, private PasswordUpdater $passwords, private FeatureGate $features, private AuthConfiguration $configuration, private AuthOperationBoundary $operations, private PrincipalSecurity $security, private AuthCommittedAudit $audits, private DomainEventDispatcher $events, private AuthEmailVerification $verification, private AuthPipeline $pipeline) {}
 
     /**
      * Create one active unverified principal without session, membership or RBAC effects.
@@ -53,29 +55,31 @@ final readonly class AuthRegistration
         }
 
         return $connection->transaction(function () use ($data, $class, $connection): User {
-            $this->nativeAdmission->assertProvisioningAllowed();
-            $mapped = $this->attributes->map(['name' => trim($data['name']), 'email' => $data['email'], 'active' => true, 'emailVerified' => false, 'locale' => $data['locale'], 'timezone' => $data['timezone'], 'profile' => [], 'preferences' => []]);
-            $extensions = $this->extensions->map(PrincipalMutation::Registration, $data['extensions'], occupiedColumns: array_keys($mapped));
-            $this->admission->assertAllowed(RegistrationMethod::Password, $data['email'], $extensions);
-            $this->nativeAdmission->assertProvisioningAllowed();
-            $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Issue);
-            try {
-                $user = $class::query()->create($mapped + $extensions);
-            } catch (UniqueConstraintViolationException $exception) {
-                throw new AuthException('registration_unavailable', 'Registration is unavailable.', 409, previous: $exception);
-            }
-            $this->passwords->update($user, $data['password']);
-            $user->setRememberToken(Str::random(60));
-            $user->save();
-            $this->security->lock($user);
-            $reference = SubjectReference::fromAuthenticatable($user);
-            $this->audits->record($connection, 'registration.completed', subject: $reference, metadata: ['method' => RegistrationMethod::Password->value]);
-            $this->events->dispatch(new PrincipalRegistered($reference, RegistrationMethod::Password), $connection);
-            if ($this->configuration->featureEnabled(AuthFeature::EmailVerification)) {
-                $this->verification->request($user, $data['locale']);
-            }
+            return $this->pipeline->run('registration', new AuthPipelineContext('registration', ['method' => 'password', 'attributes' => array_keys($data)]), function () use ($data, $class, $connection): User {
+                $this->nativeAdmission->assertProvisioningAllowed();
+                $mapped = $this->attributes->map(['name' => trim($data['name']), 'email' => $data['email'], 'active' => true, 'emailVerified' => false, 'locale' => $data['locale'], 'timezone' => $data['timezone'], 'profile' => [], 'preferences' => []]);
+                $extensions = $this->extensions->map(PrincipalMutation::Registration, $data['extensions'], occupiedColumns: array_keys($mapped));
+                $this->admission->assertAllowed(RegistrationMethod::Password, $data['email'], $extensions);
+                $this->nativeAdmission->assertProvisioningAllowed();
+                $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Issue);
+                try {
+                    $user = $class::query()->create($mapped + $extensions);
+                } catch (UniqueConstraintViolationException $exception) {
+                    throw new AuthException('registration_unavailable', 'Registration is unavailable.', 409, previous: $exception);
+                }
+                $this->passwords->update($user, $data['password']);
+                $user->setRememberToken(Str::random(60));
+                $user->save();
+                $this->security->lock($user);
+                $reference = SubjectReference::fromAuthenticatable($user);
+                $this->audits->record($connection, 'registration.completed', subject: $reference, metadata: ['method' => RegistrationMethod::Password->value]);
+                $this->events->dispatch(new PrincipalRegistered($reference, RegistrationMethod::Password), $connection);
+                if ($this->configuration->featureEnabled(AuthFeature::EmailVerification)) {
+                    $this->verification->request($user, $data['locale']);
+                }
 
-            return $user->refresh();
+                return $user->refresh();
+            });
         }, 3);
     }
 

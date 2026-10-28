@@ -40,6 +40,7 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Models\PrincipalSecurityState;
+use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Support\Config\PackageOptions;
 use ReflectionMethod;
 use ReflectionNamedType;
@@ -52,7 +53,7 @@ use Throwable;
  */
 final class AuthDoctor
 {
-    private const PIPELINES = ['login', 'logout', 'password_reset_requested', 'password_reset', 'invitation_issued', 'invitation_accepted', 'client_started', 'api_token_issued'];
+    private const PIPELINES = AuthPipeline::NAMES;
 
     private const CONFIGURABLE_TABLES = [AuthTables::Users => 'users', AuthTables::Permissions => 'permissions', AuthTables::Roles => 'roles', AuthTables::ModelHasPermissions => 'model_has_permissions', AuthTables::ModelHasRoles => 'model_has_roles', AuthTables::RoleHasPermissions => 'role_has_permissions', AuthTables::PersonalAccessTokens => 'personal_access_tokens', AuthTables::PasswordResetTokens => 'password_reset_tokens'];
 
@@ -121,6 +122,25 @@ final class AuthDoctor
         $checks[] = $this->check('security.principal_source', $sourceReady, 'Canonical principal and mandatory security state must share the same actual connection.');
         $appKey = config('app.key');
         $checks[] = $this->check('security.app_key', is_string($appKey) && $appKey !== '', 'APP_KEY is required for hashing and encrypted casts.');
+        if ($configuration->featureEnabled(AuthFeature::SocialIdentities)) {
+            try {
+                $registry = $container->make(SocialProviderRegistry::class);
+                foreach ($registry->providers() as $name => $provider) {
+                    if (! $provider['enabled']) {
+                        continue;
+                    }
+                    try {
+                        $registry->assertAvailable($name);
+                        $ready = true;
+                    } catch (Throwable) {
+                        $ready = false;
+                    }
+                    $checks[] = $this->check('social.connection.'.$name, $ready, 'Social connection requires a usable factory and stable realm.');
+                }
+            } catch (Throwable) {
+                $checks[] = $this->check('social.connections', false, 'Invalid social connection configuration.');
+            }
+        }
         $checks[] = $this->check('configuration.pipelines', $this->pipelinesReady($configuration, $container), 'Auth pipelines contain an unknown pipeline or invalid stage.');
         $checks[] = $this->check('configuration.models', $this->ownedModelsReady($container), 'An enabled native Auth model does not extend its package model.');
         $principalTable = $this->configuredTable($configuration, AuthTables::Users);

@@ -291,6 +291,14 @@ return [
         'invitation_accepted' => [],
         'client_started' => [],
         'api_token_issued' => [],
+        'registration' => [],
+        'profile_update' => [],
+        'credential_change' => [],
+        'email_change' => [],
+        'social_link_change' => [],
+        'impersonation_started' => [],
+        'impersonation_stopped' => [],
+
     ],
 
     'cleanup' => [

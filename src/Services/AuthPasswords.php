@@ -252,19 +252,21 @@ final readonly class AuthPasswords
         }
         $prototype = new ($subject::class);
         $prototype->getConnection()->transaction(function () use ($subject, $data, $grant, $context): void {
-            $this->recent->consume($subject, $grant, RecentAuthenticationPurpose::PasswordChange, $context);
-            $this->security->assertTokenContainment($subject);
-            $this->security->lock($subject);
-            $this->security->lockChallenges($subject);
-            $subject = $this->canonical->resolve($subject, true);
-            if (! $subject instanceof CanResetPassword) {
-                throw AuthException::invalidConfiguration('Password updates require a resettable principal.');
-            }
-            $this->passwords->update($subject, $data['password']);
-            $subject->setRememberToken(Str::random(60));
-            $subject->save();
-            $this->security->advance($subject, 'password_changed');
-            $this->audits->record('password.updated', subject: SubjectReference::fromAuthenticatable($subject), actor: $subject);
+            $this->pipeline->run('credential_change', new AuthPipelineContext('credential_change', ['operation' => 'password_change'], SubjectReference::fromAuthenticatable($subject)), function () use ($subject, $data, $grant, $context): void {
+                $this->recent->consume($subject, $grant, RecentAuthenticationPurpose::PasswordChange, $context);
+                $this->security->assertTokenContainment($subject);
+                $this->security->lock($subject);
+                $this->security->lockChallenges($subject);
+                $subject = $this->canonical->resolve($subject, true);
+                if (! $subject instanceof CanResetPassword) {
+                    throw AuthException::invalidConfiguration('Password updates require a resettable principal.');
+                }
+                $this->passwords->update($subject, $data['password']);
+                $subject->setRememberToken(Str::random(60));
+                $subject->save();
+                $this->security->advance($subject, 'password_changed');
+                $this->audits->record('password.updated', subject: SubjectReference::fromAuthenticatable($subject), actor: $subject);
+            });
         });
     }
 
