@@ -25,8 +25,10 @@ use Nvl\Auth\Events\InvitationAccepted;
 use Nvl\Auth\Events\PrincipalChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
+use Nvl\Auth\Models\User;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -292,6 +294,16 @@ final readonly class AuthInvitations
         }
 
         return $this->registerRegister($data, $authenticatedRecipient);
+    }
+
+    /** @param array<string, mixed> $data
+     * @return array{invitation: Invitation, subject: User}
+     */
+    public function registerSocial(#[\SensitiveParameter] string $invitationToken, #[\SensitiveParameter] string $continuation, array $data, AuthenticationRequestContext $context): array
+    {
+        $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Use);
+
+        return $this->container->make(AuthRegistration::class)->registerInvitedSocial($invitationToken, $continuation, $data, $context);
     }
 
     /** Perform registration in the already-selected ownership boundary.

@@ -32,7 +32,7 @@ use Throwable;
 /**
  * Complete native AuthSocialIdentities operations.
  *
- * @api
+ * @internal
  */
 final readonly class AuthSocialIdentities
 {
@@ -127,11 +127,7 @@ final readonly class AuthSocialIdentities
      */
     public function completeAuthorization(string $provider, Authenticatable $subject, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): SocialIdentity
     {
-        $this->features->assertAllowed(AuthFeature::SocialIdentities, FeatureOperation::Use);
-        $this->operations->central(AuthIdentityOperation::SocialIdentity, $subject);
-        $identity = $this->verifiedExternalIdentity($provider);
-
-        return $this->link($this->authorizationSubject($identity, $subject), $identity, $grant, $context);
+        throw new AuthException('social_workflow_required', 'Use purpose-bound AuthSocialLinks callbacks.', 422);
     }
 
     /** Network verification precedes native row locks, including inside a host transaction. */

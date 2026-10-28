@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -20,9 +21,13 @@ use Nvl\Auth\Events\PrincipalRegistered;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\Challenge;
+use Nvl\Auth\Models\Invitation;
+use Nvl\Auth\Models\SocialIdentity;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Pipelines\AuthPipeline;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
+use Nvl\Auth\ValueObjects\IssuedSocialRegistration;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Events\DomainEventDispatcher;
 
@@ -33,7 +38,7 @@ use Nvl\Support\Events\DomainEventDispatcher;
  */
 final readonly class AuthRegistration
 {
-    public function __construct(private AuthModelRegistry $models, private ConfiguredRegistrationAdmission $nativeAdmission, private RegistrationAdmission $admission, private PrincipalExtensions $extensions, private PrincipalAttributeMapper $attributes, private PasswordValidationRules $passwordPolicy, private PasswordUpdater $passwords, private FeatureGate $features, private AuthConfiguration $configuration, private AuthOperationBoundary $operations, private PrincipalSecurity $security, private AuthCommittedAudit $audits, private DomainEventDispatcher $events, private AuthEmailVerification $verification, private AuthPipeline $pipeline) {}
+    public function __construct(private AuthModelRegistry $models, private ConfiguredRegistrationAdmission $nativeAdmission, private RegistrationAdmission $admission, private PrincipalExtensions $extensions, private PrincipalAttributeMapper $attributes, private PasswordValidationRules $passwordPolicy, private PasswordUpdater $passwords, private FeatureGate $features, private AuthConfiguration $configuration, private AuthOperationBoundary $operations, private PrincipalSecurity $security, private AuthCommittedAudit $audits, private DomainEventDispatcher $events, private AuthEmailVerification $verification, private AuthPipeline $pipeline, private SocialRegistrationContinuations $social, private SecretHasher $hasher, private AuthIdentityChallenges $records) {}
 
     /**
      * Create one active unverified principal without session, membership or RBAC effects.
@@ -81,6 +86,102 @@ final readonly class AuthRegistration
                 return $user->refresh();
             });
         }, 3);
+    }
+
+    /** @param array<string, mixed> $data */
+    public function registerSocial(#[\SensitiveParameter] string $continuation, array $data, AuthenticationRequestContext $context): User
+    {
+        return $this->provisionSocial($continuation, $data, $context);
+    }
+
+    /** A real invitation token and a proved matching mailbox are both mandatory.
+     * @param  array<string, mixed>  $data
+     * @return array{invitation: Invitation, subject: User}
+     */
+    public function registerInvitedSocial(#[\SensitiveParameter] string $invitationToken, #[\SensitiveParameter] string $continuation, array $data, AuthenticationRequestContext $context): array
+    {
+        $invitations = app(AuthInvitations::class);
+        $invitation = $invitations->preview($invitationToken);
+        if ($invitation->getConnection() !== (new Challenge)->getConnection()) {
+            throw AuthException::invalidConfiguration('Invited signup requires one source.');
+        }
+
+        return $invitation->getConnection()->transaction(function () use ($invitations, $invitationToken, $invitation, $continuation, $data, $context): array {
+            $user = $this->provisionSocial($continuation, $data, $context, $invitation->recipient);
+
+            return ['invitation' => $invitations->accept($invitationToken, $user), 'subject' => $user];
+        });
+    }
+
+    public function requestSocialEmailVerification(#[\SensitiveParameter] string $continuation, string $email, AuthenticationRequestContext $context): void
+    {
+        $this->nativeAdmission->assertProvisioningAllowed(true, RegistrationMethod::Social);
+        $this->social->request($continuation, $email, $context);
+    }
+
+    public function verifySocialEmail(#[\SensitiveParameter] string $continuation, #[\SensitiveParameter] string $code, AuthenticationRequestContext $context): IssuedSocialRegistration
+    {
+        return $this->social->verify($continuation, $code, $context);
+    }
+
+    /** @param array<string, mixed> $data */
+    private function provisionSocial(#[\SensitiveParameter] string $continuation, array $data, AuthenticationRequestContext $context, ?string $invitedEmail = null): User
+    {
+        $this->nativeAdmission->assertProvisioningAllowed($invitedEmail !== null, RegistrationMethod::Social);
+        $this->features->assertAllowed(AuthFeature::SocialIdentities, FeatureOperation::Enroll);
+        if (array_diff(array_keys($data), ['name', 'locale', 'timezone', 'extensions']) !== []) {
+            throw new InvalidArgumentException('Unknown social registration fields.');
+        }
+        $data += ['locale' => 'en', 'timezone' => 'UTC', 'extensions' => []];
+        if (! is_string($data['name'] ?? null) || ! is_string($data['locale']) || ! is_string($data['timezone']) || ! is_array($data['extensions'])) {
+            throw new InvalidArgumentException('Invalid social signup data.');
+        }
+        Validator::make($data, ['name' => ['required', 'string', 'max:160'], 'locale' => ['required', 'string', 'max:12'], 'timezone' => ['required', 'timezone:all'], 'extensions' => ['array']])->validate();
+        $class = $this->models->userClass();
+        $prototype = new $class;
+        PrincipalEmailIdentity::assertReady($prototype);
+        $connection = $prototype->getConnection();
+        if ($connection !== (new Challenge)->getConnection() || $connection !== (new SocialIdentity)->getConnection() || $connection !== (new AuthAudit)->getConnection()) {
+            throw AuthException::invalidConfiguration('Social signup requires one source.');
+        }
+        try {
+            return $connection->transaction(function () use ($continuation, $context, $data, $class, $connection, $invitedEmail): User {
+                $proof = $this->social->lock($continuation, $context);
+                $claims = $this->social->claims($proof);
+                $email = $proof->payload['mailbox'] ?? ($claims['emailVerified'] === true ? $claims['email'] : null);
+                if (! is_string($email)) {
+                    throw new AuthException('social_registration_mailbox_required', 'Verify a signup mailbox before registration.', 422);
+                }
+                $email = PrincipalEmailIdentity::normalize($email);
+                Validator::make(['email' => $email], ['email' => ['required', 'email:rfc', 'max:254']])->validate();
+                if ($invitedEmail !== null && $email !== PrincipalEmailIdentity::normalize($invitedEmail)) {
+                    throw new AuthException('invitation_recipient_mismatch', 'The verified signup mailbox must match the invitation.', 422);
+                }
+
+                return $this->pipeline->run('registration', new AuthPipelineContext('registration', ['method' => 'social', 'attributes' => array_keys($data)]), function () use ($proof, $claims, $email, $data, $class, $connection, $invitedEmail): User {
+                    $mapped = $this->attributes->map(['name' => $data['name'], 'email' => $email, 'active' => true, 'emailVerified' => true, 'locale' => $data['locale'], 'timezone' => $data['timezone'], 'profile' => [], 'preferences' => []]);
+                    $extensions = $this->extensions->map(PrincipalMutation::Registration, $data['extensions'], occupiedColumns: array_keys($mapped));
+                    $this->admission->assertAllowed(RegistrationMethod::Social, $email, $extensions);
+                    $this->nativeAdmission->assertProvisioningAllowed($invitedEmail !== null, RegistrationMethod::Social);
+                    $hash = $this->hasher->hash('social-identity-'.$claims['provider'], $claims['id']);
+                    if (SocialIdentity::query()->where('provider', $claims['provider'])->where('provider_user_id_hash', $hash)->exists()) {
+                        throw new AuthException('registration_unavailable', 'Registration is unavailable.', 409);
+                    }
+                    $user = $class::query()->create($mapped + $extensions);
+                    $reference = SubjectReference::fromAuthenticatable($user);
+                    $this->security->lock($user);
+                    SocialIdentity::query()->create(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'provider' => $claims['provider'], 'provider_user_id' => $claims['id'], 'provider_user_id_hash' => $hash, 'email' => $claims['email'], 'profile' => ['issuer' => $claims['issuer'], 'email_verified' => $claims['emailVerified'], 'email_verification_source' => $claims['source'], 'connection_realm' => $this->configuration->get('features.social_identities.settings.providers.'.$claims['provider'].'.realm')], 'last_used_at' => now()]);
+                    $proof->consumed_at = CarbonImmutable::now();
+                    $this->records->save($proof);
+                    $this->audits->record($connection, 'registration.completed', subject: $reference, metadata: ['method' => 'social']);
+                    $this->events->dispatch(new PrincipalRegistered($reference, RegistrationMethod::Social), $connection);
+
+                    return $user->refresh();
+                });
+            }, 3);
+        } catch (UniqueConstraintViolationException) {
+            throw new AuthException('registration_unavailable', 'Registration is unavailable.', 409);
+        }
     }
 
     /**

@@ -44,12 +44,9 @@ final readonly class AuthReauthentication
                 throw new \InvalidArgumentException('Invalid recent authentication proof.');
             }
         }
-        if (isset($proof['socialProof'])) {
-            throw new AuthException('social_reauthentication_unavailable', 'Linked social reauthentication is not available yet.', 422);
-        }
         $subject = $this->canonical->resolve($subject);
         $password = $proof['password'] ?? null;
-        $passkeyProof = $proof['passkeyProof'] ?? null;
+        $passkeyProof = $proof['passkeyProof'] ?? $proof['socialProof'] ?? null;
         if (is_string($password)) {
             $secret = $this->authentication->proveReauthentication($subject, $password, $context)->reveal();
         } elseif (is_string($passkeyProof)) {
@@ -65,7 +62,7 @@ final readonly class AuthReauthentication
         $verification = $consumed['verification'];
         $evidence = $verification->evidence;
         if ($evidence->subject != SubjectReference::fromAuthenticatable($subject)
-            || $evidence->method !== (isset($proof['password']) ? AuthenticationMethod::Password : AuthenticationMethod::Passkey)
+            || $evidence->method !== (isset($proof['password']) ? AuthenticationMethod::Password : (isset($proof['socialProof']) ? AuthenticationMethod::Social : AuthenticationMethod::Passkey))
             || $evidence->method === AuthenticationMethod::Passkey && ! in_array('user_verified', $evidence->factors, true)) {
             throw new AuthException('authentication_proof_invalid', 'The authentication proof does not match the subject.', 422);
         }

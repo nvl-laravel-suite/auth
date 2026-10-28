@@ -29,6 +29,7 @@ final readonly class AuthDeliveryRequest
     public function __construct(public string $messageId, public AuthFeature $feature, public AuthMessageType $type, public string $recipient, #[\SensitiveParameter] public array $payload, public CarbonImmutable $expiresAt, public ?string $locale = null, public array $metadata = [], public ?SubjectReference $subject = null, public ?array $invitation = null)
     {
         $supportedType = match ($this->feature) {
+            AuthFeature::Registration => AuthMessageType::RegistrationEmailVerification,
             AuthFeature::Invitations => AuthMessageType::Invitation,
             AuthFeature::MagicLinks => AuthMessageType::MagicLink,
             AuthFeature::SecurityCodes => AuthMessageType::SecurityCode,
