@@ -666,6 +666,12 @@ final readonly class AuthUsers
         }
         Validator::make($validated, ['name' => ['sometimes', 'string', 'max:160'], 'email' => ['sometimes', 'email:rfc', 'max:254'], 'locale' => ['sometimes', 'string', 'regex:/^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$/'], 'timezone' => ['sometimes', 'timezone:all'], 'profile' => ['sometimes', 'array'], 'preferences' => ['sometimes', 'array']])->validate();
 
+        foreach (['profile', 'preferences'] as $field) {
+            if (isset($validated[$field])) {
+                $this->validateUpdateUserAssertJsonPayloadIsBounded($validated[$field], $field);
+            }
+        }
+
         return $validated;
     }
 

@@ -18,6 +18,7 @@ use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Nvl\Auth\Contracts\AccountAuthenticationPolicy;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\PasswordUpdater;
@@ -27,6 +28,7 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
+use Nvl\Auth\Events\AccountSecurityChanged;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
@@ -48,7 +50,7 @@ use SensitiveParameter;
 final readonly class AuthPasswords
 {
     /** Native Auth operation. */
-    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private Hasher $hasher, private AuthAuditRecorder $audits, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private PasswordBrokerManager $brokers, private AuthPipeline $pipeline, private AuthenticationEligibility $eligibility, private DomainEventDispatcher $domainEvents, private PasswordUpdater $passwords, private ConnectionCommitCallbacks $eventCommits, private CanonicalActorResolver $canonical, private PasswordValidationRules $policy, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private PrincipalEmailIdentity $emails) {}
+    public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private Hasher $hasher, private AuthAuditRecorder $audits, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private PasswordBrokerManager $brokers, private AuthPipeline $pipeline, private AuthenticationEligibility $eligibility, private DomainEventDispatcher $domainEvents, private PasswordUpdater $passwords, private ConnectionCommitCallbacks $eventCommits, private CanonicalActorResolver $canonical, private PasswordValidationRules $policy, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private PrincipalEmailIdentity $emails, private UsableAccountAuthenticationPolicy $nativeRemoval, private AccountAuthenticationPolicy $removalPolicy) {}
 
     /**
      * Verify the current password and timestamp the active session.
@@ -266,6 +268,66 @@ final readonly class AuthPasswords
                 $subject->save();
                 $this->security->advance($subject, 'password_changed');
                 $this->audits->record('password.updated', subject: SubjectReference::fromAuthenticatable($subject), actor: $subject);
+            });
+        });
+    }
+
+    /** Establish a password only when the locked principal has none.
+     * @param  array<string, mixed>  $data
+     */
+    public function setInitial(Authenticatable $subject, #[SensitiveParameter] array $data, #[SensitiveParameter] string $recentProof, AuthenticationRequestContext $context): void
+    {
+        $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Update);
+        $data = $this->validateUpdatePassword($data);
+        $subject = $this->canonical->resolve($subject);
+        if (! $subject instanceof Model) {
+            throw AuthException::invalidConfiguration('Password setup requires canonical Eloquent persistence.');
+        }
+        $subject->getConnection()->transaction(function () use ($subject, $data, $recentProof, $context): void {
+            $this->pipeline->run('credential_change', new AuthPipelineContext('credential_change', ['operation' => 'password_set'], SubjectReference::fromAuthenticatable($subject)), function () use ($subject, $data, $recentProof, $context): void {
+                $this->recent->consume($subject, $recentProof, RecentAuthenticationPurpose::PasswordChange, $context);
+                $this->security->assertTokenContainment($subject);
+                $this->security->lock($subject);
+                $this->security->lockChallenges($subject);
+                $fresh = $this->canonical->resolve($subject, true);
+                if (! $fresh instanceof CanResetPassword) {
+                    throw AuthException::invalidConfiguration('Password setup requires a resettable principal.');
+                }
+                if (filled($fresh->getAuthPassword())) {
+                    throw new AuthException('password_already_set', 'A password already exists.', 422);
+                }
+                $this->passwords->update($fresh, $data['password']);
+                $this->security->advance($fresh, 'password_changed');
+                $reference = SubjectReference::fromAuthenticatable($fresh);
+                $this->audits->record('password.established', subject: $reference, actor: $fresh);
+                $this->domainEvents->dispatch(new AccountSecurityChanged($reference, 'password_established'), $fresh->getConnection());
+            });
+        });
+    }
+
+    public function remove(Authenticatable $subject, #[SensitiveParameter] string $recentProof, AuthenticationRequestContext $context): void
+    {
+        $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Update);
+        $subject = $this->canonical->resolve($subject);
+        if (! $subject instanceof Model) {
+            throw AuthException::invalidConfiguration('Password removal requires canonical Eloquent persistence.');
+        }
+        $subject->getConnection()->transaction(function () use ($subject, $recentProof, $context): void {
+            $this->pipeline->run('credential_change', new AuthPipelineContext('credential_change', ['operation' => 'password_remove'], SubjectReference::fromAuthenticatable($subject)), function () use ($subject, $recentProof, $context): void {
+                $this->recent->consume($subject, $recentProof, RecentAuthenticationPurpose::PasswordChange, $context);
+                $this->security->assertTokenContainment($subject);
+                $this->security->lock($subject);
+                $this->security->lockChallenges($subject);
+                $fresh = $this->canonical->resolve($subject, true);
+                $this->nativeRemoval->assertRemovalAllowed($fresh, 'password', 'password');
+                $this->removalPolicy->assertRemovalAllowed($fresh, 'password', 'password');
+                $this->nativeRemoval->assertRemovalAllowed($fresh, 'password', 'password');
+                $fresh->setAttribute($fresh->getAuthPasswordName(), null);
+                $fresh->save();
+                $this->security->advance($fresh, 'password_changed');
+                $reference = SubjectReference::fromAuthenticatable($fresh);
+                $this->audits->record('password.removed', subject: $reference, actor: $fresh);
+                $this->domainEvents->dispatch(new AccountSecurityChanged($reference, 'password_removed'), $fresh->getConnection());
             });
         });
     }

@@ -66,7 +66,7 @@ final readonly class AuthAuditWriter
             return AuthAudit::query()->create($attributes);
         }
         $action = $attributes['action'] ?? null;
-        $allowed = ['registration.', 'authentication.', 'session.', 'client.', 'password.', 'magic_link.', 'magic_links.', 'security_code.', 'security_codes.', 'email_verification.', 'profile.', 'account.', 'totp.', 'passkey.', 'recovery_code.', 'social_identity.', 'membership.discovery'];
+        $allowed = ['registration.', 'authentication.', 'session.', 'client.', 'password.', 'magic_link.', 'magic_links.', 'security_code.', 'security_codes.', 'email_verification.', 'email_change.', 'profile.', 'account.', 'totp.', 'passkey.', 'recovery_code.', 'social_identity.', 'membership.discovery'];
         if (! is_string($action) || ($attributes['client_id'] ?? null) !== null || ! array_any($allowed, static fn (string $prefix): bool => str_starts_with($action, $prefix))) {
             throw AuthException::invalidConfiguration('Only the closed central identity audit families can use this writer.');
         }

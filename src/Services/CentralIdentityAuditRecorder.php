@@ -49,7 +49,7 @@ final readonly class CentralIdentityAuditRecorder
         $prefixes = match ($operation) {
             AuthIdentityOperation::Login, AuthIdentityOperation::Logout => ['authentication.', 'session.', 'client.'],
             AuthIdentityOperation::Recovery, AuthIdentityOperation::Password => ['password.', 'magic_link.', 'magic_links.', 'security_code.', 'security_codes.'],
-            AuthIdentityOperation::VerifyEmail => ['email_verification.'],
+            AuthIdentityOperation::VerifyEmail => ['email_verification.', 'email_change.'],
             AuthIdentityOperation::Registration => ['registration.'],
             AuthIdentityOperation::Profile => ['profile.', 'account.'],
             AuthIdentityOperation::Mfa => ['totp.', 'passkey.', 'recovery_code.'],
