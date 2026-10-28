@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -10,7 +9,6 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Nvl\Auth\Contracts\RegistrationAdmission;
 use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
-use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\RegistrationMethod;
 use Nvl\Auth\Exceptions\AuthException;
@@ -20,13 +18,11 @@ use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthInvitations;
 use Nvl\Auth\Services\AuthModelRegistry;
 use Nvl\Auth\Services\AuthRegistration;
-use Nvl\Auth\Services\AuthSocialIdentities;
+use Nvl\Auth\Services\AuthSocialAuthentication;
 use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Public\RegistrationController;
 use Nvl\Auth\Tests\Fixtures\ExtensionPrincipal;
 use Nvl\Auth\Tests\Fixtures\TestPrincipalExtensionMapper;
 use Nvl\Auth\Tests\Fixtures\TestSocialIdentityProviderFactory;
-use Nvl\Auth\Tests\Fixtures\TestUser;
-use Nvl\Auth\ValueObjects\ExternalIdentity;
 
 it('blocks new invited principals in closed registration without blocking existing recipient acceptance', function (): void {
     config(['nvl-auth.features.invitations.enabled' => true, 'nvl-auth.features.registration.enabled' => false, 'nvl-auth.features.registration.settings.mode' => 'closed']);
@@ -142,34 +138,17 @@ it('lets the consumer choose neutral HTTP conflict presentation', function (): v
     expect(User::query()->count())->toBe(1)->and(auth()->check())->toBeFalse();
 });
 
-it('rejects native social provisioning including quiet saves and restores admission afterward', function (bool $quiet): void {
-    config(['nvl-auth.features.registration.enabled' => true, 'nvl-auth.features.registration.settings.mode' => 'open', 'nvl-auth.features.social_identities.enabled' => true, 'nvl-auth.features.social_identities.settings.providers.github' => ['callback_url' => 'https://app.example.test/callback', 'scopes' => [], 'parameters' => []]]);
+it('requires explicit registration after an unknown social callback without provisioning or authenticating', function (): void {
+    config(['nvl-auth.features.registration.enabled' => true, 'nvl-auth.features.registration.settings.mode' => 'open', 'nvl-auth.features.social_identities.enabled' => true, 'nvl-auth.features.social_identities.settings.providers.github' => ['scopes' => [], 'parameters' => []]]);
     app()->instance(SocialIdentityProviderFactory::class, new TestSocialIdentityProviderFactory);
-    app()->instance(SocialSubjectResolver::class, new class($quiet) implements SocialSubjectResolver
-    {
-        public function __construct(private bool $quiet) {}
-
-        public function resolve(ExternalIdentity $identity): Authenticatable
-        {
-            $user = new TestUser(['name' => 'Forbidden social', 'email' => 'social.new@example.test']);
-            if ($this->quiet) {
-                $user->saveQuietly();
-            } else {
-                $user->save();
-            }
-
-            return $user->fresh();
-        }
-    });
-    $service = app(AuthSocialIdentities::class);
+    $service = app(AuthSocialAuthentication::class);
     $context = $this->authenticationContext();
-    $started = $service->startAuthentication('github', $context);
-    expect(fn () => $service->finishAuthentication('github', $started['intent']->reveal(), $context))->toThrow(AuthException::class, 'Verified social registration');
-    expect(User::query()->where('email', 'social.new@example.test')->exists())->toBeFalse()
-        ->and(SocialIdentity::query()->count())->toBe(0);
+    $started = $service->beginLogin('github', $context);
+    expect($service->completeLogin('github', $started['intent']->reveal(), $context)['status'])->toBe('registration_required');
+    expect(User::query()->count())->toBe(0)->and(SocialIdentity::query()->count())->toBe(0)->and(auth()->check())->toBeFalse();
     $registered = app(AuthRegistration::class)->register(['name' => 'Allowed password', 'email' => 'allowed@example.test', 'password' => 'SecurePassword123', 'passwordConfirmation' => 'SecurePassword123']);
     expect($registered->email)->toBe('allowed@example.test');
-})->with([false, true]);
+});
 
 it('requires password capability for public and invited password provisioning', function (): void {
     config(['nvl-auth.features.registration.enabled' => true, 'nvl-auth.features.registration.settings.mode' => 'open', 'nvl-auth.features.password.enabled' => false, 'nvl-auth.features.invitations.enabled' => true]);

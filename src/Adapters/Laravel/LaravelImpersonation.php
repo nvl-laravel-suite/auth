@@ -27,7 +27,11 @@ use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Auth\CanonicalActorResolver;
 
-/** Installs only a request-local effective user; Laravel session and recaller identity stay original. @api */
+/**
+ * Installs only a request-local effective user; Laravel session and recaller identity stay original.
+ *
+ * @api
+ */
 final readonly class LaravelImpersonation
 {
     public function __construct(private AuthExecutionContext $execution, private AuthenticationSessions $transitions, private AuthManager $auth, private CanonicalActorResolver $canonical, private PrincipalEligibility $eligibility, private AuthImpersonation $grants, private AuthBrowserSessions $browsers, private PrincipalSecurity $security, private SecretHasher $hasher, private AuthIdentityChallenges $challenges) {}

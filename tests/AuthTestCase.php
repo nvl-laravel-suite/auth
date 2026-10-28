@@ -16,13 +16,15 @@ use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Providers\AuthServiceProvider;
 use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthReauthentication;
-use Nvl\Auth\Services\AuthSocialIdentities;
+use Nvl\Auth\Services\AuthSocialAuthentication;
+use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\Tests\Fixtures\AllowAllManagementAccess;
 use Nvl\Auth\Tests\Fixtures\AllowAllSystemMutationAccess;
 use Nvl\Auth\Tests\Fixtures\Consumer\RouteServiceProvider;
 use Nvl\Auth\Tests\Fixtures\TestSubjectResolver;
 use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
+use Nvl\Auth\ValueObjects\ExternalIdentity;
 use Nvl\Auth\ValueObjects\IssuedRecentAuthentication;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Providers\LocaleServiceProvider;
@@ -126,13 +128,25 @@ abstract class AuthTestCase extends Orchestra
     }
 
     /** Complete the real native provider intent when a test exercises social login. */
-    protected function completeSocialAuthentication(AuthSocialIdentities $service, string $provider): SocialIdentity
+    protected function completeSocialAuthentication(AuthSocialAuthentication $service, string $provider): SocialIdentity
     {
         $context = $this->authenticationContext();
-        $started = $service->startAuthentication($provider, $context);
-        $service->finishAuthentication($provider, $started['intent']->reveal(), $context);
+        $started = $service->beginLogin($provider, $context);
+        $result = $service->completeLogin($provider, $started['intent']->reveal(), $context);
+        expect($result['status'])->toBe('authenticated');
 
         return SocialIdentity::query()->where('provider', $provider)->firstOrFail();
+    }
+
+    /** Arrange a previously linked immutable identity for native login tests. */
+    protected function seedSocialIdentity(Authenticatable $subject, ExternalIdentity $identity): SocialIdentity
+    {
+        return SocialIdentity::query()->create([
+            'subject_type' => $subject->getMorphClass(), 'subject_id' => (string) $subject->getAuthIdentifier(),
+            'provider' => $identity->provider, 'provider_user_id' => $identity->providerUserId,
+            'provider_user_id_hash' => app(SecretHasher::class)->hash("social-identity-{$identity->provider}", $identity->providerUserId),
+            'profile' => ['issuer' => $identity->issuer],
+        ]);
     }
 
     /**

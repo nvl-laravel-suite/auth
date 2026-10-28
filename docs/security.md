@@ -68,8 +68,7 @@ changes, so changing a connection realm requires an explicit migration. Email is
 an optional claim, not ownership authority. An authenticated subject can link a
 proved provider identity without verified email. For an unauthenticated callback,
 an active immutable link can resolve its subject without email; unknown identities
-require verified email before the configured `SocialSubjectResolver` is called.
-Custom resolvers matching by email must inspect the verification and provenance.
+return a server-held registration continuation. Native explicit registration requires provider-verified email provenance or a separate bounded local mailbox proof. No callback may resolve or merge a principal by email.
 
 The Socialite adapter recognizes Google's boolean `email_verified` userinfo claim.
 For the unmodified GitHub SDK driver, it recognizes the SDK's verified-primary

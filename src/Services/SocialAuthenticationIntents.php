@@ -25,7 +25,11 @@ use Nvl\Auth\ValueObjects\IssuedSocialIntent;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Auth\CanonicalActorResolver;
 
-/** Native callback verification and one-use accounting shared by complete social operations. @internal */
+/**
+ * Native callback verification and one-use accounting shared by complete social operations.
+ *
+ * @internal
+ */
 final readonly class SocialAuthenticationIntents
 {
     public function __construct(private FeatureGate $features, private SocialProviderRegistry $registry, private SocialProviderConfiguration $configuration, private AuthConfiguration $settings, private SocialIdentityProviderFactory $factory, private AuthIdentityChallenges $records, private SecretHasher $hasher, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private CanonicalActorResolver $canonical, private AuthSubjectResolver $subjects, private PrincipalEligibility $eligibility) {}

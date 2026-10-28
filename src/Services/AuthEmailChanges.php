@@ -31,7 +31,11 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Auth\CanonicalActorResolver;
 use Nvl\Support\Events\DomainEventDispatcher;
 
-/** Keeps live identity unchanged until the replacement mailbox is proved. @api */
+/**
+ * Keeps live identity unchanged until the replacement mailbox is proved.
+ *
+ * @api
+ */
 final readonly class AuthEmailChanges
 {
     public function __construct(private FeatureGate $features, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private SecretHasher $hasher, private PrincipalAttributeMapper $attributes, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, private DomainEventDispatcher $events, private AuthDeliveryContext $delivery) {}

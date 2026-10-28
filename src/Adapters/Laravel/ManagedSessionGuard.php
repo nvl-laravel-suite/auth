@@ -15,7 +15,11 @@ use Nvl\Auth\Services\AuthRememberCredentials;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Symfony\Component\HttpFoundation\Request;
 
-/** Explicit Laravel driver; the standard Laravel recaller path is disabled. @api */
+/**
+ * Explicit Laravel driver; the standard Laravel recaller path is disabled.
+ *
+ * @api
+ */
 final class ManagedSessionGuard extends SessionGuard
 {
     private ?AuthRememberCredentials $rememberCredentials = null;
@@ -24,7 +28,11 @@ final class ManagedSessionGuard extends SessionGuard
 
     private bool $managedRecallAttempted = false;
 
-    /** Driver construction only; does not select or replace any host guard. @internal */
+    /**
+     * Driver construction only; does not select or replace any host guard.
+     *
+     * @internal
+     */
     public function configureNative(AuthRememberCredentials $remember, AuthenticationSessions $sessions): void
     {
         $this->rememberCredentials = $remember;
@@ -113,7 +121,11 @@ final class ManagedSessionGuard extends SessionGuard
         }
     }
 
-    /** Queue only after native assurance and enrollment; ciphertext also protects transports without EncryptCookies. @internal */
+    /**
+     * Queue only after native assurance and enrollment; ciphertext also protects transports without EncryptCookies.
+     *
+     * @internal
+     */
     public function queueManagedCookie(string $selector, #[\SensitiveParameter] string $secret, CarbonImmutable $expiresAt): void
     {
         self::assertCookieConfiguration();

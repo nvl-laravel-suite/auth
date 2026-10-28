@@ -74,6 +74,10 @@ final readonly class SocialiteIdentityProvider implements SocialIdentityProvider
             );
         }
 
+        if ($this->issuer !== null && ($user->getRaw()['iss'] ?? null) !== $this->issuer) {
+            throw AuthException::invalidConfiguration('The verified provider claims do not match the configured issuer.');
+        }
+
         $policy = $this->emailVerification;
         if ($policy === null && get_class($this->providerDriver) === GoogleProvider::class) {
             $policy = new GoogleEmailVerification;

@@ -12,7 +12,7 @@ it('defines every supported feature exactly once', function (): void {
     $definitions = app(FeatureManifest::class)->definitions();
 
     expect($definitions)
-        ->toHaveCount(18)
+        ->toHaveCount(20)
         ->and(array_keys($definitions))->toBe(array_map(
             static fn (AuthFeature $feature): string => $feature->value,
             AuthFeature::cases(),
@@ -74,7 +74,7 @@ it('keeps native feature contracts and consumer route fixtures aligned', functio
 });
 
 it('exposes native operation families without duplicate execute contracts', function (): void {
-    foreach (['AuthRegistration', 'Authentication', 'AuthenticationSessions', 'AuthChallenges', 'AuthPasswords', 'AuthEmailVerification', 'AuthInvitations', 'AuthUsers', 'AuthUserReader', 'AuthClients', 'AuthMemberships', 'AuthAuditReader', 'AuthMaintenance', 'AuthTokens', 'AuthRoles', 'AuthPermissions', 'AuthRbacReader', 'AuthSecondFactor', 'AuthPasskeys', 'AuthSocialIdentities'] as $family) {
+    foreach (['AuthRegistration', 'Authentication', 'AuthenticationSessions', 'AuthChallenges', 'AuthPasswords', 'AuthEmailVerification', 'AuthInvitations', 'AuthUsers', 'AuthUserReader', 'AuthClients', 'AuthMemberships', 'AuthAuditReader', 'AuthMaintenance', 'AuthTokens', 'AuthRoles', 'AuthPermissions', 'AuthRbacReader', 'AuthSecondFactor', 'AuthPasskeys', 'AuthSocialAuthentication', 'AuthSocialLinks', 'AuthAccountSecurity', 'AuthAccountRecovery', 'AuthEmailChanges', 'AuthBrowserSessions', 'AuthRememberCredentials', 'AuthImpersonation'] as $family) {
         $reflection = new ReflectionClass('Nvl\\Auth\\Services\\'.$family);
         expect($reflection->hasMethod('execute'))->toBeFalse()->and($reflection->getMethods(ReflectionMethod::IS_PUBLIC))->not->toBeEmpty();
     }

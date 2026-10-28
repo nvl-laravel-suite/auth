@@ -126,3 +126,12 @@ Native public signup source committed. Exactly one fact per created principal; o
 | `method` | `Nvl\Auth\Enums\RegistrationMethod` |
 | `classification` | `string` |
 | `schemaVersion` | `int` |
+
+
+## AccountSecurityChanged
+
+Security mutation source committed. Carries `subject` (SubjectReference), `operation` (string), optional `credentialId` (string) and `schemaVersion` (int). No credential secret or session binding is included. Consumers own notifications and downstream business reactions.
+
+## ImpersonationChanged
+
+Grant lifecycle source committed. Carries `impersonationId`, `originalActor`, `effectiveSubject`, `operation` (granted/stopped/expired/revoked), `expiresAt`, optional `operator` and `schemaVersion`. References and timestamps describe a fact; they cannot activate an overlay or impersonate from a queue. Native audit captures original/effective attribution before leaving the source scope.

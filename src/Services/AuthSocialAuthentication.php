@@ -20,7 +20,11 @@ use Nvl\Auth\ValueObjects\IssuedSocialIntent;
 use Nvl\Auth\ValueObjects\IssuedSocialRegistration;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
-/** Complete purpose-bound social login and existing-link reauthentication. @api */
+/**
+ * Complete purpose-bound social login and existing-link reauthentication.
+ *
+ * @api
+ */
 final readonly class AuthSocialAuthentication
 {
     use IssuesAuthenticationProofs;

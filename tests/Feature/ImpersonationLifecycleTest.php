@@ -115,6 +115,8 @@ it('rotates native browser binding through explicit start and stop transport wit
     expect($store->get($key))->not->toBe($old)->and($guard->id())->toBe($actor->getAuthIdentifier());
     expect(fn () => app(AuthBrowserSessions::class)->admit($actor, 'web', $old))->toThrow(AuthException::class);
     $adapter->run($guard, $store, 'web', $grant->identifier(), fn () => expect($guard->id())->toBe($target->getAuthIdentifier()));
+    $revoked = app(AuthImpersonation::class)->revoke($actor, $grant->identifier(), 'Support permission withdrawn');
+    expect($revoked->stop_reason)->toBe('administrative');
     $beforeStop = $store->get($key);
     $adapter->stop($grant->identifier(), $guard, $store, 'web');
     expect($store->get($key))->not->toBe($beforeStop)->and($grant->refresh()->stopped_at)->not->toBeNull()->and($store->get($guard->getName()))->toBe($actor->getAuthIdentifier());

@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Schema;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Enums\UserBulkOperation;
 use Nvl\Auth\Events\AuthDeliveryRequested;
@@ -20,6 +21,7 @@ use Nvl\Auth\Events\RbacAssignmentChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\User;
+use Nvl\Auth\Services\AuthEmailChanges;
 use Nvl\Auth\Services\Authentication;
 use Nvl\Auth\Services\AuthPermissions;
 use Nvl\Auth\Services\AuthRoles;
@@ -229,23 +231,20 @@ it('rejects invalid direct principal and RBAC input before persistence', functio
     expect(User::query()->where('email', 'invalid.timezone@example.test')->exists())->toBeFalse();
 });
 
-it('changes self-service email sparsely after confirmation and restarts verification', function (): void {
-    config()->set('nvl-auth.features.email_verification.enabled', true);
-    Event::fake([AuthDeliveryRequested::class, PrincipalChanged::class]);
+it('stages self-service email sparsely until the new destination is proved', function (): void {
+    config(['nvl-auth.features.email_verification.enabled' => true]);
+    Event::fake([AuthDeliveryRequested::class]);
     $user = $this->user('old@example.test');
     $user->forceFill(['email_verified_at' => now(), 'locale' => 'bg'])->save();
-
-    $updated = app(AuthUsers::class)->updateProfile($user, ['email' => ' New.Address@Example.Test '], grant: $this->recentGrant($user, RecentAuthenticationPurpose::EmailChange, 'correct-password')->reveal(), context: $this->authenticationContext());
-
-    expect($updated->email)->toBe('new.address@example.test')
-        ->and($updated->email_verified_at)->toBeNull()
-        ->and($updated->name)->toBe('Test User')
-        ->and($updated->locale)->toBe('bg')
-        ->and(AuthAudit::query()->where('action', 'profile.updated')->exists())->toBeTrue()
-        ->and(AuthAudit::query()->where('action', 'email_verification.requested')->exists())->toBeTrue();
-    Event::assertDispatched(AuthDeliveryRequested::class, static fn (AuthDeliveryRequested $event): bool => $event->request->recipient === 'new.address@example.test');
-    Event::assertDispatched(PrincipalChanged::class, static fn (PrincipalChanged $event): bool => $event->operation === 'profile_updated'
-        && in_array('emailVerified', $event->payload['attributes'] ?? [], true));
+    $context = $this->authenticationContext();
+    $service = app(AuthEmailChanges::class);
+    $service->request($user, ' New.Address@Example.Test ', $this->recentGrant($user, RecentAuthenticationPurpose::EmailChange)->reveal(), $context);
+    expect($user->refresh()->email)->toBe('old@example.test')->and($user->hasVerifiedEmail())->toBeTrue();
+    $delivery = Event::dispatched(AuthDeliveryRequested::class)->first(fn ($args) => $args[0]->request->type === AuthMessageType::EmailChangeVerification)[0]->request;
+    $updated = $service->complete($user, $delivery->payload['token'], $context);
+    expect($updated->email)->toBe('new.address@example.test')->and($updated->hasVerifiedEmail())->toBeTrue()
+        ->and($updated->name)->toBe('Test User')->and($updated->locale)->toBe('bg')
+        ->and(AuthAudit::query()->where('action', 'email_change.completed')->exists())->toBeTrue();
 });
 
 it('updates a nonsensitive profile field without account confirmation', function (): void {
@@ -273,20 +272,24 @@ it('requires valid account confirmation before changing email', function (array 
 })->with([
     'missing recent grant' => [
         ['email' => 'missing-confirmation@example.test'],
-        'recent_authentication_required',
+        'email_change_verification_required',
     ],
     'legacy password is no authority' => [
         ['email' => 'invalid-confirmation@example.test'],
-        'recent_authentication_required',
+        'email_change_verification_required',
     ],
 ]);
 
-it('rejects a self-service email conflict without changing profile state', function (): void {
-    config()->set('nvl-auth.features.email_verification.enabled', true);
+it('rejects a self-service email conflict after destination proof without changing live identity', function (): void {
+    config(['nvl-auth.features.email_verification.enabled' => true]);
     $user = $this->user('unchanged@example.test');
     $this->user('taken@example.test');
-
-    expect(fn () => app(AuthUsers::class)->updateProfile($user, ['email' => 'taken@example.test'], grant: $this->recentGrant($user, RecentAuthenticationPurpose::EmailChange, 'correct-password')->reveal(), context: $this->authenticationContext()))->toThrow(AuthException::class, 'unavailable')
+    $context = $this->authenticationContext();
+    Event::fake([AuthDeliveryRequested::class]);
+    $service = app(AuthEmailChanges::class);
+    $service->request($user, 'taken@example.test', $this->recentGrant($user, RecentAuthenticationPurpose::EmailChange)->reveal(), $context);
+    $delivery = Event::dispatched(AuthDeliveryRequested::class)->first(fn ($args) => $args[0]->request->type === AuthMessageType::EmailChangeVerification)[0]->request;
+    expect(fn () => $service->complete($user, $delivery->payload['token'], $context))->toThrow(AuthException::class)
         ->and($user->refresh()->email)->toBe('unchanged@example.test');
 });
 

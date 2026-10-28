@@ -18,7 +18,11 @@ use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Auth\CanonicalActorResolver;
 
-/** Safe account method inventory; stored credential material never leaves this reader. @api */
+/**
+ * Safe account method inventory; stored credential material never leaves this reader.
+ *
+ * @api
+ */
 final readonly class AuthAccountSecurity
 {
     public function __construct(private CanonicalActorResolver $canonical, private AuthConfiguration $configuration, private SocialProviderRegistry $providers) {}
@@ -50,7 +54,11 @@ final readonly class AuthAccountSecurity
         return ['hasPassword' => $this->configuration->featureEnabled(AuthFeature::Password) && filled($subject->getAuthPassword()), 'passkeys' => $passkeys, 'socialIdentities' => $identities, 'totpEnabled' => $totpEnabled, 'recoveryCodesRemaining' => $remaining];
     }
 
-    /** Native verified email methods count only when an actual login feature is selected. @internal */
+    /**
+     * Native verified email methods count only when an actual login feature is selected.
+     *
+     * @internal
+     */
     public function hasEmailMethod(Authenticatable $subject): bool
     {
         $subject = $this->canonical->resolve($subject);

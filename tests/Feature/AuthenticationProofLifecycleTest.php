@@ -14,7 +14,6 @@ use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Contracts\SocialIdentityProvider;
 use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
-use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Enums\AuthenticationDestination;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Events\AuthenticationAttempted;
@@ -32,7 +31,7 @@ use Nvl\Auth\Services\AuthenticationSessions;
 use Nvl\Auth\Services\AuthPasskeys;
 use Nvl\Auth\Services\AuthSchemaManager;
 use Nvl\Auth\Services\AuthSecondFactor;
-use Nvl\Auth\Services\AuthSocialIdentities;
+use Nvl\Auth\Services\AuthSocialAuthentication;
 use Nvl\Auth\Services\AuthTokens;
 use Nvl\Auth\Services\OwnerAuthenticationIntents;
 use Nvl\Auth\Services\PrincipalSecurity;
@@ -41,7 +40,6 @@ use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Public\SocialIdentityContr
 use Nvl\Auth\Tests\Fixtures\HostAuditRecorder;
 use Nvl\Auth\Tests\Fixtures\RejectLoginStage;
 use Nvl\Auth\Tests\Fixtures\TestPasskeyCeremony;
-use Nvl\Auth\Tests\Fixtures\TestSocialSubjectResolver;
 use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\ExternalIdentity;
@@ -245,10 +243,9 @@ it('rejects another browser before redeeming native email and passkey primaries'
     }
 })->with(['email_link', 'email_code', 'passkey']);
 
-it('calls the social provider before native intent consumption inside an outer source transaction', function (): void {
+it('rejects social SDK work in an outer source transaction before consuming the intent', function (): void {
     config(['nvl-auth.features.social_identities.enabled' => true, 'nvl-auth.features.social_identities.settings.providers.github' => ['scopes' => [], 'parameters' => []]]);
     $user = $this->user();
-    $this->app->instance(SocialSubjectResolver::class, new TestSocialSubjectResolver($user));
     $provider = new class implements SocialIdentityProvider
     {
         public bool $unconsumed = false;
@@ -260,7 +257,7 @@ it('calls the social provider before native intent consumption inside an outer s
 
         public function user(string $provider, ?string $callbackUrl): ExternalIdentity
         {
-            $this->unconsumed = Challenge::query()->where('type', 'social_authentication')->sole()->consumed_at === null;
+            $this->unconsumed = Challenge::query()->where('type', 'social_intent')->sole()->consumed_at === null;
 
             return new ExternalIdentity($provider, 'social-user', email: 'claim@example.test', emailVerified: true, emailVerificationSource: 'fixture');
         }
@@ -274,10 +271,12 @@ it('calls the social provider before native intent consumption inside an outer s
             return $this->provider;
         }
     });
-    $social = app(AuthSocialIdentities::class);
+    $social = app(AuthSocialAuthentication::class);
     $context = $this->authenticationContext();
-    $intent = $social->startAuthentication('github', $context);
-    $user->getConnection()->transaction(fn () => $social->finishAuthentication('github', $intent['intent']->reveal(), $context));
+    $intent = $social->beginLogin('github', $context);
+    expect(fn () => $user->getConnection()->transaction(fn () => $social->completeLogin('github', $intent['intent']->reveal(), $context)))->toThrow(AuthException::class);
+    expect($provider->unconsumed)->toBeFalse();
+    expect($social->completeLogin('github', $intent['intent']->reveal(), $context)['status'])->toBe('registration_required');
     expect($provider->unconsumed)->toBeTrue();
 });
 
@@ -431,7 +430,6 @@ it('does not consume a pending recovery factor while session authentication is d
 it('correlates concurrent social fixture intents with their own OAuth state', function (): void {
     config(['nvl-auth.features.social_identities.enabled' => true, 'nvl-auth.features.social_identities.settings.providers.github' => ['scopes' => [], 'parameters' => []]]);
     $user = $this->user();
-    $this->app->instance(SocialSubjectResolver::class, new TestSocialSubjectResolver($user));
     $provider = new class implements SocialIdentityProvider
     {
         public int $redirects = 0;
@@ -455,23 +453,24 @@ it('correlates concurrent social fixture intents with their own OAuth state', fu
             return $this->provider;
         }
     });
+    $this->seedSocialIdentity($user, new ExternalIdentity('github', 'state-user'));
     $this->authenticationContext();
     $session = app('session.store');
     $controller = app(SocialIdentityController::class);
-    $social = app(AuthSocialIdentities::class);
+    $social = app(AuthSocialAuthentication::class);
     $this->app->bind(OwnershipActorResolver::class, NativeOwnershipActorResolver::class);
     $this->app->bind(OwnerAvailability::class, ExistingOwnerAvailability::class);
     $intents = app(OwnerAuthenticationIntents::class);
     $request = Request::create('/social/github/redirect');
     $request->setLaravelSession($session);
     $controller->redirect('github', $request, $social, $intents, app(AuthenticationSessions::class));
-    $first = Challenge::query()->where('type', 'social_authentication')->sole();
+    $first = Challenge::query()->where('type', 'social_intent')->sole();
     $controller->redirect('github', $request, $social, $intents, app(AuthenticationSessions::class));
     $callback = Request::create('/social/github/callback?state=flow-1');
     $callback->setLaravelSession($session);
     $controller->callback('github', $callback, $social, app(AuthenticationSessions::class), app(AuthSubjectResolver::class));
     expect($first->refresh()->consumed_at)->not->toBeNull()
-        ->and(Challenge::query()->where('type', 'social_authentication')->whereNull('consumed_at')->count())->toBe(1);
+        ->and(Challenge::query()->where('type', 'social_intent')->whereNull('consumed_at')->count())->toBe(1);
 });
 
 it('revokes an earlier native email challenge on same-browser reissue without erasing retained rows', function (string $method): void {

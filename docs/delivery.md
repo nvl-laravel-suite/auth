@@ -92,3 +92,8 @@ applications that use any notification system—or none.
 ## Invitation reads
 
 Use `AuthInvitations::paginate` for authorized model pages and `findActive` for an exact active model lookup. Management reads require an actor or explicitly authorized system context. Resend/revoke resolve and lock the current invitation before authorization. The consumer projects invitation models into its response schema.
+
+
+## Registration and replacement mailbox messages
+
+`RegistrationEmailVerification` delivers the bounded local mailbox code for a social continuation when provider claims lack verified provenance. `EmailChangeVerification` carries the one-use pending destination token; `EmailChangeNotification` contains lifecycle facts for the original/new mailbox. Host listeners choose transport, templates and URLs and must not log recipient/code/token payloads. A message is delivery data, never permission to authenticate or replace an identity without the matching native continuation/token/context. Source rollback emits no delivery request.

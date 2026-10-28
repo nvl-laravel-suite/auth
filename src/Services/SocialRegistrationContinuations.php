@@ -18,7 +18,11 @@ use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\IssuedSocialRegistration;
 use Nvl\Support\Events\DomainEventDispatcher;
 
-/** Server-owned verified claims and separately proved onboarding mailbox. @internal */
+/**
+ * Server-owned verified claims and separately proved onboarding mailbox.
+ *
+ * @internal
+ */
 final readonly class SocialRegistrationContinuations
 {
     public function __construct(private AuthIdentityChallenges $records, private SecretHasher $hasher, private AuthConfiguration $configuration, private AuthDeliveryContext $delivery, private DomainEventDispatcher $events) {}

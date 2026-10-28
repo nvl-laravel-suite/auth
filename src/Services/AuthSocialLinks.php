@@ -23,7 +23,11 @@ use Nvl\Auth\ValueObjects\IssuedSocialIntent;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Events\DomainEventDispatcher;
 
-/** Explicit recent-proof-before-redirect account link and reconnect operations. @api */
+/**
+ * Explicit recent-proof-before-redirect account link and reconnect operations.
+ *
+ * @api
+ */
 final readonly class AuthSocialLinks
 {
     public function __construct(private SocialAuthenticationIntents $intents, private SecretHasher $hasher, private PrincipalSecurity $security, private AuthAuditRecorder $audits, private AuthConfiguration $configuration, private AuthPipeline $pipeline, private RecentAuthenticationProofs $recent, private FeatureGate $features, private UsableAccountAuthenticationPolicy $nativeRemoval, private AccountAuthenticationPolicy $removalPolicy, private DomainEventDispatcher $securityEvents) {}

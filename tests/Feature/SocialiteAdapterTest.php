@@ -171,3 +171,10 @@ it('surfaces a provider network failure without manufacturing an identity', func
     $driver->setHttpClient(new Client(['handler' => HandlerStack::create($responses)]));
     expect(fn () => (new SocialiteIdentityProvider($driver, 'google'))->user('google', null))->toThrow(ServerException::class);
 });
+
+it('rejects a configured issuer unless the SDK claims prove the same issuer', function (?string $issuer): void {
+    $socialite = new SocialiteFake(Mockery::mock(Factory::class));
+    $socialite->fake('oidc', User::fake(['id' => 'subject', 'iss' => $issuer]));
+    $adapter = new SocialiteIdentityProvider($socialite->driver('oidc'), 'oidc', issuer: 'https://issuer.example');
+    expect(fn () => $adapter->user('oidc', null))->toThrow(AuthException::class);
+})->with([null, 'https://attacker.example']);

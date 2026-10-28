@@ -3,15 +3,17 @@
 declare(strict_types=1);
 
 use Nvl\Auth\Contracts\AccountConfirmation;
+use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Services\AuthEmailChanges;
 use Nvl\Auth\Services\AuthPasskeys;
 use Nvl\Auth\Services\AuthPasswords;
 use Nvl\Auth\Services\AuthSecondFactor;
-use Nvl\Auth\Services\AuthSocialIdentities;
+use Nvl\Auth\Services\AuthSocialLinks;
 use Nvl\Auth\Services\AuthUsers;
+use Nvl\Auth\Tests\Fixtures\TestSocialIdentityProviderFactory;
 use Nvl\Auth\ValueObjects\AuthenticationEvidence;
-use Nvl\Auth\ValueObjects\ExternalIdentity;
 
 it('does not accept the old current password shortcut for a direct sensitive mutation', function (): void {
     $user = $this->user();
@@ -30,13 +32,15 @@ it('does not let a replacement account-confirmation policy bypass native grants'
 it('requires grants for direct sensitive self-service entrypoints', function (string $operation): void {
     config(['nvl-auth.features.totp.enabled' => true, 'nvl-auth.features.recovery_codes.enabled' => true, 'nvl-auth.features.passkeys.enabled' => true, 'nvl-auth.features.social_identities.enabled' => true, 'nvl-auth.features.email_verification.enabled' => true]);
     $user = $this->user();
+    config(['nvl-auth.features.social_identities.settings.providers.github' => ['scopes' => [], 'parameters' => []]]);
+    app()->instance(SocialIdentityProviderFactory::class, new TestSocialIdentityProviderFactory);
     $call = fn () => match ($operation) {
-        'email' => app(AuthUsers::class)->updateProfile($user, ['email' => 'new@example.test']),
+        'email' => app(AuthEmailChanges::class)->request($user, 'new@example.test', 'unproved', $this->authenticationContext()),
         'deletion' => app(AuthUsers::class)->deleteOwnAccount($user, [], auth()->guard('web'), app('session.store')),
         'enrollment' => app(AuthSecondFactor::class)->startEnrollment($user, ['accountName' => $user->email]),
         'recovery' => app(AuthSecondFactor::class)->regenerateRecoveryCodes($user),
         'passkey' => app(AuthPasskeys::class)->beginRegistration($user),
-        'social' => app(AuthSocialIdentities::class)->link($user, new ExternalIdentity('github', 'external-id')),
+        'social' => app(AuthSocialLinks::class)->beginLink($user, 'github', 'unproved', $this->authenticationContext()),
     };
     expect($call)->toThrow(AuthException::class, 'operation-bound');
 })->with(['email', 'deletion', 'enrollment', 'recovery', 'passkey', 'social']);

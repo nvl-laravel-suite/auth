@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Enums;
 
-/** Service-selected social callback authority. @api */
+/**
+ * Service-selected social callback authority.
+ *
+ * @api
+ */
 enum SocialIntentPurpose: string
 {
     case Login = 'login';

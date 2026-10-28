@@ -20,7 +20,11 @@ use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Auth\CanonicalActorResolver;
 
-/** Lists and admits authoritative native browser bindings. @api */
+/**
+ * Lists and admits authoritative native browser bindings.
+ *
+ * @api
+ */
 final readonly class AuthBrowserSessions
 {
     public function __construct(private FeatureGate $features, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private SecretHasher $hasher, private PrincipalEligibility $eligibility, private RecentAuthenticationProofs $recent, private AuthAuditRecorder $audits) {}
@@ -30,7 +34,11 @@ final readonly class AuthBrowserSessions
         return 'nvl-auth.browser.'.hash('sha256', $guardName);
     }
 
-    /** Guard/provider configuration is captured without publishing credentials. @internal */
+    /**
+     * Guard/provider configuration is captured without publishing credentials.
+     *
+     * @internal
+     */
     public static function providerFingerprint(string $guardName): string
     {
         $guard = config('auth.guards.'.$guardName);

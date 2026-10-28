@@ -247,15 +247,23 @@ public function finishRegistration(Authenticatable $subject, #[\SensitiveParamet
 public function revoke(Authenticatable $subject, Passkey $passkey, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): Passkey;
 ```
 
-## AuthSocialIdentities
+## Explicit social workflows
 
-```php
-public function startAuthentication(string $provider, AuthenticationRequestContext $context): array;
-public function finishAuthentication(string $provider, #[\SensitiveParameter] string $intent, AuthenticationRequestContext $context): IssuedAuthenticationProof;
-public function completeAuthorization(string $provider, Authenticatable $subject, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): SocialIdentity;
-public function link(Authenticatable $subject, ExternalIdentity $identity, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): SocialIdentity;
-public function revoke(Authenticatable $subject, SocialIdentity $identity, #[\SensitiveParameter] ?string $grant = null, ?AuthenticationRequestContext $context = null): SocialIdentity;
-```
+`AuthSocialAuthentication::beginLogin(provider, context, destination)` returns an authorization URL and redacted intent. Retain intent/context privately in the initiating browser. `completeLogin(provider, intent, context)` returns either `authenticated` with subject/proof, or `registration_required` with a redacted continuation. Only active exact immutable links authenticate; no email matching occurs. Subject-bound `beginReauthentication`/`completeReauthentication` issue social primary proof for `AuthReauthentication::confirm(['socialProof' => ...])`; native MFA remains mandatory.
+
+`AuthSocialLinks::beginLink(subject, provider, recentProof, context)` and `beginReconnect` consume purpose-specific recent grants before redirect. Their matching completions acquire verified SDK claims and perform the native locked mutation. `unlink(subject, identityId, recentProof, context)` enforces ownership and the final usable primary method. Raw `ExternalIdentity` input cannot create a link. Reconnect is explicit and cannot transfer ownership.
+
+`AuthRegistration::registerSocial(continuation, data, context)` and `registerInvitedSocial(invitationToken, continuation, data, context)` create without logging in. Use `requestSocialEmailVerification` / `verifySocialEmail` when provider claims lack mailbox proof. Continuations expire after 300 seconds; replacement local proof retains the original deadline and has bounded attempts/issuance. Profile/extensions remain allowlisted and consumer-mapped.
+
+## Account security and browser authority
+
+`AuthAccountSecurity::state(subject)` projects usable methods without secrets. `AuthPasswords::setInitial` and `revoke` require PasswordChange grants; removal preserves a usable primary. `AuthAccountRecovery::recover(authority, subject, data)` requires separate recovery authority, reason and closed credential selections with complete session/token containment.
+
+`AuthEmailChanges::request(subject, newEmail, recentProof, context)` stages a pending mailbox. Deliver its typed verification token privately; `complete(subject, token, context)` proves and replaces once within 60 minutes. `cancel(subject, changeId)` revokes a pending request. Generic profile updates reject replacement email.
+
+`AuthBrowserSessions::paginate`, `admit`, `revoke`, `revokeOthers` and `revokeAll` manage authoritative browser grants. Enrollment is private to successful native authentication; arbitrary principals/evidence cannot enroll. `AuthRememberCredentials::resume` consumes a rotating per-device selector/secret into native primary proof, followed by normal MFA and browser admission.
+
+`AuthImpersonation::start`, `admit`, `stop` and separately authorized `revoke` manage short-lived grants. `LaravelImpersonation` handles binding/session rotation and temporary guard identity with safe restoration. `AuthExecutionContext::facts` is a bounded read seam for consumer audit attribution and cannot confer queue authority. See [security](security.md) for restrictions.
 
 ## Proof-backed completion
 
@@ -271,7 +279,7 @@ $subject = $sessions->establishFromProof(
 );
 ```
 
-Context is trusted host transport, never credential input. Preserve it from email request to redemption and from passkey/social initiation to completion. Passkey completion returns `subject`, `proof` and native `requestContext`; use that returned context. Social initiation returns `url` and redacted `intent`; retain the intent and context in the initiating browser session, and use `finishAuthentication` after SDK-managed OAuth state validation. Generic delivery challenges and social identity models cannot authenticate.
+Context is trusted host transport, never credential input. Preserve it from email request to redemption and from passkey/social initiation to completion. Passkey completion returns `subject`, `proof` and native `requestContext`; use that returned context. Social initiation returns `url` and redacted `intent`; retain the intent and context in the initiating browser session, and use `completeLogin` after SDK-managed OAuth state validation. Generic delivery challenges and social identity models cannot authenticate.
 
 For enrolled principals, password, email link/code, ordinary social and non-UV passkeys require the same second-factor continuation. Native verified UV passkeys satisfy MFA. Handle `second_factor_required` with the host factor form, then call `Authentication::completeSecondFactor($factorProof, $guard, $session)`. Final verified authentication proofs/continuations expire after 300 seconds and share five failed factor attempts. Primary email delivery retains its configured digits/fallback digits, TTL and primary attempt limit; those settings do not change final proof/MFA limits. TOTP or recovery follows valid primary proof; recovery is never a primary login method. A custom `AuthenticationAssurancePolicy` can add requirements but cannot disable native enrollment enforcement.
 
@@ -289,7 +297,7 @@ $grant = $reauthentication->confirm($subject, ['password' => $password, 'code' =
 $passwords->update($subject, ['password' => $newPassword, 'passwordConfirmation' => $newPassword], $grant->reveal(), $context);
 ```
 
-`AuthReauthentication::confirm()` accepts exactly one primary (`password` or an opaque `passkeyProof`) and at most one `code`/`recoveryCode`. Use `AuthPasskeys::beginReauthentication()` and `finishAuthentication()` for a subject-bound passkey receipt; session-login receipts cannot be reused for confirmation. Verified UV supports passwordless principals. Social receipts fail explicitly until the linked-identity reauthentication integration is supplied. TOTP/recovery alone is insufficient.
+`AuthReauthentication::confirm()` accepts exactly one primary (`password`, an opaque `passkeyProof` or `socialProof`) and at most one `code`/`recoveryCode`. Use `AuthPasskeys::beginReauthentication()` and `finishAuthentication()` for a subject-bound passkey receipt; session-login receipts cannot be reused for confirmation. Verified UV supports passwordless principals. Social receipts must come from the same subject’s active immutable link and a connection explicitly supporting reauthentication. TOTP/recovery alone is insufficient.
 
 Confirmation runs outside the principal source transaction. The grant binds the closed `RecentAuthenticationPurpose`, canonical subject, current security revision and trusted guard/session for 300 seconds. The intended mutation consumes it inside its own transaction: rollback restores grant/mutation, while the previously committed factor stays spent. Self-service password/email/deletion, factor enrollment/removal, recovery regeneration and social linking/unlinking/reconnection require the matching grant even through direct PHP calls. Enrollment begin and completion are distinct operations, each accepting an explicit grant; an operation that changes security revision requires a new confirmation for later operations.
 

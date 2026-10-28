@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Nvl\Auth\Contracts\AuthenticationAssurancePolicy;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
-use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Enums\AuthenticationDestination;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
@@ -16,13 +15,13 @@ use Nvl\Auth\Services\Authentication;
 use Nvl\Auth\Services\AuthenticationProofs;
 use Nvl\Auth\Services\AuthenticationSessions;
 use Nvl\Auth\Services\AuthPasskeys;
-use Nvl\Auth\Services\AuthSocialIdentities;
+use Nvl\Auth\Services\AuthSocialAuthentication;
 use Nvl\Auth\Services\SecretHasher;
 use Nvl\Auth\Tests\Fixtures\TestPasskeyCeremony;
 use Nvl\Auth\Tests\Fixtures\TestSocialIdentityProviderFactory;
-use Nvl\Auth\Tests\Fixtures\TestSocialSubjectResolver;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthenticationVerification;
+use Nvl\Auth\ValueObjects\ExternalIdentity;
 use PragmaRX\Google2FA\Google2FA;
 
 it('requires enrolled MFA even when the optional TOTP method is disabled', function (): void {
@@ -70,10 +69,10 @@ it('applies enrolled MFA to every native primary method and retains verified pas
         }
     } elseif ($method === 'social') {
         $this->app->instance(SocialIdentityProviderFactory::class, new TestSocialIdentityProviderFactory);
-        $this->app->instance(SocialSubjectResolver::class, new TestSocialSubjectResolver($user));
-        $social = app(AuthSocialIdentities::class);
-        $started = $social->startAuthentication('github', $context);
-        $proof = $social->finishAuthentication('github', $started['intent']->reveal(), $context);
+        $this->seedSocialIdentity($user, new ExternalIdentity('github', 'provider-user-123'));
+        $social = app(AuthSocialAuthentication::class);
+        $started = $social->beginLogin('github', $context);
+        $proof = $social->completeLogin('github', $started['intent']->reveal(), $context)['proof'];
     } else {
         $options = $passkeys->beginAuthentication(context: $context);
         $completed = $passkeys->finishAuthentication(['ceremonyId' => $options->ceremonyId, 'response' => ['valid' => true, 'credential_id' => 'test-credential', 'signature_counter' => 2, 'user_verified' => $method === 'uv_passkey']], sessionBinding: $session->getId());

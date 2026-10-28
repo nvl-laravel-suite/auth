@@ -62,6 +62,7 @@ final readonly class AuthChallenges
             AuthMessageType::SecurityCode => AuthFeature::SecurityCodes,
             AuthMessageType::PasswordReset => AuthFeature::Password,
             AuthMessageType::EmailVerification => AuthFeature::EmailVerification,
+            default => null,
         } !== $feature) {
             throw new AuthException('challenge_invalid', 'The authentication challenge is invalid or expired.', 422);
         }
@@ -114,6 +115,7 @@ final readonly class AuthChallenges
             AuthMessageType::SecurityCode => AuthFeature::SecurityCodes,
             AuthMessageType::PasswordReset => AuthFeature::Password,
             AuthMessageType::EmailVerification => AuthFeature::EmailVerification,
+            default => null,
         } !== $feature) {
             throw new AuthException('challenge_invalid', 'The authentication challenge is invalid or expired.', 422);
         }
@@ -163,6 +165,7 @@ final readonly class AuthChallenges
             AuthMessageType::SecurityCode => AuthFeature::SecurityCodes,
             AuthMessageType::PasswordReset => AuthFeature::Password,
             AuthMessageType::EmailVerification => AuthFeature::EmailVerification,
+            default => null,
         } !== $feature) {
             throw new AuthException('challenge_invalid', 'The authentication challenge is invalid or expired.', 422);
         }

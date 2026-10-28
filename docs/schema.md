@@ -83,3 +83,8 @@ Native adoption adds owner membership, membership-lock and authentication-intent
 The forward migration `2026_10_27_000001_nvl_auth_create_principal_security_states.php` adds one UUID row per canonical subject, with an unsigned revision initially 1 and a named unique subject pair. It is required independently of optional registration, MFA enrollment and session features. Principal and native security storage must share the same actual Laravel connection object.
 
 `nvl:auth:schema` reports missing columns and indexes. `--apply` creates the table or repairs missing revision/timestamp columns and the unique index without rewriting retained rows. Missing identity columns require a reviewed host migration. Host-owned migration mode never applies vendor DDL: update and run the published host migration first. The forward migration intentionally retains its table on rollback; never reset or prune revisions while a principal or dependent capability survives. Existing tables and migration history are unchanged.
+
+
+## Account and browser stores
+
+Forward migrations `2026_10_28_000001` through `000004` add `PendingEmailChange`, `BrowserSession`, `RememberCredential` and `Impersonation`. Pending mailbox and browser/remember stores are global identity authority; impersonation captures its admitted owner reference. UUID keys, named constraints, encrypted sensitive values and purpose-separated blind indexes preserve source ownership. Active browser grants are enrolled only by native verified authentication. Do not backfill authority from Laravel session payloads or legacy remember tokens. Pruning removes only terminal/expired rows according to configured retention; immutable audit facts remain.

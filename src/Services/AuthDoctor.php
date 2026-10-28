@@ -36,7 +36,6 @@ use Nvl\Auth\Contracts\PrincipalExtensionMapper;
 use Nvl\Auth\Contracts\RegistrationAdmission;
 use Nvl\Auth\Contracts\SecurityTokenContainment;
 use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
-use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\PrincipalAttribute;
@@ -212,9 +211,7 @@ final class AuthDoctor
         }
         if ($configuration->featureEnabled(AuthFeature::SocialIdentities)) {
             $socialIdentities = $this->integration($container, SocialIdentityProviderFactory::class);
-            $socialSubjects = $this->integration($container, SocialSubjectResolver::class);
             $checks[] = $this->check('adapter.social_identities', $socialIdentities !== null && ! $socialIdentities instanceof UnavailableSocialIdentityProviderFactory, 'Social identities require a configured acquisition adapter.');
-            $checks[] = $this->check('contract.social_subject_resolver', $socialSubjects !== null && ! $socialSubjects instanceof UnavailableSocialSubjectResolver, 'Social login requires a configured principal resolver.');
             $checks[] = $this->check('social.providers', $this->hasConfiguredSocialProvider($configuration, $container), 'Social identities require at least one configured provider.');
         }
         if ($configuration->featureEnabled(AuthFeature::Passkeys)) {

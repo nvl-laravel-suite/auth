@@ -32,7 +32,6 @@ use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\PrincipalSessionContainment;
 use Nvl\Auth\Contracts\RbacPrincipalAccess;
 use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
-use Nvl\Auth\Contracts\SocialSubjectResolver;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
 use Nvl\Auth\Contracts\SystemMutationAccess;
 use Nvl\Auth\Events\UserLoggedOut;
@@ -235,7 +234,6 @@ function authPublicExtensionContracts(): array
         [ApiTokenManager::class, false],
         [ApiTokenAbilityProvider::class, false],
         [SocialIdentityProviderFactory::class, true],
-        [SocialSubjectResolver::class, false],
         [PasskeyCeremony::class, false],
         [InvitationSubjectResolver::class, false],
         [InvitationRegistrationMapper::class, false],

@@ -23,7 +23,8 @@ use Nvl\Auth\Services\AuthPasskeys;
 use Nvl\Auth\Services\AuthPasswords;
 use Nvl\Auth\Services\AuthReauthentication;
 use Nvl\Auth\Services\AuthSecondFactor;
-use Nvl\Auth\Services\AuthSocialIdentities;
+use Nvl\Auth\Services\AuthSocialAuthentication;
+use Nvl\Auth\Services\AuthSocialLinks;
 use Nvl\Auth\Services\AuthUsers;
 use Nvl\Auth\Services\PrincipalSecurity;
 use Nvl\Auth\Tests\Fixtures\SecurityRace;
@@ -255,8 +256,11 @@ it('locks the social callback principal before its credential', function (): voi
     $user = $this->user();
     $external = new ExternalIdentity('github', 'callback-order');
     app()->instance(SocialIdentityProviderFactory::class, new TestSocialIdentityProviderFactory(new TestSocialIdentityProvider(identity: $external)));
-    $service = app(AuthSocialIdentities::class);
-    $service->link($user, $external, grant: $this->recentGrant($user, RecentAuthenticationPurpose::SocialLink, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $service = app(AuthSocialAuthentication::class);
+    $links = app(AuthSocialLinks::class);
+    $context = $this->authenticationContext();
+    $intent = $links->beginLink($user, 'github', $this->recentGrant($user, RecentAuthenticationPurpose::SocialLink, 'correct-password')->reveal(), $context);
+    $links->completeLink($user, 'github', $intent['intent']->reveal(), $context);
     $queries = [];
     DB::listen(function (QueryExecuted $query) use (&$queries): void {
         if ($query->connection->transactionLevel() > 0 && str_starts_with(strtolower($query->sql), 'select') && (str_contains($query->sql, 'nvl_auth_users') || str_contains($query->sql, 'nvl_auth_social_identities'))) {

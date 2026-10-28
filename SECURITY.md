@@ -5,7 +5,7 @@ Submit reports through [this package's private vulnerability reporting form](htt
 Report vulnerabilities privately to the package maintainers. Do not open a
 public issue containing secrets, exploit details, or affected production data.
 
-Security fixes are provided for the published `5.x` release line and the `6.x` line once published. Prepared 6.0.0 source does not establish release certification. Enabled Ownership requires Laravel 13; disabled/unowned hosts keep the declared framework range. Composer declares PHP `^8.4` and Laravel `^12.0|^13.0`. The local Dagger release gate verifies PHP 8.4/Laravel 13 with MySQL 8.4 and PostgreSQL 17 persistence contracts; PHP 8.5, Laravel 12 and MariaDB require separate compatibility evidence. Upstream security lifecycle limits still apply.
+This source targets the NVL Light `7.x` family, PHP `^8.4` and Laravel `^13.0`, as declared in Composer. Source changes and focused checks do not establish release certification. Production MySQL/PostgreSQL concurrency, Redis driver and clean distribution rehearsals require their own recorded release evidence; they were not rerun as part of the final focused implementation pass. No broader framework or database compatibility is implied.
 
 Security-sensitive design rules:
 

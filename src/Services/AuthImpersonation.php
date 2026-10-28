@@ -28,7 +28,11 @@ use Nvl\Support\Auth\CanonicalActorResolver;
 use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Ownership\Contracts\OwnershipContext;
 
-/** Complete durable grant lifecycle; request overlays separately re-admit this authority. @api */
+/**
+ * Complete durable grant lifecycle; request overlays separately re-admit this authority.
+ *
+ * @api
+ */
 final readonly class AuthImpersonation
 {
     public function __construct(private FeatureGate $features, private AuthenticationSessions $transitions, private AuthBrowserSessions $sessions, private RecentAuthenticationProofs $recent, private PrincipalSecurity $security, private CanonicalActorResolver $canonical, private AuthSubjectResolver $subjects, private PrincipalEligibility $eligibility, private ImpersonationAccess $access, private OwnershipContext $ownership, private AuthOwnerAdmission $owners, private AuthAuditRecorder $audits, private AuthPipeline $pipeline, private SecretHasher $hasher, private MutationAuthorizer $management, private AuthOperationBoundary $operations, private AuthConfiguration $configuration, private DomainEventDispatcher $events) {}
@@ -158,7 +162,7 @@ final readonly class AuthImpersonation
         $grant = Impersonation::query()->find($impersonationId) ?? throw $this->invalid();
         $actor = $this->management->authorize($authority, 'nvl.auth.impersonations.revoke', $grant);
 
-        return $grant->getConnection()->transaction(function () use ($grant, $actor, $reason): Impersonation {
+        return $grant->getConnection()->transaction(function () use ($grant, $authority, $reason): Impersonation {
             $grant = Impersonation::query()->whereKey($grant->identifier())->lockForUpdate()->firstOrFail();
             $actor = $this->management->authorize($authority, 'nvl.auth.impersonations.revoke', $grant);
             if ($grant->stopped_at === null) {

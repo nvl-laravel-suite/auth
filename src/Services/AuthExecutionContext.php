@@ -15,7 +15,11 @@ use Nvl\Ownership\Services\OwnerIdentityResolver;
 use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 use Spatie\Permission\PermissionRegistrar;
 
-/** Request-scoped verified identity overlay facts; never queue execution authority. @api */
+/**
+ * Request-scoped verified identity overlay facts; never queue execution authority.
+ *
+ * @api
+ */
 final class AuthExecutionContext
 {
     /** @var array{actor_type: string, actor_id: string, effective_subject_type: string, effective_subject_id: string, impersonation_id: string}|null */

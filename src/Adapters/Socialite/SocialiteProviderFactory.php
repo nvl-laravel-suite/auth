@@ -14,7 +14,11 @@ use Nvl\Auth\Contracts\SocialIdentityProviderFactory;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Services\AuthConfiguration;
 
-/** Optional class-string composition; never retains a Socialite manager or driver. @api */
+/**
+ * Optional class-string composition; never retains a Socialite manager or driver.
+ *
+ * @api
+ */
 final readonly class SocialiteProviderFactory implements SocialIdentityProviderFactory
 {
     public function __construct(private AuthConfiguration $configuration, private Container $container) {}

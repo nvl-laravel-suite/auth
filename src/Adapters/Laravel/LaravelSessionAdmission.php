@@ -12,7 +12,11 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Services\AuthBrowserSessions;
 use Nvl\Auth\Services\AuthenticationSessions;
 
-/** Host middleware calls this after session/authentication and before application authorization. @api */
+/**
+ * Host middleware calls this after session/authentication and before application authorization.
+ *
+ * @api
+ */
 final readonly class LaravelSessionAdmission
 {
     public function __construct(private AuthBrowserSessions $sessions, private AuthenticationSessions $transitions, private AuthManager $auth) {}

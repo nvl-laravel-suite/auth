@@ -11,7 +11,11 @@ use Nvl\Auth\Models\Passkey;
 use Nvl\Auth\Models\SocialIdentity;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
-/** Mandatory native ownership and last-primary protection, also the default consumer policy. @api */
+/**
+ * Mandatory native ownership and last-primary protection, also the default consumer policy.
+ *
+ * @api
+ */
 final readonly class UsableAccountAuthenticationPolicy implements AccountAuthenticationPolicy
 {
     public function __construct(private AuthAccountSecurity $inventory, private PrincipalSecurity $security) {}

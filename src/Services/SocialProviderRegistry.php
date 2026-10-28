@@ -9,7 +9,11 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\SocialIdentity;
 
-/** Safe discovery and local readiness for explicitly configured connections. @api */
+/**
+ * Safe discovery and local readiness for explicitly configured connections.
+ *
+ * @api
+ */
 final readonly class SocialProviderRegistry
 {
     public function __construct(private AuthConfiguration $configuration, private SocialProviderConfiguration $providers, private SocialIdentityProviderFactory $factory) {}
@@ -32,7 +36,7 @@ final readonly class SocialProviderRegistry
             if (! is_string($label) || trim($label) === '' || strlen($label) > 120 || ! is_bool($enabled) || ! is_bool($reauthentication)) {
                 throw AuthException::invalidConfiguration('Invalid social discovery settings.');
             }
-            $result[$name] = ['enabled' => $enabled && $this->configuration->featureEnabled(AuthFeature::SocialIdentities), 'label' => $label, 'supportsReauthentication' => $reauthentication];
+            $result[$name] = ['enabled' => $enabled && $this->configuration->enabled() && $this->configuration->featureEnabled(AuthFeature::Authentication) && $this->configuration->featureEnabled(AuthFeature::SocialIdentities), 'label' => $label, 'supportsReauthentication' => $reauthentication];
         }
 
         return $result;

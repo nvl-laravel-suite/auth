@@ -26,7 +26,11 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Support\Auth\CanonicalActorResolver;
 use Nvl\Support\Events\DomainEventDispatcher;
 
-/** Explicit support/system recovery with native containment and no identity/RBAC overrides. @api */
+/**
+ * Explicit support/system recovery with native containment and no identity/RBAC overrides.
+ *
+ * @api
+ */
 final readonly class AuthAccountRecovery
 {
     public function __construct(private UserLocator $users, private MutationAuthorizer $authorization, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private UsableAccountAuthenticationPolicy $nativeRemoval, private AccountAuthenticationPolicy $policy, private PrincipalSessionContainment $containment, private FeatureGate $features, private AuthAuditRecorder $audits, private DomainEventDispatcher $events, private AuthAccountSecurity $inventory, private PrincipalAttributeMapper $attributes) {}

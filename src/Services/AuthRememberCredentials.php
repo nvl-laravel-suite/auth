@@ -20,7 +20,11 @@ use Nvl\Auth\ValueObjects\IssuedAuthenticationProof;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Auth\CanonicalActorResolver;
 
-/** Consumes a native remembered primary credential; enrolled MFA is still required by finalization. @api */
+/**
+ * Consumes a native remembered primary credential; enrolled MFA is still required by finalization.
+ *
+ * @api
+ */
 final readonly class AuthRememberCredentials
 {
     use IssuesAuthenticationProofs;

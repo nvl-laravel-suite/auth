@@ -108,7 +108,7 @@ return [
             'models' => ['user' => User::class],
             'services' => [
                 'attribute_mapper' => ConfiguredPrincipalAttributeMapper::class, 'extension_mapper' => null,
-                'account_confirmation' => null,
+                'account_confirmation' => null, 'authentication_policy' => null,
                 'session_containment' => LaravelPrincipalSessionContainment::class,
             ],
             'settings' => [
@@ -220,7 +220,7 @@ return [
         'social_identities' => [
             'enabled' => PackageEnvironment::get('NVL_AUTH_SOCIAL_IDENTITIES_ENABLED', false),
 
-            'services' => ['provider_factory' => null, 'subject_resolver' => null],
+            'services' => ['provider_factory' => null],
             'settings' => ['providers' => []],
         ],
         'clients' => [

@@ -17,7 +17,7 @@ use Nvl\Auth\Services\AuthPasswords;
 use Nvl\Auth\Services\AuthPermissions;
 use Nvl\Auth\Services\AuthRegistration;
 use Nvl\Auth\Services\AuthSecondFactor;
-use Nvl\Auth\Services\AuthSocialIdentities;
+use Nvl\Auth\Services\AuthSocialAuthentication;
 use Nvl\Auth\Services\AuthTokens;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
@@ -35,7 +35,7 @@ it('fails a representative Action for every disabled feature before database acc
         AuthFeature::Totp->value => fn () => app(AuthSecondFactor::class)->startEnrollment($user, ['accountName' => $user->email]),
         AuthFeature::Passkeys->value => fn () => app(AuthPasskeys::class)->beginAuthentication(),
         AuthFeature::RecoveryCodes->value => fn () => app(AuthSecondFactor::class)->regenerateRecoveryCodes($user),
-        AuthFeature::SocialIdentities->value => fn () => app(AuthSocialIdentities::class)->startAuthorization('github'),
+        AuthFeature::SocialIdentities->value => fn () => app(AuthSocialAuthentication::class)->beginLogin('github', $this->authenticationContext()),
         AuthFeature::Clients->value => fn () => app(AuthClients::class)->start(['clientId' => '00000000-0000-0000-0000-000000000000', 'flow' => 'login', 'returnPath' => '/']),
         AuthFeature::Sessions->value => fn () => app(AuthenticationSessions::class)->establishFromProof(str_repeat('a', 64), auth()->guard('web'), app('session')->driver(), $this->authenticationContext()),
         AuthFeature::ApiTokens->value => fn () => app(AuthTokens::class)->all($user),
