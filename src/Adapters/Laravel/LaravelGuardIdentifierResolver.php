@@ -30,7 +30,7 @@ final readonly class LaravelGuardIdentifierResolver implements AuthIdentifierRes
     /** {@inheritDoc} */
     public function resolve(string $identifierName, string $identifier): ?Authenticatable
     {
-        $guard = $this->auth->guard($this->configuration->string('guard', 'web'));
+        $guard = $this->auth->guard($this->configuration->string('authorization.guard', 'web'));
         $provider = $this->provider($guard);
 
         return $provider->retrieveByCredentials($this->emails->credentials($provider, $identifierName, $identifier));

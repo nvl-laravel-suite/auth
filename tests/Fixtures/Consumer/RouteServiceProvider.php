@@ -64,14 +64,13 @@ final class RouteServiceProvider extends ServiceProvider
         }
 
         $names = $this->app->make(GlobalNames::class);
-        foreach (['nvl-auth.feature' => ['nvl.auth.feature', EnsureAuthFeatureAvailable::class],
-            'nvl-auth.guard' => ['nvl.auth.guard', AuthenticateAuthGuard::class]] as $legacy => [$canonical, $middleware]) {
+        foreach (['nvl.auth.feature' => EnsureAuthFeatureAvailable::class,
+            'nvl.auth.guard' => AuthenticateAuthGuard::class] as $canonical => $middleware) {
             $exists = static fn (string $name): bool => array_key_exists($name, $router->getMiddleware());
             $install = static function (string $name) use ($router, $middleware): void {
                 $router->aliasMiddleware($name, $middleware);
             };
             $names->reserve('auth', 'middleware', $canonical, $exists, $install);
-            $names->register('auth', 'middleware', $legacy, $canonical, $exists, $install);
         }
         $this->registerRateLimiters($surfaces);
         if ($this->app->routesAreCached()) {
@@ -79,15 +78,14 @@ final class RouteServiceProvider extends ServiceProvider
         }
 
         $prefix = trim($configuration->string('routes.prefix', 'nvl/api/v1/auth'), '/');
-        $this->app->make(GlobalNames::class)->loadRoutes('auth', $router, function () use ($prefix, $configuration, $features, $manifest): void {
-            Route::prefix($prefix)
-                ->name('nvl.auth.')
-                ->group(function () use ($configuration, $features, $manifest): void {
-                    foreach (['public', 'account', 'management'] as $surface) {
-                        $this->mapSurface($surface, $configuration, $manifest, $features);
-                    }
-                });
-        });
+        Route::prefix($prefix)
+            ->name('nvl.auth.')
+            ->group(function () use ($configuration, $features, $manifest): void {
+                foreach (['public', 'account', 'management'] as $surface) {
+                    $this->mapSurface($surface, $configuration, $manifest, $features);
+                }
+            });
+
     }
 
     /**
@@ -106,7 +104,6 @@ final class RouteServiceProvider extends ServiceProvider
                 RateLimiter::for($name, $limiter);
             };
             $names->reserve('auth', 'limiter', 'nvl.auth.'.$surface, $exists, $install);
-            $names->register('auth', 'limiter', 'nvl-auth-'.$surface, 'nvl.auth.'.$surface, $exists, $install);
         }
     }
 

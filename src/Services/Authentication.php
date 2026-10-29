@@ -76,7 +76,7 @@ final readonly class Authentication
             throw new \InvalidArgumentException('Invalid or protected authentication context.');
         }
         unset($context['remember']);
-        $name = $this->configuration->string('guard', 'web');
+        $name = $this->configuration->string('authorization.guard', 'web');
         if ($this->auth->guard($name) !== $guard) {
             throw new AuthException('authentication_binding_invalid', 'The authentication guard does not match.', 422);
         }

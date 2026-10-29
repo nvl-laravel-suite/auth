@@ -219,10 +219,10 @@ final class AuthServiceProvider extends ServiceProvider implements OwnershipInte
         }
         $this->configureOwnedIdentityStorage();
         $root = dirname(__DIR__, 2);
-        $this->publishes([$root.'/config/nvl-auth.php' => config_path('nvl-auth.php')], 'auth-config');
-        $this->publishesMigrations([$root.'/database/migrations' => database_path('migrations')], 'auth-migrations');
-        $this->publishes([$root.'/resources/boost/skills' => base_path('.agents/skills')], 'auth-skills');
-        $this->publishes([$root.'/resources/adoption/principals.v1.example.json' => base_path('nvl-auth.principals.json')], 'auth-adoption');
+        $this->publishes([$root.'/config/nvl-auth.php' => config_path('nvl-auth.php')], 'nvl-auth-config');
+        $this->publishesMigrations([$root.'/database/migrations' => database_path('migrations')], 'nvl-auth-migrations');
+        $this->publishes([$root.'/resources/boost/skills' => base_path('.agents/skills')], 'nvl-auth-skills');
+        $this->publishes([$root.'/resources/adoption/principals.v1.example.json' => base_path('nvl-auth.principals.json')], 'nvl-auth-adoption');
         if ($configuration->boolean('migrations.enabled', true) && ($configuration->enabled() || $configuration->boolean('migrations.load_when_disabled', false))) {
             $this->loadMigrationsFrom($root.'/database/migrations');
         }

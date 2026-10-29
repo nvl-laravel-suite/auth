@@ -73,3 +73,5 @@ Existing authenticated-recipient invitation acceptance, revocation and cleanup r
 
 
 Managed browser sessions and impersonation are opt-in native features. Consumers own routes, middleware ordering, authorization policies, cookie settings, responses and lifecycle hooks. See [flows](docs/flows.md), [configuration](docs/configuration.md) and [upgrade steps](UPGRADING.md) before enabling them. Registration and email proof never create a browser login as a side effect.
+
+Shared [service contracts, model extensions and composition](https://github.com/nvl-laravel-suite/laravel-suite/blob/main/docs/consumer-api.md) apply alongside the package-specific rules above.

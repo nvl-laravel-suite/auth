@@ -33,7 +33,7 @@ final readonly class AuthenticateAuthGuard
         $response = $this->authenticate->handle(
             $request,
             fn (Request $authenticated): Response => $this->sessions->handle($authenticated, $next),
-            $this->configuration->string('guard', 'web'),
+            $this->configuration->string('authorization.guard', 'web'),
         );
 
         if (! $response instanceof Response) {

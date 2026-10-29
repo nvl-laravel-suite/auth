@@ -4,6 +4,7 @@
         "nvl-auth": {
             "common": [
                 "adoption.spatie_storage.enabled",
+                "authorization.guard",
                 "connection",
                 "enabled",
                 "features.api_tokens.enabled",
@@ -122,7 +123,6 @@
                 "features.totp.settings.issuer",
                 "features.totp.settings.secret_length",
                 "features.totp.settings.window",
-                "guard",
                 "management.abilities",
                 "management.policy_models",
                 "migrations.enabled",

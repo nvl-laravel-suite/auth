@@ -52,7 +52,7 @@ final class ProfileController extends AuthenticatedController
         Request $request,
         AuthUsers $action,
     ): JsonResponse {
-        $action->deleteOwnAccount($this->subject($request), [], auth()->guard(config('nvl-auth.guard', 'web')), $request->session(), grant: $this->recentGrant($request), context: $this->authenticationContext($request));
+        $action->deleteOwnAccount($this->subject($request), [], auth()->guard(config('nvl-auth.authorization.guard', 'web')), $request->session(), grant: $this->recentGrant($request), context: $this->authenticationContext($request));
 
         return response()->json([
             'data' => null,

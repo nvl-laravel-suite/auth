@@ -11,7 +11,9 @@ use Illuminate\Hashing\BcryptHasher;
 use Illuminate\Validation\Rules\Password;
 use Nvl\Auth\Contracts\PasswordPolicy;
 
-/** Combines host policy with mandatory bounded input and hash-engine safety. */
+/** Combines host policy with mandatory bounded input and hash-engine safety. *
+ * @internal
+ */
 final readonly class PasswordValidationRules
 {
     public function __construct(private PasswordPolicy $policy, private Hasher $hasher) {}

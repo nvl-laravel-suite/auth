@@ -7,7 +7,9 @@ namespace Nvl\Auth\Services;
 use Illuminate\Validation\Rules\Password;
 use Nvl\Auth\Contracts\PasswordPolicy;
 
-/** Default policy for new passwords. */
+/** Default policy for new passwords. *
+ * @internal
+ */
 final readonly class ConfiguredPasswordPolicy implements PasswordPolicy
 {
     public function rules(): array

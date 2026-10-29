@@ -30,7 +30,7 @@ abstract class AuthenticatedController
         if (! $request->hasSession()) {
             throw new AuthException('authentication_binding_invalid', 'A trusted browser session is required.', 422);
         }
-        $guard = config('nvl-auth.guard', 'web');
+        $guard = config('nvl-auth.authorization.guard', 'web');
         $key = AuthBrowserSessions::bindingKey($guard);
 
         return new AuthenticationRequestContext(guardName: $guard, sessionBinding: $request->session()->getId(), browserSessionId: $request->session()->get($key.'-id'), browserBinding: $request->session()->get($key));

@@ -234,7 +234,7 @@ final readonly class AuthenticationSessions
         $this->features->assertAllowed(AuthFeature::Authentication, FeatureOperation::Revoke);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Revoke);
         $this->assertCanTransition();
-        $guardName ??= $this->configuration->string('guard', 'web');
+        $guardName ??= $this->configuration->string('authorization.guard', 'web');
         if ($this->configuration->featureEnabled(AuthFeature::ManagedSessions) && $this->auth->guard($guardName) !== $guard) {
             throw new AuthException('authentication_binding_invalid', 'The selected logout guard does not match.', 422);
         }

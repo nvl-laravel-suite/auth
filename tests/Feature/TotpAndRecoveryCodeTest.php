@@ -147,7 +147,7 @@ it('uses the configured auth guard for totp state without falling back to a diff
         'nvl-auth.routes.account.enabled' => true,
         'nvl-auth.features.totp.routes.account.enabled' => true,
         'nvl-auth.routes.account.middleware' => $middleware,
-        'nvl-auth.guard' => 'security',
+        'nvl-auth.authorization.guard' => 'security',
         'auth.guards.security' => ['driver' => 'session', 'provider' => 'users'],
     ]);
     app()->instance('routes.cached', false);

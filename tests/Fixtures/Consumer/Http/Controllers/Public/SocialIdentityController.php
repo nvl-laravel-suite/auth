@@ -25,7 +25,7 @@ final class SocialIdentityController
         $owner = $request->attributes->get('owner');
         $returnPath = $request->query('return_path');
         $issued = $owner instanceof OwnerReference ? $intents->issue($owner, OwnerAuthenticationPurpose::SocialLogin, $request->session()->getId(), provider: $provider, returnPath: is_string($returnPath) ? $returnPath : null) : null;
-        $context = new AuthenticationRequestContext(ownerIntentNonce: $issued['nonce'] ?? null, ownerSessionBinding: $request->session()->getId(), requestedOwner: $owner instanceof OwnerReference ? $owner : null, ownerPurpose: OwnerAuthenticationPurpose::SocialLogin, ownerProvider: $provider, guardName: config('nvl-auth.guard', 'web'), sessionBinding: $request->session()->getId());
+        $context = new AuthenticationRequestContext(ownerIntentNonce: $issued['nonce'] ?? null, ownerSessionBinding: $request->session()->getId(), requestedOwner: $owner instanceof OwnerReference ? $owner : null, ownerPurpose: OwnerAuthenticationPurpose::SocialLogin, ownerProvider: $provider, guardName: config('nvl-auth.authorization.guard', 'web'), sessionBinding: $request->session()->getId());
         $started = $social->beginLogin($provider, $context);
         $url = $started['url'];
         parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
@@ -58,7 +58,7 @@ final class SocialIdentityController
             return response()->json(['data' => null, 'code' => 'social_registration_required'], 202);
         }
         $proof = $result['proof'];
-        $subject = $sessions->establishFromProof($proof->reveal(), auth()->guard(config('nvl-auth.guard', 'web')), $request->session(), $context);
+        $subject = $sessions->establishFromProof($proof->reveal(), auth()->guard(config('nvl-auth.authorization.guard', 'web')), $request->session(), $context);
         $reference = SubjectReference::fromAuthenticatable($subject);
 
         return response()->json(['data' => ['subject' => ['type' => $reference->type, 'id' => $reference->identifier]], 'code' => 'social_authenticated', 'message' => trans('nvl-auth::responsecode.social_authenticated')]);

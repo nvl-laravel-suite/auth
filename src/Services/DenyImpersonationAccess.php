@@ -9,7 +9,9 @@ use Nvl\Auth\Contracts\ImpersonationAccess;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 
-/** Impersonation is unavailable until a consumer explicitly authorizes it. */
+/** Impersonation is unavailable until a consumer explicitly authorizes it. *
+ * @internal
+ */
 final class DenyImpersonationAccess implements ImpersonationAccess
 {
     public function assertAllowed(Authenticatable $actor, Authenticatable $target, ?OwnerReference $owner): void

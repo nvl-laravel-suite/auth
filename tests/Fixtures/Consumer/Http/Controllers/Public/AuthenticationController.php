@@ -27,7 +27,7 @@ final class AuthenticationController
             'remember' => $data->remember,
             'ipAddress' => $request->ip(), 'userAgent' => $request->userAgent(),
             'requestId' => $request->headers->get('X-Request-ID'),
-        ], auth()->guard(config('nvl-auth.guard', 'web')), $request->session());
+        ], auth()->guard(config('nvl-auth.authorization.guard', 'web')), $request->session());
         $reference = SubjectReference::fromAuthenticatable($subject);
 
         return response()->json([

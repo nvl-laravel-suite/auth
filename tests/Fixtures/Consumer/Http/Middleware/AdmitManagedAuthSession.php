@@ -19,7 +19,7 @@ final readonly class AdmitManagedAuthSession
     public function handle(Request $request, Closure $next): Response
     {
         if (config('nvl-auth.features.managed_sessions.enabled') === true) {
-            $name = config('nvl-auth.guard', 'web');
+            $name = config('nvl-auth.authorization.guard', 'web');
             $this->admission->admit($this->auth->guard($name), $request->session(), $name);
         }
 

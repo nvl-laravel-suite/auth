@@ -29,7 +29,7 @@ final class AuthenticationController extends AuthenticatedController
      */
     public function logout(Request $request, AuthenticationSessions $action): JsonResponse
     {
-        $action->logout(auth()->guard(config('nvl-auth.guard', 'web')), $request->session());
+        $action->logout(auth()->guard(config('nvl-auth.authorization.guard', 'web')), $request->session());
 
         return response()->json(['data' => null, 'code' => 'logged_out', 'message' => trans('nvl-auth::responsecode.logged_out')]);
     }

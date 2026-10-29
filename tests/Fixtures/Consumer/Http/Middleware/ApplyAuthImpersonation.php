@@ -18,7 +18,7 @@ final readonly class ApplyAuthImpersonation
     /** @param Closure(Request): Response $next */
     public function handle(Request $request, Closure $next): Response
     {
-        $name = config('nvl-auth.guard', 'web');
+        $name = config('nvl-auth.authorization.guard', 'web');
         $id = $request->session()->get('nvl-auth.impersonation.'.$name);
         if (! is_string($id)) {
             return $next($request);
