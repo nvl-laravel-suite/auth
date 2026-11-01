@@ -22,10 +22,11 @@ rows. Do not log service results containing issuance secrets.
   subjects receive no token or delivery, and reset consumption checks the same
   policy before changing credentials.
 - Public magic-link requests resolve through the configured user provider, emit no
-  delivery for unknown identifiers, and return the same neutral HTTP response.
-- Account-bound magic-link, security-code and password-reset HTTP requests use a
-  200 ms minimum Laravel Timebox without early return. Queue delivery listeners;
-  host work exceeding that floor can still expose account-dependent timing.
+  delivery for unknown identifiers, and return a neutral service outcome for consumer transport mapping.
+- Consumers own timing protection around account-bound magic-link, security-code
+  and password-reset endpoints. Apply a minimum-duration Laravel Timebox without
+  early return and queue delivery listeners; a timing floor alone does not hide
+  host work that exceeds it. Native services do not impose an HTTP timing floor.
 - Challenges bind message type, purpose, normalized recipient, and secret.
   Compound magic links store independently purpose-separated hashes for their
   link token and fallback code; consuming either credential consumes both.
@@ -39,8 +40,13 @@ rows. Do not log service results containing issuance secrets.
 - Self-service account deletion requires the configured confirmation policy,
   revokes all subject API tokens, logs out the guard, invalidates the browser
   session, and rotates its CSRF token.
-- Password confirmation uses Laravel's standard session timestamp.
-- Every package HTTP response is non-cacheable and suppresses referrer leakage.
+- Sensitive operations require the native recent-authentication grant, bound to
+  the current principal and proof context. Laravel password-confirmed session
+  timestamps are presentation state and do not authorize these operations.
+- Consumers must make authentication responses non-cacheable and suppress referrer
+  leakage. The headless package registers no HTTP routes or response middleware.
+
+Principal Eloquent fillable fields are a storage mechanism, not an authorization policy. Do not pass request arrays directly to `User::create`, `fill` or `update`; use the native principal services and their explicit field/policy boundaries for verification, activation, lock and credential state. Host model extensions must validate their own trusted mutation inputs as well.
 
 ## Passkeys
 
@@ -51,7 +57,8 @@ algorithm, counter, backup bits, and credential parsing. Auth supplies the store
 COSE public key, user handle, counter, and backup state, then independently
 enforces counter regression and backup-eligibility invariants transactionally.
 Unexpected ceremony-adapter failures are retained as previous exceptions for
-PHP diagnostics but normalized to stable, neutral package errors over HTTP.
+PHP diagnostics but normalized to stable package errors. Consumers must map those
+errors to neutral HTTP responses.
 Browser responses, adapter state, and returned option documents are bounded
 before persistence or response serialization. User verification is required by
 default, and the per-subject credential limit defaults to 20.

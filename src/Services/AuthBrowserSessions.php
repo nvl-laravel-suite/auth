@@ -16,6 +16,7 @@ use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\RememberCredential;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Auth\CanonicalActorResolver;
@@ -113,8 +114,8 @@ final readonly class AuthBrowserSessions
             }
             $this->recent->consume($subject, $recentProof, RecentAuthenticationPurpose::SessionRevocation, $context);
             $reference = SubjectReference::fromAuthenticatable($subject);
-            $count = BrowserSession::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->where('guard_name', $guardName)->where('session_family_id', '!=', $current->session_family_id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
-            RememberCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->where('guard_name', $guardName)->where('session_family_id', '!=', $current->session_family_id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+            $count = BrowserSession::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->where('guard_name', $guardName)->where('session_family_id', '!=', $current->session_family_id)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new BrowserSession)->getConnection(), now())]);
+            RememberCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->where('guard_name', $guardName)->where('session_family_id', '!=', $current->session_family_id)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new RememberCredential)->getConnection(), now())]);
             $this->audits->record('session.others_revoked', subject: $reference, actor: $subject, metadata: ['count' => $count, 'current_browser_session_id' => $current->identifier()]);
 
             return $count;
@@ -127,8 +128,8 @@ final readonly class AuthBrowserSessions
             $this->recent->consume($subject, $recentProof, RecentAuthenticationPurpose::SessionRevocation, $context);
             $this->security->lock($subject);
             $reference = SubjectReference::fromAuthenticatable($subject);
-            $count = BrowserSession::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => now()]);
-            RememberCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+            $count = BrowserSession::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new BrowserSession)->getConnection(), now())]);
+            RememberCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new RememberCredential)->getConnection(), now())]);
             $this->audits->record('session.all_revoked', subject: $reference, actor: $subject, metadata: ['count' => $count]);
 
             return $count;
@@ -138,8 +139,8 @@ final readonly class AuthBrowserSessions
     private function revokeFamily(Authenticatable $subject, string $family, string $guard): void
     {
         $reference = SubjectReference::fromAuthenticatable($subject);
-        BrowserSession::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->where('guard_name', $guard)->where('session_family_id', $family)->whereNull('revoked_at')->update(['revoked_at' => now()]);
-        RememberCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->where('guard_name', $guard)->where('session_family_id', $family)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+        BrowserSession::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->where('guard_name', $guard)->where('session_family_id', $family)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new BrowserSession)->getConnection(), now())]);
+        RememberCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->where('guard_name', $guard)->where('session_family_id', $family)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new RememberCredential)->getConnection(), now())]);
     }
 
     private function invalid(): AuthException

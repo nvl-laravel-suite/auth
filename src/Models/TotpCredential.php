@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\TotpCredentialFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Support\AuthInstantCast;
 
 /**
  * Stores one encrypted TOTP secret owned by a host subject.
@@ -71,9 +72,9 @@ final class TotpCredential extends AuthModel
             'period' => 'integer',
             'allowed_drift' => 'integer',
             'last_accepted_timestep' => 'integer',
-            'confirmed_at' => 'immutable_datetime',
-            'last_used_at' => 'immutable_datetime',
-            'revoked_at' => 'immutable_datetime',
+            'confirmed_at' => AuthInstantCast::class,
+            'last_used_at' => AuthInstantCast::class,
+            'revoked_at' => AuthInstantCast::class,
         ];
     }
 

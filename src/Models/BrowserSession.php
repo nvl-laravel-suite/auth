@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\BrowserSessionFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Support\AuthInstantCast;
 
 /** Authoritative browser binding; never stores the Laravel payload-store identifier.
  * @property string $subject_type
@@ -49,7 +50,7 @@ final class BrowserSession extends AuthModel
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['security_revision' => 'integer', 'assurance' => 'encrypted:array', 'ip_address' => 'encrypted', 'user_agent' => 'encrypted', 'authenticated_at' => 'immutable_datetime', 'last_seen_at' => 'immutable_datetime', 'absolute_expires_at' => 'immutable_datetime', 'revoked_at' => 'immutable_datetime'];
+        return ['security_revision' => 'integer', 'assurance' => 'encrypted:array', 'ip_address' => 'encrypted', 'user_agent' => 'encrypted', 'authenticated_at' => AuthInstantCast::class, 'last_seen_at' => AuthInstantCast::class, 'absolute_expires_at' => AuthInstantCast::class, 'revoked_at' => AuthInstantCast::class];
     }
 
     /** Pure snapshot check; admission owns canonical locking and source checks. */

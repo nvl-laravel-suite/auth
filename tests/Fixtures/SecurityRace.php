@@ -6,6 +6,7 @@ namespace Nvl\Auth\Tests\Fixtures;
 
 use Closure;
 use Illuminate\Support\Facades\DB;
+use PDO;
 use RuntimeException;
 use Throwable;
 
@@ -17,8 +18,12 @@ final class SecurityRace
     public static function run(array $workers): array
     {
         $driver = DB::connection()->getDriverName();
-        if (! in_array($driver, ['mysql', 'pgsql'], true) || DB::connection()->transactionLevel() !== 0) {
-            throw new RuntimeException('Races require committed MySQL/PostgreSQL.');
+        if (! in_array($driver, ['mysql', 'mariadb', 'pgsql'], true) || DB::connection()->transactionLevel() !== 0) {
+            throw new RuntimeException('Races require committed MySQL/MariaDB/PostgreSQL.');
+        }
+        $pdoDriver = $driver === 'mariadb' ? 'mysql' : $driver;
+        if (DB::connection()->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME) !== $pdoDriver) {
+            throw new RuntimeException('The native race source selected an incompatible PDO driver.');
         }
         $directory = sys_get_temp_dir().'/auth-security-race-'.bin2hex(random_bytes(8));
         mkdir($directory, 0700);
@@ -37,12 +42,15 @@ final class SecurityRace
                 }
                 try {
                     DB::purge();
-                    if (DB::connection()->getDriverName() !== $driver || DB::connection()->transactionLevel() !== 0) {
+                    $connection = DB::connection();
+                    if ($connection->getDriverName() !== $driver || $connection->transactionLevel() !== 0
+                        || $connection->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME) !== $pdoDriver) {
                         throw new RuntimeException('Worker did not select committed production engine.');
                     }
+                    $connectionId = $connection->scalar($driver === 'pgsql' ? 'SELECT pg_backend_pid()' : 'SELECT CONNECTION_ID()');
                     file_put_contents("{$directory}/ready-{$index}", 'ready');
                     self::wait(static fn (): bool => is_file("{$directory}/go"));
-                    $result = ['ok' => true, 'driver' => $driver, ...$worker()];
+                    $result = ['ok' => true, 'driver' => $driver, 'pdo_driver' => $pdoDriver, 'process_id' => getmypid(), 'connection_id' => $connectionId, ...$worker()];
                 } catch (Throwable $exception) {
                     $result = ['ok' => false, 'error' => $exception::class, 'message' => $exception->getMessage()];
                 }
@@ -56,7 +64,18 @@ final class SecurityRace
             $results = [];
             foreach ($children as $index => $pid) {
                 pcntl_waitpid($pid, $status);
-                $results[] = json_decode((string) file_get_contents("{$directory}/result-{$index}"), true, flags: JSON_THROW_ON_ERROR);
+                $decoded = json_decode((string) file_get_contents("{$directory}/result-{$index}"), true, flags: JSON_THROW_ON_ERROR);
+                if (! is_array($decoded)) {
+                    throw new RuntimeException('A security worker returned an invalid result.');
+                }
+                $result = [];
+                foreach ($decoded as $key => $value) {
+                    if (! is_string($key)) {
+                        throw new RuntimeException('A security worker returned an invalid result key.');
+                    }
+                    $result[$key] = $value;
+                }
+                $results[] = $result;
             }
 
             return $results;

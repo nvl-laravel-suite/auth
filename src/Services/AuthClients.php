@@ -19,6 +19,7 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthClient;
 use Nvl\Auth\Models\AuthClientSession;
 use Nvl\Auth\Pipelines\AuthPipeline;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
@@ -211,7 +212,7 @@ final readonly class AuthClients
                 throw new AuthException('client_origin_invalid', 'The client origin is not allowlisted.', 422);
             }
             DB::connection($client->getConnectionName())->transaction(function () use ($client, $data): void {
-                AuthClient::query()->whereKey($client->identifier())->update(['last_used_at' => CarbonImmutable::now('UTC')]);
+                AuthClient::query()->whereKey($client->identifier())->update(['last_used_at' => AuthInstantCast::forQuery((new AuthClient)->getConnection(), CarbonImmutable::now('UTC'))]);
                 $this->audits->record('client.started', clientId: $client->identifier(), metadata: ['flow' => $data['flow']]);
             }, 3);
 

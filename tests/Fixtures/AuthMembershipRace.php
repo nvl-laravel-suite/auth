@@ -6,6 +6,7 @@ namespace Nvl\Auth\Tests\Fixtures;
 
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Nvl\Ownership\Tests\Fixtures\NativeDatabaseSource;
 use RuntimeException;
 use Throwable;
 
@@ -14,9 +15,10 @@ final class AuthMembershipRace
 {
     /**
      * @param  list<callable(): array<string, mixed>>  $workers
+     * @param  array<string, mixed>|null  $nativeParent
      * @return list<array{ok: bool, error?: class-string, code?: string}>
      */
-    public static function run(string $connectionName, array $workers): array
+    public static function run(string $connectionName, array $workers, ?array $nativeParent = null): array
     {
         $configuration = config("database.connections.{$connectionName}");
         if (! is_array($configuration)) {
@@ -46,6 +48,9 @@ final class AuthMembershipRace
                 try {
                     config()->set("database.connections.{$connectionName}", $configuration);
                     DB::purge($connectionName);
+                    if ($nativeParent !== null) {
+                        NativeDatabaseSource::inspect(DB::connection($connectionName), $nativeParent);
+                    }
                     file_put_contents($ready[$index], 'ready');
                     $deadline = microtime(true) + 10;
                     while (file_get_contents($gate) !== 'go') {

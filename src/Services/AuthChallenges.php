@@ -27,6 +27,7 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\Traits\IssuesAuthenticationProofs;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
@@ -89,7 +90,7 @@ final readonly class AuthChallenges
         $connection = (new Challenge)->getConnectionName();
         try {
             return DB::connection($connection)->transaction(function () use ($activeKey, $expiresAt, $feature, $locale, $maxAttempts, $messageType, $metadata, $normalizedRecipient, $payload, $purpose, $recipientHash, $secret, $secretHash, $subject, $fallbackCode, $secondarySecretHash): array {
-                $this->records->query()->where('active_key', $activeKey)->update(['active_key' => null, 'revoked_at' => CarbonImmutable::now('UTC')]);
+                $this->records->query()->where('active_key', $activeKey)->update(['active_key' => null, 'revoked_at' => AuthInstantCast::forQuery((new Challenge)->getConnection(), CarbonImmutable::now('UTC'))]);
                 $challenge = $this->records->create(['type' => $messageType->value, 'purpose' => $purpose, 'subject_type' => $subject?->type, 'subject_id' => $subject?->identifier, 'recipient_hash' => $recipientHash, 'secret_hash' => $secretHash, 'secondary_secret_hash' => $secondarySecretHash, 'active_key' => $activeKey, 'payload' => $payload, 'max_attempts' => $maxAttempts, 'expires_at' => $expiresAt]);
                 $this->domainEvents->dispatch(new AuthDeliveryRequested(new AuthDeliveryRequest(messageId: (string) Str::uuid(), feature: $feature, type: $messageType, recipient: $normalizedRecipient, payload: [...$payload, 'challenge_id' => $challenge->identifier(), 'secret' => $secret, 'code' => $fallbackCode, 'purpose' => $purpose], expiresAt: $expiresAt, locale: $locale, metadata: ['challenge_id' => $challenge->identifier(), ...$metadata], subject: $subject), $this->deliveryContext->capture(true)), $challenge->getConnection());
                 $this->audits->record("{$feature->value}.issued", subject: $subject, metadata: ['challenge_id' => $challenge->identifier(), 'purpose' => $purpose]);
@@ -125,12 +126,12 @@ final readonly class AuthChallenges
         $secondarySecretHash = $this->hasher->hash("challenge-{$messageType->value}-secondary-{$recipientHash}", $secret);
         $connection = (new Challenge)->getConnectionName();
         $challenge = DB::connection($connection)->transaction(function () use ($messageType, $purpose, $recipientHash, $secretHash, $secondarySecretHash): ?Challenge {
-            $this->records->query()->where('type', $messageType->value)->where('purpose', $purpose)->where('recipient_hash', $recipientHash)->whereNull('consumed_at')->whereNull('revoked_at')->where('expires_at', '<=', CarbonImmutable::now('UTC'))->update(['active_key' => null]);
+            $this->records->query()->where('type', $messageType->value)->where('purpose', $purpose)->where('recipient_hash', $recipientHash)->whereNull('consumed_at')->whereNull('revoked_at')->where('expires_at', '<=', AuthInstantCast::forQuery((new Challenge)->getConnection(), CarbonImmutable::now('UTC')))->update(['active_key' => null]);
             /** @var Challenge|null $challenge */
             $challenge = $this->records->query()->where('type', $messageType->value)->where('purpose', $purpose)->where('recipient_hash', $recipientHash)->where(static fn ($query) => $query->where('secret_hash', $secretHash)->orWhere('secondary_secret_hash', $secondarySecretHash))->lockForUpdate()->first();
             if (! $challenge instanceof Challenge || ! $challenge->isUsable()) {
                 /** @var Challenge|null $active */
-                $active = $this->records->query()->where('type', $messageType->value)->where('purpose', $purpose)->where('recipient_hash', $recipientHash)->whereNull('consumed_at')->whereNull('revoked_at')->where('expires_at', '>', CarbonImmutable::now('UTC'))->whereColumn('attempts', '<', 'max_attempts')->lockForUpdate()->first();
+                $active = $this->records->query()->where('type', $messageType->value)->where('purpose', $purpose)->where('recipient_hash', $recipientHash)->whereNull('consumed_at')->whereNull('revoked_at')->where('expires_at', '>', AuthInstantCast::forQuery((new Challenge)->getConnection(), CarbonImmutable::now('UTC')))->whereColumn('attempts', '<', 'max_attempts')->lockForUpdate()->first();
                 if ($active instanceof Challenge) {
                     $attempts = min($active->attempts + 1, $active->max_attempts);
                     $this->records->save($active->forceFill(['attempts' => $attempts, 'active_key' => $attempts >= $active->max_attempts ? null : $active->active_key]));
@@ -442,7 +443,7 @@ final readonly class AuthChallenges
             $expiresAt = CarbonImmutable::now('UTC')->addMinutes($ttlMinutes);
             $active = $this->nativeEmailKey($type, $recipientHash, $context);
             $secretNamespace = (string) Str::uuid();
-            $this->records->query()->where('active_key', $active)->update(['active_key' => null, 'revoked_at' => now()]);
+            $this->records->query()->where('active_key', $active)->update(['active_key' => null, 'revoked_at' => AuthInstantCast::forQuery((new Challenge)->getConnection(), now())]);
             $challenge = $this->records->create(['type' => $type, 'purpose' => $method->purpose()->value, 'subject_type' => $reference->type, 'subject_id' => $reference->identifier,
                 'recipient_hash' => $recipientHash, 'secret_hash' => $this->hasher->hash($type.':'.$secretNamespace, $secret), 'secondary_secret_hash' => $fallback === null ? null : $this->hasher->hash($type.':'.$secretNamespace, $fallback),
                 'active_key' => $active, 'payload' => ['revision' => $revision, 'context' => $context->facts(), 'secretNamespace' => $secretNamespace], 'max_attempts' => $maximumAttempts, 'expires_at' => $expiresAt]);

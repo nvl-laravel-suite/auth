@@ -160,7 +160,8 @@ it('keeps eager-loaded principal list queries independent of fixture size', func
         DB::enableQueryLog();
 
         $page = app(AuthUserReader::class)->paginate($actor, perPage: 100);
-        $queryCount = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => str_contains($query['query'], 'from "nvl_auth_') && ! str_contains($query['query'], 'installation')));
+        $isDataQuery = static fn (array $query): bool => preg_match('/\bfrom ["`]nvl_auth_/i', $query['query']) === 1 && ! str_contains($query['query'], 'installation');
+        $queryCount = count(array_filter(DB::getQueryLog(), $isDataQuery));
 
         foreach ($page->items() as $user) {
             $user->roles->count();
@@ -168,7 +169,7 @@ it('keeps eager-loaded principal list queries independent of fixture size', func
         }
 
         expect($queryCount)->toBeGreaterThan(0);
-        expect(array_filter(DB::getQueryLog(), static fn (array $query): bool => str_contains($query['query'], 'from "nvl_auth_') && ! str_contains($query['query'], 'installation')))->toHaveCount($queryCount);
+        expect(array_filter(DB::getQueryLog(), $isDataQuery))->toHaveCount($queryCount);
         DB::disableQueryLog();
 
         return $queryCount;

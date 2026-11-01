@@ -1,5 +1,8 @@
 # Verification reference
 
+These invariants belong to native Auth services. Integrate their complete operations;
+do not build consumer challenge hashing, proof consumption or login finalization.
+
 - Normalize the recipient before hashing.
 - Scope a challenge hash by purpose and message type.
 - A compound challenge may carry a primary token and secondary numeric code;
@@ -13,7 +16,8 @@
 - Treat provider email as a claim, never provider ownership. Preserve its
   verified boolean and claim provenance, and fail closed before email matching.
 - Use `AuthSubjectResolver` only after a proof has succeeded.
-- Regenerate Laravel's session identifier after authentication.
+- Supply the server session to native `Authentication` / `AuthenticationSessions`
+  transitions; native stateful success regenerates its identifier.
 - Run shared eligibility and login pipelines before success metadata.
 - Require every `AuthDeliveryRequest` feature/message pair to match the closed
   package-owned delivery map.

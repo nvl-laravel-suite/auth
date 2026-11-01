@@ -16,6 +16,7 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\RememberCredential;
 use Nvl\Auth\Services\PrincipalSecurity;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 
@@ -53,8 +54,8 @@ final readonly class LaravelPrincipalSessionContainment implements PrincipalSess
                     throw AuthException::invalidConfiguration('Managed session containment requires one source.');
                 }
                 $reference = SubjectReference::fromAuthenticatable($principal);
-                $sessions->newQuery()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => now()]);
-                RememberCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+                $sessions->newQuery()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery($sessions->getConnection(), now())]);
+                RememberCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new RememberCredential)->getConnection(), now())]);
             }
             if (method_exists($principal, 'tokens') && ! (new \ReflectionMethod($principal, 'tokens'))->invoke($principal) instanceof MorphMany) {
                 throw AuthException::invalidConfiguration('Session containment requires a Sanctum token relationship.');

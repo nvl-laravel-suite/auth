@@ -22,6 +22,7 @@ use Nvl\Auth\Models\RecoveryCode;
 use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Results\GeneratedRecoveryCodes;
 use Nvl\Auth\Results\TotpEnrollment;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Events\DomainEventDispatcher;
@@ -234,7 +235,7 @@ final readonly class AuthSecondFactor
             $this->recent->consume($subject, $grant, RecentAuthenticationPurpose::RecoveryRegeneration, $context);
             $this->security->lock($subject);
             $this->security->lockChallenges($subject);
-            RecoveryCode::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('used_at')->whereNull('revoked_at')->update(['revoked_at' => CarbonImmutable::now()]);
+            RecoveryCode::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('used_at')->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new RecoveryCode)->getConnection(), CarbonImmutable::now())]);
             foreach ($codes as $code) {
                 RecoveryCode::query()->create(['batch_id' => $batchId, 'subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'code_hash' => $this->hasher->hash('recovery-code', $code)]);
             }
@@ -290,7 +291,7 @@ final readonly class AuthSecondFactor
             $this->security->lock($subject);
             $this->security->lockChallenges($subject);
             $this->removalPolicy->assertRemovalAllowed($subject, 'recovery', 'all');
-            $count = RecoveryCode::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('used_at')->whereNull('revoked_at')->update(['revoked_at' => CarbonImmutable::now()]);
+            $count = RecoveryCode::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('used_at')->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new RecoveryCode)->getConnection(), CarbonImmutable::now())]);
             if ($count > 0) {
                 $this->security->advance($subject, 'recovery_revoked');
             }

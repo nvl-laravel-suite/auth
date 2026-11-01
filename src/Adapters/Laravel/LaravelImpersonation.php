@@ -23,6 +23,7 @@ use Nvl\Auth\Services\AuthImpersonation;
 use Nvl\Auth\Services\PrincipalEligibility;
 use Nvl\Auth\Services\PrincipalSecurity;
 use Nvl\Auth\Services\SecretHasher;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Auth\CanonicalActorResolver;
@@ -191,8 +192,8 @@ final readonly class LaravelImpersonation
     {
         $reference = SubjectReference::fromAuthenticatable($actor);
         try {
-            BrowserSession::query()->whereKey($context->browserSessionId)->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->update(['revoked_at' => now()]);
-            Impersonation::query()->whereKey($grantId)->where('actor_type', $reference->type)->where('actor_id', $reference->identifier)->where('browser_session_id', $context->browserSessionId)->whereNull('stopped_at')->update(['stopped_at' => now(), 'stop_reason' => 'transition_failed', 'active_session_key' => null]);
+            BrowserSession::query()->whereKey($context->browserSessionId)->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->update(['revoked_at' => AuthInstantCast::forQuery((new BrowserSession)->getConnection(), now())]);
+            Impersonation::query()->whereKey($grantId)->where('actor_type', $reference->type)->where('actor_id', $reference->identifier)->where('browser_session_id', $context->browserSessionId)->whereNull('stopped_at')->update(['stopped_at' => AuthInstantCast::forQuery((new Impersonation)->getConnection(), now()), 'stop_reason' => 'transition_failed', 'active_session_key' => null]);
         } finally {
             try {
                 $guard->logout();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Str;
 use Nvl\Auth\Contracts\AccountAuthenticationPolicy;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Passkey;
@@ -32,19 +33,24 @@ final readonly class UsableAccountAuthenticationPolicy implements AccountAuthent
         }
         $passkeys = array_column($state['passkeys'], 'id');
         $social = array_column($state['socialIdentities'], 'id');
-        $usable = match ($kind) {
-            'password' => $credentialId === 'password' && $state['hasPassword'], 'passkey' => in_array($credentialId, $passkeys, true), default => in_array($credentialId, $social, true)
-        };
+        $ownedIdentifier = $credentialId;
         if ($kind === 'password') {
             $owned = $credentialId === 'password' && filled($subject->getAuthPassword());
-        } else {
+        } elseif (Str::isUuid($credentialId)) {
             $model = $kind === 'passkey' ? new Passkey : new SocialIdentity;
             $reference = SubjectReference::fromAuthenticatable($subject);
-            $owned = $model->newQuery()->whereKey($credentialId)->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->exists();
+            $credential = $model->newQuery()->whereKey($credentialId)->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->first([$model->getKeyName()]);
+            $owned = $credential !== null;
+            $ownedIdentifier = $credential?->identifier();
+        } else {
+            $owned = false;
         }
         if (! $owned) {
             throw new AuthException('credential_unavailable', 'The credential is unavailable.', 422);
         }
+        $usable = match ($kind) {
+            'password' => $state['hasPassword'], 'passkey' => in_array($ownedIdentifier, $passkeys, true), default => in_array($ownedIdentifier, $social, true)
+        };
         $remaining = ($state['hasPassword'] ? 1 : 0) + count($passkeys) + count($social) + ($this->inventory->hasEmailMethod($subject) ? 1 : 0) - ($usable ? 1 : 0);
         if ($remaining < 1) {
             throw new AuthException('last_authentication_method', 'Keep at least one usable primary authentication method.', 422);

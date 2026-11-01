@@ -8,6 +8,8 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
+use Nvl\Auth\Support\AuthInstantCast;
+use Nvl\Auth\Traits\SerializesAuthTimestamps;
 use Nvl\Support\Config\PackageStorage;
 
 /**
@@ -20,6 +22,7 @@ use Nvl\Support\Config\PackageStorage;
 abstract class AuthModel extends Model
 {
     use HasUuids;
+    use SerializesAuthTimestamps;
 
     /**
      * Disable integer key assumptions.
@@ -27,6 +30,12 @@ abstract class AuthModel extends Model
      * @var string
      */
     protected $keyType = 'string';
+
+    /** @var array<string, string> */
+    protected $casts = [
+        'created_at' => AuthInstantCast::class,
+        'updated_at' => AuthInstantCast::class,
+    ];
 
     /**
      * Resolve the immutable package operational connection.

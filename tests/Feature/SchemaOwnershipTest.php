@@ -14,8 +14,9 @@ use Nvl\Auth\Services\PrincipalSecurity;
 
 beforeEach(function (): void {
     $driver = getenv('NVL_C1_TEST_DRIVER');
-    if (in_array($driver, ['mysql', 'pgsql'], true)) {
-        expect(DB::connection()->getDriverName())->toBe($driver);
+    if (in_array($driver, ['mysql', 'mariadb', 'pgsql'], true)) {
+        expect(DB::connection()->getDriverName())->toBe($driver)
+            ->and(DB::connection()->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME))->toBe($driver === 'mariadb' ? 'mysql' : $driver);
     }
 });
 
@@ -219,8 +220,8 @@ it('repairs partial mandatory security state without changing retained revisions
 });
 
 it('rejects a malformed named security index without changing host data or schema', function (array $columns, string $operation): void {
-    if ($columns === ['partial'] && DB::connection()->getDriverName() === 'mysql') {
-        $this->markTestSkipped('MySQL does not support partial indexes.');
+    if ($columns === ['partial'] && in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+        $this->markTestSkipped('MySQL and MariaDB do not support partial indexes.');
     }
     $user = $this->user();
     app(PrincipalSecurity::class)->revision($user);

@@ -13,6 +13,7 @@ use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\IssuedSocialRegistration;
@@ -85,7 +86,7 @@ final readonly class SocialRegistrationContinuations
             if (! is_int($requests) || $requests >= 5) {
                 throw $this->invalid();
             }
-            $this->records->query()->where('type', 'social_registration_mailbox')->where('active_key', $parent->identifier())->update(['revoked_at' => now(), 'active_key' => null]);
+            $this->records->query()->where('type', 'social_registration_mailbox')->where('active_key', $parent->identifier())->update(['revoked_at' => AuthInstantCast::forQuery((new Challenge)->getConnection(), now()), 'active_key' => null]);
             $code = (string) random_int(100000, 999999);
             $expiry = CarbonImmutable::now('UTC')->addSeconds(300)->min($parent->expires_at);
             $id = (string) Str::uuid();

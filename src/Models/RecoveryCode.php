@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\RecoveryCodeFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Support\AuthInstantCast;
 
 /**
  * Stores one independently consumable hashed recovery code.
@@ -54,8 +55,8 @@ final class RecoveryCode extends AuthModel
     protected function casts(): array
     {
         return [
-            'used_at' => 'immutable_datetime',
-            'revoked_at' => 'immutable_datetime',
+            'used_at' => AuthInstantCast::class,
+            'revoked_at' => AuthInstantCast::class,
         ];
     }
 

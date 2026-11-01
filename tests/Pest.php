@@ -9,10 +9,12 @@ use Nvl\Auth\Tests\NativeOwnerScenarioTestCase;
 use Nvl\Auth\Tests\SecurityConcurrencyTestCase;
 use Nvl\Auth\Tests\StatefulAuthTestCase;
 use Nvl\Auth\Tests\TestCase;
+use Nvl\Ownership\Tests\OwnershipTestCase;
 
 $raceFiles = [__DIR__.'/Feature/RegistrationConcurrencyTest.php', __DIR__.'/Feature/EmailIdentityTest.php', __DIR__.'/Feature/EmailIdentityAdoptionTest.php', __DIR__.'/Feature/EmailVerificationSecurityTest.php', __DIR__.'/Feature/PasswordMutationSecurityTest.php', __DIR__.'/Feature/WebauthnPasskeyCeremonyTest.php', __DIR__.'/Feature/PasskeyLifecycleTest.php', __DIR__.'/Feature/TotpAndRecoveryCodeTest.php', __DIR__.'/Feature/PrincipalManagementTest.php', __DIR__.'/Feature/SocialIdentityLifecycleTest.php', __DIR__.'/Feature/NativeAuthCoreTest.php', __DIR__.'/Feature/RecentAuthenticationTest.php', __DIR__.'/Feature/SensitiveOperationAdmissionTest.php', __DIR__.'/Feature/AuthenticationProofLifecycleTest.php', __DIR__.'/Feature/AuthenticationAssuranceTest.php', __DIR__.'/Feature/CredentialConcurrencyTest.php', __DIR__.'/Feature/InvitationRegistrationRaceTest.php', __DIR__.'/Feature/SchemaOwnershipTest.php'];
 uses(SecurityConcurrencyTestCase::class)->in(...$raceFiles);
-$statefulFiles = [__DIR__.'/Feature/RegistrationTest.php', __DIR__.'/Feature/ImpersonationLifecycleTest.php', __DIR__.'/Feature/ManagedRememberAuthenticationTest.php', __DIR__.'/Feature/BrowserSessionRevocationTest.php', __DIR__.'/Feature/BrowserSessionDriverTest.php', __DIR__.'/Feature/BrowserSessionLifecycleTest.php', __DIR__.'/Feature/PasswordlessAccountTest.php', __DIR__.'/Feature/EmailChangeTest.php', __DIR__.'/Feature/AccountSecurityInventoryTest.php', __DIR__.'/Feature/SocialRegistrationTest.php', __DIR__.'/Feature/SocialAuthenticationTest.php', __DIR__.'/Feature/LifecyclePipelineTest.php', __DIR__.'/Feature/RegistrationCompositionTest.php', __DIR__.'/Feature/SocialiteWorkerIsolationTest.php', __DIR__.'/Feature/StatefulTransactionBoundaryTest.php', __DIR__.'/Feature/AuthenticationAndVerificationTest.php', __DIR__.'/Feature/PrincipalAttributeMappingTest.php', __DIR__.'/Feature/ConsumerContractBindingTest.php', __DIR__.'/Feature/HttpApiTest.php', __DIR__.'/Feature/FeatureAdmissionTest.php'];
+$statefulFiles = [__DIR__.'/Feature/RegistrationTest.php', __DIR__.'/Feature/ImpersonationLifecycleTest.php', __DIR__.'/Feature/ManagedRememberAuthenticationTest.php', __DIR__.'/Feature/BrowserSessionRevocationTest.php', __DIR__.'/Feature/BrowserSessionDriverTest.php', __DIR__.'/Feature/BrowserSessionLifecycleTest.php', __DIR__.'/Feature/PasswordlessAccountTest.php', __DIR__.'/Feature/EmailChangeTest.php', __DIR__.'/Feature/AccountSecurityInventoryTest.php', __DIR__.'/Feature/SocialRegistrationTest.php', __DIR__.'/Feature/SocialAuthenticationTest.php', __DIR__.'/Feature/LifecyclePipelineTest.php', __DIR__.'/Feature/RegistrationCompositionTest.php', __DIR__.'/Feature/SocialiteWorkerIsolationTest.php', __DIR__.'/Feature/StatefulTransactionBoundaryTest.php', __DIR__.'/Feature/AuthenticationAndVerificationTest.php', __DIR__.'/Feature/PrincipalAttributeMappingTest.php', __DIR__.'/Feature/PrincipalExtensionsTest.php', __DIR__.'/Feature/ConsumerContractBindingTest.php', __DIR__.'/Feature/HttpApiTest.php', __DIR__.'/Feature/FeatureAdmissionTest.php'];
+$statefulFiles[] = __DIR__.'/Feature/PruningTest.php';
 uses(StatefulAuthTestCase::class)->in(...$statefulFiles);
 $legacyFeatureFiles = array_diff(glob(__DIR__.'/Feature/*Test.php') ?: [], $raceFiles, $statefulFiles);
 uses(TestCase::class)->in(...$legacyFeatureFiles);
@@ -25,7 +27,9 @@ $nativeOwnerScenarios = [__DIR__.'/Ownership/NativeImpersonationTest.php',
     __DIR__.'/Ownership/NativeInvitationBootstrapTest.php',
     __DIR__.'/Ownership/NativeQueuedDeliveryContextTest.php',
 ];
-uses(NativeOwnerScenarioTestCase::class)->in(...$nativeOwnerScenarios);
+if (class_exists(OwnershipTestCase::class)) {
+    uses(NativeOwnerScenarioTestCase::class)->in(...$nativeOwnerScenarios);
+}
 
 $disabledProviderFiles = array_filter(
     glob(__DIR__.'/Provider/*Test.php') ?: [],

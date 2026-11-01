@@ -34,6 +34,7 @@ use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\RememberCredential;
 use Nvl\Auth\Pipelines\AuthPipeline;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\ValueObjects\AuthenticationEvidence;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
@@ -194,7 +195,7 @@ final readonly class AuthenticationSessions
         $key = AuthBrowserSessions::bindingKey($guard);
         $old = $session->get($key);
         if (is_string($old)) {
-            BrowserSession::query()->where('binding_hash', $this->hasher->hash('native-browser-binding', $old))->where('guard_name', $guard)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+            BrowserSession::query()->where('binding_hash', $this->hasher->hash('native-browser-binding', $old))->where('guard_name', $guard)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new BrowserSession)->getConnection(), now())]);
         }
         $binding = bin2hex(random_bytes(32));
         $now = CarbonImmutable::now('UTC');
@@ -249,8 +250,8 @@ final readonly class AuthenticationSessions
                 if (is_string($binding)) {
                     $record = BrowserSession::query()->where('binding_hash', $this->hasher->hash('native-browser-binding', $binding))->where('guard_name', $guardName)->first();
                     if ($record !== null) {
-                        BrowserSession::query()->where('subject_type', $record->subject_type)->where('subject_id', $record->subject_id)->where('guard_name', $guardName)->where('session_family_id', $record->session_family_id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
-                        RememberCredential::query()->where('subject_type', $record->subject_type)->where('subject_id', $record->subject_id)->where('guard_name', $guardName)->where('session_family_id', $record->session_family_id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+                        BrowserSession::query()->where('subject_type', $record->subject_type)->where('subject_id', $record->subject_id)->where('guard_name', $guardName)->where('session_family_id', $record->session_family_id)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new BrowserSession)->getConnection(), now())]);
+                        RememberCredential::query()->where('subject_type', $record->subject_type)->where('subject_id', $record->subject_id)->where('guard_name', $guardName)->where('session_family_id', $record->session_family_id)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new RememberCredential)->getConnection(), now())]);
                     }
                 }
             }

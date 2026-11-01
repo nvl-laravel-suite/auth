@@ -455,7 +455,7 @@ it('returns compatibility role and permission pages as stable DTOs without mappi
             perPage: 1,
         )->through(RoleListItemData::fromModel(...));
         $roleQueryCount = count(DB::getQueryLog());
-        $roleCatalogReads = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => str_contains($query['query'], 'sqlite_master')));
+        $roleCatalogReads = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => preg_match('/\b(?:sqlite_master|information_schema|pg_catalog|pg_class)\b/i', $query['query']) === 1));
         $roleItem = $roles->items()[0] ?? null;
         $roleItem?->toArray();
 
@@ -485,7 +485,7 @@ it('returns compatibility role and permission pages as stable DTOs without mappi
             perPage: 1,
         )->through(PermissionListItemData::fromModel(...));
         $permissionQueryCount = count(DB::getQueryLog());
-        $permissionCatalogReads = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => str_contains($query['query'], 'sqlite_master')));
+        $permissionCatalogReads = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => preg_match('/\b(?:sqlite_master|information_schema|pg_catalog|pg_class)\b/i', $query['query']) === 1));
         $permissionItem = $permissions->items()[0] ?? null;
         $permissionItem?->toArray();
 
@@ -529,7 +529,7 @@ it('keeps option and catalog query counts independent of fixture size', function
             DB::flushQueryLog();
             DB::enableQueryLog();
             $read();
-            $catalogReads = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => str_contains($query['query'], 'sqlite_master')));
+            $catalogReads = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => preg_match('/\b(?:sqlite_master|information_schema|pg_catalog|pg_class)\b/i', $query['query']) === 1));
             $counts[$name] = count(DB::getQueryLog()) - $catalogReads;
             $counts[$name.'_ownership_probes'] = $catalogReads;
             expect($catalogReads)->toBeLessThanOrEqual(4);

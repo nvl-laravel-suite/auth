@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\ImpersonationFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Support\AuthInstantCast;
 
 /** Durable grant bound to the original admitted browser, never a standalone bearer.
  * @property string $actor_type
@@ -49,6 +50,6 @@ final class Impersonation extends AuthModel
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['actor_revision' => 'integer', 'target_revision' => 'integer', 'reason' => 'encrypted', 'owner_reference' => 'encrypted:array', 'started_at' => 'immutable_datetime', 'expires_at' => 'immutable_datetime', 'stopped_at' => 'immutable_datetime'];
+        return ['actor_revision' => 'integer', 'target_revision' => 'integer', 'reason' => 'encrypted', 'owner_reference' => 'encrypted:array', 'started_at' => AuthInstantCast::class, 'expires_at' => AuthInstantCast::class, 'stopped_at' => AuthInstantCast::class];
     }
 }

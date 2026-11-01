@@ -38,8 +38,9 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 beforeEach(function (): void {
     config(['nvl-auth.features.totp.enabled' => true, 'nvl-auth.features.recovery_codes.enabled' => true]);
     $requested = getenv('NVL_C1_TEST_DRIVER');
-    if (in_array($requested, ['mysql', 'pgsql'], true)) {
-        expect(DB::connection()->getDriverName())->toBe($requested);
+    if (in_array($requested, ['mysql', 'mariadb', 'pgsql'], true)) {
+        expect(DB::connection()->getDriverName())->toBe($requested)
+            ->and(DB::connection()->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME))->toBe($requested === 'mariadb' ? 'mysql' : $requested);
     }
 });
 it('retains monotonic security revision and rolls back credential replacement', function (): void {
@@ -62,12 +63,18 @@ it('retains monotonic security revision and rolls back credential replacement', 
 });
 it('creates one initial security state from two committed processes', function (): void {
     $id = $this->user()->getKey();
+    $driver = DB::connection()->getDriverName();
+    $pdoDriver = DB::connection()->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME);
     $worker = static fn (): array => ['revision' => app(PrincipalSecurity::class)->revision(TestUser::query()->findOrFail($id))];
     $results = SecurityRace::run([$worker, $worker]);
     expect(array_column($results, 'ok'))->toBe([true, true], json_encode($results, JSON_THROW_ON_ERROR))
         ->and(array_column($results, 'revision'))->toBe([1, 1])
+        ->and(array_column($results, 'driver'))->toBe(array_fill(0, 2, $driver))
+        ->and(array_column($results, 'pdo_driver'))->toBe(array_fill(0, 2, $pdoDriver))
+        ->and(array_unique(array_column($results, 'process_id')))->toHaveCount(2)
+        ->and(array_unique(array_column($results, 'connection_id')))->toHaveCount(2)
         ->and(PrincipalSecurityState::query()->count())->toBe(1);
-})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/PostgreSQL.');
+})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/MariaDB/PostgreSQL.');
 it('serializes concurrent credential inventory replacements', function (string $operation): void {
     $user = $this->user();
     $id = $user->getKey();
@@ -97,7 +104,7 @@ it('serializes concurrent credential inventory replacements', function (string $
     } else {
         expect(RecoveryCode::query()->whereNull('revoked_at')->distinct()->count('batch_id'))->toBe(1);
     }
-})->with(['totp', 'recovery'])->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/PostgreSQL.');
+})->with(['totp', 'recovery'])->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/MariaDB/PostgreSQL.');
 
 it('finishes passkey verification outside the security transaction', function (): void {
     config(['nvl-auth.features.passkeys.enabled' => true]);
@@ -136,7 +143,7 @@ it('never exceeds the passkey limit when distinct ceremonies finish together', f
     expect(array_column($results, 'ok'))->toBe([true, true], json_encode($results, JSON_THROW_ON_ERROR))
         ->and(array_sum(array_column($results, 'enrolled')))->toBe(1)
         ->and(Passkey::query()->whereNull('revoked_at')->count())->toBe(1);
-})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/PostgreSQL.');
+})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/MariaDB/PostgreSQL.');
 
 it('advances passwords and revokes only exact managed token namespaces', function (): void {
     config(['nvl-auth.features.api_tokens.settings.namespace' => 'secure_auth']);

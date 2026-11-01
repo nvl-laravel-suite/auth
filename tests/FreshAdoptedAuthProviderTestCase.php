@@ -7,6 +7,7 @@ namespace Nvl\Auth\Tests;
 use Illuminate\Contracts\Auth\Access\Gate;
 use Laravel\Sanctum\SanctumServiceProvider;
 use Nvl\Auth\Providers\AuthServiceProvider;
+use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Support\Providers\LocaleServiceProvider;
 use Spatie\Permission\PermissionServiceProvider;
 
@@ -27,7 +28,13 @@ abstract class FreshAdoptedAuthProviderTestCase extends DisabledAuthProviderTest
     protected function defineEnvironment($app): void
     {
         parent::defineEnvironment($app);
+        $app['config']->set('database.default', 'auth_adopted_fresh');
+        $app['config']->set('database.connections.auth_adopted_fresh', [
+            'driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '', 'foreign_key_constraints' => true,
+        ]);
         $app['config']->set('nvl-auth.enabled', true);
+        $app['config']->set('nvl-auth.features.rbac.enabled', true);
+        $app['config']->set('nvl-auth.features.rbac.models.principal', TestUser::class);
         $app['config']->set('nvl-auth.migrations.enabled', false);
         $app['config']->set('nvl-auth.adoption.spatie_storage.enabled', true);
         $app->make(Gate::class);

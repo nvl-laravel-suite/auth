@@ -33,7 +33,6 @@ use Nvl\Auth\Services\AuthSchemaManager;
 use Nvl\Auth\Services\AuthSecondFactor;
 use Nvl\Auth\Services\AuthSocialAuthentication;
 use Nvl\Auth\Services\AuthTokens;
-use Nvl\Auth\Services\OwnerAuthenticationIntents;
 use Nvl\Auth\Services\PrincipalSecurity;
 use Nvl\Auth\Tests\Fixtures\ConfiguredOwnerUser;
 use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Public\SocialIdentityController;
@@ -44,10 +43,6 @@ use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\ExternalIdentity;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Nvl\Ownership\Contracts\OwnerAvailability;
-use Nvl\Ownership\Contracts\OwnershipActorResolver;
-use Nvl\Ownership\Services\ExistingOwnerAvailability;
-use Nvl\Ownership\Services\NativeOwnershipActorResolver;
 use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 
 it('binds a native password proof to its browser and consumes it only once', function (): void {
@@ -458,14 +453,11 @@ it('correlates concurrent social fixture intents with their own OAuth state', fu
     $session = app('session.store');
     $controller = app(SocialIdentityController::class);
     $social = app(AuthSocialAuthentication::class);
-    $this->app->bind(OwnershipActorResolver::class, NativeOwnershipActorResolver::class);
-    $this->app->bind(OwnerAvailability::class, ExistingOwnerAvailability::class);
-    $intents = app(OwnerAuthenticationIntents::class);
     $request = Request::create('/social/github/redirect');
     $request->setLaravelSession($session);
-    $controller->redirect('github', $request, $social, $intents, app(AuthenticationSessions::class));
+    $controller->redirect('github', $request, $social, app(AuthenticationSessions::class));
     $first = Challenge::query()->where('type', 'social_intent')->sole();
-    $controller->redirect('github', $request, $social, $intents, app(AuthenticationSessions::class));
+    $controller->redirect('github', $request, $social, app(AuthenticationSessions::class));
     $callback = Request::create('/social/github/callback?state=flow-1');
     $callback->setLaravelSession($session);
     $controller->callback('github', $callback, $social, app(AuthenticationSessions::class), app(AuthSubjectResolver::class));

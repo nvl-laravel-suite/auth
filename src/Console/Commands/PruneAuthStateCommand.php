@@ -20,6 +20,9 @@ final class PruneAuthStateCommand extends Command
     /** @var string */
     protected $description = 'Prune terminal NVL Auth state after its retention window';
 
+    /** @var string */
+    protected $help = 'Requires a host SystemMutationAccess policy approving nvl.auth.maintenance.prune; the default policy denies scheduling. Deletes bounded batches using cleanup.batch_size (default 250, range 1..1000). Run outside a database transaction; completed batches survive later failures.';
+
     /**
      * Execute the pruning command.
      */

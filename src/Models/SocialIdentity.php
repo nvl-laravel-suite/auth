@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\SocialIdentityFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Support\AuthInstantCast;
 
 /**
  * Links one verified external provider identity to a host subject.
@@ -63,8 +64,8 @@ final class SocialIdentity extends AuthModel
             'provider_user_id' => 'encrypted',
             'email' => 'encrypted',
             'profile' => 'encrypted:array',
-            'last_used_at' => 'immutable_datetime',
-            'revoked_at' => 'immutable_datetime',
+            'last_used_at' => AuthInstantCast::class,
+            'revoked_at' => AuthInstantCast::class,
         ];
     }
 

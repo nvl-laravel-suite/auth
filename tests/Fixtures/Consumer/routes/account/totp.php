@@ -6,7 +6,6 @@ use Illuminate\Support\Facades\Route;
 use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Account\TotpController;
 
 Route::get('totp', [TotpController::class, 'show'])
-    ->withoutMiddleware('auth')
     ->middleware(['nvl.auth.guard', 'nvl.auth.feature:totp,read'])
     ->name('totp.show');
 Route::post('totp/enroll', [TotpController::class, 'start'])

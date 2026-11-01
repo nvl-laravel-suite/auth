@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Schema\Builder as SchemaBuilder;
@@ -34,6 +35,7 @@ use Nvl\Auth\Models\RecoveryCode;
 use Nvl\Auth\Models\RememberCredential;
 use Nvl\Auth\Models\SocialIdentity;
 use Nvl\Auth\Models\TotpCredential;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\ValueObjects\LegacyPasswordResetMapping;
 use Nvl\Auth\ValueObjects\LegacyPrincipalForeignKey;
 use Nvl\Auth\ValueObjects\PrincipalAdoptionPlan;
@@ -500,7 +502,11 @@ final readonly class AuthMaintenance
     }
 
     /**
-     * Count or delete terminal records older than retention.
+     * Count terminal records or delete them in bounded, freshly authorized batches.
+     * Completed batches remain committed if a later batch fails. A host outer
+     * transaction retains its normal commit boundary; scheduled pruning should
+     * start outside a transaction. Short metadata transactions and preview counts
+     * use each model's authoritative write source as deletion does.
      *
      * @return array<string, int>
      */
@@ -515,7 +521,8 @@ final readonly class AuthMaintenance
         $this->features->assertAllowed(AuthFeature::RecoveryCodes, FeatureOperation::Cleanup);
         $this->features->assertAllowed(AuthFeature::SocialIdentities, FeatureOperation::Cleanup);
         $this->features->assertAllowed(AuthFeature::Clients, FeatureOperation::Cleanup);
-        $cutoff = CarbonImmutable::now('UTC')->subDays($this->configuration->integerBetween('cleanup.retention_days', 30, 1, 3650));
+        $batchSize = $this->configuration->integerBetween('cleanup.batch_size', 250, 1, 1000);
+        $cutoff = AuthInstantCast::forQuery((new Invitation)->getConnection(), CarbonImmutable::now('UTC')->subDays($this->configuration->integerBetween('cleanup.retention_days', 30, 1, 3650)));
         $ownedQueries = ['invitations' => Invitation::query()->where(function (Builder $query) use ($cutoff): void {
             $query->where('expires_at', '<', $cutoff)->orWhere('accepted_at', '<', $cutoff)->orWhere('revoked_at', '<', $cutoff);
         }), 'challenges' => Challenge::query()->where(function (Builder $query) use ($cutoff): void {
@@ -525,28 +532,60 @@ final readonly class AuthMaintenance
         $queries += ['impersonations' => Impersonation::query()->where('expires_at', '<', $cutoff), 'remember_credentials' => RememberCredential::query()->where('absolute_expires_at', '<', $cutoff), 'browser_sessions' => BrowserSession::query()->where('absolute_expires_at', '<', $cutoff), 'pending_email_changes' => PendingEmailChange::query()->where('expires_at', '<', $cutoff), 'totp_credentials' => TotpCredential::query()->where('revoked_at', '<', $cutoff), 'passkeys' => Passkey::query()->where('revoked_at', '<', $cutoff), 'recovery_codes' => RecoveryCode::query()->where(function (Builder $query) use ($cutoff): void {
             $query->where('used_at', '<', $cutoff)->orWhere('revoked_at', '<', $cutoff);
         }), 'social_identities' => SocialIdentity::query()->where('revoked_at', '<', $cutoff), 'client_sessions' => AuthClientSession::query()->where('ended_at', '<', $cutoff)];
-        $connection = (new Invitation)->getConnectionName();
-        $counts = DB::connection($connection)->transaction(function () use ($dryRun, $queries): array {
-            $counts = [];
-            foreach ($queries as $name => $query) {
-                if (! $query->getModel()->getConnection()->getSchemaBuilder()->hasTable($query->getModel()->getTable())) {
-                    $counts[$name] = 0;
+        $counts = [];
+        foreach ($queries as $name => $query) {
+            $this->mutations->authorize($authority, 'nvl.auth.maintenance.prune');
+            $model = $query->getModel();
+            $exists = $model->getConnection()->transaction(fn (): bool => $model->getConnection()->getSchemaBuilder()->hasTable($model->getTable()));
+            if (! $exists) {
+                $counts[$name] = 0;
 
-                    continue;
-                }
-                $result = $dryRun ? $query->count() : $query->delete();
-                if (! is_int($result)) {
-                    throw new \LogicException('Auth pruning returned a non-integer result.');
-                }
-                $counts[$name] = $result;
+                continue;
             }
-
-            return $counts;
-        }, 3);
+            $counts[$name] = $dryRun ? $query->useWritePdo()->count() : $this->pruneQuery($query, $authority, $batchSize);
+        }
         if (! $dryRun) {
             $this->audits->record('auth_state.pruned', metadata: ['counts' => $counts]);
         }
 
         return $counts;
+    }
+
+    /**
+     * Reapply retention and ownership predicates when deleting each bounded keyset.
+     *
+     * @param  Builder<covariant Model>  $query
+     */
+    private function pruneQuery(Builder $query, Authenticatable|SystemMutationContext $authority, int $batchSize): int
+    {
+        $key = $query->getModel()->getQualifiedKeyName();
+        $after = null;
+        $deleted = 0;
+        do {
+            $this->mutations->authorize($authority, 'nvl.auth.maintenance.prune');
+            $batch = clone $query;
+            if ($after !== null) {
+                $batch->where($key, '>', $after);
+            }
+            $identifiers = $batch->useWritePdo()->orderBy($key)->limit($batchSize)->pluck($key)->all();
+            if ($identifiers === []) {
+                break;
+            }
+            $after = $identifiers[array_key_last($identifiers)];
+            if (! is_string($after) && ! is_int($after)) {
+                throw new \LogicException('Auth pruning requires scalar primary keys.');
+            }
+            $deleted += $query->getModel()->getConnection()->transaction(function () use ($query, $identifiers, $authority): int {
+                $this->mutations->authorize($authority, 'nvl.auth.maintenance.prune');
+                $result = (clone $query)->whereKey($identifiers)->delete();
+                if (! is_int($result)) {
+                    throw new \LogicException('Auth pruning returned a non-integer result.');
+                }
+
+                return $result;
+            }, 3);
+        } while (count($identifiers) === $batchSize);
+
+        return $deleted;
     }
 }

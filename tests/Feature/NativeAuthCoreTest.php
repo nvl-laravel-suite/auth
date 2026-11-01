@@ -7,6 +7,7 @@ use Illuminate\Auth\GenericUser;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Contracts\Session\Session;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthenticationAssurancePolicy;
@@ -18,10 +19,12 @@ use Nvl\Auth\Enums\AuthenticationMethod;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
+use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Events\AuthenticationRejected;
 use Nvl\Auth\Events\UserAuthenticated;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
+use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Results\IssuedApiToken;
@@ -29,16 +32,20 @@ use Nvl\Auth\Services\AuthChallenges;
 use Nvl\Auth\Services\Authentication;
 use Nvl\Auth\Services\AuthenticationProofs;
 use Nvl\Auth\Services\AuthenticationSessions;
+use Nvl\Auth\Services\AuthInvitations;
+use Nvl\Auth\Services\AuthMaintenance;
 use Nvl\Auth\Services\AuthSecondFactor;
 use Nvl\Auth\Services\AuthTokens;
 use Nvl\Auth\Services\PrincipalEmailIdentity;
 use Nvl\Auth\Services\PrincipalEmailIdentityAdoption;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\Tests\Fixtures\RejectLoginStage;
 use Nvl\Auth\Traits\IssuesAuthenticationProofs;
 use Nvl\Auth\ValueObjects\AuthenticationEvidence;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthenticationVerification;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
+use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 use Nvl\Auth\ValueObjects\IssuedAuthenticationProof;
 use PragmaRX\Google2FA\Google2FA;
 
@@ -96,7 +103,7 @@ it('keeps challenge SQL expiry and failed attempts on UTC instants under host ti
         config(['app.timezone' => $timezone, 'nvl-auth.features.security_codes.enabled' => true]);
         $challenges = app(AuthChallenges::class);
         $issued = $challenges->issue(AuthFeature::SecurityCodes, AuthMessageType::SecurityCode, 'clock@example.test', 'login', CarbonImmutable::now($timezone)->addMinute(), numeric: true);
-        expect($issued['challenge']->getRawOriginal('expires_at'))->toBe('2026-10-25 12:01:00');
+        expect(CarbonImmutable::parse($issued['challenge']->getRawOriginal('expires_at'), 'UTC')->utc()->toIso8601String())->toBe('2026-10-25T12:01:00+00:00');
         expect(fn () => $challenges->consume(AuthFeature::SecurityCodes, AuthMessageType::SecurityCode, 'clock@example.test', 'login', 'wrong'))->toThrow(AuthException::class);
         expect($issued['challenge']->refresh()->attempts)->toBe(1);
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-25T12:02:00Z'));
@@ -107,6 +114,67 @@ it('keeps challenge SQL expiry and failed attempts on UTC instants under host ti
     } finally {
         CarbonImmutable::setTestNow();
         date_default_timezone_set($original);
+    }
+})->with(['Europe/Sofia', 'America/New_York']);
+
+it('enforces the challenge attempt ceiling in a non UTC PostgreSQL session', function (string $timezone): void {
+    $connection = DB::connection();
+    if ($connection->getDriverName() !== 'pgsql') {
+        $this->markTestSkipped('PostgreSQL session timezone regression.');
+    }
+    $original = $connection->scalar('SHOW TimeZone');
+    try {
+        $connection->selectOne("SELECT set_config('TimeZone', ?, false)", [$timezone]);
+        config(['nvl-auth.features.security_codes.enabled' => true]);
+        $challenges = app(AuthChallenges::class);
+        $issued = $challenges->issue(AuthFeature::SecurityCodes, AuthMessageType::SecurityCode, 'attempts@example.test', 'login', CarbonImmutable::now('UTC')->addMinutes(10), numeric: true, maxAttempts: 2);
+        $wrong = $issued['secret'] === '000000' ? '111111' : '000000';
+        foreach ([1, 2] as $attempts) {
+            expect(fn () => $challenges->consume(AuthFeature::SecurityCodes, AuthMessageType::SecurityCode, 'attempts@example.test', 'login', $wrong))->toThrow(AuthException::class);
+            expect($issued['challenge']->refresh()->attempts)->toBe($attempts);
+        }
+        expect($issued['challenge']->active_key)->toBeNull()
+            ->and(fn () => $challenges->consume(AuthFeature::SecurityCodes, AuthMessageType::SecurityCode, 'attempts@example.test', 'login', $issued['secret']))->toThrow(AuthException::class);
+    } finally {
+        $connection->selectOne("SELECT set_config('TimeZone', ?, false)", [$original]);
+    }
+})->with(['Europe/Sofia', 'America/New_York']);
+
+it('uses exact invitation expiry and retention boundaries in a non UTC PostgreSQL session', function (string $timezone): void {
+    $connection = DB::connection();
+    if ($connection->getDriverName() !== 'pgsql') {
+        $this->markTestSkipped('PostgreSQL session timezone regression.');
+    }
+    $original = $connection->scalar('SHOW TimeZone');
+    try {
+        $connection->selectOne("SELECT set_config('TimeZone', ?, false)", [$timezone]);
+        $now = CarbonImmutable::parse('2026-11-01T12:00:00Z');
+        $this->travelTo($now);
+        config(['nvl-auth.features.invitations.enabled' => true, 'nvl-auth.cleanup.retention_days' => 30]);
+        Event::fake([AuthDeliveryRequested::class]);
+        $actor = $this->user();
+        $invitations = app(AuthInvitations::class);
+        $expired = $invitations->create(['recipient' => 'expired@example.test'], $actor, new InvitationIssuanceContext(expiresAt: $now->addMinute()))['invitation'];
+        $active = $invitations->create(['recipient' => 'active@example.test'], $actor, new InvitationIssuanceContext(expiresAt: $now->addMinutes(3)))['invitation'];
+        $this->travelTo($now->addMinutes(2));
+        expect($invitations->findActive('expired@example.test', 'registration', authority: $actor))->toBeNull()
+            ->and($invitations->findActive('active@example.test', 'registration', authority: $actor)?->identifier())->toBe($active->identifier())
+            ->and($invitations->paginate($actor, ['lifecycle' => 'expired'])->modelKeys())->toBe([$expired->identifier()])
+            ->and($invitations->paginate($actor, ['lifecycle' => 'active'])->modelKeys())->toBe([$active->identifier()])
+            ->and($invitations->paginate($actor, ['expiresAfter' => $now->addMinutes(2)->toIso8601String(), 'expiresBefore' => $now->addMinutes(4)->toIso8601String()])->modelKeys())->toBe([$active->identifier()]);
+
+        $cutoff = $now->addMinutes(2)->subDays(30);
+        $old = Invitation::factory()->create(['expires_at' => $cutoff->subMinute()]);
+        $retained = Invitation::factory()->create(['expires_at' => $cutoff->addMinute()]);
+        $maintenance = app(AuthMaintenance::class);
+        expect($maintenance->prune($actor, true)['invitations'])->toBe(1)
+            ->and(Invitation::query()->whereKey($old->identifier())->exists())->toBeTrue();
+        expect($maintenance->prune($actor)['invitations'])->toBe(1)
+            ->and(Invitation::query()->whereKey($old->identifier())->exists())->toBeFalse()
+            ->and(Invitation::query()->whereKey($retained->identifier())->exists())->toBeTrue();
+    } finally {
+        $this->travelBack();
+        $connection->selectOne("SELECT set_config('TimeZone', ?, false)", [$original]);
     }
 })->with(['Europe/Sofia', 'America/New_York']);
 
@@ -420,7 +488,7 @@ it('rejects raw native token issuance for persisted inactive locked or deleted p
     $user = $this->user();
     match ($state) {
         'inactive' => $user->newQuery()->whereKey($user->id)->update(['is_active' => false]),
-        'locked' => $user->newQuery()->whereKey($user->id)->update(['locked_until' => now()->addHour()]),
+        'locked' => $user->newQuery()->whereKey($user->id)->update(['locked_until' => AuthInstantCast::forQuery($user->getConnection(), now()->addHour())]),
         'deleted' => $user->delete(),
     };
     expect(fn () => app(AuthTokens::class)->create($user, ['name' => 'Rejected device', 'abilities' => ['profile:read']]))

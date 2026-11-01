@@ -298,7 +298,8 @@ it('lists bounded invitation projections with multi-type filters and constant qu
     DB::flushQueryLog();
     DB::enableQueryLog();
     app(ListInvitationProjectionsAction::class)->execute($actor, perPage: 100)->items();
-    $queryCount = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => str_contains($query['query'], 'from "nvl_auth_invitations"')));
+    $from = 'from '.DB::connection()->getQueryGrammar()->wrapTable((new Invitation)->getTable());
+    $queryCount = count(array_filter(DB::getQueryLog(), static fn (array $query): bool => str_contains($query['query'], $from)));
     DB::disableQueryLog();
 
     expect($queryCount)->toBeGreaterThan(0)->toBeLessThanOrEqual(2);

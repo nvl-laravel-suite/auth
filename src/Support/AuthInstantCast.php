@@ -7,6 +7,7 @@ namespace Nvl\Auth\Support;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
+use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 
@@ -31,7 +32,7 @@ final class AuthInstantCast implements CastsAttributes
             throw new InvalidArgumentException('Auth timestamps require UTC strings.');
         }
 
-        return CarbonImmutable::parse($value, 'UTC');
+        return CarbonImmutable::parse($value, 'UTC')->utc();
     }
 
     /** @param array<string, mixed> $attributes
@@ -44,6 +45,14 @@ final class AuthInstantCast implements CastsAttributes
         }
         $date = $value instanceof DateTimeInterface ? CarbonImmutable::instance($value) : CarbonImmutable::parse($value, 'UTC');
 
-        return [$key => $date->utc()->format('Y-m-d H:i:s')];
+        return [$key => self::forQuery($model->getConnection(), $date)];
+    }
+
+    /** Encode an instant for a predicate or bulk write on its actual source. */
+    public static function forQuery(Connection $connection, DateTimeInterface $value): string
+    {
+        $format = $connection->getDriverName() === 'pgsql' ? 'Y-m-d H:i:sP' : 'Y-m-d H:i:s';
+
+        return CarbonImmutable::instance($value)->utc()->format($format);
     }
 }

@@ -84,6 +84,6 @@ final readonly class AuthReauthentication
                 'secret_hash' => $this->hasher->hash('native-recent-authentication', $grant), 'payload' => $source->payload, 'max_attempts' => 1, 'expires_at' => $source->expires_at]);
 
             return new IssuedRecentAuthentication($grant);
-        });
+        }, 3);
     }
 }

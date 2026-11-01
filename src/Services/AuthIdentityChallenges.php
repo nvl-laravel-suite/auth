@@ -7,6 +7,7 @@ namespace Nvl\Auth\Services;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 use Nvl\Auth\Models\Challenge;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Support\Ownership\Contracts\OwnershipReadiness;
 use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
 use Nvl\Support\Ownership\Services\OwnershipScope;
@@ -67,7 +68,7 @@ final readonly class AuthIdentityChallenges
             if (! $query->lockForUpdate()->first() instanceof Challenge) {
                 throw new OwnershipViolation('The global credential challenge is unavailable.');
             }
-            $query->toBase()->update([...$changes, 'updated_at' => now()]);
+            $query->toBase()->update([...$changes, 'updated_at' => AuthInstantCast::forQuery($challenge->getConnection(), now())]);
             $challenge->syncOriginal();
 
             return true;

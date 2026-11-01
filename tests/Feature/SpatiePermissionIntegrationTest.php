@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Nvl\Auth\Contracts\AuthSchemaMigration;
 use Nvl\Auth\Contracts\SystemMutationAccess;
 use Nvl\Auth\Events\RbacAssignmentChanged;
 use Nvl\Auth\Exceptions\AuthException;
@@ -22,11 +23,20 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Spatie\Permission\PermissionRegistrar;
 
 it('rolls back configured RBAC storage when synchronization fails midway', function (string $operation): void {
-    config(['database.connections.rbac_custom' => config('database.connections.sqlite')]);
+    config(['database.connections.rbac_custom' => [
+        'driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '', 'foreign_key_constraints' => true,
+    ]]);
     $connection = DB::connection('rbac_custom');
-    $connection->getPdo()->exec(DB::connection()->getPdo()->query("SELECT sql FROM sqlite_master WHERE name = 'nvl_auth_roles'")->fetchColumn());
-    $connection->getPdo()->exec(DB::connection()->getPdo()->query("SELECT sql FROM sqlite_master WHERE name = 'nvl_auth_permissions'")->fetchColumn());
-    $connection->getPdo()->exec(DB::connection()->getPdo()->query("SELECT sql FROM sqlite_master WHERE name = 'nvl_auth_role_has_permissions'")->fetchColumn());
+    expect($connection->getDriverName())->toBe('sqlite')->and($connection->getDatabaseName())->toBe(':memory:');
+    $authConnection = config('nvl-auth.connection');
+    try {
+        config(['nvl-auth.connection' => 'rbac_custom']);
+        /** @var AuthSchemaMigration $migration */
+        $migration = require dirname(__DIR__, 2).'/database/migrations/2026_08_01_000000_nvl_auth_create_nvl_auth_identity_tables.php';
+        $migration->up();
+    } finally {
+        config(['nvl-auth.connection' => $authConnection]);
+    }
     $role = new class extends Role
     {
         protected $connection = 'rbac_custom';
@@ -64,7 +74,9 @@ it('rolls back configured RBAC storage when synchronization fails midway', funct
 })->with(['catalog', 'templates', 'synchronize', 'bootstrap']);
 
 it('rejects split role and permission storage before synchronization writes', function (string $operation): void {
-    config(['database.connections.rbac_custom' => config('database.connections.sqlite')]);
+    config(['database.connections.rbac_custom' => [
+        'driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '', 'foreign_key_constraints' => true,
+    ]]);
     $role = new class extends Role
     {
         protected $connection = 'rbac_custom';

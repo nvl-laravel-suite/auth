@@ -19,6 +19,7 @@ use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\PrincipalSecurityState;
 use Nvl\Auth\Models\RememberCredential;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 /** Serializes native credential mutations on the principal's actual source.
@@ -109,12 +110,12 @@ final readonly class PrincipalSecurity
                 throw AuthException::invalidConfiguration('Managed containment requires one source.');
             }
             $reference = SubjectReference::fromAuthenticatable($subject);
-            $sessions->newQuery()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => now()]);
-            RememberCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+            $sessions->newQuery()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery($sessions->getConnection(), now())]);
+            RememberCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new RememberCredential)->getConnection(), now())]);
         }
         $principal = $this->principal($subject);
         if ($principal->getConnection()->getSchemaBuilder()->hasTable((new Challenge)->getTable())) {
-            $this->challenges(SubjectReference::fromAuthenticatable($principal))->update(['revoked_at' => now(), 'active_key' => null]);
+            $this->challenges(SubjectReference::fromAuthenticatable($principal))->update(['revoked_at' => AuthInstantCast::forQuery((new Challenge)->getConnection(), now()), 'active_key' => null]);
         }
         if ($principal->getRememberTokenName() !== '') {
             $principal->setRememberToken(Str::random(60));

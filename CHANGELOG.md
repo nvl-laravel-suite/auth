@@ -5,6 +5,16 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Align NVL peers and consumer contracts on the coordinated 7.x line. Review [UPGRADING.md](UPGRADING.md) for adoption and application-owned integration requirements.
+
+### Fixed
+
+- Prune retained terminal state in bounded batches with one cutoff, fresh authority and repeated ownership/terminal predicates; explain the default-denied scheduling policy in command help.
+- Reject malformed native credential identifiers with a domain denial and preserve last-method protection when different UUID spellings address the same stored credential.
+- Preserve UTC instants in PostgreSQL timestamp storage and source-aware expiry, retry, lock, and retention predicates, including framework-managed timestamps.
+
 ## [6.1.0] - 2026-10-23
 
 <!-- NVL GENERATED CHANGES START -->

@@ -14,8 +14,8 @@ use Nvl\Auth\Services\AuthInvitations;
  */
 function authOutcomeConcurrencySkipReason(): ?string
 {
-    if (! in_array(DB::connection()->getDriverName(), ['mysql', 'pgsql'], true)) {
-        return 'The process concurrency gate runs in the PostgreSQL/MySQL matrix.';
+    if (! in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb', 'pgsql'], true)) {
+        return 'The process concurrency gate runs in the PostgreSQL/MySQL/MariaDB matrix.';
     }
 
     if (! function_exists('pcntl_exec')
@@ -70,6 +70,12 @@ function authOutcomeRunWorkers(string $connectionName, array $workers): array
     if (! is_array($connectionConfig)) {
         throw new RuntimeException('The Auth concurrency database configuration is unavailable.');
     }
+    $driver = DB::connection($connectionName)->getDriverName();
+    $pdoDriver = $driver === 'mariadb' ? 'mysql' : $driver;
+    if (! in_array($driver, ['mysql', 'mariadb', 'pgsql'], true)
+        || DB::connection($connectionName)->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME) !== $pdoDriver) {
+        throw new RuntimeException('The Auth concurrency source requires a supported native PDO driver.');
+    }
 
     $gate = tempnam(sys_get_temp_dir(), 'auth-outcome-gate-');
     $readyFiles = [];
@@ -112,6 +118,12 @@ function authOutcomeRunWorkers(string $connectionName, array $workers): array
                 );
                 config()->set('nvl-auth.connection', $workerConnectionName);
                 DB::purge($workerConnectionName);
+                $connection = DB::connection($workerConnectionName);
+                if ($connection->getDriverName() !== $driver || $connection->transactionLevel() !== 0
+                    || $connection->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME) !== $pdoDriver) {
+                    throw new RuntimeException('An Auth outcome worker did not select an independent committed native source.');
+                }
+                $connectionId = $connection->scalar($driver === 'pgsql' ? 'SELECT pg_backend_pid()' : 'SELECT CONNECTION_ID()');
                 file_put_contents($readyFiles[$workerIndex], 'ready');
                 $deadline = microtime(true) + 10;
 
@@ -123,7 +135,7 @@ function authOutcomeRunWorkers(string $connectionName, array $workers): array
                     usleep(10_000);
                 }
 
-                $result = ['ok' => true, ...$worker()];
+                $result = ['ok' => true, 'driver' => $driver, 'pdo_driver' => $pdoDriver, 'process_id' => getmypid(), 'connection_id' => $connectionId, ...$worker()];
             } catch (Throwable $exception) {
                 $result = [
                     'ok' => false,
@@ -237,6 +249,10 @@ it('records one result when duplicate delivery outcomes race', function (): void
             $results,
             static fn (array $result): bool => $result['ok'] !== true,
         ))->toBe([])
+            ->and(array_column($results, 'driver'))->toBe(array_fill(0, 2, $connection->getDriverName()))
+            ->and(array_column($results, 'pdo_driver'))->toBe(array_fill(0, 2, $connection->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME)))
+            ->and(array_unique(array_column($results, 'process_id')))->toHaveCount(2)
+            ->and(array_unique(array_column($results, 'connection_id')))->toHaveCount(2)
             ->and($connection->table(AuthTables::Invitations)
                 ->where('id', $invitationId)
                 ->value('delivery_status'))->toBe(InvitationDeliveryStatus::Failed->value)
@@ -260,5 +276,5 @@ it('records one result when duplicate delivery outcomes race', function (): void
     }
 })->skip(
     fn (): bool => authOutcomeConcurrencySkipReason() !== null,
-    'The process concurrency gate requires PostgreSQL/MySQL and pcntl.',
+    'The process concurrency gate requires PostgreSQL/MySQL/MariaDB and pcntl.',
 );

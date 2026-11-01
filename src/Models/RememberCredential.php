@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\RememberCredentialFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Support\AuthInstantCast;
 
 /** Per-device, one-use remember credential; no plaintext secret or cookie is retained.
  * @property string $selector
@@ -46,6 +47,6 @@ final class RememberCredential extends AuthModel
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['security_revision' => 'integer', 'absolute_expires_at' => 'immutable_datetime', 'consumed_at' => 'immutable_datetime', 'revoked_at' => 'immutable_datetime'];
+        return ['security_revision' => 'integer', 'absolute_expires_at' => AuthInstantCast::class, 'consumed_at' => AuthInstantCast::class, 'revoked_at' => AuthInstantCast::class];
     }
 }

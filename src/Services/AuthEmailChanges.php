@@ -24,6 +24,7 @@ use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\PendingEmailChange;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Pipelines\AuthPipeline;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
@@ -58,7 +59,7 @@ final readonly class AuthEmailChanges
                 if (PrincipalEmailIdentity::normalize($fresh->getEmailForVerification()) === $newEmail) {
                     throw new AuthException('email_change_unavailable', 'The email change is unavailable.', 422);
                 }
-                PendingEmailChange::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNotNull('active_key')->update(['revoked_at' => now(), 'active_key' => null]);
+                PendingEmailChange::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNotNull('active_key')->update(['revoked_at' => AuthInstantCast::forQuery((new PendingEmailChange)->getConnection(), now()), 'active_key' => null]);
                 $secret = bin2hex(random_bytes(32));
                 $expiry = CarbonImmutable::now('UTC')->addMinutes(60);
                 $pending = PendingEmailChange::query()->create(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'new_email' => $newEmail, 'email_hash' => $this->hasher->hash('pending-email-identity', $newEmail), 'token_hash' => $this->hasher->hash('pending-email-proof', $secret), 'security_revision' => $revision, 'active_key' => $this->hasher->hash('pending-email-active', $reference->type."\0".$reference->identifier), 'context' => ['guard' => $context->guardName, 'binding' => $this->hasher->hash('pending-email-browser', (string) $context->sessionBinding)], 'expires_at' => $expiry]);

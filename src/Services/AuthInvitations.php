@@ -27,6 +27,7 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Pipelines\AuthPipeline;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
@@ -119,7 +120,7 @@ final readonly class AuthInvitations
             $connection = (new Invitation)->getConnectionName();
             try {
                 return DB::connection($connection)->transaction(function () use ($actor, $activeKey, $actorReference, $data, $context, $connection, $recipient, $recipientHash, $grants, $ownership): array {
-                    $this->boundary->query(Invitation::query(), 'auth.invitations')->where('active_key', $activeKey)->where('expires_at', '<=', CarbonImmutable::now('UTC'))->update(['active_key' => null]);
+                    $this->boundary->query(Invitation::query(), 'auth.invitations')->where('active_key', $activeKey)->where('expires_at', '<=', AuthInstantCast::forQuery((new Invitation)->getConnection(), CarbonImmutable::now('UTC')))->update(['active_key' => null]);
                     $duplicate = $this->boundary->query(Invitation::query(), 'auth.invitations')->where('active_key', $activeKey)->exists();
                     if ($duplicate) {
                         throw $this->createDuplicateInvitation();
@@ -177,7 +178,7 @@ final readonly class AuthInvitations
             throw new InvalidArgumentException('Invitation contexts must contain between one and 191 characters.');
         }
         $filters = $this->validateInvitationIndexQuery(['types' => $types]);
-        $invitation = $this->boundary->query(Invitation::query(), 'auth.invitations')->where('recipient_hash', $this->hasher->hash('invitation-recipient', $recipient))->where('purpose', $purpose)->whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '>', CarbonImmutable::now('UTC'))->when($filters['types'] !== null, fn ($query) => $query->whereIn('type', $filters['types']))->when($context !== null, fn ($query) => $query->where('context_hash', $this->hasher->hash('invitation-context', (string) $context)))->latest('created_at')->orderByDesc('id')->first();
+        $invitation = $this->boundary->query(Invitation::query(), 'auth.invitations')->where('recipient_hash', $this->hasher->hash('invitation-recipient', $recipient))->where('purpose', $purpose)->whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '>', AuthInstantCast::forQuery((new Invitation)->getConnection(), CarbonImmutable::now('UTC')))->when($filters['types'] !== null, fn ($query) => $query->whereIn('type', $filters['types']))->when($context !== null, fn ($query) => $query->where('context_hash', $this->hasher->hash('invitation-context', (string) $context)))->latest('created_at')->orderByDesc('id')->first();
         if (! $invitation instanceof Invitation) {
             return null;
         }
@@ -196,12 +197,12 @@ final readonly class AuthInvitations
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Read);
         $filters = $this->validateInvitationIndexQuery($filters);
         $this->authorization->authorize($actor, 'nvl.auth.invitations.viewAny');
-        $query = $this->boundary->query(Invitation::query(), 'auth.invitations')->when($filters['recipient'] !== null, fn ($query) => $query->where('recipient_hash', $this->hasher->hash('invitation-recipient', PrincipalEmailIdentity::normalize((string) $filters['recipient']))))->when($filters['type'] !== null, fn ($query) => $query->where('type', $filters['type']))->when($filters['types'] !== null, fn ($query) => $query->whereIn('type', $filters['types']))->when($filters['purpose'] !== null, fn ($query) => $query->where('purpose', $filters['purpose']))->when($filters['expiresAfter'] !== null, fn ($query) => $query->where('expires_at', '>=', CarbonImmutable::parse($filters['expiresAfter'])->utc()))->when($filters['expiresBefore'] !== null, fn ($query) => $query->where('expires_at', '<=', CarbonImmutable::parse($filters['expiresBefore'])->utc()))->when($filters['context'] !== null, fn ($query) => $query->where('context_hash', $this->hasher->hash('invitation-context', trim((string) $filters['context']))));
+        $query = $this->boundary->query(Invitation::query(), 'auth.invitations')->when($filters['recipient'] !== null, fn ($query) => $query->where('recipient_hash', $this->hasher->hash('invitation-recipient', PrincipalEmailIdentity::normalize((string) $filters['recipient']))))->when($filters['type'] !== null, fn ($query) => $query->where('type', $filters['type']))->when($filters['types'] !== null, fn ($query) => $query->whereIn('type', $filters['types']))->when($filters['purpose'] !== null, fn ($query) => $query->where('purpose', $filters['purpose']))->when($filters['expiresAfter'] !== null, fn ($query) => $query->where('expires_at', '>=', AuthInstantCast::forQuery((new Invitation)->getConnection(), CarbonImmutable::parse($filters['expiresAfter'])->utc())))->when($filters['expiresBefore'] !== null, fn ($query) => $query->where('expires_at', '<=', AuthInstantCast::forQuery((new Invitation)->getConnection(), CarbonImmutable::parse($filters['expiresBefore'])->utc())))->when($filters['context'] !== null, fn ($query) => $query->where('context_hash', $this->hasher->hash('invitation-context', trim((string) $filters['context']))));
         match ($filters['lifecycle']) {
-            'active' => $query->whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '>', CarbonImmutable::now('UTC')),
+            'active' => $query->whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '>', AuthInstantCast::forQuery((new Invitation)->getConnection(), CarbonImmutable::now('UTC'))),
             'accepted' => $query->whereNotNull('accepted_at'),
             'revoked' => $query->whereNotNull('revoked_at'),
-            'expired' => $query->whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '<=', CarbonImmutable::now('UTC')),
+            'expired' => $query->whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '<=', AuthInstantCast::forQuery((new Invitation)->getConnection(), CarbonImmutable::now('UTC'))),
             default => null,
         };
 

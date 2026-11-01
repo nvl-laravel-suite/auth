@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +22,7 @@ use Nvl\Auth\Tests\Fixtures\ExtensionPrincipal;
 use Nvl\Auth\Tests\Fixtures\TestPrincipalExtensionMapper;
 
 beforeEach(function (): void {
+    expect(DB::transactionLevel())->toBe(0);
     Schema::table(AuthTables::Users, function (Blueprint $table): void {
         $table->string('job_title')->nullable();
         $table->string('phone')->nullable();

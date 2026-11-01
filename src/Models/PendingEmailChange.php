@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\PendingEmailChangeFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Support\AuthInstantCast;
 
 /** One-use replacement mailbox proof, separate from the principal's live identity.
  * @property string $subject_type
@@ -45,6 +46,6 @@ final class PendingEmailChange extends AuthModel
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['new_email' => 'encrypted', 'context' => 'encrypted:array', 'security_revision' => 'integer', 'expires_at' => 'immutable_datetime', 'consumed_at' => 'immutable_datetime', 'revoked_at' => 'immutable_datetime'];
+        return ['new_email' => 'encrypted', 'context' => 'encrypted:array', 'security_revision' => 'integer', 'expires_at' => AuthInstantCast::class, 'consumed_at' => AuthInstantCast::class, 'revoked_at' => AuthInstantCast::class];
     }
 }

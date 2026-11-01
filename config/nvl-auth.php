@@ -235,7 +235,7 @@ return [
             'settings' => ['abilities' => [], 'namespace' => 'nvl-auth'],
         ],
         'rbac' => [
-            'enabled' => env('NVL_AUTH_RBAC_ENABLED', true),
+            'enabled' => env('NVL_AUTH_RBAC_ENABLED', false),
 
             'models' => [
                 'role' => Role::class,
@@ -297,6 +297,7 @@ return [
 
     'cleanup' => [
         'retention_days' => env('NVL_AUTH_RETENTION_DAYS', 30),
+        'batch_size' => 250,
     ],
 
     /*

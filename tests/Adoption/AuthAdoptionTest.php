@@ -18,7 +18,8 @@ use Spatie\Permission\PermissionRegistrar;
 it('preserves complete host auth and permission configuration on default installation', function (): void {
     expect(config('auth'))->toBe($this->hostAuth)
         ->and(config('permission'))->toBe($this->hostPermission)
-        ->and(config('nvl-auth.routes.enabled'))->toBeNull();
+        ->and(config('nvl-auth.routes.enabled'))->toBeNull()
+        ->and(config('nvl-auth.features.rbac.enabled'))->toBeFalse();
 });
 
 it('leaves principal and password broker configuration owned by the consumer', function (): void {

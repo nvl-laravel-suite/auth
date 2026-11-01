@@ -23,6 +23,8 @@ use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Services\PrincipalCreationGuard;
 use Nvl\Auth\Services\PrincipalEmailIdentity;
+use Nvl\Auth\Support\AuthInstantCast;
+use Nvl\Auth\Traits\SerializesAuthTimestamps;
 use Nvl\Support\Config\PackageStorage;
 
 /**
@@ -115,6 +117,7 @@ class User extends Authenticatable implements CanResetPasswordContract, HasLocal
     use HasUuids;
     use MustVerifyEmail;
     use Notifiable;
+    use SerializesAuthTimestamps;
     use SoftDeletes;
 
     public const TABLE = AuthTables::Users;
@@ -342,7 +345,7 @@ class User extends Authenticatable implements CanResetPasswordContract, HasLocal
             ->where($this->principalColumn(PrincipalAttribute::Active), true)
             ->where(function (Builder $locks): void {
                 $lockedUntil = $this->principalColumn(PrincipalAttribute::LockedUntil);
-                $locks->whereNull($lockedUntil)->orWhere($lockedUntil, '<=', now());
+                $locks->whereNull($lockedUntil)->orWhere($lockedUntil, '<=', AuthInstantCast::forQuery($locks->getModel()->getConnection(), now()));
             });
     }
 
@@ -406,6 +409,27 @@ class User extends Authenticatable implements CanResetPasswordContract, HasLocal
         return $this->morphMany(AuthAudit::class, 'actor');
     }
 
+    /** Persist raw soft-delete columns through their native casts, retaining Laravel's events and originals. */
+    protected function runSoftDelete(): void
+    {
+        $query = $this->newModelQuery()->getQuery()
+            ->where($this->getKeyName(), $this->getKeyForSaveQuery());
+        $time = $this->freshTimestamp();
+        $deleted = $this->getDeletedAtColumn();
+        $this->{$deleted} = $time;
+        $columns = [$deleted => $this->getAttributes()[$deleted]];
+
+        $updated = $this->getUpdatedAtColumn();
+        if ($this->usesTimestamps() && $updated !== null) {
+            $this->{$updated} = $time;
+            $columns[$updated] = $this->getAttributes()[$updated];
+        }
+
+        $query->update($columns);
+        $this->syncOriginalAttributes(array_keys($columns));
+        $this->fireModelEvent('trashed', false);
+    }
+
     /**
      * Define principal casts.
      *
@@ -414,15 +438,17 @@ class User extends Authenticatable implements CanResetPasswordContract, HasLocal
     protected function casts(): array
     {
         return [
-            $this->principalColumn(PrincipalAttribute::EmailVerifiedAt) => 'immutable_datetime',
+            $this->principalColumn(PrincipalAttribute::CreatedAt) => AuthInstantCast::class,
+            $this->principalColumn(PrincipalAttribute::UpdatedAt) => AuthInstantCast::class,
+            $this->principalColumn(PrincipalAttribute::EmailVerifiedAt) => AuthInstantCast::class,
             $this->principalColumn(PrincipalAttribute::Password) => 'hashed',
             $this->principalColumn(PrincipalAttribute::Active) => 'boolean',
             $this->principalColumn(PrincipalAttribute::Profile) => 'array',
             $this->principalColumn(PrincipalAttribute::Preferences) => 'array',
-            $this->principalColumn(PrincipalAttribute::LastLoginAt) => 'immutable_datetime',
+            $this->principalColumn(PrincipalAttribute::LastLoginAt) => AuthInstantCast::class,
             $this->principalColumn(PrincipalAttribute::LastLoginIp) => 'encrypted',
-            $this->principalColumn(PrincipalAttribute::LockedUntil) => 'immutable_datetime',
-            $this->principalColumn(PrincipalAttribute::DeletedAt) => 'immutable_datetime',
+            $this->principalColumn(PrincipalAttribute::LockedUntil) => AuthInstantCast::class,
+            $this->principalColumn(PrincipalAttribute::DeletedAt) => AuthInstantCast::class,
         ];
     }
 

@@ -140,6 +140,7 @@
             "advanced": [
                 "adoption.maximum_manifest_bytes",
                 "adoption.maximum_records",
+                "cleanup.batch_size",
                 "cleanup.retention_days",
                 "features.authentication.settings.owner_intent_ttl_minutes",
                 "features.email_verification.settings.ttl_minutes",

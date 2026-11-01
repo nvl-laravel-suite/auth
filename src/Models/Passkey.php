@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Nvl\Auth\Database\Factories\PasskeyFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Support\AuthInstantCast;
 
 /**
  * Stores verified WebAuthn credential material for a host subject.
@@ -75,8 +76,8 @@ final class Passkey extends AuthModel
             'transports' => 'array',
             'backup_eligible' => 'boolean',
             'backed_up' => 'boolean',
-            'last_used_at' => 'immutable_datetime',
-            'revoked_at' => 'immutable_datetime',
+            'last_used_at' => AuthInstantCast::class,
+            'revoked_at' => AuthInstantCast::class,
         ];
     }
 

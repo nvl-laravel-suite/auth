@@ -72,6 +72,7 @@ abstract class AuthTestCase extends Orchestra
         $app['config']->set('nvl-auth.features.principal_management.models.user', TestUser::class);
 
         $app['config']->set('nvl-auth.migrations.install_all', true);
+        $app['config']->set('nvl-auth.features.rbac.enabled', true);
         $app['config']->set('nvl-auth.features.api_tokens.enabled', true);
         $app['config']->set('nvl-auth.features.api_tokens.settings.abilities', ['profile:read']);
         $app['config']->set('nvl-auth.routes', (require __DIR__.'/Fixtures/Consumer/config.php')['routes']);

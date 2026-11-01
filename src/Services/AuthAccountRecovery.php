@@ -21,6 +21,7 @@ use Nvl\Auth\Models\RecoveryCode;
 use Nvl\Auth\Models\SocialIdentity;
 use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Models\User;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Support\Auth\CanonicalActorResolver;
@@ -86,7 +87,7 @@ final readonly class AuthAccountRecovery
                     throw AuthException::invalidConfiguration('Recovery codes require one source.');
                 }
                 if ($codes->getConnection()->getSchemaBuilder()->hasTable($codes->getTable())) {
-                    RecoveryCode::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+                    RecoveryCode::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new RecoveryCode)->getConnection(), now())]);
                 }
             }
             $state = $this->inventory->state($user);

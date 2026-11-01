@@ -5,11 +5,19 @@ declare(strict_types=1);
 namespace Nvl\Auth\Tests;
 
 use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Nvl\Auth\Tests\Fixtures\Consumer\RouteServiceProvider;
 
 /** Boots enabled Auth services while retaining a complete host integration snapshot. */
 abstract class HostAuthAdoptionTestCase extends DisabledAuthProviderTestCase
 {
     use DatabaseMigrations;
+
+    /** Exercise native package adoption without the consumer-owned HTTP fixture. */
+    protected function getPackageProviders($app): array
+    {
+        return array_values(array_filter(parent::getPackageProviders($app),
+            static fn (string $provider): bool => $provider !== RouteServiceProvider::class));
+    }
 
     /** @var array<string, mixed> */
     public array $hostAuth = [];

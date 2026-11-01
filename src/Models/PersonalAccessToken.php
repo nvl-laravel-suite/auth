@@ -10,7 +10,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 use Nvl\Auth\Database\Factories\PersonalAccessTokenFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\Traits\HasAuthOwnership;
+use Nvl\Auth\Traits\SerializesAuthTimestamps;
 use Nvl\Support\Config\PackageStorage;
 use Nvl\Support\Ownership\Contracts\Ownable;
 
@@ -40,6 +42,7 @@ class PersonalAccessToken extends SanctumPersonalAccessToken implements Ownable
     use HasFactory;
 
     use HasUuids;
+    use SerializesAuthTimestamps;
 
     public const TABLE = AuthTables::PersonalAccessTokens;
 
@@ -50,6 +53,17 @@ class PersonalAccessToken extends SanctumPersonalAccessToken implements Ownable
     protected $fillable = [
         'name', 'token', 'abilities', 'expires_at',
     ];
+
+    /** @return array<string, class-string<AuthInstantCast>> */
+    protected function casts(): array
+    {
+        return [
+            'created_at' => AuthInstantCast::class,
+            'updated_at' => AuthInstantCast::class,
+            'last_used_at' => AuthInstantCast::class,
+            'expires_at' => AuthInstantCast::class,
+        ];
+    }
 
     /**
      * Resolve the configured package token table.

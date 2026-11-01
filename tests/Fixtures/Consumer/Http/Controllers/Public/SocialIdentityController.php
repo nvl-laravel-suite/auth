@@ -19,12 +19,12 @@ use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 /** Host-owned Socialite redirect, state and callback transport. */
 final class SocialIdentityController
 {
-    public function redirect(string $provider, Request $request, AuthSocialAuthentication $social, OwnerAuthenticationIntents $intents, AuthenticationSessions $sessions): JsonResponse
+    public function redirect(string $provider, Request $request, AuthSocialAuthentication $social, AuthenticationSessions $sessions): JsonResponse
     {
         $sessions->assertCanTransition();
         $owner = $request->attributes->get('owner');
         $returnPath = $request->query('return_path');
-        $issued = $owner instanceof OwnerReference ? $intents->issue($owner, OwnerAuthenticationPurpose::SocialLogin, $request->session()->getId(), provider: $provider, returnPath: is_string($returnPath) ? $returnPath : null) : null;
+        $issued = $owner instanceof OwnerReference ? app(OwnerAuthenticationIntents::class)->issue($owner, OwnerAuthenticationPurpose::SocialLogin, $request->session()->getId(), provider: $provider, returnPath: is_string($returnPath) ? $returnPath : null) : null;
         $context = new AuthenticationRequestContext(ownerIntentNonce: $issued['nonce'] ?? null, ownerSessionBinding: $request->session()->getId(), requestedOwner: $owner instanceof OwnerReference ? $owner : null, ownerPurpose: OwnerAuthenticationPurpose::SocialLogin, ownerProvider: $provider, guardName: config('nvl-auth.authorization.guard', 'web'), sessionBinding: $request->session()->getId());
         $started = $social->beginLogin($provider, $context);
         $url = $started['url'];

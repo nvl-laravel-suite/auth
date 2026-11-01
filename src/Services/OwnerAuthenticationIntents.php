@@ -10,6 +10,7 @@ use InvalidArgumentException;
 use Nvl\Auth\Enums\OwnerAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\OwnerAuthenticationIntent;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Ownership\Contracts\OwnerAvailability;
 use Nvl\Ownership\Services\OwnerIdentityResolver;
@@ -79,7 +80,8 @@ final readonly class OwnerAuthenticationIntents
                 || ! is_array($payload) || ($payload['provider'] ?? null) !== $provider || ($payload['generations'] ?? null) !== $this->installation->generations()) {
                 throw $this->invalid();
             }
-            if ($query->whereNull('consumed_at')->update(['consumed_at' => CarbonImmutable::now('UTC'), 'updated_at' => CarbonImmutable::now('UTC')]) !== 1) {
+            $now = AuthInstantCast::forQuery($model->getConnection(), CarbonImmutable::now('UTC'));
+            if ($query->whereNull('consumed_at')->update(['consumed_at' => $now, 'updated_at' => $now]) !== 1) {
                 throw $this->invalid();
             }
 

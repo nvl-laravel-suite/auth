@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
@@ -165,6 +167,8 @@ it('uses the configured auth guard for totp state without falling back to a diff
     auth()->shouldUse('web');
     $response = $this->getJson('/nvl/api/v1/auth/totp');
     if ($requiresWeb) {
+        $route = app(Router::class)->getRoutes()->match(Request::create('/nvl/api/v1/auth/totp'));
+        expect(app(Router::class)->gatherRouteMiddleware($route))->toContain(Authenticate::class.':web');
         $response->assertUnauthorized();
     } else {
         $response->assertOk()->assertJsonPath('data.confirmedCredentials', 1);

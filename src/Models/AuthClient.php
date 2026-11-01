@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Nvl\Auth\Database\Factories\AuthClientFactory;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Support\AuthInstantCast;
 
 /**
  * Represents one package-managed first-party authentication client.
@@ -63,7 +64,7 @@ final class AuthClient extends AuthModel
             'allowed_flows' => 'array',
             'metadata' => 'array',
             'is_active' => 'boolean',
-            'last_used_at' => 'immutable_datetime',
+            'last_used_at' => AuthInstantCast::class,
         ];
     }
 

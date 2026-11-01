@@ -170,13 +170,19 @@ final class RouteServiceProvider extends ServiceProvider
                 $definition->dependenciesForSurface($surface),
             ),
         ];
+        $routeMiddleware = [
+            ...$this->middleware($configuration->get('routes.middleware', ['api'])),
+            ...$this->middleware($configuration->get("routes.{$surface}.middleware", [])),
+        ];
+        if ($surface === 'account' && $family === 'totp') {
+            $routeMiddleware = array_map(static fn (string $middleware): string => $middleware === 'auth' ? 'nvl.auth.guard' : $middleware, $routeMiddleware);
+        }
         Route::name("{$surface}.")
             ->middleware([
                 ApplyAuthSecurityHeaders::class,
                 RenderAuthExceptions::class,
                 ...$featureMiddleware,
-                ...$this->middleware($configuration->get('routes.middleware', ['api'])),
-                ...$this->middleware($configuration->get("routes.{$surface}.middleware", [])),
+                ...$routeMiddleware,
             ])
             ->group($path);
     }

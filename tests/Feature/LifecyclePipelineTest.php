@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use Nvl\Auth\Contracts\AuthPipelineStage;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Services\AuthRegistration;
+use Nvl\Auth\Tests\Fixtures\LifecycleTestStage;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 
 function lifecycleStage(string $pipeline, Closure $callback): void
@@ -14,16 +14,6 @@ function lifecycleStage(string $pipeline, Closure $callback): void
     $stage = new LifecycleTestStage($callback);
     app()->instance($stage::class, $stage);
     config()->set('nvl-auth.pipelines.'.$pipeline, [$stage::class]);
-}
-
-final class LifecycleTestStage implements AuthPipelineStage
-{
-    public function __construct(private Closure $callback) {}
-
-    public function handle(AuthPipelineContext $context, Closure $next): mixed
-    {
-        return ($this->callback)($context, $next);
-    }
 }
 
 it('rejects substituted and in-place changed terminal model identities', function (string $mutation): void {
