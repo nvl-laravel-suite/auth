@@ -1372,7 +1372,9 @@ public const mixed TABLE=\Nvl\Auth\Definitions\Tables\AuthTables::Audits
 public function client(): Illuminate\Database\Eloquent\Relations\BelongsTo
 @return BelongsTo<AuthClient, $this>
 resolved @return Illuminate\Database\Eloquent\Relations\BelongsTo<Nvl\Auth\Models\AuthClient, $this>
-public function delete(): ?bool
+public function delete(): mixed
+@return ($this is Pivot ? (bool | int | null) : (bool | null))
+resolved @return ($this is Illuminate\Database\Eloquent\Relations\Pivot ? (bool | int | null) : (bool | null))
 public function fresh(mixed $with=[]): ?static
 @param (array<array-key, mixed> | string) $with
 public function getConnectionName(): ?string
@@ -1506,7 +1508,9 @@ resolved @property (Carbon\CarbonImmutable | null) $updated_at
 #[Illuminate\Database\Eloquent\Attributes\UseFactory(\Nvl\Auth\Database\Factories\ChallengeFactory::class)]
 final class Nvl\Auth\Models\Challenge extends Nvl\Auth\Models\AuthModel implements Nvl\Support\Ownership\Contracts\Ownable
 public const mixed TABLE=\Nvl\Auth\Definitions\Tables\AuthTables::Challenges
-public function delete(): ?bool
+public function delete(): mixed
+@return ($this is Pivot ? (bool | int | null) : (bool | null))
+resolved @return ($this is Illuminate\Database\Eloquent\Relations\Pivot ? (bool | int | null) : (bool | null))
 public function fresh(mixed $with=[]): ?static
 @param (array<array-key, mixed> | string) $with
 public function getConnectionName(): ?string
@@ -1585,7 +1589,9 @@ resolved @property (Carbon\CarbonImmutable | null) $updated_at
 #[Illuminate\Database\Eloquent\Attributes\UseFactory(\Nvl\Auth\Database\Factories\InvitationFactory::class)]
 final class Nvl\Auth\Models\Invitation extends Nvl\Auth\Models\AuthModel implements Nvl\Support\Ownership\Contracts\Ownable
 public const mixed TABLE=\Nvl\Auth\Definitions\Tables\AuthTables::Invitations
-public function delete(): ?bool
+public function delete(): mixed
+@return ($this is Pivot ? (bool | int | null) : (bool | null))
+resolved @return ($this is Illuminate\Database\Eloquent\Relations\Pivot ? (bool | int | null) : (bool | null))
 public function fresh(mixed $with=[]): ?static
 @param (array<array-key, mixed> | string) $with
 public function getConnectionName(): ?string
@@ -1665,7 +1671,9 @@ resolved @property (Carbon\CarbonImmutable | null) $updated_at
 
 ```text
 class Nvl\Auth\Models\OwnerMembership extends Nvl\Auth\Models\Membership implements Nvl\Support\Ownership\Contracts\Ownable
-public function delete(): ?bool
+public function delete(): mixed
+@return ($this is Pivot ? (bool | int | null) : (bool | null))
+resolved @return ($this is Illuminate\Database\Eloquent\Relations\Pivot ? (bool | int | null) : (bool | null))
 public function fresh(mixed $with=[]): ?static
 @param (array<array-key, mixed> | string) $with
 public function getConnectionName(): ?string
@@ -1782,7 +1790,9 @@ resolved @return Illuminate\Database\Eloquent\Relations\BelongsToMany<covariant 
 #[Illuminate\Database\Eloquent\Attributes\UseFactory(\Nvl\Auth\Database\Factories\PersonalAccessTokenFactory::class)]
 class Nvl\Auth\Models\PersonalAccessToken extends Laravel\Sanctum\PersonalAccessToken implements Nvl\Support\Ownership\Contracts\Ownable
 public const mixed TABLE=\Nvl\Auth\Definitions\Tables\AuthTables::PersonalAccessTokens
-public function delete(): ?bool
+public function delete(): mixed
+@return ($this is Pivot ? (bool | int | null) : (bool | null))
+resolved @return ($this is Illuminate\Database\Eloquent\Relations\Pivot ? (bool | int | null) : (bool | null))
 public function fresh(mixed $with=[]): ?static
 @param (array<array-key, mixed> | string) $with
 public function getConnectionName(): ?string
@@ -1867,7 +1877,9 @@ public const mixed TABLE=\Nvl\Auth\Definitions\Tables\AuthTables::Roles
 public function children(): Illuminate\Database\Eloquent\Relations\HasMany
 @return HasMany<static, $this>
 resolved @return Illuminate\Database\Eloquent\Relations\HasMany<Nvl\Auth\Models\Role, $this>
-public function delete(): ?bool
+public function delete(): mixed
+@return ($this is Pivot ? (bool | int | null) : (bool | null))
+resolved @return ($this is Illuminate\Database\Eloquent\Relations\Pivot ? (bool | int | null) : (bool | null))
 public function fresh(mixed $with=[]): ?static
 @param (array<array-key, mixed> | string) $with
 public function getConnectionName(): ?string
