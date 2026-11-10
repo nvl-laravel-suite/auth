@@ -5,9 +5,17 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [Unreleased]
 
+## [7.0.2] - 2026-11-10
+
 ### Changed
 
 - Remove the obsolete Spatie Laravel Data development dependency. Authentication test adapters now use native Laravel validation and explicit consumer projections while retaining the optional authentication integrations.
+
+<!-- NVL GENERATED CHANGES START -->
+### Changed
+
+- retire Spatie Data test dependency
+<!-- NVL GENERATED CHANGES END -->
 
 ## [7.0.1] - 2026-11-09
 
