@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Account;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Nvl\Auth\Services\AuthTokens;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\ApiTokenData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\AuthRequestInput;
 
 /**
  * Handles Sanctum-backed personal API token transport.
@@ -27,9 +30,14 @@ final class ApiTokenController extends AuthenticatedController
     /**
      * Issue one provider token.
      */
-    public function store(ApiTokenData $data, Request $request, AuthTokens $action): JsonResponse
+    public function store(Request $request, AuthTokens $action): JsonResponse
     {
-        $issued = $action->create($this->subject($request), get_object_vars($data));
+        $data = array_replace(['expiresAt' => null], Validator::make(AuthRequestInput::aliased($request->all(), ['expiresAt' => ['expires_at']]), ApiTokenData::rules())->validate());
+        if (is_string($data['expiresAt'] ?? null)) {
+            $data['expiresAt'] = CarbonImmutable::parse($data['expiresAt']);
+        }
+
+        $issued = $action->create($this->subject($request), $data);
 
         return response()->json(['data' => [...$this->snapshot($issued->token), 'plain_text_token' => $issued->plainTextToken], 'code' => 'api_token_issued', 'message' => trans('nvl-auth::responsecode.api_token_issued')], 201);
     }
@@ -37,9 +45,14 @@ final class ApiTokenController extends AuthenticatedController
     /**
      * Update one provider token.
      */
-    public function update(ApiTokenData $data, Request $request, string $tokenId, AuthTokens $action): JsonResponse
+    public function update(Request $request, string $tokenId, AuthTokens $action): JsonResponse
     {
-        $token = $action->update($this->subject($request), $tokenId, get_object_vars($data));
+        $data = array_replace(['expiresAt' => null], Validator::make(AuthRequestInput::aliased($request->all(), ['expiresAt' => ['expires_at']]), ApiTokenData::rules())->validate());
+        if (is_string($data['expiresAt'] ?? null)) {
+            $data['expiresAt'] = CarbonImmutable::parse($data['expiresAt']);
+        }
+
+        $token = $action->update($this->subject($request), $tokenId, $data);
 
         return response()->json(['data' => $this->snapshot($token), 'code' => 'api_token_updated', 'message' => trans('nvl-auth::responsecode.api_token_updated')]);
     }
@@ -47,9 +60,14 @@ final class ApiTokenController extends AuthenticatedController
     /**
      * Rotate one provider token.
      */
-    public function rotate(ApiTokenData $data, Request $request, string $tokenId, AuthTokens $action): JsonResponse
+    public function rotate(Request $request, string $tokenId, AuthTokens $action): JsonResponse
     {
-        $issued = $action->rotate($this->subject($request), $tokenId, get_object_vars($data));
+        $data = array_replace(['expiresAt' => null], Validator::make(AuthRequestInput::aliased($request->all(), ['expiresAt' => ['expires_at']]), ApiTokenData::rules())->validate());
+        if (is_string($data['expiresAt'] ?? null)) {
+            $data['expiresAt'] = CarbonImmutable::parse($data['expiresAt']);
+        }
+
+        $issued = $action->rotate($this->subject($request), $tokenId, $data);
 
         return response()->json(['data' => [...$this->snapshot($issued->token), 'plain_text_token' => $issued->plainTextToken], 'code' => 'api_token_rotated', 'message' => trans('nvl-auth::responsecode.api_token_rotated')]);
     }

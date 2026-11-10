@@ -4,17 +4,15 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Display;
 
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
+use Illuminate\Contracts\Support\Arrayable;
+use JsonSerializable;
 
 /**
  * Consumer-safe result for a role canonical-name availability check.
  *
  * @api
  */
-#[MapOutputName(CamelCaseMapper::class)]
-final class RoleNameAvailabilityData extends Data
+final class RoleNameAvailabilityData implements Arrayable, JsonSerializable
 {
     /**
      * Create a role name availability result.
@@ -24,4 +22,30 @@ final class RoleNameAvailabilityData extends Data
         public readonly bool $available,
         public readonly ?string $conflictingRoleId,
     ) {}
+
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        return [
+            'name' => $this->name,
+            'available' => $this->available,
+            'conflictingRoleId' => $this->conflictingRoleId,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
+    }
+
+    /** @param array<string, mixed> $attributes */
+    public static function from(array $attributes): self
+    {
+        return new self(
+            name: $attributes['name'],
+            available: $attributes['available'],
+            conflictingRoleId: $attributes['conflictingRoleId'],
+        );
+    }
 }

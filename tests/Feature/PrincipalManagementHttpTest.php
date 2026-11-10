@@ -10,8 +10,22 @@ use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest;
 use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Account\ProfileController;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Management\UserController;
 use Nvl\Auth\Tests\Fixtures\Consumer\Http\Middleware\RenderAuthExceptions;
 use Nvl\Auth\Tests\Fixtures\Consumer\RouteServiceProvider;
+use Nvl\Auth\Tests\Fixtures\TestUser;
+
+it('creates a managed principal without a password when the HTTP field is omitted', function (): void {
+    Route::post('/consumer/users', [UserController::class, 'store']);
+    $actor = $this->user('passwordless.manager@example.test');
+
+    $this->actingAs($actor, 'web')->postJson('/consumer/users', [
+        'name' => 'Passwordless principal',
+        'email' => 'passwordless.principal@example.test',
+    ])->assertCreated()->assertJsonPath('code', 'user_created');
+
+    expect(TestUser::query()->where('email', 'passwordless.principal@example.test')->sole()->getAuthPassword())->toBeNull();
+});
 
 it('serves configurable principal profile and RBAC APIs without Inertia', function (): void {
     app()->instance('routes.cached', false);

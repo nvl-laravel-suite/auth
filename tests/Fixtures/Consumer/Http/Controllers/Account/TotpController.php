@@ -6,12 +6,13 @@ namespace Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Account;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Services\AuthSecondFactor;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\ConfirmTotpEnrollmentData;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\StartTotpEnrollmentData;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\VerifyTotpData;
-use Spatie\LaravelData\Optional;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\AuthRequestInput;
 
 /**
  * Handles authenticated TOTP enrollment and lifecycle transport.
@@ -31,9 +32,11 @@ final class TotpController extends AuthenticatedController
     /**
      * Start TOTP enrollment.
      */
-    public function start(StartTotpEnrollmentData $data, Request $request, AuthSecondFactor $action): JsonResponse
+    public function start(Request $request, AuthSecondFactor $action): JsonResponse
     {
-        $result = $action->startEnrollment($this->subject($request), array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional), grant: $this->recentGrant($request), context: $this->authenticationContext($request));
+        $data = array_replace(['name' => null], Validator::make(AuthRequestInput::aliased($request->all(), ['accountName' => ['account_name']]), StartTotpEnrollmentData::rules())->validate());
+
+        $result = $action->startEnrollment($this->subject($request), $data, grant: $this->recentGrant($request), context: $this->authenticationContext($request));
 
         return response()->json([
             'data' => [
@@ -49,12 +52,13 @@ final class TotpController extends AuthenticatedController
      * Confirm TOTP enrollment.
      */
     public function confirm(
-        ConfirmTotpEnrollmentData $data,
         Request $request,
         TotpCredential $credential,
         AuthSecondFactor $action,
     ): JsonResponse {
-        $confirmed = $action->confirmEnrollment($this->subject($request), $credential, array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional), grant: $this->recentGrant($request), context: $this->authenticationContext($request));
+        $data = Validator::make($request->all(), ConfirmTotpEnrollmentData::rules())->validate();
+
+        $confirmed = $action->confirmEnrollment($this->subject($request), $credential, $data, grant: $this->recentGrant($request), context: $this->authenticationContext($request));
 
         return response()->json(['data' => ['credential_id' => $confirmed->identifier()], 'code' => 'totp_enrolled', 'message' => trans('nvl-auth::responsecode.totp_enrolled')]);
     }
@@ -62,9 +66,11 @@ final class TotpController extends AuthenticatedController
     /**
      * Verify a current TOTP proof.
      */
-    public function verify(VerifyTotpData $data, Request $request, AuthSecondFactor $action): JsonResponse
+    public function verify(Request $request, AuthSecondFactor $action): JsonResponse
     {
-        $credential = $action->verify($this->subject($request), array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional));
+        $data = Validator::make($request->all(), VerifyTotpData::rules())->validate();
+
+        $credential = $action->verify($this->subject($request), $data);
 
         return response()->json(['data' => ['credential_id' => $credential->identifier()], 'code' => 'totp_verified', 'message' => trans('nvl-auth::responsecode.totp_verified')]);
     }

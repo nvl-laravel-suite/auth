@@ -11,7 +11,6 @@ use Nvl\Ownership\Tests\Fixtures\NativeDatabaseSource;
 use Nvl\Support\Providers\LocaleServiceProvider;
 use Nvl\Support\Providers\SupportServiceProvider;
 use Orchestra\Testbench\Foundation\Application as TestbenchApplication;
-use Spatie\LaravelData\LaravelDataServiceProvider;
 use Spatie\Permission\PermissionServiceProvider;
 
 require dirname(__DIR__, 6).'/vendor/autoload.php';
@@ -21,7 +20,7 @@ if (! is_array($source) || ! in_array($source['driver'] ?? null, ['pgsql', 'mysq
     throw new RuntimeException('Auth workers require an explicitly dedicated native source.');
 }
 WorkerProvider::useSource($source);
-$application = TestbenchApplication::create(options: ['load_environment_variables' => false, 'extra' => ['dont-discover' => ['*'], 'providers' => [SupportServiceProvider::class, OwnershipServiceProvider::class, LocaleServiceProvider::class, PermissionServiceProvider::class, SanctumServiceProvider::class, LaravelDataServiceProvider::class, AuthServiceProvider::class, WorkerProvider::class]]]);
+$application = TestbenchApplication::create(options: ['load_environment_variables' => false, 'extra' => ['dont-discover' => ['*'], 'providers' => [SupportServiceProvider::class, OwnershipServiceProvider::class, LocaleServiceProvider::class, PermissionServiceProvider::class, SanctumServiceProvider::class, AuthServiceProvider::class, WorkerProvider::class]]]);
 $kernel = $application->make(Kernel::class);
 $kernel->bootstrap();
 NativeDatabaseSource::inspect($application->make('db')->connection());

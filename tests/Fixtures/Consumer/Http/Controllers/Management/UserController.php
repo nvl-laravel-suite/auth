@@ -7,8 +7,10 @@ namespace Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Management;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Validator;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\PrincipalAttribute;
+use Nvl\Auth\Enums\UserBulkOperation;
 use Nvl\Auth\Services\AuthPermissions;
 use Nvl\Auth\Services\AuthRoles;
 use Nvl\Auth\Services\AuthUserReader;
@@ -23,7 +25,6 @@ use Nvl\Auth\Tests\Fixtures\Consumer\Data\Queries\UserIndexQueryData;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Queries\UserSuggestionQueryData;
 use Nvl\Auth\Tests\Fixtures\Consumer\Http\AuthRequestInput;
 use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Account\AuthenticatedController;
-use Spatie\LaravelData\Optional;
 
 /** Handles package-owned principal management API transport. */
 final class UserController extends AuthenticatedController
@@ -31,14 +32,21 @@ final class UserController extends AuthenticatedController
     /** List principals. */
     public function index(Request $request, AuthUserReader $action): JsonResponse
     {
-        $query = UserIndexQueryData::validateAndCreate($request->all());
+        $query = array_replace(['search' => null, 'active' => null, 'trashed' => null, 'role' => null, 'per_page' => null], Validator::make(AuthRequestInput::aliased($request->all(), ['per_page' => ['perPage']]), UserIndexQueryData::rules())->validate());
+        if (isset($query['active'])) {
+            $query['active'] = (bool) $query['active'];
+        }
+        if (isset($query['per_page'])) {
+            $query['per_page'] = (int) $query['per_page'];
+        }
+
         $page = $action->paginate(
             $this->subject($request),
-            $query->search,
-            $query->active,
-            $query->trashed ?? 'without',
-            $query->role,
-            $query->perPage ?? 25,
+            $query['search'],
+            $query['active'],
+            $query['trashed'] ?? 'without',
+            $query['role'],
+            $query['per_page'] ?? 25,
         );
 
         return response()->json(['data' => $page, 'code' => 'users_listed', 'message' => trans('nvl-auth::responsecode.users_listed')]);
@@ -47,29 +55,40 @@ final class UserController extends AuthenticatedController
     /** Return minimal principal suggestions. */
     public function suggestions(Request $request, AuthUserReader $action): JsonResponse
     {
-        $query = UserSuggestionQueryData::validateAndCreate($request->all());
+        $query = array_replace(['limit' => null], Validator::make($request->all(), UserSuggestionQueryData::rules())->validate());
+        if (isset($query['limit'])) {
+            $query['limit'] = (int) $query['limit'];
+        }
 
         return response()->json([
             'data' => $action->suggest(
                 $this->subject($request),
-                $query->search,
-                $query->limit,
+                $query['search'],
+                $query['limit'],
             ),
             'code' => 'user_suggestions_listed', 'message' => trans('nvl-auth::responsecode.user_suggestions_listed'),
         ]);
     }
 
     /** Create a principal. */
-    public function store(StoreUserData $data, Request $request, AuthUsers $action): JsonResponse
+    public function store(Request $request, AuthUsers $action): JsonResponse
     {
-        if (! $request->has('locale')) {
-            $data->locale = Config::string('nvl-auth.features.principal_management.settings.default_locale', 'en');
+        $data = array_replace(['password' => null, 'active' => true, 'locale' => 'en', 'timezone' => 'UTC', 'profile' => [], 'preferences' => [], 'roles' => [], 'permissions' => [], 'emailVerified' => false], Validator::make(AuthRequestInput::aliased($request->all(), ['emailVerified' => ['email_verified']]), StoreUserData::rules())->validate());
+        if (isset($data['active'])) {
+            $data['active'] = (bool) $data['active'];
         }
-        if (! $request->has('timezone')) {
-            $data->timezone = Config::string('nvl-auth.features.principal_management.settings.default_timezone', 'UTC');
+        if (isset($data['emailVerified'])) {
+            $data['emailVerified'] = (bool) $data['emailVerified'];
         }
 
-        $user = $action->create($this->subject($request), array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional));
+        if (! $request->has('locale')) {
+            $data['locale'] = Config::string('nvl-auth.features.principal_management.settings.default_locale', 'en');
+        }
+        if (! $request->has('timezone')) {
+            $data['timezone'] = Config::string('nvl-auth.features.principal_management.settings.default_timezone', 'UTC');
+        }
+
+        $user = $action->create($this->subject($request), $data);
 
         return response()->json(['data' => $user, 'code' => 'user_created', 'message' => trans('nvl-auth::responsecode.user_created')], 201);
     }
@@ -87,20 +106,24 @@ final class UserController extends AuthenticatedController
     public function update(Request $request, string $user, AuthUsers $action): JsonResponse
     {
         $data = UpdateUserData::validateForUpdate($this->requestPayload($request), $user);
-        $updated = $action->update($this->subject($request), $user, array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional));
+        $updated = $action->update($this->subject($request), $user, $data);
 
         return response()->json(['data' => $updated, 'code' => 'user_updated', 'message' => trans('nvl-auth::responsecode.user_updated')]);
     }
 
     /** Enable or disable one principal. */
     public function status(
-        UpdateUserStatusData $data,
         Request $request,
         string $user,
         AuthUsers $action,
         PrincipalAttributeMapper $attributes,
     ): JsonResponse {
-        $updated = $action->setActive($this->subject($request), $user, array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional));
+        $data = Validator::make($request->all(), UpdateUserStatusData::rules())->validate();
+        if (isset($data['active'])) {
+            $data['active'] = (bool) $data['active'];
+        }
+
+        $updated = $action->setActive($this->subject($request), $user, $data);
         $active = (bool) $attributes->value($updated, PrincipalAttribute::Active);
 
         return response()->json([
@@ -130,26 +153,30 @@ final class UserController extends AuthenticatedController
     /** Apply one bounded bulk lifecycle operation. */
     public function bulk(Request $request, AuthUsers $action): JsonResponse
     {
-        $data = BulkUserData::validateAndCreate(AuthRequestInput::aliased($request->all(), ['user_ids' => ['userIds']]));
-        $result = $action->bulkUpdate($this->subject($request), $data->operation, $data->userIds);
+        $data = Validator::make(AuthRequestInput::aliased($request->all(), ['user_ids' => ['userIds']]), BulkUserData::rules())->validate();
+        $result = $action->bulkUpdate($this->subject($request), UserBulkOperation::from($data['operation']), $data['user_ids']);
 
         return response()->json(['data' => $result, 'code' => 'users_bulk_updated', 'message' => trans('nvl-auth::responsecode.users_bulk_updated')]);
     }
 
     /** Replace one principal's roles. */
-    public function roles(SyncUserRolesData $data, Request $request, string $user, AuthRoles $action): JsonResponse
+    public function roles(Request $request, string $user, AuthRoles $action): JsonResponse
     {
+        $data = Validator::make($request->all(), SyncUserRolesData::rules())->validate();
+
         return response()->json([
-            'data' => $action->syncUserRoles($this->subject($request), $user, array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional)),
+            'data' => $action->syncUserRoles($this->subject($request), $user, $data),
             'code' => 'user_roles_synchronized', 'message' => trans('nvl-auth::responsecode.user_roles_synchronized'),
         ]);
     }
 
     /** Replace one principal's direct permissions. */
-    public function permissions(SyncUserPermissionsData $data, Request $request, string $user, AuthPermissions $action): JsonResponse
+    public function permissions(Request $request, string $user, AuthPermissions $action): JsonResponse
     {
+        $data = Validator::make($request->all(), SyncUserPermissionsData::rules())->validate();
+
         return response()->json([
-            'data' => $action->syncUserPermissions($this->subject($request), $user, array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional)),
+            'data' => $action->syncUserPermissions($this->subject($request), $user, $data),
             'code' => 'user_permissions_synchronized', 'message' => trans('nvl-auth::responsecode.user_permissions_synchronized'),
         ]);
     }

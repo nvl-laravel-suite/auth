@@ -6,9 +6,9 @@ namespace Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Account;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Nvl\Auth\Services\AuthSecondFactor;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\ConsumeRecoveryCodeData;
-use Spatie\LaravelData\Optional;
 
 /**
  * Handles authenticated recovery-code lifecycle transport.
@@ -31,9 +31,11 @@ final class RecoveryCodeController extends AuthenticatedController
     /**
      * Consume one recovery code.
      */
-    public function consume(ConsumeRecoveryCodeData $data, Request $request, AuthSecondFactor $action): JsonResponse
+    public function consume(Request $request, AuthSecondFactor $action): JsonResponse
     {
-        $record = $action->consumeRecoveryCode($this->subject($request), array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional));
+        $data = Validator::make($request->all(), ConsumeRecoveryCodeData::rules())->validate();
+
+        $record = $action->consumeRecoveryCode($this->subject($request), $data);
 
         return response()->json(['data' => ['batch_id' => $record->batch_id], 'code' => 'recovery_code_consumed', 'message' => trans('nvl-auth::responsecode.recovery_code_consumed')]);
     }

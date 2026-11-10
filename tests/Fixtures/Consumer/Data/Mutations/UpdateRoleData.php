@@ -5,24 +5,19 @@ declare(strict_types=1);
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations;
 
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 use JsonException;
 use Nvl\Auth\Definitions\Tables\AuthTables;
-use Spatie\LaravelData\Attributes\MapInputName;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
-use Spatie\LaravelData\Support\Validation\ValidationContext;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\AuthRequestInput;
 
 /**
  * Validated replacement mutation for one managed role.
  *
  * @api
  */
-#[MapInputName(CamelCaseMapper::class)]
-#[MapOutputName(CamelCaseMapper::class)]
-final class UpdateRoleData extends Data
+final class UpdateRoleData
 {
     /**
      * @param  list<string>  $permissions
@@ -73,16 +68,14 @@ final class UpdateRoleData extends Data
      *
      * @param  array<string, mixed>  $payload
      */
-    public static function validateForUpdate(array $payload, string $roleId): self
+    public static function validateForUpdate(array $payload, string $roleId): array
     {
-        return self::validateAndCreate(array_replace($payload, ['_currentRoleId' => $roleId]));
+        return Validator::make(AuthRequestInput::aliased($payload, ['displayName' => ['display_name'], 'parentId' => ['parent_id']]), self::rules($roleId))->validate();
     }
 
     /** @return array<string, list<mixed>> */
-    public static function rules(?ValidationContext $context = null): array
+    public static function rules(?string $roleId = null): array
     {
-        $payload = is_array($context?->fullPayload) ? $context->fullPayload : [];
-        $roleId = isset($payload['_currentRoleId']) && is_string($payload['_currentRoleId']) ? $payload['_currentRoleId'] : null;
         $roles = Config::string('nvl-auth.tables.roles', AuthTables::get(AuthTables::Roles));
         $permissions = Config::string('nvl-auth.tables.permissions', AuthTables::get(AuthTables::Permissions));
         $guard = Config::string('nvl-auth.features.rbac.settings.guard', 'web');
@@ -90,6 +83,7 @@ final class UpdateRoleData extends Data
         $unique = Rule::unique($roles, 'name')->where('guard_name', $guard)->ignore($roleId);
         $parent = Rule::exists($roles, 'id');
 
-        return ['name' => ['required', 'string', 'max:160', $unique], 'displayName' => ['nullable', 'string', 'max:160'], 'description' => ['nullable', 'string', 'max:2000'], 'parentId' => ['nullable', 'uuid', $parent], 'priority' => ['sometimes', 'integer', 'between:-100000,100000'], 'permissions' => ['sometimes', 'array', 'max:500'], 'permissions.*' => ['string', 'distinct', "exists:{$permissions},name"], 'metadata' => ['sometimes', 'array', 'max:100']];
+        return [
+            'system' => ['sometimes', 'boolean'], 'name' => ['required', 'string', 'max:160', $unique], 'displayName' => ['nullable', 'string', 'max:160'], 'description' => ['nullable', 'string', 'max:2000'], 'parentId' => ['nullable', 'uuid', $parent], 'priority' => ['sometimes', 'integer', 'between:-100000,100000'], 'permissions' => ['sometimes', 'array', 'max:500'], 'permissions.*' => ['string', 'distinct', "exists:{$permissions},name"], 'metadata' => ['sometimes', 'array', 'max:100']];
     }
 }

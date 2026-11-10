@@ -6,22 +6,19 @@ namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Display;
 
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
+use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Collection;
+use JsonSerializable;
 use LogicException;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
-use Spatie\TypeScriptTransformer\Attributes\LiteralTypeScriptType;
 
 /**
  * Bounded permission catalog row containing only allowlisted assignment identifiers.
  *
  * @api
  */
-#[MapOutputName(CamelCaseMapper::class)]
-final class PermissionListItemData extends Data
+final class PermissionListItemData implements Arrayable, JsonSerializable
 {
     public readonly string $label;
 
@@ -39,11 +36,9 @@ final class PermissionListItemData extends Data
         public readonly ?string $description,
         public readonly string $guard,
         string $group,
-        #[LiteralTypeScriptType('Array<string>')]
         public readonly array $roleIds,
         public readonly int $rolesCount,
         public readonly int $usersCount,
-        #[LiteralTypeScriptType('string')]
         public readonly CarbonImmutable $createdAt,
     ) {
         $label = trim($label);
@@ -75,6 +70,29 @@ final class PermissionListItemData extends Data
             usersCount: self::count($permission->getAttribute('users_count')),
             createdAt: self::createdAt($permission->getAttribute('created_at')),
         );
+    }
+
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'label' => $this->label,
+            'description' => $this->description,
+            'guard' => $this->guard,
+            'group' => $this->group,
+            'roleIds' => $this->roleIds,
+            'rolesCount' => $this->rolesCount,
+            'usersCount' => $this->usersCount,
+            'createdAt' => $this->createdAt->format(DATE_ATOM),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 
     /**

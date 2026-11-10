@@ -4,21 +4,17 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Display;
 
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
-use Spatie\TypeScriptTransformer\Attributes\LiteralTypeScriptType;
+use Illuminate\Contracts\Support\Arrayable;
+use JsonSerializable;
 
 /**
  * Bounded, identity-free per-role analytics with deterministic permission groups.
  *
  * @api
  */
-#[MapOutputName(CamelCaseMapper::class)]
-final class RoleAnalyticsData extends Data
+final class RoleAnalyticsData implements Arrayable, JsonSerializable
 {
     /** @var array<string, int> */
-    #[LiteralTypeScriptType('Record<string, number>')]
     public readonly array $permissionGroups;
 
     /**
@@ -51,5 +47,43 @@ final class RoleAnalyticsData extends Data
         });
 
         $this->permissionGroups = $normalized;
+    }
+
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        return [
+            'roleId' => $this->roleId,
+            'users' => $this->users,
+            'activeUsers' => $this->activeUsers,
+            'inactiveUsers' => $this->inactiveUsers,
+            'permissions' => $this->permissions,
+            'children' => $this->children,
+            'descendants' => $this->descendants,
+            'parentName' => $this->parentName,
+            'permissionGroups' => $this->permissionGroups,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
+    }
+
+    /** @param array<string, mixed> $attributes */
+    public static function from(array $attributes): self
+    {
+        return new self(
+            roleId: $attributes['roleId'],
+            users: $attributes['users'],
+            activeUsers: $attributes['activeUsers'],
+            inactiveUsers: $attributes['inactiveUsers'],
+            permissions: $attributes['permissions'],
+            children: $attributes['children'],
+            descendants: $attributes['descendants'],
+            parentName: $attributes['parentName'],
+            permissionGroups: $attributes['permissionGroups'],
+        );
     }
 }

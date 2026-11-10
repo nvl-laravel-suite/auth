@@ -6,11 +6,12 @@ namespace Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Public;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Nvl\Auth\Services\AuthInvitations;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\AcceptInvitationData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\AuthRequestInput;
 use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Concerns\InteractsWithValidatedInput;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Spatie\LaravelData\Optional;
 
 /**
  * Handles public invitation acceptance through a host subject resolver.
@@ -23,11 +24,12 @@ final class InvitationController
      * Provision or resolve the host subject and consume the invitation.
      */
     public function accept(
-        AcceptInvitationData $data,
         AuthInvitations $register,
         Request $request,
     ): JsonResponse {
-        $registered = $register->register(array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional), $request->user());
+        $data = array_replace(['registrationMethod' => 'password', 'locale' => null, 'timezone' => null, 'extensions' => []], Validator::make(AuthRequestInput::aliased($request->all(), ['registrationMethod' => ['registration_method'], 'passwordConfirmation' => ['password_confirmation']]), AcceptInvitationData::rules())->validate());
+
+        $registered = $register->register($data, $request->user());
         $reference = SubjectReference::fromAuthenticatable($registered['subject']);
 
         return response()->json([

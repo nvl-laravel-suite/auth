@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Http;
 
-/** Preserves snake-case HTTP input while accepting generated Data aliases. */
+/** Preserves snake-case HTTP input while accepting consumer field aliases. */
 final class AuthRequestInput
 {
     /**

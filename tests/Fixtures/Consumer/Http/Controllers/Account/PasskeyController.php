@@ -6,10 +6,11 @@ namespace Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Account;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Nvl\Auth\Models\Passkey;
 use Nvl\Auth\Services\AuthPasskeys;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\FinishPasskeyRegistrationData;
-use Spatie\LaravelData\Optional;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\AuthRequestInput;
 
 /**
  * Handles authenticated passkey registration and revocation transport.
@@ -32,9 +33,11 @@ final class PasskeyController extends AuthenticatedController
     /**
      * Finish passkey registration.
      */
-    public function finish(FinishPasskeyRegistrationData $data, Request $request, AuthPasskeys $action): JsonResponse
+    public function finish(Request $request, AuthPasskeys $action): JsonResponse
     {
-        $passkey = $action->finishRegistration($this->subject($request), array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional), grant: $this->recentGrant($request), context: $this->authenticationContext($request));
+        $data = array_replace(['name' => null], Validator::make(AuthRequestInput::aliased($request->all(), ['ceremonyId' => ['ceremony_id']]), FinishPasskeyRegistrationData::rules())->validate());
+
+        $passkey = $action->finishRegistration($this->subject($request), $data, grant: $this->recentGrant($request), context: $this->authenticationContext($request));
 
         return response()->json([
             'data' => ['passkey_id' => $passkey->identifier(), 'name' => $passkey->name],

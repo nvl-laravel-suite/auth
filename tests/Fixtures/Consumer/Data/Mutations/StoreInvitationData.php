@@ -5,19 +5,13 @@ declare(strict_types=1);
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations;
 
 use InvalidArgumentException;
-use Spatie\LaravelData\Attributes\MapInputName;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
 
 /**
  * Recipient, grants, and context input for issuing an invitation.
  *
  * @api
  */
-#[MapInputName(CamelCaseMapper::class)]
-#[MapOutputName(CamelCaseMapper::class)]
-final class StoreInvitationData extends Data
+final class StoreInvitationData
 {
     /**
      * @param  list<string>  $roles
@@ -86,6 +80,7 @@ final class StoreInvitationData extends Data
     public static function rules(): array
     {
         return [
+            'locale' => ['sometimes', 'nullable', 'string'],
             'recipient' => ['required', 'string', 'max:320'],
             'type' => ['sometimes', 'string', 'max:80'],
             'purpose' => ['sometimes', 'string', 'max:120'],

@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Public;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Nvl\Auth\Services\AuthClients;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\StartClientAuthData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\AuthRequestInput;
 use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Concerns\InteractsWithValidatedInput;
-use Spatie\LaravelData\Optional;
 
 /**
  * Handles hosted first-party client start requests.
@@ -20,9 +22,11 @@ final class ClientController
     /**
      * Resolve an allowlisted client return URL.
      */
-    public function start(StartClientAuthData $data, AuthClients $action): JsonResponse
+    public function start(Request $request, AuthClients $action): JsonResponse
     {
-        $result = $action->start(array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional));
+        $data = array_replace(['origin' => null], Validator::make(AuthRequestInput::aliased($request->all(), ['clientId' => ['client_id'], 'returnPath' => ['return_path']]), StartClientAuthData::rules())->validate());
+
+        $result = $action->start($data);
 
         return response()->json([
             'data' => ['client_id' => $result['client']->identifier(), 'flow' => $result['flow'], 'return_url' => $result['returnUrl']],

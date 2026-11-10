@@ -5,19 +5,13 @@ declare(strict_types=1);
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Queries;
 
 use InvalidArgumentException;
-use Spatie\LaravelData\Attributes\MapInputName;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
 
 /**
  * Validated invitation management filters over queryable package fields.
  *
  * @api
  */
-#[MapInputName(CamelCaseMapper::class)]
-#[MapOutputName(CamelCaseMapper::class)]
-final class InvitationIndexQueryData extends Data
+final class InvitationIndexQueryData
 {
     /** @var list<string>|null */
     public readonly ?array $types;
@@ -35,7 +29,7 @@ final class InvitationIndexQueryData extends Data
         public readonly ?string $expiresAfter = null,
         public readonly ?string $expiresBefore = null,
         public readonly ?string $context = null,
-        #[MapInputName('per_page')] #[MapOutputName('per_page')] public readonly ?int $perPage = null,
+        public readonly ?int $perPage = null,
         ?array $types = null,
     ) {
         $this->types = self::normalizeTypes($types);

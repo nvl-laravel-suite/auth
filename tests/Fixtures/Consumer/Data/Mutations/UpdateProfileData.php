@@ -4,34 +4,13 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations;
 
-use Spatie\LaravelData\Attributes\MapInputName;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
-use Spatie\LaravelData\Optional;
-
 /**
  * Validated sparse self-service principal profile mutation.
  *
  * @api
  */
-#[MapInputName(CamelCaseMapper::class)]
-#[MapOutputName(CamelCaseMapper::class)]
-final class UpdateProfileData extends Data
+final class UpdateProfileData
 {
-    /**
-     * @param  array<string, mixed>|Optional  $profile
-     * @param  array<string, mixed>|Optional  $preferences
-     */
-    public function __construct(
-        public readonly string|Optional $name = new Optional,
-        public readonly string|Optional $email = new Optional,
-        public readonly string|Optional $locale = new Optional,
-        public readonly string|Optional $timezone = new Optional,
-        public readonly array|Optional $profile = new Optional,
-        public readonly array|Optional $preferences = new Optional,
-    ) {}
-
     /** @return array<string, list<string>> */
     public static function rules(): array
     {

@@ -4,19 +4,12 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations;
 
-use Spatie\LaravelData\Attributes\MapInputName;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
-
 /**
  * Recipient and purpose input for requesting a security code.
  *
  * @api
  */
-#[MapInputName(CamelCaseMapper::class)]
-#[MapOutputName(CamelCaseMapper::class)]
-final class RequestSecurityCodeData extends Data
+final class RequestSecurityCodeData
 {
     public function __construct(
         public readonly string $recipient,

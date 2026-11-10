@@ -6,6 +6,7 @@ namespace Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Public;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Nvl\Auth\Services\Authentication;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\LoginData;
 use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Concerns\InteractsWithValidatedInput;
@@ -21,10 +22,15 @@ final class AuthenticationController
     /**
      * Authenticate one browser user.
      */
-    public function login(LoginData $data, Request $request, Authentication $action): JsonResponse
+    public function login(Request $request, Authentication $action): JsonResponse
     {
-        $subject = $action->login(['identifier' => $data->identifier, 'password' => $data->password], [
-            'remember' => $data->remember,
+        $data = array_replace(['remember' => false], Validator::make($request->all(), LoginData::rules())->validate());
+        if (isset($data['remember'])) {
+            $data['remember'] = (bool) $data['remember'];
+        }
+
+        $subject = $action->login(['identifier' => $data['identifier'], 'password' => $data['password']], [
+            'remember' => $data['remember'],
             'ipAddress' => $request->ip(), 'userAgent' => $request->userAgent(),
             'requestId' => $request->headers->get('X-Request-ID'),
         ], auth()->guard(config('nvl-auth.authorization.guard', 'web')), $request->session());

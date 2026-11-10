@@ -5,16 +5,9 @@ declare(strict_types=1);
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations;
 
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Spatie\LaravelData\Attributes\MapInputName;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
-use Spatie\LaravelData\Mappers\SnakeCaseMapper;
 
 /** Validated host principal and permissions for membership enrollment. */
-#[MapInputName(SnakeCaseMapper::class)]
-#[MapOutputName(CamelCaseMapper::class)]
-final class EnrollMembershipInputData extends Data
+final class EnrollMembershipInputData
 {
     /**
      * @param  list<string>  $roles

@@ -5,20 +5,18 @@ declare(strict_types=1);
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Display;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Support\Arrayable;
+use JsonSerializable;
 use Nvl\Auth\Enums\InvitationDeliveryStatus;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\ValueObjects\SubjectReference;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
 
 /**
  * Value-only invitation state for management lists and trusted lookup results.
  *
  * @api
  */
-#[MapOutputName(CamelCaseMapper::class)]
-final class InvitationReadData extends Data
+final class InvitationReadData implements Arrayable, JsonSerializable
 {
     /**
      * @param  list<string>  $roles
@@ -86,6 +84,39 @@ final class InvitationReadData extends Data
             deliveryFailedAt: $invitation->delivery_failed_at,
             deliveryFailureCode: $invitation->delivery_failure_code,
         );
+    }
+
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'recipient' => $this->recipient,
+            'type' => $this->type,
+            'purpose' => $this->purpose,
+            'inviter' => $this->inviter?->toArray(),
+            'acceptedBy' => $this->acceptedBy?->toArray(),
+            'roles' => $this->roles,
+            'permissions' => $this->permissions,
+            'metadata' => $this->metadata,
+            'lifecycle' => $this->lifecycle,
+            'resendCount' => $this->resendCount,
+            'lastSentAt' => $this->lastSentAt?->format(DATE_ATOM),
+            'expiresAt' => $this->expiresAt->format(DATE_ATOM),
+            'acceptedAt' => $this->acceptedAt?->format(DATE_ATOM),
+            'revokedAt' => $this->revokedAt?->format(DATE_ATOM),
+            'deliveryStatus' => $this->deliveryStatus?->value,
+            'deliveryAttemptedAt' => $this->deliveryAttemptedAt?->format(DATE_ATOM),
+            'deliveredAt' => $this->deliveredAt?->format(DATE_ATOM),
+            'deliveryFailedAt' => $this->deliveryFailedAt?->format(DATE_ATOM),
+            'deliveryFailureCode' => $this->deliveryFailureCode,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 
     /**

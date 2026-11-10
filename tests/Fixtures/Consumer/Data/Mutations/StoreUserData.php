@@ -10,19 +10,13 @@ use Illuminate\Validation\Rules\Password;
 use InvalidArgumentException;
 use JsonException;
 use Nvl\Auth\Definitions\Tables\AuthTables;
-use Spatie\LaravelData\Attributes\MapInputName;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
 
 /**
  * Validated creation mutation for one managed principal.
  *
  * @api
  */
-#[MapInputName(CamelCaseMapper::class)]
-#[MapOutputName(CamelCaseMapper::class)]
-final class StoreUserData extends Data
+final class StoreUserData
 {
     /**
      * @param  array<string, mixed>  $profile

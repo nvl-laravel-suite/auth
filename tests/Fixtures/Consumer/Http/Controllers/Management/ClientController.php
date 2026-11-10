@@ -6,13 +6,14 @@ namespace Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Management;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Nvl\Auth\Models\AuthClient;
 use Nvl\Auth\Services\AuthClients;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\StoreClientData;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\UpdateClientData;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\UpdateClientStatusData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\AuthRequestInput;
 use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Account\AuthenticatedController;
-use Spatie\LaravelData\Optional;
 
 /**
  * Handles authorized first-party Auth client management transport.
@@ -32,9 +33,14 @@ final class ClientController extends AuthenticatedController
     /**
      * Create an Auth client.
      */
-    public function store(StoreClientData $data, Request $request, AuthClients $action): JsonResponse
+    public function store(Request $request, AuthClients $action): JsonResponse
     {
-        $client = $action->create($this->subject($request), array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional));
+        $data = array_replace(['returnPaths' => [], 'allowedOrigins' => [], 'allowedFlows' => ['login'], 'metadata' => [], 'active' => true], Validator::make(AuthRequestInput::aliased($request->all(), ['baseUrl' => ['base_url'], 'returnPaths' => ['return_paths'], 'allowedOrigins' => ['allowed_origins'], 'allowedFlows' => ['allowed_flows']]), StoreClientData::rules())->validate());
+        if (isset($data['active'])) {
+            $data['active'] = (bool) $data['active'];
+        }
+
+        $client = $action->create($this->subject($request), $data);
 
         return response()->json(['data' => $client, 'code' => 'client_created', 'message' => trans('nvl-auth::responsecode.client_created')], 201);
     }
@@ -56,12 +62,16 @@ final class ClientController extends AuthenticatedController
      * Update an Auth client.
      */
     public function update(
-        UpdateClientData $data,
         Request $request,
         AuthClient $client,
         AuthClients $action,
     ): JsonResponse {
-        $updated = $action->update($this->subject($request), $client, array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional));
+        $data = array_replace(['returnPaths' => [], 'allowedOrigins' => [], 'allowedFlows' => ['login'], 'metadata' => [], 'active' => true], Validator::make(AuthRequestInput::aliased($request->all(), ['baseUrl' => ['base_url'], 'returnPaths' => ['return_paths'], 'allowedOrigins' => ['allowed_origins'], 'allowedFlows' => ['allowed_flows']]), UpdateClientData::rules())->validate());
+        if (isset($data['active'])) {
+            $data['active'] = (bool) $data['active'];
+        }
+
+        $updated = $action->update($this->subject($request), $client, $data);
 
         return response()->json(['data' => $updated, 'code' => 'client_updated', 'message' => trans('nvl-auth::responsecode.client_updated')]);
     }
@@ -87,8 +97,12 @@ final class ClientController extends AuthenticatedController
         AuthClient $client,
         AuthClients $action,
     ): JsonResponse {
-        $data = UpdateClientStatusData::validateAndCreate($request->all());
-        $client = $action->setActive($this->subject($request), $client, $data->active);
+        $data = Validator::make($request->all(), UpdateClientStatusData::rules())->validate();
+        if (isset($data['active'])) {
+            $data['active'] = (bool) $data['active'];
+        }
+
+        $client = $action->setActive($this->subject($request), $client, $data['active']);
 
         return response()->json([
             'data' => $client,

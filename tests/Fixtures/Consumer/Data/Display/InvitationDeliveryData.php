@@ -5,17 +5,15 @@ declare(strict_types=1);
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Display;
 
 use Carbon\CarbonImmutable;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
+use Illuminate\Contracts\Support\Arrayable;
+use JsonSerializable;
 
 /**
  * Bounded invitation context for host-owned delivery listeners.
  *
  * @api
  */
-#[MapOutputName(CamelCaseMapper::class)]
-final class InvitationDeliveryData extends Data
+final class InvitationDeliveryData implements Arrayable, JsonSerializable
 {
     /**
      * @param  list<string>  $roles
@@ -34,4 +32,27 @@ final class InvitationDeliveryData extends Data
         public readonly CarbonImmutable $expiresAt,
         public readonly int $resendCount,
     ) {}
+
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'type' => $this->type,
+            'purpose' => $this->purpose,
+            'recipient' => $this->recipient,
+            'inviter' => $this->inviter?->toArray(),
+            'roles' => $this->roles,
+            'permissions' => $this->permissions,
+            'metadata' => $this->metadata,
+            'expiresAt' => $this->expiresAt->format(DATE_ATOM),
+            'resendCount' => $this->resendCount,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
+    }
 }

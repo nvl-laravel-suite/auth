@@ -9,19 +9,13 @@ use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 use JsonException;
 use Nvl\Auth\Definitions\Tables\AuthTables;
-use Spatie\LaravelData\Attributes\MapInputName;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
 
 /**
  * Validated creation mutation for one managed role.
  *
  * @api
  */
-#[MapInputName(CamelCaseMapper::class)]
-#[MapOutputName(CamelCaseMapper::class)]
-final class StoreRoleData extends Data
+final class StoreRoleData
 {
     /**
      * @param  list<string>  $permissions
@@ -77,6 +71,7 @@ final class StoreRoleData extends Data
         $unique = Rule::unique($roles, 'name')->where('guard_name', $guard);
         $parent = Rule::exists($roles, 'id');
 
-        return ['name' => ['required', 'string', 'max:160', $unique], 'displayName' => ['nullable', 'string', 'max:160'], 'description' => ['nullable', 'string', 'max:2000'], 'parentId' => ['nullable', 'uuid', $parent], 'priority' => ['sometimes', 'integer', 'between:-100000,100000'], 'permissions' => ['sometimes', 'array', 'max:500'], 'permissions.*' => ['string', 'distinct', "exists:{$permissions},name"], 'metadata' => ['sometimes', 'array', 'max:100']];
+        return [
+            'system' => ['sometimes', 'boolean'], 'name' => ['required', 'string', 'max:160', $unique], 'displayName' => ['nullable', 'string', 'max:160'], 'description' => ['nullable', 'string', 'max:2000'], 'parentId' => ['nullable', 'uuid', $parent], 'priority' => ['sometimes', 'integer', 'between:-100000,100000'], 'permissions' => ['sometimes', 'array', 'max:500'], 'permissions.*' => ['string', 'distinct', "exists:{$permissions},name"], 'metadata' => ['sometimes', 'array', 'max:100']];
     }
 }

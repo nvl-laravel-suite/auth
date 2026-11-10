@@ -25,7 +25,6 @@ use Nvl\Auth\Tests\Fixtures\Consumer\Http\Middleware\RenderAuthExceptions;
 use Nvl\Auth\Tests\Fixtures\RecordingTenantAwareAuthActivityBridge;
 use Nvl\Auth\Tests\Fixtures\TestSubjectResolver;
 use Nvl\Auth\Tests\Fixtures\TestUser;
-use Nvl\Data\Services\TypeScriptSourceRegistry;
 use Nvl\Support\Providers\LocaleServiceProvider;
 use Nvl\Tenancy\Contracts\PlatformAccess;
 use Nvl\Tenancy\Contracts\TenantDirectory;
@@ -37,7 +36,6 @@ use Nvl\Tenancy\ValueObjects\PlatformOperation;
 use Orchestra\Testbench\TestCase as Orchestra;
 use ReflectionClass;
 use RuntimeException;
-use Spatie\LaravelData\LaravelDataServiceProvider;
 use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\PermissionServiceProvider;
 
@@ -53,7 +51,7 @@ abstract class TenancyTestCase extends Orchestra
             LocaleServiceProvider::class,
             PermissionServiceProvider::class,
             SanctumServiceProvider::class,
-            LaravelDataServiceProvider::class,
+
             TenancyServiceProvider::class,
             AuthServiceProvider::class,
         ];
@@ -109,7 +107,7 @@ abstract class TenancyTestCase extends Orchestra
             'nvl-auth.adoption.password_broker' => ['enabled' => true, 'broker' => 'users'],
             'nvl-auth.adoption.spatie_storage.enabled' => true,
         ]);
-        (new AuthServiceProvider($this->app))->boot($this->app->make(AuthConfiguration::class), $this->app->make(TypeScriptSourceRegistry::class));
+        (new AuthServiceProvider($this->app))->boot($this->app->make(AuthConfiguration::class));
         $this->app->make(PermissionRegistrar::class);
         if ($this->deactivateMaintenanceAfterSetup()) {
             $this->app->make(MaintenanceMode::class)->deactivate();

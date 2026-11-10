@@ -37,7 +37,6 @@
         "pestphp/pest": "^4.0",
         "pestphp/pest-plugin-laravel": "^4.0",
         "pragmarx/google2fa": "^9.0",
-        "spatie/laravel-data": "^4.23",
         "spatie/laravel-permission": "^8.0",
         "spomky-labs/cbor-php": "^3.0",
         "symfony/process": "^7.0 || ^8.0",

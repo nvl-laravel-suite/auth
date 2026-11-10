@@ -30,7 +30,6 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Providers\LocaleServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use PragmaRX\Google2FA\Google2FA;
-use Spatie\LaravelData\LaravelDataServiceProvider;
 use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\PermissionServiceProvider;
 
@@ -50,7 +49,7 @@ abstract class AuthTestCase extends Orchestra
             LocaleServiceProvider::class,
             PermissionServiceProvider::class,
             SanctumServiceProvider::class,
-            LaravelDataServiceProvider::class,
+
             AuthServiceProvider::class,
             RouteServiceProvider::class,
         ];

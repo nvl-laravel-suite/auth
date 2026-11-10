@@ -22,7 +22,6 @@ use Nvl\Ownership\ValueObjects\OwnershipAdoptionPlan;
 use Nvl\Ownership\ValueObjects\OwnershipMapping;
 use Nvl\Ownership\ValueObjects\OwnershipOperation;
 use Nvl\Support\Providers\LocaleServiceProvider;
-use Spatie\LaravelData\LaravelDataServiceProvider;
 use Spatie\Permission\PermissionServiceProvider;
 
 /** Runs native Auth ownership without the Tenancy provider or outer database transactions. */
@@ -44,7 +43,7 @@ abstract class OwnerScopeTestCase extends OwnershipTestCase
 
     protected function getPackageProviders($app): array
     {
-        return [...parent::getPackageProviders($app), LocaleServiceProvider::class, PermissionServiceProvider::class, SanctumServiceProvider::class, LaravelDataServiceProvider::class, AuthServiceProvider::class];
+        return [...parent::getPackageProviders($app), LocaleServiceProvider::class, PermissionServiceProvider::class, SanctumServiceProvider::class, AuthServiceProvider::class];
     }
 
     protected function defineEnvironment($app): void

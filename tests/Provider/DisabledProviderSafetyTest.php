@@ -19,7 +19,6 @@ it('remains passive over host integrations and migration inventory when globally
         ->and(config('permission.models.permission'))->toBe(Permission::class)
         ->and(config('permission.table_names.roles'))->toBe('host_roles')
         ->and(Sanctum::personalAccessTokenModel())->toBe(HostPersonalAccessToken::class)
-        ->and(app()->bound('Nvl\\Data\\Services\\TypeScriptSourceRegistry'))->toBeFalse()
         ->and(app('migrator')->paths())->not->toContain($authMigrationPath);
 
     config()->set('nvl-auth.enabled', true);

@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
@@ -17,7 +18,7 @@ use Nvl\Auth\Services\AuthPasswords;
 use Nvl\Auth\Services\AuthReauthentication;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\ConfirmPasswordData;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\UpdatePasswordData;
-use Spatie\LaravelData\Optional;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\AuthRequestInput;
 
 /**
  * Handles authenticated account credential operations.
@@ -38,17 +39,18 @@ final class AuthenticationController extends AuthenticatedController
      * Change the current subject's password.
      */
     public function updatePassword(
-        UpdatePasswordData $data,
         Request $request,
         AuthPasswords $action,
     ): JsonResponse {
+        $data = Validator::make(AuthRequestInput::aliased($request->all(), ['passwordConfirmation' => ['password_confirmation']]), UpdatePasswordData::rules())->validate();
+
         $subject = $this->subject($request);
 
         if (! $subject instanceof CanResetPassword) {
             throw AuthException::invalidConfiguration('The host subject does not support password updates.');
         }
 
-        $action->update($subject, array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional), grant: $this->recentGrant($request), context: $this->authenticationContext($request));
+        $action->update($subject, $data, grant: $this->recentGrant($request), context: $this->authenticationContext($request));
 
         return response()->json(['data' => null, 'code' => 'password_updated', 'message' => trans('nvl-auth::responsecode.password_updated')]);
     }
@@ -65,9 +67,11 @@ final class AuthenticationController extends AuthenticatedController
     /**
      * Confirm the current password in Laravel's browser session.
      */
-    public function confirmPassword(ConfirmPasswordData $data, Request $request, AuthPasswords $action): JsonResponse
+    public function confirmPassword(Request $request, AuthPasswords $action): JsonResponse
     {
-        $action->confirm($this->subject($request), array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional), $request->session());
+        $data = Validator::make($request->all(), ConfirmPasswordData::rules())->validate();
+
+        $action->confirm($this->subject($request), $data, $request->session());
 
         return response()->json([
             'data' => null,

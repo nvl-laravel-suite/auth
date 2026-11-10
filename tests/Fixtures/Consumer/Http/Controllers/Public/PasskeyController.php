@@ -6,10 +6,12 @@ namespace Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Public;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
 use Nvl\Auth\Services\AuthenticationSessions;
 use Nvl\Auth\Services\AuthPasskeys;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\FinishPasskeyAuthenticationData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\AuthRequestInput;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 
@@ -24,10 +26,12 @@ final class PasskeyController
         return response()->json(['data' => ['ceremony_id' => $options->ceremonyId, 'options' => $options->options, 'expires_at' => $options->expiresAt->toIso8601String()], 'code' => 'passkey_authentication_started', 'message' => trans('nvl-auth::responsecode.passkey_authentication_started')]);
     }
 
-    public function finish(FinishPasskeyAuthenticationData $data, Request $request, AuthPasskeys $passkeys, AuthenticationSessions $sessions, AuthSubjectResolver $subjects): JsonResponse
+    public function finish(Request $request, AuthPasskeys $passkeys, AuthenticationSessions $sessions, AuthSubjectResolver $subjects): JsonResponse
     {
+        $data = Validator::make(AuthRequestInput::aliased($request->all(), ['ceremonyId' => ['ceremony_id']]), FinishPasskeyAuthenticationData::rules())->validate();
+
         $sessions->assertCanTransition();
-        $completed = $passkeys->finishAuthentication(get_object_vars($data), $this->owner($request), $request->session()->getId());
+        $completed = $passkeys->finishAuthentication($data, $this->owner($request), $request->session()->getId());
         $reference = $completed['subject'];
         $sessions->establishFromProof($completed['proof']->reveal(), auth()->guard(config('nvl-auth.authorization.guard', 'web')), $request->session(), $completed['requestContext']);
 

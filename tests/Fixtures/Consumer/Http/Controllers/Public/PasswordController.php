@@ -6,12 +6,13 @@ namespace Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Public;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Timebox;
 use Nvl\Auth\Services\AuthPasswords;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\RequestPasswordResetData;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\ResetPasswordData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\AuthRequestInput;
 use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Concerns\InteractsWithValidatedInput;
-use Spatie\LaravelData\Optional;
 
 /**
  * Handles password reset HTTP requests without sending notifications.
@@ -24,13 +25,14 @@ final class PasswordController
      * Create a password broker token and emit a delivery request.
      */
     public function requestReset(
-        RequestPasswordResetData $data,
         Request $request,
         AuthPasswords $action,
         Timebox $timebox,
     ): JsonResponse {
+        $data = Validator::make($request->all(), RequestPasswordResetData::rules())->validate();
+
         $timebox->dontReturnEarly()->call(static function () use ($action, $data, $request): void {
-            $action->requestReset(array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional), $request->getPreferredLanguage());
+            $action->requestReset($data, $request->getPreferredLanguage());
         }, 200_000);
 
         return response()->json([
@@ -42,9 +44,11 @@ final class PasswordController
     /**
      * Consume a password broker token.
      */
-    public function reset(ResetPasswordData $data, AuthPasswords $action): JsonResponse
+    public function reset(Request $request, AuthPasswords $action): JsonResponse
     {
-        $action->reset(array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional));
+        $data = Validator::make(AuthRequestInput::aliased($request->all(), ['passwordConfirmation' => ['password_confirmation']]), ResetPasswordData::rules())->validate();
+
+        $action->reset($data);
 
         return response()->json([
             'data' => null,

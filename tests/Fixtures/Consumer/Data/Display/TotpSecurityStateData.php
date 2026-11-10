@@ -4,17 +4,15 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Display;
 
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
+use Illuminate\Contracts\Support\Arrayable;
+use JsonSerializable;
 
 /**
  * Describes principal TOTP lifecycle counts without credentials or provisioning secrets.
  *
  * @api
  */
-#[MapOutputName(CamelCaseMapper::class)]
-final class TotpSecurityStateData extends Data
+final class TotpSecurityStateData implements Arrayable, JsonSerializable
 {
     /** Retain disjoint lifecycle counts, treating every revoked credential as revoked. */
     public function __construct(
@@ -22,4 +20,20 @@ final class TotpSecurityStateData extends Data
         public readonly int $pendingEnrollments,
         public readonly int $revokedCredentials,
     ) {}
+
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        return [
+            'confirmedCredentials' => $this->confirmedCredentials,
+            'pendingEnrollments' => $this->pendingEnrollments,
+            'revokedCredentials' => $this->revokedCredentials,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
+    }
 }

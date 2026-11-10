@@ -4,18 +4,16 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Display;
 
+use Illuminate\Contracts\Support\Arrayable;
+use JsonSerializable;
 use Nvl\Auth\Models\Role;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
 
 /**
  * Minimal role identity for bounded consumer selectors and resolution results.
  *
  * @api
  */
-#[MapOutputName(CamelCaseMapper::class)]
-final class RoleOptionData extends Data
+final class RoleOptionData implements Arrayable, JsonSerializable
 {
     public readonly string $label;
 
@@ -46,6 +44,24 @@ final class RoleOptionData extends Data
             description: $role->description,
             isSystem: $role->is_system,
         );
+    }
+
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'label' => $this->label,
+            'description' => $this->description,
+            'isSystem' => $this->isSystem,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 
     /**

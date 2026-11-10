@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Display;
 
+use Illuminate\Contracts\Support\Arrayable;
+use JsonSerializable;
 use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Support\Ownership\ValueObjects\OwnerReference;
-use Spatie\LaravelData\Data;
-use Spatie\TypeScriptTransformer\Attributes\LiteralTypeScriptType;
 
 /**
  * Exposes only tenant-safe membership and allowlisted principal identity fields.
  *
  * @api
  */
-final class TenantMembershipData extends Data
+final class TenantMembershipData implements Arrayable, JsonSerializable
 {
     public function __construct(
         public readonly string $id,
@@ -26,7 +26,29 @@ final class TenantMembershipData extends Data
         public readonly int $revision,
         public readonly ?string $name = null,
         public readonly ?string $email = null,
-        #[LiteralTypeScriptType("{ version: 1; type: string; storage: string; keyType: 'int' | 'string'; key: string } | null")]
         public readonly ?OwnerReference $ownerReference = null,
     ) {}
+
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'tenantId' => $this->tenantId,
+            'subjectType' => $this->subjectType,
+            'subjectId' => $this->subjectId,
+            'status' => $this->status->value,
+            'owner' => $this->owner,
+            'revision' => $this->revision,
+            'name' => $this->name,
+            'email' => $this->email,
+            'ownerReference' => $this->ownerReference?->toArray(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
+    }
 }

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Nvl\Auth\Contracts\RoleTemplateProvider;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Exceptions\AuthException;
@@ -16,12 +18,13 @@ use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\DeleteOwnAccountData;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\StoreInvitationData;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\SyncUserPermissionsData;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\SyncUserRolesData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\UpdateUserData;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Queries\InvitationIndexQueryData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\AuthRequestInput;
 use Nvl\Auth\ValueObjects\ExternalIdentity;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
 use Nvl\Auth\ValueObjects\RoleTemplate;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
-use Spatie\LaravelData\Optional;
 
 it('exposes complete consumer validation rules and invitation registration data', function (): void {
     $registration = new AcceptInvitationData(
@@ -34,8 +37,6 @@ it('exposes complete consumer validation rules and invitation registration data'
         token: 'token',
         name: 'Social Consumer',
         registrationMethod: 'social',
-        password: new Optional,
-        passwordConfirmation: new Optional,
     );
 
     expect($registration->toRegistrationArray())
@@ -79,6 +80,44 @@ it('normalizes bounded multi-type invitation filters', function (): void {
             21,
             'candidate',
         )))->toThrow(InvalidArgumentException::class, 'at most 20');
+});
+
+it('preserves omitted fields, explicit null and false in native principal input', function (): void {
+    $userId = '018f0c47-99c0-75cb-bc57-16790e06fbe1';
+    $omitted = UpdateUserData::validateForUpdate(['name' => 'Changed name'], $userId);
+    $cleared = UpdateUserData::validateForUpdate(['password' => null], $userId);
+    $unverified = UpdateUserData::validateForUpdate(['email_verified' => '0'], $userId);
+
+    expect($omitted)->toBe(['name' => 'Changed name'])
+        ->and($cleared)->toBe(['password' => null])
+        ->and($unverified)->toBe(['emailVerified' => false]);
+});
+
+it('validates native invitation passwords through consumer field aliases', function (string $confirmation): void {
+    $input = AuthRequestInput::aliased([
+        'token' => 'invitation-token',
+        'name' => 'Consumer',
+        'password' => 'correct-password',
+        $confirmation => 'correct-password',
+    ], ['passwordConfirmation' => ['password_confirmation']]);
+    $validated = Validator::make($input, AcceptInvitationData::rules())->validate();
+
+    expect($validated['passwordConfirmation'])->toBe('correct-password')
+        ->and($validated)->not->toHaveKey('password_confirmation');
+
+    $input['passwordConfirmation'] = 'different-password';
+
+    expect(fn () => Validator::make($input, AcceptInvitationData::rules())->validate())
+        ->toThrow(ValidationException::class);
+})->with(['camel case' => 'passwordConfirmation', 'snake case' => 'password_confirmation']);
+
+it('keeps omitted social invitation secrets absent from native validated input', function (): void {
+    $input = ['token' => 'invitation-token', 'name' => 'Social consumer', 'registrationMethod' => 'social'];
+    $omitted = Validator::make($input, AcceptInvitationData::rules())->validate();
+    $cleared = Validator::make([...$input, 'password' => null], AcceptInvitationData::rules())->validate();
+
+    expect($omitted)->not->toHaveKeys(['password', 'passwordConfirmation'])
+        ->and($cleared)->toHaveKey('password', null);
 });
 
 it('rejects malformed role, invitation, and assignment consumer mutations', function (): void {

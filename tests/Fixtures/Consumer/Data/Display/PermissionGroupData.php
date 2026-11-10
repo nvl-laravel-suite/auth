@@ -4,17 +4,15 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Display;
 
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
+use Illuminate\Contracts\Support\Arrayable;
+use JsonSerializable;
 
 /**
  * Deterministic permission group option with its bounded catalog count.
  *
  * @api
  */
-#[MapOutputName(CamelCaseMapper::class)]
-final class PermissionGroupData extends Data
+final class PermissionGroupData implements Arrayable, JsonSerializable
 {
     public readonly string $value;
 
@@ -31,5 +29,31 @@ final class PermissionGroupData extends Data
         $this->value = PermissionOptionData::normalizeGroup($value);
         $label = trim($label);
         $this->label = $label !== '' ? $label : $this->value;
+    }
+
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        return [
+            'value' => $this->value,
+            'label' => $this->label,
+            'permissionsCount' => $this->permissionsCount,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
+    }
+
+    /** @param array<string, mixed> $attributes */
+    public static function from(array $attributes): self
+    {
+        return new self(
+            value: $attributes['value'],
+            label: $attributes['label'],
+            permissionsCount: $attributes['permissionsCount'],
+        );
     }
 }

@@ -9,19 +9,13 @@ use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 use JsonException;
 use Nvl\Auth\Definitions\Tables\AuthTables;
-use Spatie\LaravelData\Attributes\MapInputName;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
 
 /**
  * Validated creation mutation for one managed permission.
  *
  * @api
  */
-#[MapInputName(CamelCaseMapper::class)]
-#[MapOutputName(CamelCaseMapper::class)]
-final class StorePermissionData extends Data
+final class StorePermissionData
 {
     /**
      * @param  array<string, mixed>  $metadata
@@ -72,6 +66,7 @@ final class StorePermissionData extends Data
         $guard = Config::string('nvl-auth.features.rbac.settings.guard', 'web');
 
         return [
+            'system' => ['sometimes', 'boolean'],
             'name' => [
                 'required',
                 'string',

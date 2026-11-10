@@ -7,19 +7,13 @@ namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations;
 use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;
 use Nvl\Auth\Definitions\Tables\AuthTables;
-use Spatie\LaravelData\Attributes\MapInputName;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
 
 /**
  * Validated replacement mutation for one principal's direct permissions.
  *
  * @api
  */
-#[MapInputName(CamelCaseMapper::class)]
-#[MapOutputName(CamelCaseMapper::class)]
-final class SyncUserPermissionsData extends Data
+final class SyncUserPermissionsData
 {
     /**
      * @param  list<string>  $permissions

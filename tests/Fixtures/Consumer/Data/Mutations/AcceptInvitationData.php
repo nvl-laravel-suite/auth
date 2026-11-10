@@ -5,33 +5,23 @@ declare(strict_types=1);
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations;
 
 use SensitiveParameter;
-use Spatie\LaravelData\Attributes\Hidden;
-use Spatie\LaravelData\Attributes\MapInputName;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
-use Spatie\LaravelData\Optional;
 
 /**
  * Registration input for accepting an invitation.
  *
  * @api
  */
-#[MapInputName(CamelCaseMapper::class)]
-#[MapOutputName(CamelCaseMapper::class)]
-final class AcceptInvitationData extends Data
+final class AcceptInvitationData
 {
     /** Create a validated invitation-acceptance mutation. */
     public function __construct(
         public readonly string $token,
         public readonly string $name,
         public readonly string $registrationMethod = 'password',
-        #[Hidden]
         #[SensitiveParameter]
-        public readonly string|null|Optional $password = new Optional,
-        #[Hidden]
+        public readonly ?string $password = null,
         #[SensitiveParameter]
-        public readonly string|null|Optional $passwordConfirmation = new Optional,
+        public readonly ?string $passwordConfirmation = null,
         public readonly ?string $locale = null,
         public readonly ?string $timezone = null,
         /** @var array<string, mixed> */
@@ -41,7 +31,13 @@ final class AcceptInvitationData extends Data
     /** @return array<string, mixed> */
     public function toRegistrationArray(): array
     {
-        $validated = $this->except('token')->toArray();
+        $validated = [
+            'name' => $this->name,
+            'registrationMethod' => $this->registrationMethod,
+            'locale' => $this->locale,
+            'timezone' => $this->timezone,
+            'extensions' => $this->extensions,
+        ];
 
         if (is_string($this->password)) {
             $validated['password'] = $this->password;
@@ -58,9 +54,10 @@ final class AcceptInvitationData extends Data
     public static function rules(): array
     {
         return [
+            'passwordConfirmation' => ['sometimes', 'nullable', 'string'],
             'token' => ['required', 'string', 'max:128'],
             'registrationMethod' => ['sometimes', 'in:password,social'],
-            'password' => ['required_unless:registrationMethod,social', 'nullable', 'string', 'min:8', 'max:4096', 'confirmed'],
+            'password' => ['required_unless:registrationMethod,social', 'nullable', 'string', 'min:8', 'max:4096', 'confirmed:passwordConfirmation'],
             'name' => ['required', 'string', 'max:160'],
             'locale' => ['sometimes', 'nullable', 'string', 'max:12'],
             'timezone' => ['sometimes', 'nullable', 'timezone:all'],

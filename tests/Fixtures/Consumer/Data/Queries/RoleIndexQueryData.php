@@ -5,20 +5,13 @@ declare(strict_types=1);
 namespace Nvl\Auth\Tests\Fixtures\Consumer\Data\Queries;
 
 use InvalidArgumentException;
-use Spatie\LaravelData\Attributes\MapInputName;
-use Spatie\LaravelData\Attributes\MapOutputName;
-use Spatie\LaravelData\Data;
-use Spatie\LaravelData\Mappers\CamelCaseMapper;
-use Spatie\TypeScriptTransformer\Attributes\Optional as TypeScriptOptional;
 
 /**
  * Validated filtering, sorting, and pagination for role listing.
  *
  * @api
  */
-#[MapInputName(CamelCaseMapper::class)]
-#[MapOutputName(CamelCaseMapper::class)]
-final class RoleIndexQueryData extends Data
+final class RoleIndexQueryData
 {
     /** @var list<string> */
     private const array SORTS = ['name', 'label', 'priority', 'created_at'];
@@ -28,16 +21,11 @@ final class RoleIndexQueryData extends Data
 
     public function __construct(
         public readonly ?string $search = null,
-        #[MapInputName('per_page')] #[MapOutputName('per_page')] public readonly ?int $perPage = null,
-        #[TypeScriptOptional]
+        public readonly ?int $perPage = null,
         public readonly ?bool $isSystem = null,
-        #[TypeScriptOptional]
         public readonly ?string $guard = null,
-        #[TypeScriptOptional]
         public readonly ?string $sort = null,
-        #[TypeScriptOptional]
         public readonly ?string $direction = null,
-        #[TypeScriptOptional]
         public readonly bool $includeAssignments = false,
     ) {
         if ($sort !== null && ! in_array($sort, self::SORTS, true)) {

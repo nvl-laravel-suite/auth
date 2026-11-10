@@ -6,12 +6,13 @@ namespace Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Management;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Services\AuthInvitations;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Mutations\StoreInvitationData;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Queries\InvitationIndexQueryData;
+use Nvl\Auth\Tests\Fixtures\Consumer\Http\AuthRequestInput;
 use Nvl\Auth\Tests\Fixtures\Consumer\Http\Controllers\Account\AuthenticatedController;
-use Spatie\LaravelData\Optional;
 
 /**
  * Handles authorized invitation management transport.
@@ -22,11 +23,15 @@ final class InvitationController extends AuthenticatedController
      * List invitations.
      */
     public function index(
-        InvitationIndexQueryData $data,
         Request $request,
         AuthInvitations $action,
     ): JsonResponse {
-        $page = $action->paginate($this->subject($request), array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional));
+        $data = array_replace(['recipient' => null, 'type' => null, 'purpose' => null, 'lifecycle' => null, 'expiresAfter' => null, 'expiresBefore' => null, 'context' => null, 'per_page' => null, 'types' => null], Validator::make(AuthRequestInput::aliased($request->all(), ['expiresAfter' => ['expires_after'], 'expiresBefore' => ['expires_before'], 'per_page' => ['perPage']]), InvitationIndexQueryData::rules())->validate());
+        if (isset($data['per_page'])) {
+            $data['per_page'] = (int) $data['per_page'];
+        }
+
+        $page = $action->paginate($this->subject($request), $data);
 
         return response()->json(['data' => $page, 'code' => 'invitations_listed', 'message' => trans('nvl-auth::responsecode.invitations_listed')]);
     }
@@ -34,10 +39,12 @@ final class InvitationController extends AuthenticatedController
     /**
      * Issue an invitation and emit its delivery event.
      */
-    public function store(StoreInvitationData $data, Request $request, AuthInvitations $action): JsonResponse
+    public function store(Request $request, AuthInvitations $action): JsonResponse
     {
-        $data->locale = $request->getPreferredLanguage();
-        $result = $action->create(array_filter(get_object_vars($data), static fn ($value): bool => ! $value instanceof Optional), $this->subject($request));
+        $data = array_replace(['type' => 'registration', 'purpose' => 'registration', 'roles' => [], 'permissions' => [], 'metadata' => [], 'locale' => null, 'context' => null], Validator::make($request->all(), StoreInvitationData::rules())->validate());
+
+        $data['locale'] = $request->getPreferredLanguage();
+        $result = $action->create($data, $this->subject($request));
 
         return response()->json([
             'data' => ['invitation_id' => $result['invitation']->identifier(), 'expires_at' => $result['invitation']->expires_at->toIso8601String()],
