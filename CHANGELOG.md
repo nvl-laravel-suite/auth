@@ -5,6 +5,8 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [Unreleased]
 
+## [7.0.3] - 2026-11-11
+
 ### Fixed
 
 - `NVL_AUTH_RETENTION_DAYS` is read as an integer, so setting it no longer makes `nvl:auth:prune` fail with an invalid-configuration error; a non-integer value still fails closed. Hosts that published the full configuration should apply the same `filter_var(..., FILTER_VALIDATE_INT)` read.
@@ -34,6 +36,12 @@ All notable changes to `nvl/auth` are documented here.
 - Management searches match `%` and `_` literally, and legacy role and permission page filters are length-bounded.
 - Email-identity adoption streams only the identity columns instead of loading every principal.
 - `nvl:auth:configuration` reports drift as unavailable when inspection fails instead of reporting no findings.
+
+<!-- NVL GENERATED CHANGES START -->
+### Changed
+
+- harden credentials, RBAC cache, deliveries and schema probes
+<!-- NVL GENERATED CHANGES END -->
 
 ## [7.0.2] - 2026-11-10
 
