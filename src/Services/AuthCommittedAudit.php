@@ -22,7 +22,7 @@ use Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope;
  */
 final readonly class AuthCommittedAudit
 {
-    /** Native Auth operation. */
+    /** Create the after-commit audit recorder. */
     public function __construct(private RecorderContract $recorder, private ConnectionCommitCallbacks $commits, private AuthOwnershipState $state, private OwnershipContext $context, private OwnershipQueueContext $queue) {}
 
     /**

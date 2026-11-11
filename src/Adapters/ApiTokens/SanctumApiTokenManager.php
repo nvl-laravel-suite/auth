@@ -66,7 +66,7 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
 
         $query = $prototype->getConnection()->table($prototype->getTable())
             ->where('tokenable_type', $model->getMorphClass())->where('tokenable_id', $model->getKey())
-            ->whereRaw('SUBSTR(name, 1, ?) = ?', [strlen($prefix), $prefix]);
+            ->whereRaw($this->managedNamePredicate($prototype->getConnection()), $this->managedNameBindings());
         $identifiers = $query->orderBy($prototype->getKeyName())->lockForUpdate()->get([$prototype->getKeyName(), 'name'])
             ->filter(static fn (object $token): bool => is_string($token->name) && str_starts_with($token->name, $prefix))
             ->pluck($prototype->getKeyName())->all();
@@ -170,7 +170,7 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
     {
         $model = $this->subject($subject);
         $token = $this->tokens($model)->getModel();
-        $row = $token->getConnection()->table($token->getTable())->useWritePdo()->where($token->getKeyName(), $tokenId)->where('tokenable_type', $model->getMorphClass())->where('tokenable_id', $model->getKey())->whereRaw('name LIKE ?', [$this->namespace().':%'])->first();
+        $row = $token->getConnection()->table($token->getTable())->useWritePdo()->where($token->getKeyName(), $tokenId)->where('tokenable_type', $model->getMorphClass())->where('tokenable_id', $model->getKey())->whereRaw($this->managedNamePredicate($token->getConnection()), $this->managedNameBindings())->first();
         if ($row === null || ! is_string($row->owner_reference ?? null) || $row->expires_at !== null && (! is_string($row->expires_at) || CarbonImmutable::parse($row->expires_at)->isPast())) {
             return null;
         }
@@ -234,7 +234,8 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
      */
     private function managedTokens(Model $subject): Builder
     {
-        $query = $this->tokens($subject)->whereRaw('name LIKE ?', [$this->namespace().':%'])->getQuery();
+        $relation = $this->tokens($subject);
+        $query = $relation->whereRaw($this->managedNamePredicate($relation->getRelated()->getConnection()), $this->managedNameBindings())->getQuery();
 
         return $this->boundary->query($query, 'auth.tokens');
     }
@@ -296,6 +297,34 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
         }
 
         return $namespace;
+    }
+
+    /**
+     * Compare the namespace prefix byte for byte: MySQL and MariaDB fold case in text comparisons,
+     * and a host column may carry a case-insensitive collation on PostgreSQL or SQLite.
+     *
+     * @return literal-string
+     */
+    private function managedNamePredicate(Connection $connection): string
+    {
+        return match ($connection->getDriverName()) {
+            'mysql', 'mariadb' => 'SUBSTR(name, 1, ?) = CAST(? AS BINARY)',
+            'pgsql' => 'SUBSTR(name, 1, ?) = ? COLLATE "C"',
+            'sqlite' => 'SUBSTR(name, 1, ?) = ? COLLATE BINARY',
+            default => 'SUBSTR(name, 1, ?) = ?',
+        };
+    }
+
+    /**
+     * Bind the exact namespace prefix; LIKE would treat an underscore in the namespace as a wildcard.
+     *
+     * @return array{int, string}
+     */
+    private function managedNameBindings(): array
+    {
+        $prefix = $this->namespace().':';
+
+        return [strlen($prefix), $prefix];
     }
 
     /**

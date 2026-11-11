@@ -38,7 +38,7 @@ use Throwable;
  */
 final readonly class AuthTokens
 {
-    /** Native Auth operation. */
+    /** Create the API token service. */
     public function __construct(private FeatureGate $features, private ApiTokenPolicy $policy, private ApiTokenManager $tokens, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, private AuthCommittedAudit $committedAudits, private AuthenticationProofs $proofs, private SuccessfulLoginMetadataRecorder $loginMetadata, private DomainEventDispatcher $domainEvents, private ConnectionCommitCallbacks $commits, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes) {}
 
     /** Complete stateless authentication from a native namespace-bound proof.

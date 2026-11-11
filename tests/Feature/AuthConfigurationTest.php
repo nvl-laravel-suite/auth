@@ -9,9 +9,11 @@ use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\PasskeyCeremony;
 use Nvl\Auth\Enums\AuthFeature;
+use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Providers\AuthServiceProvider;
+use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthDoctor;
 use Nvl\Auth\Services\AuthManagementAbilityCatalog;
 use Nvl\Auth\Services\ConfiguredPolicyAuthManagementAccess;
@@ -350,4 +352,20 @@ it('reports Auth integration state and configuration drift without scalar secret
         ->and($report['models']['user'] ?? null)->toBe(TestUser::class)
         ->and($report['adapters'][PasskeyCeremony::class]['required'] ?? null)->toBeFalse()
         ->and($output)->not->toContain('must-never-appear');
+});
+
+it('reads the retention period from the environment as a strict integer', function (): void {
+    $retentionDays = static function (string $value): int {
+        putenv("NVL_AUTH_RETENTION_DAYS={$value}");
+        try {
+            config(['nvl-auth.cleanup' => (require dirname(__DIR__, 2).'/config/nvl-auth.php')['cleanup']]);
+
+            return app(AuthConfiguration::class)->integerBetween('cleanup.retention_days', 30, 1, 3650);
+        } finally {
+            putenv('NVL_AUTH_RETENTION_DAYS');
+        }
+    };
+
+    expect($retentionDays('45'))->toBe(45)
+        ->and(fn () => $retentionDays('3O'))->toThrow(AuthException::class, 'cleanup.retention_days');
 });

@@ -19,6 +19,7 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Membership;
 use Nvl\Auth\Models\OwnerMembership;
 use Nvl\Auth\Models\OwnerMembershipLock;
+use Nvl\Auth\Support\LiteralSearch;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
@@ -35,7 +36,7 @@ use Nvl\Support\Ownership\ValueObjects\OwnerReference;
  */
 final readonly class AuthMemberships
 {
-    /** Native Auth operation. */
+    /** Create the owner membership lifecycle service. */
     public function __construct(private AuthModelRegistry $models, private ManagementAuthorizer $management, private AuthConfiguration $configuration, private AuthOperationBoundary $operations, private OwnershipReadiness $readiness, private OwnershipBoundary $boundary, private OwnershipContext $context, private FeatureGate $features, private MutationAuthorizer $authorization, private MembershipPrincipalResolver $principals, private OwnerMembershipAssignments $assignments, private AuthCommittedAudit $audits) {}
 
     /** Explicitly provision an existing principal; authentication never calls this method. */
@@ -62,6 +63,8 @@ final readonly class AuthMemberships
     }
 
     /** Enroll a principal only under explicit management authorization and an existing owner lock.
+     * Granting access, or replacing a retained member's access, additionally requires access management authority.
+     *
      * @param  list<string>  $roles
      * @param  list<string>  $permissions
      */
@@ -80,6 +83,9 @@ final readonly class AuthMemberships
                 $membership = new $class;
                 $membership->fill(['subject_type' => $subject->type, 'subject_id' => $subject->identifier]);
             }
+            if ($roles !== [] || $permissions !== [] || ($membership->exists && $membership->status !== MembershipStatus::Revoked)) {
+                $this->authorization->authorize($authority, 'nvl.auth.memberships.manageAccess', $membership);
+            }
             if (! $membership->exists || $membership->status === MembershipStatus::Revoked) {
                 $membership->forceFill(['status' => MembershipStatus::Active, 'is_owner' => false, 'revision' => $membership->exists ? $membership->revision + 1 : 1])->save();
             }
@@ -90,7 +96,9 @@ final readonly class AuthMemberships
         }, 3);
     }
 
-    /** Apply one optimistic status transition without removing an owner's last active administrator. */
+    /** Apply one optimistic status transition without removing an owner's last active administrator.
+     * Revocation also ends owner administration, so later reactivation never restores it.
+     */
     public function setStatus(Authenticatable|SystemMutationContext $authority, Membership|string $membership, MembershipStatus $status, int $expectedRevision): OwnerMembership
     {
         $this->features->assertAllowed(AuthFeature::Memberships, FeatureOperation::Update);
@@ -115,7 +123,7 @@ final readonly class AuthMemberships
                 }
             }
             if ($target->status !== $status) {
-                $target->forceFill(['status' => $status, 'revision' => $target->revision + 1])->save();
+                $target->forceFill(['status' => $status, 'is_owner' => $target->is_owner && $status !== MembershipStatus::Revoked, 'revision' => $target->revision + 1])->save();
             }
             $this->audits->record($target->getConnection(), 'membership.'.$status->value, subject: new SubjectReference($target->subject_type, $target->subject_id), actor: $actor, metadata: $this->authorization->metadata($authority));
 
@@ -123,7 +131,7 @@ final readonly class AuthMemberships
         }, 3);
     }
 
-    /** Move administration between two memberships without transferring the resource owner. */
+    /** Move administration between two active memberships without transferring the resource owner. */
     public function transfer(Authenticatable|SystemMutationContext $authority, Membership|string $membership, string $recipientId, int $expectedRevision): OwnerMembership
     {
         $this->features->assertAllowed(AuthFeature::Memberships, FeatureOperation::Update);
@@ -137,11 +145,11 @@ final readonly class AuthMemberships
             if ($source->revision !== $expectedRevision) {
                 throw new AuthException('membership_revision_conflict', 'The membership revision is stale.', 409);
             }
-            if (! $source->is_owner || $source->status !== MembershipStatus::Active || $source->is($recipient)) {
+            if (! $source->is_owner || $source->status !== MembershipStatus::Active || $recipient->status !== MembershipStatus::Active || $source->is($recipient)) {
                 throw new AuthException('membership_ownership_invalid', 'Membership administration cannot be transferred.', 422);
             }
             $this->principals->resolve(new SubjectReference($recipient->subject_type, $recipient->subject_id), true);
-            $recipient->forceFill(['status' => MembershipStatus::Active, 'is_owner' => true, 'revision' => $recipient->revision + 1])->save();
+            $recipient->forceFill(['is_owner' => true, 'revision' => $recipient->revision + 1])->save();
             $source->forceFill(['is_owner' => false, 'revision' => $source->revision + 1])->save();
             $this->audits->record($source->getConnection(), 'membership.ownership_transferred', subject: new SubjectReference($source->subject_type, $source->subject_id), actor: $actor, metadata: [...$this->authorization->metadata($authority), 'recipient_membership_id' => $recipient->id]);
 
@@ -229,10 +237,7 @@ final readonly class AuthMemberships
         }
         $query = $this->query();
         if ($search !== null && trim($search) !== '') {
-            $term = '%'.trim($search).'%';
-            $query->where(static function (Builder $builder) use ($term): void {
-                $builder->where('subject_id', 'like', $term)->orWhere('subject_type', 'like', $term);
-            });
+            LiteralSearch::contains($query, ['subject_id', 'subject_type'], trim($search));
         }
 
         return $query->orderBy('created_at')->paginate(max(1, min($perPage, $this->configuration->positiveInteger('features.memberships.settings.maximum_per_page', 100))));

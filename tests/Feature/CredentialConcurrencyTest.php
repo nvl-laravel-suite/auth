@@ -34,6 +34,7 @@ use Nvl\Auth\Tests\Fixtures\TestSocialIdentityProviderFactory;
 use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Auth\ValueObjects\ExternalIdentity;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use PragmaRX\Google2FA\Google2FA;
 
 beforeEach(function (): void {
     config(['nvl-auth.features.totp.enabled' => true, 'nvl-auth.features.recovery_codes.enabled' => true]);
@@ -105,6 +106,39 @@ it('serializes concurrent credential inventory replacements', function (string $
         expect(RecoveryCode::query()->whereNull('revoked_at')->distinct()->count('batch_id'))->toBe(1);
     }
 })->with(['totp', 'recovery'])->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/MariaDB/PostgreSQL.');
+
+it('admits exactly one concurrent use of a recovery code or totp timestep', function (string $factor): void {
+    $user = $this->user();
+    $id = $user->getKey();
+    if ($factor === 'recovery') {
+        $code = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration)->reveal(), context: $this->authenticationContext())->codes[0];
+    } else {
+        $credential = TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
+        $code = app(Google2FA::class)->getCurrentOtp($credential->secret);
+    }
+    $worker = static function () use ($id, $factor, $code): array {
+        DB::listen(static function ($query): void {
+            if (str_starts_with(strtolower($query->sql), 'update')) {
+                usleep(250000);
+            }
+        });
+        $user = TestUser::query()->findOrFail($id);
+        try {
+            $factor === 'recovery'
+                ? app(AuthSecondFactor::class)->consumeRecoveryCode($user, ['code' => $code])
+                : app(AuthSecondFactor::class)->verify($user, ['code' => $code]);
+
+            return ['accepted' => true];
+        } catch (AuthException $exception) {
+            return ['accepted' => false, 'rejection' => $exception->errorCode];
+        }
+    };
+    $results = SecurityRace::run([$worker, $worker, $worker]);
+    expect(array_column($results, 'ok'))->toBe([true, true, true], json_encode($results, JSON_THROW_ON_ERROR))
+        ->and(array_sum(array_column($results, 'accepted')))->toBe(1, json_encode($results, JSON_THROW_ON_ERROR))
+        ->and(array_values(array_unique(array_filter(array_column($results, 'rejection')))))->toBe([$factor === 'recovery' ? 'recovery_code_invalid' : 'totp_invalid'])
+        ->and($factor === 'recovery' ? RecoveryCode::query()->whereNotNull('used_at')->count() : AuthAudit::query()->where('action', 'totp.verified')->count())->toBe(1);
+})->with(['recovery', 'totp'])->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/MariaDB/PostgreSQL.');
 
 it('finishes passkey verification outside the security transaction', function (): void {
     config(['nvl-auth.features.passkeys.enabled' => true]);

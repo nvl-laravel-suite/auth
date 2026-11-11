@@ -16,10 +16,10 @@ use Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope;
  */
 final readonly class AuthDeliveryContext
 {
-    /** Native Auth operation. */
+    /** Create the delivery ownership-context capturer. */
     public function __construct(private OwnershipContext $context, private OwnershipQueueContext $queues) {}
 
-    /** Native Auth operation. */
+    /** Capture the current ownership context, or an unowned envelope for identity deliveries and unresolved contexts. */
     public function capture(bool $identity = false): OwnershipJobEnvelope
     {
         return $identity || $this->context->snapshot()->mode === OwnershipContextMode::Unresolved ? $this->queues->captureUnowned() : OwnershipJobEnvelope::capture($this->context);

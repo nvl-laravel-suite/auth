@@ -17,6 +17,10 @@ final class RoleHierarchy
 {
     /**
      * Require a parent assignment to remain acyclic and in the same guard.
+     *
+     * Must run inside the transaction that writes the parent: every role of the guard is
+     * locked in key order and the ancestor chain is read from those locked rows, so two
+     * concurrent parent changes cannot each pass against the other's uncommitted state.
      */
     public function assertParentAllowed(Role $role, ?Role $parent): void
     {
@@ -26,20 +30,21 @@ final class RoleHierarchy
         if ($parent->id === $role->id || $parent->guard_name !== $role->guard_name) {
             throw new AuthException('invalid_role_parent', 'The selected role parent is invalid.', 422);
         }
-        $ancestor = $parent;
+        $parents = [];
+        foreach ($role->newQuery()->where('guard_name', $role->guard_name)->orderBy($role->getKeyName())->lockForUpdate()->get(['id', 'parent_id']) as $locked) {
+            $parents[$locked->id] = $locked->parent_id;
+        }
+        $ancestor = $parent->id;
         $visited = [];
-        while ($ancestor->parent_id !== null) {
-            if (isset($visited[$ancestor->id])) {
+        while (($next = $parents[$ancestor] ?? null) !== null) {
+            if (isset($visited[$ancestor])) {
                 throw new AuthException('role_hierarchy_cycle', 'The persisted role hierarchy contains a cycle.', 422);
             }
-            $visited[$ancestor->id] = true;
-            if ($ancestor->parent_id === $role->id) {
+            $visited[$ancestor] = true;
+            if ($next === $role->id) {
                 throw new AuthException('role_hierarchy_cycle', 'Role hierarchy cycles are not allowed.', 422);
             }
-            $ancestor = $ancestor->parent()->first();
-            if (! $ancestor instanceof Role) {
-                break;
-            }
+            $ancestor = $next;
         }
     }
 

@@ -30,7 +30,7 @@ use Spatie\Permission\PermissionRegistrar;
  */
 final readonly class AuthRoles
 {
-    /** Native Auth operation. */
+    /** Create the role management service. */
     public function __construct(private FeatureGate $features, private ManagementAuthorizer $authorization, private AuthModelRegistry $models, private RbacEntityLocator $entities, private RoleHierarchy $hierarchy, private AuthConfiguration $configuration, private AuthAuditRecorder $audits, private AuthCommittedAudit $committedAudits, private DomainEventDispatcher $domainEvents, private RbacAssignmentService $assignments, private RoleTemplateRegistry $templates, private RbacSynchronizer $synchronizer, private Container $rbacContainer, private MutationAuthorizer $syncUserRolesAuthorization, private RbacPrincipalAccess $principals, private RbacManager $rbac) {}
 
     /** Persist one role.
@@ -44,7 +44,7 @@ final readonly class AuthRoles
         $class = $this->models->roleClass();
         $connection = (new $class)->getConnectionName();
 
-        return DB::connection($connection)->transaction(function () use ($actor, $class, $data): Role {
+        $role = DB::connection($connection)->transaction(function () use ($actor, $class, $data): Role {
             $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
             $parent = $data['parentId'] !== null ? $this->entities->role($data['parentId']) : null;
             /** @var array{name: string, guard_name: string, display_name: string|null, description: string|null, parent_id: null, priority: int, is_system: bool, metadata: array<string, mixed>|null} $attributes */
@@ -58,6 +58,9 @@ final readonly class AuthRoles
 
             return $role->refresh()->load(['parent', 'permissions']);
         }, 3);
+        $this->assignments->clearPermissionCache();
+
+        return $role;
     }
 
     /** Persist one role mutation.
@@ -73,7 +76,7 @@ final readonly class AuthRoles
             throw new AuthException('system_role_immutable', 'System role names cannot be changed.', 422);
         }
 
-        return DB::connection($role->getConnectionName())->transaction(function () use ($actor, $data, $role): Role {
+        $role = DB::connection($role->getConnectionName())->transaction(function () use ($actor, $data, $role): Role {
             $parent = $data['parentId'] !== null ? $this->entities->role($data['parentId']) : null;
             $this->hierarchy->assertParentAllowed($role, $parent);
             $role->fill(['name' => trim($data['name']), 'display_name' => $data['displayName'], 'description' => $data['description'], 'parent_id' => $parent?->id, 'priority' => $data['priority'], 'metadata' => $data['metadata']])->save();
@@ -83,6 +86,9 @@ final readonly class AuthRoles
 
             return $role->refresh()->load(['parent', 'permissions']);
         }, 3);
+        $this->assignments->clearPermissionCache();
+
+        return $role;
     }
 
     /** Delete one role. */
@@ -95,7 +101,7 @@ final readonly class AuthRoles
             throw new AuthException('system_role_delete_forbidden', 'System roles cannot be deleted.', 422);
         }
 
-        return DB::connection($role->getConnectionName())->transaction(function () use ($actor, $role): bool {
+        $deleted = DB::connection($role->getConnectionName())->transaction(function () use ($actor, $role): bool {
             $identifier = $role->id;
             $deleted = (bool) $role->delete();
             $this->audits->record('role.deleted', actor: $actor, metadata: ['role_id' => $identifier]);
@@ -103,6 +109,9 @@ final readonly class AuthRoles
 
             return $deleted;
         }, 3);
+        $this->assignments->clearPermissionCache();
+
+        return $deleted;
     }
 
     /** Clone one role. */
@@ -113,7 +122,7 @@ final readonly class AuthRoles
         $source = $this->entities->role($role)->load('permissions');
         $class = $this->models->roleClass();
 
-        return DB::connection($source->getConnectionName())->transaction(function () use ($actor, $class, $displayName, $name, $source): Role {
+        $clone = DB::connection($source->getConnectionName())->transaction(function () use ($actor, $class, $displayName, $name, $source): Role {
             /** @var array{name: string, guard_name: string, display_name: string|null, description: string|null, parent_id: string|null, priority: int, is_system: bool, metadata: array<string, mixed>|null} $attributes */
             $attributes = [...[], 'name' => trim($name), 'guard_name' => $source->guard_name, 'display_name' => $displayName, 'description' => $source->description, 'parent_id' => $source->parent_id, 'priority' => $source->priority, 'is_system' => false, 'metadata' => $source->metadata];
             $clone = $class::query()->create($attributes);
@@ -123,6 +132,9 @@ final readonly class AuthRoles
 
             return $clone->refresh()->load('permissions');
         }, 3);
+        $this->assignments->clearPermissionCache();
+
+        return $clone;
     }
 
     /**
@@ -186,7 +198,7 @@ final readonly class AuthRoles
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
         $connection = $this->synchronizer->roleConnection();
 
-        return $connection->transaction(function () use ($actor, $connection, $data, $guard, $permissionClass, $roleClass, $template, $templateKey): Role {
+        $role = $connection->transaction(function () use ($actor, $connection, $data, $guard, $permissionClass, $roleClass, $template, $templateKey): Role {
             $parent = $template->parentRole !== null ? $this->entities->roleByName($template->parentRole, $guard) : null;
             $mutation = $template->toMutation($data['roleName'], $parent?->id);
             try {
@@ -208,6 +220,9 @@ final readonly class AuthRoles
 
             return $role->refresh()->load(['parent', 'permissions']);
         }, 3);
+        $this->assignments->clearPermissionCache();
+
+        return $role;
     }
 
     /**
@@ -517,7 +532,7 @@ final readonly class AuthRoles
         return $data;
     }
 
-    /** Native Auth operation. */
+    /** Resolve the Spatie permission registrar, which RBAC requires. */
     private function registrar(): PermissionRegistrar
     {
         if (! class_exists(PermissionRegistrar::class)) {

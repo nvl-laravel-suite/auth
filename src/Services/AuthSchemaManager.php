@@ -24,7 +24,7 @@ final readonly class AuthSchemaManager
     /** @var array<string, list<string>> */
     private const array REQUIRED_INDEXES = [AuthTables::Impersonations => ['nvl_auth_impersonation_active_unique'], AuthTables::RememberCredentials => ['nvl_auth_remember_selector_unique'], AuthTables::BrowserSessions => ['nvl_auth_browser_binding_unique'], AuthTables::PendingEmailChanges => ['nvl_auth_pending_email_active_unique'], AuthTables::PrincipalSecurityStates => ['nvl_auth_principal_security_states_subject_unique'], AuthTables::Invitations => ['nvl_auth_invitations_context_hash_index', 'nvl_auth_invitations_delivery_status_index'], AuthTables::Challenges => ['nvl_auth_challenges_secondary_secret_hash_unique']];
 
-    /** Native Auth operation. */
+    /** Create the feature-aware schema planner and installer. */
     public function __construct(private AuthConfiguration $configuration, private AuthModelRegistry $models) {}
 
     /**
@@ -200,19 +200,19 @@ final readonly class AuthSchemaManager
         return array_values(array_unique($tables));
     }
 
-    /** Native Auth operation. */
+    /** Report whether a feature is enabled in configuration. */
     private function enabled(AuthFeature $feature): bool
     {
         return $this->configuration->featureEnabled($feature);
     }
 
-    /** Native Auth operation. */
+    /** Return the configured name of one identity table. */
     private function table(string $key, string $default): string
     {
         return $this->configuration->string("tables.{$key}", $default);
     }
 
-    /** Native Auth operation. */
+    /** Return the configured package connection name, if any. */
     private function connectionName(): ?string
     {
         $connection = $this->configuration->get('connection');
@@ -220,7 +220,7 @@ final readonly class AuthSchemaManager
         return is_string($connection) && trim($connection) !== '' ? trim($connection) : null;
     }
 
-    /** Native Auth operation. */
+    /** Load one bundled schema migration by filename. */
     private function migration(string $filename): AuthSchemaMigration
     {
         $migration = require dirname(__DIR__, 2).'/database/migrations/'.$filename;

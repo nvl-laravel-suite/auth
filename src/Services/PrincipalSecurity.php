@@ -20,6 +20,7 @@ use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\PrincipalSecurityState;
 use Nvl\Auth\Models\RememberCredential;
 use Nvl\Auth\Support\AuthInstantCast;
+use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
 /** Serializes native credential mutations on the principal's actual source.
@@ -30,7 +31,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  */
 final readonly class PrincipalSecurity
 {
-    public function __construct(private AuthConfiguration $configuration, private ApiTokenManager $tokens) {}
+    public function __construct(private AuthConfiguration $configuration, private ApiTokenManager $tokens, private AuthSchemaProbes $probes, private SecretHasher $hasher) {}
 
     /** @var list<string> */
     private const REASONS = ['password_reset', 'password_changed', 'password_admin_reset', 'totp_pending_replaced', 'totp_enrolled', 'totp_revoked', 'recovery_replaced', 'recovery_revoked', 'passkey_enrolled', 'passkey_revoked', 'social_linked', 'social_revoked', 'principal_disabled', 'principal_enabled', 'principal_deleted', 'principal_restored', 'email_changed', 'security_containment'];
@@ -62,6 +63,14 @@ final readonly class PrincipalSecurity
         return $state;
     }
 
+    /** Probe the challenge table once per authentication operation. */
+    private function challengeTableExists(Model $principal): bool
+    {
+        $table = (new Challenge)->getTable();
+
+        return $this->probes->once('table:'.$principal->getConnection()->getName().':'.$table, static fn (): bool => $principal->getConnection()->getSchemaBuilder()->hasTable($table));
+    }
+
     /** Lock native capabilities after all participating principals and states, before credentials. */
     public function lockChallenges(Authenticatable $subject): void
     {
@@ -69,7 +78,7 @@ final readonly class PrincipalSecurity
         if ($principal->getConnection()->transactionLevel() === 0) {
             throw new \LogicException('Challenge locks require the owning source transaction.');
         }
-        if ($principal->getConnection()->getSchemaBuilder()->hasTable((new Challenge)->getTable())) {
+        if ($this->challengeTableExists($principal)) {
             $this->challenges(SubjectReference::fromAuthenticatable($principal))->orderBy('id')->lockForUpdate()->get();
         }
     }
@@ -91,8 +100,14 @@ final readonly class PrincipalSecurity
         return $state->revision ?? 1;
     }
 
-    /** Advance inside the owning transaction; rollback restores every invalidation. */
-    public function advance(Authenticatable $subject, string $reason): int
+    /**
+     * Advance inside the owning transaction; rollback restores every invalidation.
+     *
+     * A managed browser that proves its own binding through the acting context follows the new
+     * revision, so a principal is not signed out by their own security action; every other
+     * browser and every remember credential ends.
+     */
+    public function advance(Authenticatable $subject, string $reason, ?AuthenticationRequestContext $acting = null): int
     {
         if (! in_array($reason, self::REASONS, true)) {
             throw new InvalidArgumentException('Unknown native security revision reason.');
@@ -110,11 +125,18 @@ final readonly class PrincipalSecurity
                 throw AuthException::invalidConfiguration('Managed containment requires one source.');
             }
             $reference = SubjectReference::fromAuthenticatable($subject);
-            $sessions->newQuery()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery($sessions->getConnection(), now())]);
+            $active = $sessions->newQuery()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at');
+            if ($acting?->browserSessionId !== null && $acting->browserBinding !== null) {
+                $kept = (clone $active)->whereKey($acting->browserSessionId)->where('guard_name', $acting->guardName)->where('binding_hash', $this->hasher->hash('native-browser-binding', $acting->browserBinding))->where('security_revision', $state->revision - 1)->update(['security_revision' => $state->revision]);
+                if ($kept === 1) {
+                    $active->whereKeyNot($acting->browserSessionId);
+                }
+            }
+            $active->update(['revoked_at' => AuthInstantCast::forQuery($sessions->getConnection(), now())]);
             RememberCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new RememberCredential)->getConnection(), now())]);
         }
         $principal = $this->principal($subject);
-        if ($principal->getConnection()->getSchemaBuilder()->hasTable((new Challenge)->getTable())) {
+        if ($this->challengeTableExists($principal)) {
             $this->challenges(SubjectReference::fromAuthenticatable($principal))->update(['revoked_at' => AuthInstantCast::forQuery((new Challenge)->getConnection(), now()), 'active_key' => null]);
         }
         if ($principal->getRememberTokenName() !== '') {

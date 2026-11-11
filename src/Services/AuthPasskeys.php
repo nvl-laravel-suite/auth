@@ -7,7 +7,7 @@ namespace Nvl\Auth\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Container\Container;
-use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Nvl\Auth\Contracts\AccountAuthenticationPolicy;
@@ -24,6 +24,7 @@ use Nvl\Auth\Events\AccountSecurityChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\Passkey;
+use Nvl\Auth\Support\UniqueViolation;
 use Nvl\Auth\Traits\IssuesAuthenticationProofs;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\IssuedAuthenticationProof;
@@ -43,7 +44,7 @@ final readonly class AuthPasskeys
 {
     use IssuesAuthenticationProofs;
 
-    /** Native Auth operation. */
+    /** Create the passkey enrollment and authentication service. */
     public function __construct(private FeatureGate $features, private AuthConfiguration $configuration, private Container $container, private SecretHasher $hasher, private AuthAuditRecorder $audits, private OwnerAuthenticationChallengeIntents $ownerIntents, private PasskeyInputValidator $input, private PrincipalSecurity $security, private AuthSubjectResolver $subjects, private AuthIdentityChallenges $records, private RecentAuthenticationProofs $recent, private UsableAccountAuthenticationPolicy $nativeRemoval, private AccountAuthenticationPolicy $removalPolicy, private DomainEventDispatcher $securityEvents) {}
 
     /**
@@ -137,7 +138,7 @@ final readonly class AuthPasskeys
         return $this->finishAuthenticationFinish($data, $requestedOwner, $sessionBinding);
     }
 
-    /** Native Auth operation.
+    /** Verify a passkey assertion against its stored ceremony and issue the authentication proof.
      * @param  array<string, mixed>  $data
      * @return array{subject: SubjectReference, proof: IssuedAuthenticationProof, requestContext: AuthenticationRequestContext}
      */
@@ -208,7 +209,7 @@ final readonly class AuthPasskeys
 
                 return new AuthException('passkey_invalid', 'The passkey assertion was rejected.', 422);
             }
-            if ($passkey->signature_counter > 0 && $assertion->signatureCounter > 0 && $assertion->signatureCounter <= $passkey->signature_counter) {
+            if (($passkey->signature_counter > 0 || $assertion->signatureCounter > 0) && $assertion->signatureCounter <= $passkey->signature_counter) {
                 $challenge->increment('attempts');
 
                 return new AuthException('passkey_counter_regression', 'The passkey assertion was rejected.', 422);
@@ -286,13 +287,13 @@ final readonly class AuthPasskeys
                 }
                 $passkey = Passkey::query()->create(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'name' => $data['name'], 'credential_id' => $registration->credentialId, 'credential_id_hash' => $this->hasher->hash('passkey-credential', $registration->credentialId), 'public_key' => $registration->publicKey, 'user_handle' => $registration->userHandle, 'signature_counter' => $registration->signatureCounter, 'transports' => $registration->transports, 'backup_eligible' => $registration->backupEligible, 'backed_up' => $registration->backedUp]);
                 $challenge->forceFill(['consumed_at' => CarbonImmutable::now()])->save();
-                $this->security->advance($subject, 'passkey_enrolled');
+                $this->security->advance($subject, 'passkey_enrolled', $context);
                 $this->audits->record('passkey.enrolled', subject: $reference, actor: $subject, metadata: ['passkey_id' => $passkey->identifier()]);
 
                 return $passkey;
             }, 3);
-        } catch (QueryException $exception) {
-            if (! in_array($exception->errorInfo[0] ?? null, ['23000', '23505'], true) || ! str_contains($exception->getMessage(), 'nvl_auth_passkeys_credential_id_hash_unique') && ! str_contains($exception->getMessage(), 'auth_passkeys.credential_id_hash')) {
+        } catch (UniqueConstraintViolationException $exception) {
+            if (UniqueViolation::columns($exception, (new Passkey)->getConnection(), (new Passkey)->getTable()) !== ['credential_id_hash']) {
                 throw $exception;
             }
             $this->finishRegistrationCommitFailedAttempt($connection, $data['ceremonyId']);
@@ -349,7 +350,7 @@ final readonly class AuthPasskeys
                 $this->removalPolicy->assertRemovalAllowed($subject, 'passkey', $locked->identifier());
                 $this->nativeRemoval->assertRemovalAllowed($subject, 'passkey', $locked->identifier());
                 $locked->forceFill(['revoked_at' => CarbonImmutable::now()])->save();
-                $this->security->advance($subject, 'passkey_revoked');
+                $this->security->advance($subject, 'passkey_revoked', $context);
                 $this->audits->record('passkey.revoked', subject: $reference, actor: $subject, metadata: ['passkey_id' => $locked->identifier()]);
                 $this->securityEvents->dispatch(new AccountSecurityChanged($reference, 'passkey_revoked', $locked->identifier()), (new Passkey)->getConnection());
             }

@@ -25,6 +25,7 @@ use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\SocialIdentity;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Pipelines\AuthPipeline;
+use Nvl\Auth\Support\UniqueViolation;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\IssuedSocialRegistration;
@@ -68,8 +69,12 @@ final readonly class AuthRegistration
                 $this->nativeAdmission->assertProvisioningAllowed();
                 $this->features->assertAllowed(AuthFeature::Password, FeatureOperation::Issue);
                 try {
-                    $user = $class::query()->create($mapped + $extensions);
+                    // The savepoint keeps the source transaction usable for reading which index was violated.
+                    $user = $connection->transaction(static fn (): User => $class::query()->create($mapped + $extensions));
                 } catch (UniqueConstraintViolationException $exception) {
+                    if (UniqueViolation::columns($exception, $connection, (new $class)->getTable()) === null) {
+                        throw $exception;
+                    }
                     throw new AuthException('registration_unavailable', 'Registration is unavailable.', 409, previous: $exception);
                 }
                 $this->passwords->update($user, $data['password']);
@@ -179,8 +184,11 @@ final readonly class AuthRegistration
                     return $user->refresh();
                 });
             }, 3);
-        } catch (UniqueConstraintViolationException) {
-            throw new AuthException('registration_unavailable', 'Registration is unavailable.', 409);
+        } catch (UniqueConstraintViolationException $exception) {
+            if (UniqueViolation::columns($exception, $connection, (new $class)->getTable()) === null && UniqueViolation::columns($exception, $connection, (new SocialIdentity)->getTable()) === null) {
+                throw $exception;
+            }
+            throw new AuthException('registration_unavailable', 'Registration is unavailable.', 409, previous: $exception);
         }
     }
 

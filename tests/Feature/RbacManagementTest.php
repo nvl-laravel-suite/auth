@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\Events\ForgettingKey;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Schema\Blueprint;
@@ -34,6 +35,7 @@ use Nvl\Auth\Tests\Fixtures\HostAnalyticsPrincipal;
 use Nvl\Auth\Tests\Fixtures\HostRbacRole;
 use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Auth\ValueObjects\SubjectReference;
+use Spatie\Permission\PermissionRegistrar;
 
 it('owns role and permission CRUD foundations, cloning, hierarchy, templates, and analytics', function (): void {
     $actor = $this->user('rbac.owner@example.test');
@@ -1019,3 +1021,34 @@ function authProtectedRbacReads(array $queries): array
         return false;
     }));
 }
+
+it('flushes cached permissions after a role or permission mutation commits', function (string $mutation): void {
+    $actor = $this->user('rbac.cache@example.test');
+    $roles = app(AuthRoles::class);
+    $permissions = app(AuthPermissions::class);
+    $permission = $permissions->create($actor, ['name' => 'cache.read']);
+    $role = $roles->create($actor, ['name' => 'cache-reader', 'permissions' => ['cache.read']]);
+    $registrar = app(PermissionRegistrar::class);
+    $connection = $role->getConnection();
+    $flushLevels = [];
+    Event::listen(ForgettingKey::class, function (ForgettingKey $event) use (&$flushLevels, $registrar, $connection): void {
+        if ($event->key === $registrar->cacheKey) {
+            $flushLevels[] = $connection->transactionLevel();
+        }
+    });
+    $committedLevel = $connection->transactionLevel();
+
+    match ($mutation) {
+        'role create' => $roles->create($actor, ['name' => 'cache-writer', 'permissions' => ['cache.read']]),
+        'role update' => $roles->update($actor, $role, ['name' => 'cache-reader', 'permissions' => []]),
+        'role delete' => $roles->delete($actor, $role),
+        'role duplicate' => $roles->duplicate($actor, $role, 'cache-observer'),
+        'role template' => $roles->applyTemplate($actor, ['template' => 'auth-auditor']),
+        'permission create' => $permissions->create($actor, ['name' => 'cache.write']),
+        'permission update' => $permissions->update($actor, $permission, ['name' => 'cache.read', 'displayName' => 'Read cache']),
+        'permission delete' => $permissions->delete($actor, $permission),
+    };
+
+    expect($flushLevels)->not->toBeEmpty()
+        ->and(end($flushLevels))->toBe($committedLevel);
+})->with(['role create', 'role update', 'role delete', 'role duplicate', 'role template', 'permission create', 'permission update', 'permission delete']);

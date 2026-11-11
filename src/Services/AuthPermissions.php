@@ -28,7 +28,7 @@ use Spatie\Permission\PermissionRegistrar;
  */
 final readonly class AuthPermissions
 {
-    /** Native Auth operation. */
+    /** Create the permission management service. */
     public function __construct(private FeatureGate $features, private ManagementAuthorizer $authorization, private AuthModelRegistry $models, private AuthConfiguration $configuration, private AuthAuditRecorder $audits, private AuthCommittedAudit $committedAudits, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private RbacAssignmentService $assignments, private RbacEntityLocator $entities, private RbacSynchronizer $synchronizer, private Container $rbacContainer, private MutationAuthorizer $syncUserPermissionsAuthorization, private RbacPrincipalAccess $principals, private RbacManager $rbac, private MutationAuthorizer $bootstrapAuthorization) {}
 
     /** Persist one permission.
@@ -43,13 +43,16 @@ final readonly class AuthPermissions
         $class = $this->models->permissionClass();
         $connection = (new $class)->getConnectionName();
 
-        return DB::connection($connection)->transaction(function () use ($actor, $class, $data): Permission {
+        $permission = DB::connection($connection)->transaction(function () use ($actor, $class, $data): Permission {
             $permission = $class::query()->create(['name' => trim($data['name']), 'guard_name' => $this->configuration->string('features.rbac.settings.guard', 'web'), 'display_name' => $data['displayName'], 'description' => $data['description'], 'group' => RbacPermissionGroupExpressions::normalize($data['group']), 'is_system' => $data['system'], 'metadata' => $data['metadata']]);
             $this->audits->record('permission.created', actor: $actor, metadata: ['permission_id' => $permission->id]);
             $this->domainEvents->dispatch(new RbacChanged('permission', $permission->id, 'created', ['name' => $permission->name]), $permission->getConnection());
 
             return $permission->refresh();
         }, 3);
+        $this->assignments->clearPermissionCache();
+
+        return $permission;
     }
 
     /**
@@ -96,13 +99,16 @@ final readonly class AuthPermissions
             throw new AuthException('system_permission_immutable', 'System permission names cannot be changed.', 422);
         }
 
-        return DB::connection($permission->getConnectionName())->transaction(function () use ($actor, $data, $permission): Permission {
+        $permission = DB::connection($permission->getConnectionName())->transaction(function () use ($actor, $data, $permission): Permission {
             $permission->fill(['name' => trim($data['name']), 'display_name' => $data['displayName'], 'description' => $data['description'], 'group' => RbacPermissionGroupExpressions::normalize($data['group']), 'metadata' => $data['metadata']])->save();
             $this->audits->record('permission.updated', actor: $actor, metadata: ['permission_id' => $permission->id]);
             $this->domainEvents->dispatch(new RbacChanged('permission', $permission->id, 'updated'), $permission->getConnection());
 
             return $permission->refresh();
         }, 3);
+        $this->assignments->clearPermissionCache();
+
+        return $permission;
     }
 
     /** Delete one permission. */
@@ -116,7 +122,7 @@ final readonly class AuthPermissions
             throw new AuthException('system_permission_delete_forbidden', 'System permissions cannot be deleted.', 422);
         }
 
-        return DB::connection($permission->getConnectionName())->transaction(function () use ($actor, $permission): bool {
+        $deleted = DB::connection($permission->getConnectionName())->transaction(function () use ($actor, $permission): bool {
             $identifier = $permission->id;
             $deleted = (bool) $permission->delete();
             $this->audits->record('permission.deleted', actor: $actor, metadata: ['permission_id' => $identifier]);
@@ -124,6 +130,9 @@ final readonly class AuthPermissions
 
             return $deleted;
         }, 3);
+        $this->assignments->clearPermissionCache();
+
+        return $deleted;
     }
 
     /**
@@ -379,7 +388,7 @@ final readonly class AuthPermissions
         return $data;
     }
 
-    /** Native Auth operation. */
+    /** Resolve the Spatie permission registrar, which RBAC requires. */
     private function registrar(): PermissionRegistrar
     {
         if (! class_exists(PermissionRegistrar::class)) {

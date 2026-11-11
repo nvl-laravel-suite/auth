@@ -35,7 +35,7 @@ use SensitiveParameter;
  */
 final readonly class AuthSecondFactor
 {
-    /** Native Auth operation. */
+    /** Create the TOTP and recovery-code service. */
     public function __construct(private FeatureGate $features, private TotpEngine $totp, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private AuthConfiguration $configuration, private SecretHasher $hasher, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private UsableAccountAuthenticationPolicy $nativeRemoval, private AccountAuthenticationPolicy $removalPolicy, private DomainEventDispatcher $securityEvents) {}
 
     /**
@@ -62,7 +62,7 @@ final readonly class AuthSecondFactor
             $this->security->lockChallenges($subject);
             TotpCredential::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('confirmed_at')->whereNull('revoked_at')->delete();
             $credential = TotpCredential::query()->create(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'name' => $data['name'], 'secret' => $secret, ...$parameters]);
-            $this->security->advance($subject, 'totp_pending_replaced');
+            $this->security->advance($subject, 'totp_pending_replaced', $context);
             $this->audits->record('totp.enrollment_started', subject: $reference, actor: $subject, metadata: ['credential_id' => $credential->identifier()]);
 
             return new TotpEnrollment($credential, $secret, $this->totp->provisioningUri($data['accountName'], $secret));
@@ -103,7 +103,7 @@ final readonly class AuthSecondFactor
                 throw new AuthException('totp_invalid', 'The TOTP code is invalid.', 422);
             }
             $locked->forceFill(['confirmed_at' => CarbonImmutable::now(), 'last_used_at' => CarbonImmutable::now(), 'last_accepted_timestep' => $timestep])->save();
-            $this->security->advance($subject, 'totp_enrolled');
+            $this->security->advance($subject, 'totp_enrolled', $context);
             $this->audits->record('totp.enrolled', subject: $reference, actor: $subject, metadata: ['credential_id' => $locked->identifier()]);
 
             return $locked;
@@ -183,7 +183,7 @@ final readonly class AuthSecondFactor
                     throw new AuthException('credential_unavailable', 'The credential is unavailable.', 422);
                 }
                 $locked->forceFill(['revoked_at' => CarbonImmutable::now()])->save();
-                $this->security->advance($subject, 'totp_revoked');
+                $this->security->advance($subject, 'totp_revoked', $context);
                 $this->audits->record('totp.revoked', subject: $reference, actor: $subject, metadata: ['credential_id' => $locked->identifier()]);
                 $this->securityEvents->dispatch(new AccountSecurityChanged($reference, 'totp_revoked', $locked->identifier()), (new TotpCredential)->getConnection());
             }
@@ -239,7 +239,7 @@ final readonly class AuthSecondFactor
             foreach ($codes as $code) {
                 RecoveryCode::query()->create(['batch_id' => $batchId, 'subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'code_hash' => $this->hasher->hash('recovery-code', $code)]);
             }
-            $this->security->advance($subject, 'recovery_replaced');
+            $this->security->advance($subject, 'recovery_replaced', $context);
             $this->audits->record('recovery_codes.regenerated', subject: $reference, actor: $subject, metadata: ['batch_id' => $batchId, 'count' => count($codes)]);
 
             return new GeneratedRecoveryCodes($batchId, $codes);
@@ -293,7 +293,7 @@ final readonly class AuthSecondFactor
             $this->removalPolicy->assertRemovalAllowed($subject, 'recovery', 'all');
             $count = RecoveryCode::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNull('used_at')->whereNull('revoked_at')->update(['revoked_at' => AuthInstantCast::forQuery((new RecoveryCode)->getConnection(), CarbonImmutable::now())]);
             if ($count > 0) {
-                $this->security->advance($subject, 'recovery_revoked');
+                $this->security->advance($subject, 'recovery_revoked', $context);
             }
             $this->audits->record('recovery_codes.revoked', subject: $reference, actor: $subject, metadata: ['count' => $count]);
 

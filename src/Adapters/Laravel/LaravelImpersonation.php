@@ -53,6 +53,12 @@ final readonly class LaravelImpersonation
 
             return $grant;
         } catch (\Throwable $exception) {
+            try {
+                $this->grants->stop($actor, $grant->identifier(), $context, 'transition_failed');
+            } catch (\Throwable) {
+                $this->failClosed($actor, $guard, $session, $context, $grant->identifier());
+                throw $exception;
+            }
             $this->failClosed($actor, $guard, $session, $context, $grant->identifier());
             throw $exception;
         }

@@ -27,10 +27,10 @@ use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
  */
 final readonly class AuthOwnerAdmission
 {
-    /** Native Auth operation. */
+    /** Create the owner admission check. */
     public function __construct(private Container $container, private OwnershipContext $context, private MembershipPrincipalResolver $principals, private OwnershipReadiness $readiness, private AuthOwnershipState $state) {}
 
-    /** Native Auth operation. */
+    /** Require the subject to be admitted to the current owner, including its access token binding. */
     public function assertAllowed(Authenticatable $subject): void
     {
         $this->state->configured();

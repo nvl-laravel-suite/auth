@@ -422,6 +422,20 @@ it('does not consume a pending recovery factor while session authentication is d
     expect($authentication->completeSecondFactor(['recoveryCode' => $recovery->codes[0]], auth()->guard('web'), app('session.store'))->getAuthIdentifier())->toBe($user->id);
 });
 
+it('completes a pending second factor after the session is serialized as JSON', function (): void {
+    config(['nvl-auth.features.totp.enabled' => true, 'nvl-auth.features.recovery_codes.enabled' => true]);
+    $user = $this->user();
+    TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
+    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $authentication = app(Authentication::class);
+    $session = app('session.store');
+    expect(fn () => $authentication->login(['identifier' => $user->email, 'password' => 'correct-password'], [], auth()->guard('web'), $session))->toThrow(AuthException::class, 'second factor');
+    $session->replace(json_decode(json_encode($session->all(), JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR));
+
+    expect($authentication->hasPendingSecondFactor($session))->toBeTrue()
+        ->and($authentication->completeSecondFactor(['recoveryCode' => $recovery->codes[0]], auth()->guard('web'), $session)->getAuthIdentifier())->toBe($user->id);
+});
+
 it('correlates concurrent social fixture intents with their own OAuth state', function (): void {
     config(['nvl-auth.features.social_identities.enabled' => true, 'nvl-auth.features.social_identities.settings.providers.github' => ['scopes' => [], 'parameters' => []]]);
     $user = $this->user();
@@ -596,3 +610,36 @@ it('does not relabel committed native email consumption when its host audit obse
         ->and(Challenge::query()->where('type', 'authentication_proof')->count())->toBe(1)
         ->and($recorder->actions)->toBe(['security_codes.issued', 'security_code.consumed']);
 });
+
+it('redeems a native email challenge once, only before expiry, only in its browser and within its attempt budget', function (string $method): void {
+    config(['nvl-auth.features.magic_links.enabled' => true, 'nvl-auth.features.security_codes.enabled' => true, 'nvl-auth.features.magic_links.settings.max_attempts' => 2, 'nvl-auth.features.security_codes.settings.max_attempts' => 2]);
+    $this->freezeSecond();
+    $user = $this->user();
+    $context = $this->authenticationContext();
+    $foreign = new AuthenticationRequestContext(guardName: 'web', sessionBinding: 'another-browser');
+    $challenges = app(AuthChallenges::class);
+    $issue = fn (): array => $method === 'code'
+        ? $challenges->requestSecurityCodeAuthentication(['recipient' => $user->email, 'purpose' => 'passwordless_login'], $context)
+        : $challenges->requestMagicLinkAuthentication(['recipient' => $user->email], $context);
+    $redeem = fn (array $issued, string $secret, AuthenticationRequestContext $browser) => $method === 'code'
+        ? $challenges->proveSecurityCodeAuthentication(['recipient' => $user->email, 'purpose' => 'passwordless_login', 'code' => $secret], $browser)
+        : $challenges->consumeMagicLinkAuthentication(['recipient' => null, 'token' => $secret, 'challengeId' => $issued['challenge']->identifier()], $browser);
+
+    $single = $issue();
+    expect(fn () => $redeem($single, $single['secret'], $foreign))->toThrow(AuthException::class, 'invalid or expired')
+        ->and($single['challenge']->getRawOriginal('secret_hash'))->not->toContain($single['secret'])
+        ->and($redeem($single, $single['secret'], $context)->reveal())->toHaveLength(64)
+        ->and(fn () => $redeem($single, $single['secret'], $context))->toThrow(AuthException::class, 'invalid or expired');
+
+    $expired = $issue();
+    $this->travelTo($expired['challenge']->expires_at);
+    expect(fn () => $redeem($expired, $expired['secret'], $context))->toThrow(AuthException::class, 'invalid or expired');
+
+    $exhausted = $issue();
+    foreach ([1, 2] as $attempt) {
+        expect(fn () => $redeem($exhausted, 'incorrect', $context))->toThrow(AuthException::class, 'invalid or expired');
+    }
+    expect(fn () => $redeem($exhausted, $exhausted['secret'], $context))->toThrow(AuthException::class, 'invalid or expired')
+        ->and($exhausted['challenge']->refresh()->attempts)->toBe(2)
+        ->and(Challenge::query()->where('type', 'authentication_proof')->count())->toBe(1);
+})->with(['link', 'code']);

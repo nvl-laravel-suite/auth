@@ -2372,6 +2372,7 @@
             "kind": "class",
             "file": "src/Services/EnrolledFactorAssurancePolicy.php",
             "methods": [
+                "__construct",
                 "assertSatisfied",
                 "requiresSecondFactor"
             ],

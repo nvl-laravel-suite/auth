@@ -3,12 +3,17 @@
 declare(strict_types=1);
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Auth\StatefulGuard;
+use Illuminate\Contracts\Session\Session;
+use Illuminate\Support\Facades\Event;
 use Nvl\Auth\Adapters\Laravel\LaravelImpersonation;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\ImpersonationAccess;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
+use Nvl\Auth\Events\ImpersonationChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
+use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\Impersonation;
 use Nvl\Auth\Services\AuthBrowserSessions;
 use Nvl\Auth\Services\Authentication;
@@ -17,6 +22,7 @@ use Nvl\Auth\Services\AuthImpersonation;
 use Nvl\Auth\Services\AuthReauthentication;
 use Nvl\Auth\Services\AuthTokens;
 use Nvl\Auth\Services\AuthUsers;
+use Nvl\Auth\Tests\Fixtures\TestUser;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 
@@ -144,4 +150,119 @@ it('commits expiry at the exact deadline and rejects an outer transaction before
     $this->travelTo($grant->expires_at);
     expect(fn () => $service->admit($actor, $grant->identifier(), $context))->toThrow(AuthException::class);
     expect($grant->refresh()->stop_reason)->toBe('expired');
+});
+
+/**
+ * Log an administrator into a managed browser and return the facts an impersonation start needs.
+ *
+ * @return array{actor: TestUser, target: TestUser, store: Session, guard: StatefulGuard, context: AuthenticationRequestContext, proof: string}
+ */
+function impersonationScenario(TestUser $actor, TestUser $target): array
+{
+    config(['nvl-auth.features.managed_sessions.enabled' => true, 'nvl-auth.features.impersonation.enabled' => true]);
+    app()->instance(ImpersonationAccess::class, new class implements ImpersonationAccess
+    {
+        public function assertAllowed(Authenticatable $actor, Authenticatable $target, ?OwnerReference $owner): void {}
+    });
+    $store = app('session.store');
+    $guard = auth()->guard('web');
+    app(Authentication::class)->login(['identifier' => $actor->email, 'password' => 'correct-password'], [], $guard, $store);
+    $binding = $store->get(AuthBrowserSessions::bindingKey('web'));
+    $browser = app(AuthBrowserSessions::class)->admit($actor, 'web', $binding);
+    $context = new AuthenticationRequestContext(guardName: 'web', sessionBinding: $store->getId(), browserSessionId: $browser->identifier(), browserBinding: $binding);
+    $proof = app(AuthReauthentication::class)->confirm($actor, ['password' => 'correct-password'], RecentAuthenticationPurpose::ImpersonationStart, $context)->reveal();
+
+    return ['actor' => $actor, 'target' => $target, 'store' => $store, 'guard' => $guard, 'context' => $context, 'proof' => $proof];
+}
+
+it('refuses self impersonation and a nested start from inside an overlay', function (): void {
+    ['actor' => $actor, 'target' => $target, 'store' => $store, 'guard' => $guard, 'context' => $context, 'proof' => $proof] = impersonationScenario($this->user('admin@example.test'), $this->user());
+    $service = app(AuthImpersonation::class);
+
+    expect(fn () => $service->start($actor, $actor, $proof, ['reason' => 'Self'], $context))->toThrow(AuthException::class, 'unavailable or expired')
+        ->and(Impersonation::query()->count())->toBe(0);
+
+    $grant = $service->start($actor, $target, $proof, ['reason' => 'Support ticket'], $context);
+    $third = $this->user('third@example.test');
+    app(LaravelImpersonation::class)->run($guard, $store, 'web', $grant->identifier(), function () use ($service, $target, $third, $proof, $context, $grant): void {
+        expect(fn () => $service->start($target, $third, $proof, ['reason' => 'Nested'], $context))->toThrow(AuthException::class, 'while impersonating')
+            ->and(fn () => $service->stop($target, $grant->identifier(), $context))->toThrow(AuthException::class, 'while impersonating');
+    });
+    expect(fn () => $service->start($actor, $third, $proof, ['reason' => 'Second'], $context))->toThrow(AuthException::class, 'already has an active impersonation')
+        ->and(Impersonation::query()->count())->toBe(1);
+});
+
+it('regenerates the session on enter and leave and ends the overlay once the impersonator is contained', function (): void {
+    ['actor' => $actor, 'target' => $target, 'store' => $store, 'guard' => $guard, 'proof' => $proof] = impersonationScenario($this->user('admin@example.test'), $this->user());
+    $adapter = app(LaravelImpersonation::class);
+    $before = $store->getId();
+    $grant = $adapter->start($target, $proof, ['reason' => 'Support ticket'], $guard, $store, 'web');
+    $entered = $store->getId();
+    expect($entered)->not->toBe($before)->and($store->get('nvl-auth.impersonation.web'))->toBe($grant->identifier());
+
+    $actor->forceFill(['is_active' => false])->save();
+    $reached = false;
+    expect(function () use ($adapter, $guard, $store, $grant, &$reached): void {
+        $adapter->run($guard, $store, 'web', $grant->identifier(), function () use (&$reached): void {
+            $reached = true;
+        });
+    })->toThrow(AuthException::class);
+    expect($reached)->toBeFalse()->and($guard->check())->toBeFalse()->and($grant->refresh()->stopped_at)->not->toBeNull();
+});
+
+it('leaves through stop with a regenerated session and the original principal restored', function (): void {
+    ['actor' => $actor, 'target' => $target, 'store' => $store, 'guard' => $guard, 'proof' => $proof] = impersonationScenario($this->user('admin@example.test'), $this->user());
+    $adapter = app(LaravelImpersonation::class);
+    $grant = $adapter->start($target, $proof, ['reason' => 'Support ticket'], $guard, $store, 'web');
+    $entered = $store->getId();
+    $adapter->stop($grant->identifier(), $guard, $store, 'web');
+
+    expect($store->getId())->not->toBe($entered)
+        ->and($store->has('nvl-auth.impersonation.web'))->toBeFalse()
+        ->and($guard->id())->toBe($actor->getAuthIdentifier())
+        ->and(fn () => $adapter->run($guard, $store, 'web', $grant->identifier(), fn () => null))->toThrow(AuthException::class);
+});
+
+it('audits every impersonation ending with the impersonator and the impersonated principal', function (): void {
+    ['actor' => $actor, 'target' => $target, 'context' => $context, 'proof' => $proof] = impersonationScenario($this->user('admin@example.test'), $this->user());
+    $service = app(AuthImpersonation::class);
+    $expired = $service->start($actor, $target, $proof, ['reason' => 'First ticket', 'durationSeconds' => 60], $context);
+    $this->travel(61)->seconds();
+    $proof = app(AuthReauthentication::class)->confirm($actor, ['password' => 'correct-password'], RecentAuthenticationPurpose::ImpersonationStart, $context)->reveal();
+    $revoked = $service->start($actor, $target, $proof, ['reason' => 'Second ticket'], $context);
+    $operator = $this->user('operator@example.test');
+    $service->revoke($operator, $revoked->identifier(), 'Support permission withdrawn');
+
+    $expiry = AuthAudit::query()->where('action', 'impersonation.expired')->sole();
+    $revocation = AuthAudit::query()->where('action', 'impersonation.revoked')->sole();
+    expect($expired->refresh()->stop_reason)->toBe('expired')
+        ->and($expiry->metadata['grant_id'])->toBe($expired->identifier())
+        ->and($expiry->actor_id)->toBe((string) $actor->getKey())
+        ->and($expiry->subject_id)->toBe((string) $target->getKey())
+        ->and($revocation->actor_id)->toBe((string) $operator->getKey())
+        ->and($revocation->subject_id)->toBe((string) $target->getKey())
+        ->and($revocation->metadata['impersonator_id'])->toBe((string) $actor->getKey())
+        ->and($revocation->metadata['impersonator_type'])->toBe($actor->getMorphClass())
+        ->and(AuthAudit::query()->where('action', 'impersonation.granted')->count())->toBe(2);
+});
+
+it('audits the compensating stop when the browser transition fails after the grant is created', function (): void {
+    ['actor' => $actor, 'target' => $target, 'store' => $store, 'guard' => $guard, 'proof' => $proof] = impersonationScenario($this->user('admin@example.test'), $this->user());
+    Event::listen(ImpersonationChanged::class, static function (ImpersonationChanged $event): void {
+        if ($event->operation === 'granted') {
+            BrowserSession::query()->update(['revoked_at' => now()]);
+        }
+    });
+
+    expect(fn () => app(LaravelImpersonation::class)->start($target, $proof, ['reason' => 'Support ticket'], $guard, $store, 'web'))->toThrow(AuthException::class);
+
+    $grant = Impersonation::query()->sole();
+    $stopped = AuthAudit::query()->where('action', 'impersonation.stopped')->sole();
+    expect($grant->stop_reason)->toBe('transition_failed')
+        ->and($grant->active_session_key)->toBeNull()
+        ->and($stopped->metadata['reason'])->toBe('transition_failed')
+        ->and($stopped->actor_id)->toBe((string) $actor->getKey())
+        ->and($stopped->subject_id)->toBe((string) $target->getKey())
+        ->and($guard->check())->toBeFalse()
+        ->and($store->has('nvl-auth.impersonation.web'))->toBeFalse();
 });

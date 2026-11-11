@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests;
 
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Nvl\Auth\Tests\Fixtures\Consumer\RouteServiceProvider;
 use Nvl\Support\Providers\SupportServiceProvider;
 
 /** Committed delivery uses the shared host setup without consumer routes. */
-abstract class CommittedDeliveryTestCase extends AuthTestCase
+abstract class CommittedDeliveryTestCase extends TestCase
 {
-    use DatabaseMigrations;
+    use CommitsTestDatabase;
 
     /** @return list<class-string> */
     protected function getPackageProviders($app): array

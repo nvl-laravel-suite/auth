@@ -20,6 +20,7 @@ use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
+use Nvl\Auth\Support\LiteralSearch;
 use stdClass;
 
 /**
@@ -29,7 +30,7 @@ use stdClass;
  */
 final readonly class AuthRbacReader
 {
-    /** Native Auth operation. */
+    /** Create the authorized RBAC reader. */
     public function __construct(private FeatureGate $features, private ManagementAuthorizer $authorization, private AuthModelRegistry $models, private AuthConfiguration $configuration, private RbacPermissionGroupExpressions $groupExpressions, private RbacConsumerLimits $limits, private RbacOptionReadService $options, private RoleHierarchy $hierarchy, private RoleTemplateRegistry $templates, private RbacEntityLocator $entities, private PrincipalAttributeMapper $principalAttributes) {}
 
     /** Return availability within the configured RBAC guard.
@@ -78,10 +79,7 @@ final readonly class AuthRbacReader
         }
         $search = trim((string) $data['search']);
         if ($search !== '') {
-            $term = "%{$search}%";
-            $query->where(static function ($searchQuery) use ($term): void {
-                $searchQuery->where('name', 'like', $term)->orWhere('display_name', 'like', $term)->orWhere('description', 'like', $term)->orWhere('group', 'like', $term);
-            });
+            LiteralSearch::contains($query, ['name', 'display_name', 'description', 'group'], $search);
         }
         $group = RbacPermissionGroupExpressions::normalize($data['group']);
         if ($group !== null) {
@@ -204,13 +202,14 @@ final readonly class AuthRbacReader
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
         $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
+        $search = $this->permissionOptionsNormalizedSearch($search);
+        if ($group !== null && mb_strlen($group) > 120) {
+            throw new AuthException('invalid_permission_group', 'Permission group may not exceed 120 characters.');
+        }
         $class = $this->models->permissionClass();
         $query = $class::query()->withCount(['roles', 'users']);
-        if ($search !== null && trim($search) !== '') {
-            $term = '%'.trim($search).'%';
-            $query->where(static function ($searchQuery) use ($term): void {
-                $searchQuery->where('name', 'like', $term)->orWhere('display_name', 'like', $term);
-            });
+        if ($search !== null) {
+            LiteralSearch::contains($query, ['name', 'display_name'], $search);
         }
         if ($group !== null && trim($group) !== '') {
             $query->where('group', trim($group));
@@ -240,10 +239,7 @@ final readonly class AuthRbacReader
         }
         $search = trim((string) $data['search']);
         if ($search !== '') {
-            $term = "%{$search}%";
-            $query->where(static function ($searchQuery) use ($term): void {
-                $searchQuery->where('name', 'like', $term)->orWhere('display_name', 'like', $term)->orWhere('description', 'like', $term);
-            });
+            LiteralSearch::contains($query, ['name', 'display_name', 'description'], $search);
         }
         if ($data['isSystem'] !== null) {
             $query->where('is_system', $data['isSystem']);
@@ -343,13 +339,11 @@ final readonly class AuthRbacReader
     {
         $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Read);
         $this->authorization->authorize($actor, 'nvl.auth.rbac.view');
+        $search = $this->roleOptionsNormalizedSearch($search);
         $class = $this->models->roleClass();
         $query = $class::query()->with('parent')->withCount(['users', 'permissions']);
-        if ($search !== null && trim($search) !== '') {
-            $term = '%'.trim($search).'%';
-            $query->where(static function ($searchQuery) use ($term): void {
-                $searchQuery->where('name', 'like', $term)->orWhere('display_name', 'like', $term);
-            });
+        if ($search !== null) {
+            LiteralSearch::contains($query, ['name', 'display_name'], $search);
         }
         $roles = $query->orderByDesc('priority')->orderBy('name')->paginate(max(1, min($perPage, 100)));
 

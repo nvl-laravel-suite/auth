@@ -81,7 +81,7 @@ final readonly class AuthAuditRecorder implements AuthAuditRecorderContract
         return fn (): ?AuthAudit => $this->writer->write(new AuthEventContext(OwnershipContextMode::Disabled), $action, $outcome, $subject, $actor, $clientId, $metadata, $attribution);
     }
 
-    /** Native Auth operation. */
+    /** Map an audit action prefix to the central identity operation it belongs to. */
     private function centralOperation(string $action): ?AuthIdentityOperation
     {
         foreach ([AuthIdentityOperation::Impersonation->value => ['impersonation.'], AuthIdentityOperation::Registration->value => ['registration.'], AuthIdentityOperation::Login->value => ['authentication.', 'session.', 'client.'], AuthIdentityOperation::Recovery->value => ['magic_link.', 'magic_links.', 'security_code.', 'security_codes.'], AuthIdentityOperation::Password->value => ['password.'], AuthIdentityOperation::VerifyEmail->value => ['email_verification.', 'email_change.'], AuthIdentityOperation::Profile->value => ['profile.', 'account.'], AuthIdentityOperation::Mfa->value => ['totp.', 'passkey.', 'recovery_code.'], AuthIdentityOperation::SocialIdentity->value => ['social_identity.']] as $operation => $prefixes) {

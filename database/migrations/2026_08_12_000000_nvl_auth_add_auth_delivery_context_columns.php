@@ -19,7 +19,7 @@ return new class extends Migration implements AuthSchemaMigration
     }
 
     /**
-     * Add the Auth delivery correlation columns introduced after v1.0.1.
+     * Add the Auth delivery correlation columns.
      */
     public function up(): void
     {

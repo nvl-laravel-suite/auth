@@ -6,7 +6,6 @@ namespace Nvl\Auth\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
@@ -16,6 +15,7 @@ use Nvl\Auth\Enums\FeatureOperation;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\User;
+use Nvl\Auth\Support\LiteralSearch;
 
 /**
  * Complete native AuthUserReader operations.
@@ -24,7 +24,7 @@ use Nvl\Auth\Models\User;
  */
 final readonly class AuthUserReader
 {
-    /** Native Auth operation. */
+    /** Create the authorized principal reader. */
     public function __construct(private FeatureGate $features, private ManagementAuthorizer $authorization, private UserLocator $users, private AuthConfiguration $configuration, private PrincipalAttributeMapper $attributes, private AuthOperationBoundary $operations) {}
 
     /**
@@ -63,12 +63,7 @@ final readonly class AuthUserReader
             $query->onlyTrashed();
         }
         if ($search !== null && trim($search) !== '') {
-            $term = '%'.trim($search).'%';
-            $name = $this->attributes->column(PrincipalAttribute::Name);
-            $email = $this->attributes->column(PrincipalAttribute::Email);
-            $query->where(static function (Builder $searchQuery) use ($email, $name, $term): void {
-                $searchQuery->where($name, 'like', $term)->orWhere($email, 'like', $term);
-            });
+            LiteralSearch::contains($query, [$this->attributes->column(PrincipalAttribute::Name), $this->attributes->column(PrincipalAttribute::Email)], trim($search));
         }
         if ($active !== null) {
             $query->where($this->attributes->column(PrincipalAttribute::Active), $active);
@@ -117,14 +112,14 @@ final readonly class AuthUserReader
             throw new AuthException('invalid_user_search', 'User suggestions require between one and 160 search characters.', 422);
         }
         $maximum = $this->configuration->positiveInteger('features.principal_management.settings.suggestion_limit', 20);
-        $term = "%{$search}%";
         $id = $this->attributes->column(PrincipalAttribute::Id);
         $name = $this->attributes->column(PrincipalAttribute::Name);
         $email = $this->attributes->column(PrincipalAttribute::Email);
         $active = $this->attributes->column(PrincipalAttribute::Active);
 
-        return $this->users->query()->select([$id, $name, $email, $active])->where($active, true)->where(static function (Builder $query) use ($email, $name, $term): void {
-            $query->where($name, 'like', $term)->orWhere($email, 'like', $term);
-        })->orderBy($name)->limit(max(1, min($limit ?? $maximum, $maximum)))->get();
+        $query = $this->users->query()->select([$id, $name, $email, $active])->where($active, true);
+        LiteralSearch::contains($query, [$name, $email], $search);
+
+        return $query->orderBy($name)->limit(max(1, min($limit ?? $maximum, $maximum)))->get();
     }
 }

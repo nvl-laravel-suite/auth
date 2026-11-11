@@ -17,6 +17,7 @@ use Nvl\Auth\Enums\AuthenticationMethod;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\RememberCredential;
+use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\ValueObjects\AuthenticationEvidence;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthenticationVerification;
@@ -32,6 +33,8 @@ use Throwable;
  */
 final readonly class AuthenticationProofs
 {
+    private const int FACTOR_ATTEMPT_BUDGET = 5;
+
     public function __construct(private AuthIdentityChallenges $records, private PrincipalSecurity $security, private SecretHasher $hasher, private AuthSubjectResolver $subjects, private AuthenticationEligibility $eligibility, private EnrolledFactorAssurancePolicy $enrollment, private AuthenticationAssurancePolicy $assurance, private AuthSecondFactor $secondFactor, private CanonicalActorResolver $actors, private PrincipalEligibility $nativeEligibility, private AuthAuditRecorder $audits) {}
 
     /** @return array{subject: Model&Authenticatable, evidence: AuthenticationEvidence} */
@@ -96,6 +99,9 @@ final readonly class AuthenticationProofs
             $verification = $this->verification($challenge, $destination, $context);
             $evidence = $verification->evidence;
             $subject = $this->recheck($verification, assurance: false);
+            if ($this->factorBudgetSpent($challenge)) {
+                return $this->invalid();
+            }
             $challenge->attempts++;
             $this->records->save($challenge);
             try {
@@ -185,10 +191,29 @@ final readonly class AuthenticationProofs
             $subject = $this->subject($challenge);
             $subject->getConnection()->transaction(fn () => $this->recheck(AuthenticationVerification::fromChallenge($challenge), assurance: false));
 
-            return true;
+            return ! $this->factorBudgetSpent($challenge);
         } catch (AuthException) {
             return false;
         }
+    }
+
+    /**
+     * Determine whether the principal's unexpired proofs have together spent the factor attempt budget.
+     *
+     * A fresh primary proof must not grant a fresh set of TOTP or recovery-code guesses.
+     */
+    private function factorBudgetSpent(Challenge $challenge): bool
+    {
+        $spent = 0;
+        $proofs = $this->records->query()->where('type', 'authentication_proof')
+            ->where('subject_type', $challenge->subject_type)->where('subject_id', $challenge->subject_id)
+            ->where('expires_at', '>', AuthInstantCast::forQuery($challenge->getConnection(), CarbonImmutable::now('UTC')))
+            ->where('attempts', '>', 0)->get();
+        foreach ($proofs as $proof) {
+            $spent += $proof->attempts;
+        }
+
+        return $spent >= self::FACTOR_ATTEMPT_BUDGET;
     }
 
     private function find(#[\SensitiveParameter] string $proof, bool $lock = false): Challenge

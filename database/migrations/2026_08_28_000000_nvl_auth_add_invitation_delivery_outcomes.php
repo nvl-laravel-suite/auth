@@ -66,7 +66,7 @@ return new class extends Migration implements AuthSchemaMigration
     }
 
     /**
-     * Remove the unreleased delivery outcome projection.
+     * Remove the invitation delivery outcome projection.
      */
     public function down(): void
     {

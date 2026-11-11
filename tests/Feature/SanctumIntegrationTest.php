@@ -42,3 +42,30 @@ it('manages tokens directly through sanctum without an auth projection', functio
         ->and($user->tokens()->whereKey($hostToken->accessToken->getKey())->exists())->toBeTrue()
         ->and($user->tokens()->where('name', 'host-owned')->exists())->toBeTrue();
 });
+
+it('matches the token namespace exactly when it contains a LIKE wildcard character', function (): void {
+    config()->set('nvl-auth.features.api_tokens.enabled', true);
+    config()->set('nvl-auth.features.api_tokens.settings.abilities', ['reports:read']);
+    config()->set('nvl-auth.features.api_tokens.settings.namespace', 'acme_api');
+    $user = $this->user();
+    $user->createToken('acme-api:host-owned', ['host:read']);
+    app(AuthTokens::class)->create($user, ['name' => 'automation', 'abilities' => ['reports:read']]);
+
+    expect(array_column(app(AuthTokens::class)->all($user), 'name'))->toBe(['automation'])
+        ->and(app(AuthTokens::class)->revokeAll($user))->toBe(1)
+        ->and($user->tokens()->pluck('name')->all())->toBe(['acme-api:host-owned']);
+});
+
+it('matches the token namespace case-sensitively on every database collation', function (): void {
+    config()->set('nvl-auth.features.api_tokens.enabled', true);
+    config()->set('nvl-auth.features.api_tokens.settings.abilities', ['reports:read']);
+    config()->set('nvl-auth.features.api_tokens.settings.namespace', 'acme');
+    $user = $this->user();
+    $host = $user->createToken('ACME:host-owned', ['host:read'])->accessToken;
+    app(AuthTokens::class)->create($user, ['name' => 'automation', 'abilities' => ['reports:read']]);
+
+    expect(array_column(app(AuthTokens::class)->all($user), 'name'))->toBe(['automation'])
+        ->and(app(AuthTokens::class)->revoke($user, (string) $host->getKey()))->toBeFalse()
+        ->and(app(AuthTokens::class)->revokeAll($user))->toBe(1)
+        ->and($user->tokens()->pluck('name')->all())->toBe(['ACME:host-owned']);
+});

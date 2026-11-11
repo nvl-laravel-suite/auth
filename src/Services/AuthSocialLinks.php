@@ -73,7 +73,7 @@ final readonly class AuthSocialLinks
                 $this->removalPolicy->assertRemovalAllowed($subject, 'social', $identityId);
                 $this->nativeRemoval->assertRemovalAllowed($subject, 'social', $identityId);
                 $link->update(['revoked_at' => now()]);
-                $this->security->advance($subject, 'social_revoked');
+                $this->security->advance($subject, 'social_revoked', $context);
                 $this->audits->record('social_identity.revoked', subject: $reference, actor: $subject, metadata: ['social_identity_id' => $identityId]);
                 $this->securityEvents->dispatch(new AccountSecurityChanged($reference, 'social_identity_revoked', $identityId), (new SocialIdentity)->getConnection());
             }
@@ -84,13 +84,13 @@ final readonly class AuthSocialLinks
 
     private function complete(Authenticatable $subject, string $provider, #[\SensitiveParameter] string $intent, AuthenticationRequestContext $context, SocialIntentPurpose $purpose): SocialIdentity
     {
-        return $this->intents->complete($provider, $intent, $purpose, $context, $subject, function (ExternalIdentity $identity, ?Authenticatable $canonical) use ($purpose): SocialIdentity {
+        return $this->intents->complete($provider, $intent, $purpose, $context, $subject, function (ExternalIdentity $identity, ?Authenticatable $canonical) use ($context, $purpose): SocialIdentity {
             if ($canonical === null) {
                 throw new AuthException('social_identity_unavailable', 'The social identity is unavailable.', 422);
             }
             $reference = SubjectReference::fromAuthenticatable($canonical);
 
-            return $this->pipeline->run('social_link_change', new AuthPipelineContext('social_link_change', ['operation' => $purpose->value, 'provider' => $identity->provider], $reference), function () use ($canonical, $identity, $reference, $purpose): SocialIdentity {
+            return $this->pipeline->run('social_link_change', new AuthPipelineContext('social_link_change', ['operation' => $purpose->value, 'provider' => $identity->provider], $reference), function () use ($canonical, $identity, $reference, $purpose, $context): SocialIdentity {
                 $this->security->lock($canonical);
                 $this->security->lockChallenges($canonical);
                 $hash = $this->hasher->hash("social-identity-{$identity->provider}", $identity->providerUserId);
@@ -101,7 +101,7 @@ final readonly class AuthSocialLinks
                 }
                 $link ??= new SocialIdentity;
                 $link->fill(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'provider' => $identity->provider, 'provider_user_id' => $identity->providerUserId, 'provider_user_id_hash' => $hash, 'email' => $identity->email, 'profile' => ['name' => $identity->name, 'avatar' => $identity->avatar, 'issuer' => $identity->issuer, 'email_verified' => $identity->emailVerified, 'email_verification_source' => $identity->emailVerificationSource, 'connection_realm' => $this->configuration->get("features.social_identities.settings.providers.{$identity->provider}.realm")], 'last_used_at' => now(), 'revoked_at' => null])->save();
-                $this->security->advance($canonical, 'social_linked');
+                $this->security->advance($canonical, 'social_linked', $context);
                 $this->audits->record($purpose === SocialIntentPurpose::Link ? 'social_identity.linked' : 'social_identity.reconnected', subject: $reference, actor: $canonical, metadata: ['provider' => $identity->provider, 'social_identity_id' => $link->identifier()]);
 
                 return $link;

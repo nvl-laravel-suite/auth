@@ -22,10 +22,10 @@ use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
  */
 final readonly class AuthOperationBoundary
 {
-    /** Native Auth operation. */
+    /** Create the central-identity operation boundary. */
     public function __construct(private FeatureGate $features, private AuthModelRegistry $models, private OwnershipContext $ownership, private AuthOwnershipState $state) {}
 
-    /** Native Auth operation. */
+    /** Admit one central identity operation and, when given, require its subject to be a persisted principal. */
     public function central(AuthIdentityOperation $operation, ?Authenticatable $subject = null): void
     {
         $feature = match ($operation) {
@@ -51,7 +51,7 @@ final readonly class AuthOperationBoundary
         }
     }
 
-    /** Native Auth operation. */
+    /** Require explicit central admission for global administration under native ownership. */
     public function requirePlatformAdministration(): void
     {
         if ($this->state->native()) {

@@ -259,3 +259,26 @@ it('rejects a malformed named security index without changing host data or schem
         expect(DB::select($definitionQuery, [$indexName]))->toEqual($definition);
     }
 })->with(['primary id' => [['id']], 'subject id only' => [['subject_id']], 'reversed columns' => [['subject_id', 'subject_type']], 'partial constraint' => [['partial']]])->with(['migration', 'readiness']);
+
+it('rolls back without dropping a configured host table the migration adopted instead of creating', function (): void {
+    $identity = require dirname(__DIR__, 2).'/database/migrations/2026_08_01_000000_nvl_auth_create_nvl_auth_identity_tables.php';
+    $identity->down();
+    Schema::create('host_accounts', static function (Blueprint $table): void {
+        $table->id();
+        $table->string('email');
+    });
+    DB::table('host_accounts')->insert(['email' => 'kept@example.test']);
+    config()->set('nvl-auth.tables.users', 'host_accounts');
+    try {
+        $identity->up();
+        $identity->down();
+
+        expect(Schema::hasTable('host_accounts'))->toBeTrue()
+            ->and(DB::table('host_accounts')->count())->toBe(1)
+            ->and(Schema::hasTable(AuthTables::Roles))->toBeFalse();
+    } finally {
+        Schema::dropIfExists('host_accounts');
+        config()->set('nvl-auth.tables.users', AuthTables::Users);
+        $identity->up();
+    }
+});

@@ -65,3 +65,20 @@ it('rejects immediate profile replacement and binds pending proof to the current
     expect(fn () => $service->complete($user, $token, $context))->toThrow(AuthException::class);
     expect($user->refresh()->email)->toBe('user@example.test');
 });
+
+it('expires a pending email change after the configured email verification lifetime', function (): void {
+    config(['nvl-auth.features.email_verification.enabled' => true, 'nvl-auth.features.email_verification.settings.ttl_minutes' => 5]);
+    $user = $this->user();
+    $context = $this->authenticationContext();
+    $grant = $this->recentGrant($user, RecentAuthenticationPurpose::EmailChange)->reveal();
+    Event::fake([AuthDeliveryRequested::class]);
+    $this->travelTo(now()->startOfSecond());
+    $service = app(AuthEmailChanges::class);
+    $pending = $service->request($user, 'next@example.test', $grant, $context);
+    $delivery = Event::dispatched(AuthDeliveryRequested::class)->first(fn ($args) => $args[0]->request->type === AuthMessageType::EmailChangeVerification)[0]->request;
+
+    expect($pending->expires_at->equalTo(now()->addMinutes(5)))->toBeTrue()
+        ->and($delivery->expiresAt->equalTo(now()->addMinutes(5)))->toBeTrue();
+    $this->travel(5)->minutes();
+    expect(fn () => $service->complete($user, $delivery->payload['token'], $context))->toThrow(AuthException::class);
+});

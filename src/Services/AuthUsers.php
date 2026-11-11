@@ -46,7 +46,7 @@ use Nvl\Support\Events\DomainEventDispatcher;
  */
 final readonly class AuthUsers
 {
-    /** Native Auth operation. */
+    /** Create the principal management service. */
     public function __construct(private FeatureGate $features, private MutationAuthorizer $authorization, private UserLocator $users, private AuthAuditRecorder $audits, private PrincipalAttributeMapper $attributes, private PrincipalSessionContainment $sessions, private AuthMemberships $owners, private AuthOwnershipState $ownershipState, private DomainEventDispatcher $domainEvents, private ManagementAuthorizer $createAuthorization, private AuthModelRegistry $models, private Container $container, private AuthOperationBoundary $operations, private ManagementAuthorizer $updateAuthorization, private PasswordUpdater $passwords, private PasswordValidationRules $passwordPolicy, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private AuthenticationSessions $browserSessions, private PrincipalExtensions $extensions, private AuthPipeline $pipeline) {}
 
     /**
@@ -460,7 +460,7 @@ final readonly class AuthUsers
         return [];
     }
 
-    /** Native Auth operation.
+    /** Require a new principal JSON payload to be serializable and within the size limit.
      * @param  array<array-key, mixed>  $payload
      */
     private function validateStoreUserAssertJsonPayloadIsBounded(array $payload, string $field): void
@@ -475,7 +475,7 @@ final readonly class AuthUsers
         }
     }
 
-    /** Native Auth operation.
+    /** Require a bounded list of strings for a new principal.
      * @param  array<array-key, mixed>  $values
      *
      * @phpstan-assert list<string> $values
@@ -675,7 +675,7 @@ final readonly class AuthUsers
         return $validated;
     }
 
-    /** Native Auth operation.
+    /** Require an updated principal JSON payload to be serializable and within the size limit.
      * @param  array<array-key, mixed>  $payload
      */
     private function validateUpdateUserAssertJsonPayloadIsBounded(array $payload, string $field): void

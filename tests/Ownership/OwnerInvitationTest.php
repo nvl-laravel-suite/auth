@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Auth\Authenticatable;
+use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\OwnerMembership;
 use Nvl\Auth\Models\User;
@@ -79,4 +81,26 @@ it('requires verified authentication before registration can reuse an existing p
     $accepted = app(AuthInvitations::class)->register($input, $recipient);
     expect($accepted['subject']->getAuthIdentifier())->toBe($recipient->id)
         ->and(User::query()->where('email', $recipient->email)->count())->toBe(1);
+});
+
+it('refuses owner invitation grants when the issuer cannot manage member access', function (): void {
+    $inviter = User::factory()->create();
+    $recipient = User::factory()->create();
+    $issued = app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), function () use ($inviter, $recipient) {
+        app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'invitation-grants'), SubjectReference::fromAuthenticatable($inviter));
+        $role = app(AuthRoles::class)->create($inviter, ['name' => 'invited-admin']);
+
+        return app(AuthInvitations::class)->create(['recipient' => $recipient->email, 'roles' => [$role->id]], $inviter);
+    });
+    $this->app->bind(OwnerAccess::class, AuthOwnerAccess::class);
+    $this->app->bind(AuthManagementAccess::class, static fn () => new class implements AuthManagementAccess
+    {
+        public function allows(Authenticatable $actor, string $ability, mixed $target = null): bool
+        {
+            return $ability !== 'nvl.auth.memberships.manageAccess';
+        }
+    });
+
+    expect(fn () => app(AuthInvitations::class)->accept($issued['token'], $recipient))->toThrow(AuthException::class, 'not authorized')
+        ->and(fn () => app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), $recipient, static fn () => true))->toThrow(AuthException::class);
 });

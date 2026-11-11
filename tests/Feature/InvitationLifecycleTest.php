@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\InvitationRegistrationMapper;
+use Nvl\Auth\Contracts\SystemMutationAccess;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\InvitationDeliveryStatus;
 use Nvl\Auth\Events\AuthDeliveryRequested;
@@ -12,8 +15,10 @@ use Nvl\Auth\Events\InvitationAccepted;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\Invitation;
+use Nvl\Auth\Models\Role;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthInvitations;
+use Nvl\Auth\Services\DenySystemMutationAccess;
 use Nvl\Auth\Tests\Fixtures\Consumer\Data\Display\InvitationReadData;
 use Nvl\Auth\Tests\Fixtures\Consumer\ListInvitationProjectionsAction;
 use Nvl\Auth\Tests\Fixtures\RejectLoginStage;
@@ -543,4 +548,85 @@ it('rejects caller asserted social registration before the host mapper', functio
     expect(User::query()->where('email', 'social.invitee@example.test')->exists())->toBeFalse()
         ->and(AuthAudit::query()->where('action', 'invitation.accepted')->count())->toBe($successful)
         ->and($issued['invitation']->refresh()->accepted_at)->toBeNull();
+});
+
+it('refuses rotated, revoked, expired, and mismatched-recipient invitation tokens', function (): void {
+    config()->set('nvl-auth.features.invitations.settings.resend_cooldown_seconds', 1);
+    $actor = $this->user('lifecycle.owner@example.test');
+    $recipient = $this->user('lifecycle.invitee@example.test');
+    $recipient->markEmailAsVerified();
+    $other = $this->user('lifecycle.other@example.test');
+    $other->markEmailAsVerified();
+    $invitations = app(AuthInvitations::class);
+    $issued = $invitations->create(['recipient' => 'lifecycle.invitee@example.test'], $actor);
+    $issued['invitation']->forceFill(['last_sent_at' => now()->subSeconds(2)])->save();
+    $resent = $invitations->resend($issued['invitation']->identifier(), $actor);
+
+    expect($resent['token'])->not->toBe($issued['token'])
+        ->and(fn () => $invitations->preview($issued['token']))->toThrow(AuthException::class, 'invalid or expired')
+        ->and(fn () => $invitations->accept($issued['token'], $recipient))->toThrow(AuthException::class, 'invalid or expired')
+        ->and(fn () => $invitations->accept($resent['token'], $other))->toThrow(AuthException::class, 'could not be verified')
+        ->and($issued['invitation']->refresh()->accepted_at)->toBeNull();
+
+    $this->travelTo($issued['invitation']->expires_at);
+    expect(fn () => $invitations->accept($resent['token'], $recipient))->toThrow(AuthException::class, 'invalid or expired');
+    $this->travelBack();
+
+    $invitations->revoke($issued['invitation']->identifier(), $actor);
+    expect(fn () => $invitations->accept($resent['token'], $recipient))->toThrow(AuthException::class, 'invalid or expired')
+        ->and($issued['invitation']->refresh()->accepted_at)->toBeNull();
+});
+
+it('requires access management authority to issue and to honor invitation grants', function (): void {
+    $access = new class implements AuthManagementAccess
+    {
+        /** @var list<string> */
+        public array $denied = ['nvl.auth.users.manageAccess'];
+
+        public function allows(Authenticatable $actor, string $ability, mixed $target = null): bool
+        {
+            return ! in_array($ability, $this->denied, true);
+        }
+    };
+    app()->instance(AuthManagementAccess::class, $access);
+    Role::query()->create(['name' => 'invited-editor', 'guard_name' => 'web']);
+    $actor = $this->user('grant.owner@example.test');
+    $recipient = $this->user('grant.invitee@example.test');
+    $recipient->markEmailAsVerified();
+    $invitations = app(AuthInvitations::class);
+
+    expect(fn () => $invitations->create(['recipient' => 'grant.invitee@example.test', 'roles' => ['invited-editor']], $actor))->toThrow(AuthException::class, 'not authorized')
+        ->and(Invitation::query()->count())->toBe(0);
+
+    $access->denied = [];
+    $issued = $invitations->create(['recipient' => 'grant.invitee@example.test', 'roles' => ['invited-editor']], $actor);
+
+    $access->denied = ['nvl.auth.users.manageAccess'];
+    expect(fn () => $invitations->accept($issued['token'], $recipient))->toThrow(AuthException::class, 'invalid or expired')
+        ->and($recipient->fresh()->hasRole('invited-editor'))->toBeFalse();
+
+    $access->denied = [];
+    $actor->forceFill(['is_active' => false])->save();
+    expect(fn () => $invitations->accept($issued['token'], $recipient))->toThrow(AuthException::class, 'invalid or expired')
+        ->and($issued['invitation']->refresh()->accepted_at)->toBeNull()
+        ->and($recipient->fresh()->hasRole('invited-editor'))->toBeFalse();
+
+    $actor->forceFill(['is_active' => true])->save();
+    $invitations->accept($issued['token'], $recipient);
+    expect($recipient->fresh()->hasRole('invited-editor'))->toBeTrue();
+});
+
+it('lets the system authority that issued an invitation revoke it and refuses an unauthorized system context', function (): void {
+    $authority = new SystemMutationContext('Invitation campaign', 'campaign-42');
+    $issued = app(AuthInvitations::class)->create(['recipient' => 'system-revoke@example.test'], authority: $authority);
+
+    $revoked = app(AuthInvitations::class)->revoke($issued['invitation'], $authority);
+
+    expect($revoked->revoked_at)->not->toBeNull()
+        ->and(AuthAudit::query()->where('action', 'invitation.revoked')->sole()->actor_id)->toBeNull();
+
+    $second = app(AuthInvitations::class)->create(['recipient' => 'system-denied@example.test'], authority: $authority);
+    app()->bind(SystemMutationAccess::class, DenySystemMutationAccess::class);
+    expect(fn () => app(AuthInvitations::class)->revoke($second['invitation'], $authority))->toThrow(AuthException::class, 'This system Auth mutation is not authorized.')
+        ->and($second['invitation']->refresh()->revoked_at)->toBeNull();
 });

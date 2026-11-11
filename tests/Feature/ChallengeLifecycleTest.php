@@ -122,3 +122,42 @@ it('keeps one active challenge and caps committed attempts', function (): void {
         ->and(fn () => app(AuthChallenges::class)->verifySecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login', 'code' => $second['secret']]))
         ->toThrow(AuthException::class);
 });
+
+it('redraws a code that collides with a retained challenge for the same recipient', function (bool $magicLink): void {
+    config()->set('nvl-auth.features.security_codes.enabled', true);
+    config()->set('nvl-auth.features.magic_links.enabled', true);
+    $column = $magicLink ? 'secondary_secret_hash' : 'secret_hash';
+    $collidedHash = null;
+    Challenge::creating(function (Challenge $challenge) use (&$collidedHash, $column): void {
+        if ($collidedHash === null) {
+            $collidedHash = $challenge->getAttribute($column);
+            Challenge::factory()->create([$column => $collidedHash, 'revoked_at' => now()]);
+        }
+    });
+    $challenges = app(AuthChallenges::class);
+    $issued = $magicLink
+        ? $challenges->requestMagicLink(['recipient' => 'user@example.test'])
+        : $challenges->requestSecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login']);
+
+    expect($collidedHash)->toBeString();
+
+    $consumed = $magicLink
+        ? $challenges->consumeMagicLink(['recipient' => 'user@example.test', 'token' => (string) $issued['fallbackCode']])
+        : $challenges->verifySecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login', 'code' => $issued['secret']]);
+    expect($consumed->consumed_at)->not->toBeNull();
+})->with(['security code' => false, 'magic-link fallback code' => true]);
+
+it('reports a conflict instead of a database error when every redraw collides', function (): void {
+    config()->set('nvl-auth.features.security_codes.enabled', true);
+    $colliding = false;
+    Challenge::creating(function (Challenge $challenge) use (&$colliding): void {
+        if (! $colliding) {
+            $colliding = true;
+            Challenge::factory()->create(['secret_hash' => $challenge->secret_hash, 'revoked_at' => now()]);
+            $colliding = false;
+        }
+    });
+
+    expect(fn () => app(AuthChallenges::class)->requestSecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login']))
+        ->toThrow(fn (AuthException $exception) => expect($exception->errorCode)->toBe('challenge_issue_conflict'));
+});

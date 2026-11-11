@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Permission;
@@ -86,10 +87,13 @@ final readonly class OwnerMembershipAssignments
         $roleClass = $this->models->roleClass();
         $permissionClass = $this->models->permissionClass();
         $guard = $this->configuration->string('features.rbac.settings.guard', 'web');
+        // A name is never compared with the UUID key: PostgreSQL rejects a non-UUID value there instead of matching nothing.
+        $roleIds = array_values(array_filter($roles, Str::isUuid(...)));
+        $permissionIds = array_values(array_filter($permissions, Str::isUuid(...)));
         $roleRecords = $this->boundary->query($roleClass::query(), 'auth.roles')->where('guard_name', $guard)
-            ->where(static fn ($query) => $query->whereIn('id', $roles)->orWhereIn('name', $roles))->get();
+            ->where(static fn ($query) => $query->whereIn('id', $roleIds)->orWhereIn('name', $roles))->get();
         $permissionRecords = $permissionClass::query()->where('guard_name', $guard)
-            ->where(static fn ($query) => $query->whereIn('id', $permissions)->orWhereIn('name', $permissions))->get();
+            ->where(static fn ($query) => $query->whereIn('id', $permissionIds)->orWhereIn('name', $permissions))->get();
         if ($roleRecords->count() !== count($roles) || $permissionRecords->count() !== count($permissions)) {
             throw new AuthException('membership_assignment_invalid', 'A membership access assignment is invalid.', 422);
         }

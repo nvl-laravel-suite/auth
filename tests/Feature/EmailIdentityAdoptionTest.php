@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
 use Nvl\Auth\Contracts\SystemMutationAccess;
@@ -80,4 +81,27 @@ it('keeps the adoption command read only by default and requires an explicit app
     expect($user->fresh()->getAttribute('email_identity_hash'))->toBeNull();
     expect(fn () => Artisan::call('nvl:auth:adopt-email-identities', ['--apply' => true]))->toThrow(InvalidArgumentException::class, 'reason');
     expect($user->fresh()->getAttribute('email_identity_hash'))->toBeNull();
+});
+
+it('reads only identity columns from retained principals while planning and applying adoption', function (): void {
+    $this->user('first@example.test');
+    $this->user('second@example.test');
+    retainedEmailSchema();
+    authorizeEmailAdoption();
+    $model = new TestUser;
+    $from = 'from '.$model->getConnection()->getQueryGrammar()->wrapTable($model->getTable());
+    $reads = [];
+    $model->getConnection()->listen(function (QueryExecuted $query) use (&$reads, $from): void {
+        if (str_starts_with($query->sql, 'select') && str_contains($query->sql, $from)) {
+            $reads[] = $query->sql;
+        }
+    });
+    $service = app(PrincipalEmailIdentityAdoption::class);
+
+    expect($service->plan()['missing'])->toBe(2)
+        ->and($service->apply(new SystemMutationContext('Reviewed adoption; workers drained', 'projection'))['updated'])->toBe(2)
+        ->and($reads)->not->toBeEmpty();
+    foreach ($reads as $sql) {
+        expect($sql)->not->toContain('select *')->not->toContain('password');
+    }
 });

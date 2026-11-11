@@ -25,6 +25,7 @@ use Nvl\Auth\Models\PendingEmailChange;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Support\AuthInstantCast;
+use Nvl\Auth\Support\UniqueViolation;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
@@ -39,7 +40,7 @@ use Nvl\Support\Events\DomainEventDispatcher;
  */
 final readonly class AuthEmailChanges
 {
-    public function __construct(private FeatureGate $features, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private SecretHasher $hasher, private PrincipalAttributeMapper $attributes, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, private DomainEventDispatcher $events, private AuthDeliveryContext $delivery) {}
+    public function __construct(private FeatureGate $features, private CanonicalActorResolver $canonical, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private SecretHasher $hasher, private PrincipalAttributeMapper $attributes, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, private DomainEventDispatcher $events, private AuthDeliveryContext $delivery, private AuthConfiguration $configuration) {}
 
     public function request(Authenticatable $subject, string $newEmail, #[\SensitiveParameter] string $recentProof, AuthenticationRequestContext $context): PendingEmailChange
     {
@@ -61,7 +62,7 @@ final readonly class AuthEmailChanges
                 }
                 PendingEmailChange::query()->where('subject_type', $reference->type)->where('subject_id', $reference->identifier)->whereNotNull('active_key')->update(['revoked_at' => AuthInstantCast::forQuery((new PendingEmailChange)->getConnection(), now()), 'active_key' => null]);
                 $secret = bin2hex(random_bytes(32));
-                $expiry = CarbonImmutable::now('UTC')->addMinutes(60);
+                $expiry = CarbonImmutable::now('UTC')->addMinutes($this->configuration->integerBetween('features.email_verification.settings.ttl_minutes', 60, 1, 10080));
                 $pending = PendingEmailChange::query()->create(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'new_email' => $newEmail, 'email_hash' => $this->hasher->hash('pending-email-identity', $newEmail), 'token_hash' => $this->hasher->hash('pending-email-proof', $secret), 'security_revision' => $revision, 'active_key' => $this->hasher->hash('pending-email-active', $reference->type."\0".$reference->identifier), 'context' => ['guard' => $context->guardName, 'binding' => $this->hasher->hash('pending-email-browser', (string) $context->sessionBinding)], 'expires_at' => $expiry]);
                 $this->notify($newEmail, AuthMessageType::EmailChangeVerification, ['token' => $pending->identifier().'.'.$secret], $expiry, $fresh);
                 $this->notify($fresh->getEmailForVerification(), AuthMessageType::EmailChangeNotification, ['change_id' => $pending->identifier(), 'stage' => 'requested'], $expiry, $fresh);
@@ -94,7 +95,7 @@ final readonly class AuthEmailChanges
                     $pending->consumed_at = CarbonImmutable::now('UTC');
                     $pending->active_key = null;
                     $pending->save();
-                    $this->security->advance($fresh, 'email_changed');
+                    $this->security->advance($fresh, 'email_changed', $context);
                     $this->audits->record('email_change.completed', subject: $reference, actor: $fresh, metadata: ['change_id' => $pending->identifier()]);
                     $expiry = CarbonImmutable::now('UTC')->addHour();
                     foreach ([$oldEmail, $fresh->getEmailForVerification()] as $email) {
@@ -105,7 +106,10 @@ final readonly class AuthEmailChanges
                     return $fresh->refresh();
                 });
             }, 3);
-        } catch (UniqueConstraintViolationException) {
+        } catch (UniqueConstraintViolationException $exception) {
+            if (UniqueViolation::columns($exception, $user->getConnection(), $user->getTable()) === null) {
+                throw $exception;
+            }
             throw $this->invalid();
         }
     }

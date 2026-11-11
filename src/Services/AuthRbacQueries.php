@@ -24,7 +24,7 @@ use Nvl\Support\Ownership\Enums\OwnershipContextMode;
  */
 final readonly class AuthRbacQueries
 {
-    /** Native Auth operation. */
+    /** Create the owner-bounded role query source. */
     public function __construct(private AuthModelRegistry $models, private AuthConfiguration $configuration, private OwnershipBoundary $boundary, private MembershipPrincipalResolver $principals, private RbacPrincipalTracker $tracker, private Container $container, private OwnershipContext $ownership) {}
 
     /** @return Builder<Role> */
@@ -37,7 +37,7 @@ final readonly class AuthRbacQueries
         return $query->where('guard_name', $this->configuration->string('features.rbac.settings.guard', 'web'));
     }
 
-    /** Native Auth operation. */
+    /** Find one role of the current owner scope, optionally locking it. */
     public function role(string $id, bool $lock = false): Role
     {
         $query = $this->roles()->whereKey($id);
@@ -56,7 +56,7 @@ final readonly class AuthRbacQueries
         return $class::query()->where('guard_name', $this->configuration->string('features.rbac.settings.guard', 'web'));
     }
 
-    /** Native Auth operation. */
+    /** Reload and admit the principal that will receive roles or permissions. */
     public function assertAssignmentPrincipal(Authenticatable $principal): Authenticatable
     {
         $reloaded = $this->principals->resolve(SubjectReference::fromAuthenticatable($principal), true);

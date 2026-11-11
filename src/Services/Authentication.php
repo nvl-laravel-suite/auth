@@ -10,6 +10,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Hash;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\AuthenticationEligibility;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
@@ -43,7 +44,7 @@ final readonly class Authentication
 
     private const string PendingFactorLogin = 'nvl-auth.credential_login';
 
-    public function __construct(private FeatureGate $features, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private AuthManager $auth, private AuthAuditRecorder $audits, private AuthenticationEligibility $eligibility, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private AuthTokens $tokens, private SecretHasher $hasher, private AuthIdentityChallenges $records, private PrincipalSecurity $security, private AuthenticationSessions $sessions, private AuthenticationProofs $proofs, private PrincipalEmailIdentity $emails) {}
+    public function __construct(private FeatureGate $features, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private AuthManager $auth, private AuthAuditRecorder $audits, private AuthenticationEligibility $eligibility, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private AuthTokens $tokens, private SecretHasher $hasher, private AuthIdentityChallenges $records, private PrincipalSecurity $security, private AuthenticationSessions $sessions, private AuthenticationProofs $proofs, private PrincipalEmailIdentity $emails, private AuthSchemaProbes $probes) {}
 
     /** Verify native password credentials into a browser-bound bearer capability.
      * @param  array{identifier?: mixed, password?: mixed}  $credentials
@@ -68,6 +69,16 @@ final readonly class Authentication
      * @param  array{code?: mixed, recoveryCode?: mixed}  $factorProof
      */
     public function login(#[SensitiveParameter] array $credentials, array $context, StatefulGuard $guard, Session $session, #[SensitiveParameter] array $factorProof = []): Authenticatable
+    {
+        return $this->probes->during(fn (): Authenticatable => $this->authenticate($credentials, $context, $guard, $session, $factorProof));
+    }
+
+    /** Run one password login inside one probe-sharing operation.
+     * @param  array{identifier?: mixed, password?: mixed}  $credentials
+     * @param  array<string, mixed>  $context
+     * @param  array{code?: mixed, recoveryCode?: mixed}  $factorProof
+     */
+    private function authenticate(#[SensitiveParameter] array $credentials, array $context, StatefulGuard $guard, Session $session, #[SensitiveParameter] array $factorProof): Authenticatable
     {
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Use);
         $this->sessions->assertCanTransition();
@@ -195,6 +206,16 @@ final readonly class Authentication
         $this->domainEvents->dispatch(new AuthenticationRejected($identifierName, $identifier, $reason), (new AuthAudit)->getConnection());
     }
 
+    /**
+     * Pay for one password hash when there is no stored hash to verify, so a failed login takes the same
+     * time whether or not the account exists. Hashing afresh keeps the application's current algorithm and
+     * cost without process state, which would not outlive a request under PHP-FPM.
+     */
+    private function spendPasswordHash(): void
+    {
+        Hash::make('nvl-auth-absent-password');
+    }
+
     /** Capture verification freshness before invoking the credential provider.
      * @param  array<string, mixed>  $credentials
      * @return array{subject: Model&Authenticatable, passwordHash: string, revision: int}
@@ -214,11 +235,15 @@ final readonly class Authentication
         $native = $this->emails->credentials($provider, $identifier, $credentials['identifier']) + ['password' => $credentials['password']];
         $subject = $provider->retrieveByCredentials($native);
         if (! $subject instanceof Model) {
+            $this->spendPasswordHash();
             throw new AuthException('credentials_invalid', 'The supplied credentials are invalid.', 422);
         }
         $passwordHash = $subject->getAuthPassword();
         $revision = $this->security->revisionSnapshot($subject);
         if (! $provider->validateCredentials($subject, $native)) {
+            if (blank($passwordHash)) {
+                $this->spendPasswordHash();
+            }
             throw new AuthException('credentials_invalid', 'The supplied credentials are invalid.', 422);
         }
 

@@ -178,3 +178,18 @@ it('rejects a configured issuer unless the SDK claims prove the same issuer', fu
     $adapter = new SocialiteIdentityProvider($socialite->driver('oidc'), 'oidc', issuer: 'https://issuer.example');
     expect(fn () => $adapter->user('oidc', null))->toThrow(AuthException::class);
 })->with([null, 'https://attacker.example']);
+
+it('refuses an OAuth2 driver that does not bind its authorization to SDK-managed session state', function (): void {
+    $driver = static function (): GithubProvider {
+        $request = Request::create('/redirect');
+        $request->setLaravelSession(new Store('session', new ArraySessionHandler(120)));
+
+        return new GithubProvider($request, 'client', 'secret', 'https://example.test/callback');
+    };
+    $stateful = (new SocialiteIdentityProvider($driver(), 'github'))->redirectUrl('github', null, [], []);
+    parse_str((string) parse_url($stateful, PHP_URL_QUERY), $query);
+
+    expect($query['state'] ?? null)->toBeString()->not->toBeEmpty()
+        ->and(fn () => (new SocialiteIdentityProvider($driver()->stateless(), 'github'))->redirectUrl('github', null, [], []))
+        ->toThrow(AuthException::class, 'SDK-managed OAuth state');
+});

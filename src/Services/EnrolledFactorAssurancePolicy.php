@@ -19,6 +19,8 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  */
 final readonly class EnrolledFactorAssurancePolicy implements AuthenticationAssurancePolicy
 {
+    public function __construct(private AuthSchemaProbes $probes = new AuthSchemaProbes) {}
+
     public function assertSatisfied(Authenticatable $subject, AuthenticationEvidence $evidence, AuthenticationPurpose $purpose): void
     {
         if ($this->requiresSecondFactor($subject) && ! $evidence->satisfiesMfa()) {
@@ -29,7 +31,7 @@ final readonly class EnrolledFactorAssurancePolicy implements AuthenticationAssu
     public function requiresSecondFactor(Authenticatable $subject): bool
     {
         $model = new TotpCredential;
-        if (! $model->getConnection()->getSchemaBuilder()->hasTable($model->getTable())) {
+        if (! $this->probes->once('table:'.$model->getConnection()->getName().':'.$model->getTable(), static fn (): bool => $model->getConnection()->getSchemaBuilder()->hasTable($model->getTable()))) {
             return false;
         }
         $reference = SubjectReference::fromAuthenticatable($subject);

@@ -9,7 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -28,6 +28,7 @@ use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Support\AuthInstantCast;
+use Nvl\Auth\Support\UniqueViolation;
 use Nvl\Auth\Traits\IssuesAuthenticationProofs;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
@@ -45,7 +46,7 @@ final readonly class AuthChallenges
 {
     use IssuesAuthenticationProofs;
 
-    /** Native Auth operation. */
+    /** Create the magic-link and security-code challenge service. */
     public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private AuthSubjectResolver $subjects, private AuthenticationSessions $sessions, private AuthIdentityChallenges $records, private OpaqueTokenFactory $tokens, private SecretHasher $hasher, private AuthAuditRecorder $audits, private DomainEventDispatcher $domainEvents, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private AuthIdentifierResolver $identifiers, private PrincipalSecurity $security, private AuthCommittedAudit $committedAudits) {}
 
     /**
@@ -82,27 +83,45 @@ final readonly class AuthChallenges
         }
         $normalizedRecipient = mb_strtolower(trim($recipient));
         $recipientHash = $this->hasher->hash('challenge-recipient', $normalizedRecipient);
-        $secret = $numeric ? str_pad((string) random_int(0, 10 ** $digits - 1), $digits, '0', STR_PAD_LEFT) : $this->tokens->make();
-        $secretHash = $this->hasher->hash("challenge-{$messageType->value}-{$recipientHash}", $secret);
-        $fallbackCode = $withFallbackCode ? str_pad((string) random_int(0, 10 ** $fallbackDigits - 1), $fallbackDigits, '0', STR_PAD_LEFT) : null;
-        $secondarySecretHash = $fallbackCode === null ? null : $this->hasher->hash("challenge-{$messageType->value}-secondary-{$recipientHash}", $fallbackCode);
         $activeKey = $this->hasher->hash('active-challenge', $messageType->value."\x00".$purpose."\x00".$recipientHash);
         $connection = (new Challenge)->getConnectionName();
-        try {
-            return DB::connection($connection)->transaction(function () use ($activeKey, $expiresAt, $feature, $locale, $maxAttempts, $messageType, $metadata, $normalizedRecipient, $payload, $purpose, $recipientHash, $secret, $secretHash, $subject, $fallbackCode, $secondarySecretHash): array {
-                $this->records->query()->where('active_key', $activeKey)->update(['active_key' => null, 'revoked_at' => AuthInstantCast::forQuery((new Challenge)->getConnection(), CarbonImmutable::now('UTC'))]);
-                $challenge = $this->records->create(['type' => $messageType->value, 'purpose' => $purpose, 'subject_type' => $subject?->type, 'subject_id' => $subject?->identifier, 'recipient_hash' => $recipientHash, 'secret_hash' => $secretHash, 'secondary_secret_hash' => $secondarySecretHash, 'active_key' => $activeKey, 'payload' => $payload, 'max_attempts' => $maxAttempts, 'expires_at' => $expiresAt]);
-                $this->domainEvents->dispatch(new AuthDeliveryRequested(new AuthDeliveryRequest(messageId: (string) Str::uuid(), feature: $feature, type: $messageType, recipient: $normalizedRecipient, payload: [...$payload, 'challenge_id' => $challenge->identifier(), 'secret' => $secret, 'code' => $fallbackCode, 'purpose' => $purpose], expiresAt: $expiresAt, locale: $locale, metadata: ['challenge_id' => $challenge->identifier(), ...$metadata], subject: $subject), $this->deliveryContext->capture(true)), $challenge->getConnection());
-                $this->audits->record("{$feature->value}.issued", subject: $subject, metadata: ['challenge_id' => $challenge->identifier(), 'purpose' => $purpose]);
+        for ($draw = 1; ; $draw++) {
+            $secret = $numeric ? str_pad((string) random_int(0, 10 ** $digits - 1), $digits, '0', STR_PAD_LEFT) : $this->tokens->make();
+            $secretHash = $this->hasher->hash("challenge-{$messageType->value}-{$recipientHash}", $secret);
+            $fallbackCode = $withFallbackCode ? str_pad((string) random_int(0, 10 ** $fallbackDigits - 1), $fallbackDigits, '0', STR_PAD_LEFT) : null;
+            $secondarySecretHash = $fallbackCode === null ? null : $this->hasher->hash("challenge-{$messageType->value}-secondary-{$recipientHash}", $fallbackCode);
+            try {
+                return DB::connection($connection)->transaction(function () use ($activeKey, $expiresAt, $feature, $locale, $maxAttempts, $messageType, $metadata, $normalizedRecipient, $payload, $purpose, $recipientHash, $secret, $secretHash, $subject, $fallbackCode, $secondarySecretHash): array {
+                    $this->records->query()->where('active_key', $activeKey)->update(['active_key' => null, 'revoked_at' => AuthInstantCast::forQuery((new Challenge)->getConnection(), CarbonImmutable::now('UTC'))]);
+                    $challenge = $this->records->create(['type' => $messageType->value, 'purpose' => $purpose, 'subject_type' => $subject?->type, 'subject_id' => $subject?->identifier, 'recipient_hash' => $recipientHash, 'secret_hash' => $secretHash, 'secondary_secret_hash' => $secondarySecretHash, 'active_key' => $activeKey, 'payload' => $payload, 'max_attempts' => $maxAttempts, 'expires_at' => $expiresAt]);
+                    $this->domainEvents->dispatch(new AuthDeliveryRequested(new AuthDeliveryRequest(messageId: (string) Str::uuid(), feature: $feature, type: $messageType, recipient: $normalizedRecipient, payload: [...$payload, 'challenge_id' => $challenge->identifier(), 'secret' => $secret, 'code' => $fallbackCode, 'purpose' => $purpose], expiresAt: $expiresAt, locale: $locale, metadata: ['challenge_id' => $challenge->identifier(), ...$metadata], subject: $subject), $this->deliveryContext->capture(true)), $challenge->getConnection());
+                    $this->audits->record("{$feature->value}.issued", subject: $subject, metadata: ['challenge_id' => $challenge->identifier(), 'purpose' => $purpose]);
 
-                return ['challenge' => $challenge, 'secret' => $secret, 'fallbackCode' => $fallbackCode];
-            }, 3);
-        } catch (QueryException $exception) {
-            if (in_array($exception->errorInfo[0] ?? null, ['23000', '23505'], true) && (str_contains($exception->getMessage(), 'nvl_auth_challenges_active_key_unique') || str_contains($exception->getMessage(), 'auth_challenges.active_key'))) {
-                throw new AuthException('challenge_issue_conflict', 'An authentication challenge is already being issued.', 409, previous: $exception);
+                    return ['challenge' => $challenge, 'secret' => $secret, 'fallbackCode' => $fallbackCode];
+                }, 3);
+            } catch (UniqueConstraintViolationException $exception) {
+                $column = $this->violatedUniqueColumn($exception);
+                if ($column === null) {
+                    throw $exception;
+                }
+                if ($column === 'active_key' || $draw === 3) {
+                    throw new AuthException('challenge_issue_conflict', 'An authentication challenge is already being issued.', 409, previous: $exception);
+                }
             }
-            throw $exception;
         }
+    }
+
+    /**
+     * Name the unique challenge column a rejected insert collided on.
+     *
+     * Code hashes are deterministic per recipient and type, so a retained challenge can already hold a newly drawn code.
+     */
+    private function violatedUniqueColumn(UniqueConstraintViolationException $exception): ?string
+    {
+        $challenge = new Challenge;
+        $columns = UniqueViolation::columns($exception, $challenge->getConnection(), $challenge->getTable());
+
+        return $columns !== null && count($columns) === 1 && in_array($columns[0], ['active_key', 'secret_hash', 'secondary_secret_hash'], true) ? $columns[0] : null;
     }
 
     /**
@@ -264,7 +283,7 @@ final readonly class AuthChallenges
         return $this->issue(feature: AuthFeature::SecurityCodes, messageType: AuthMessageType::SecurityCode, recipient: $data['recipient'], purpose: $data['purpose'], expiresAt: CarbonImmutable::now('UTC')->addMinutes($this->configuration->integerBetween('features.security_codes.settings.ttl_minutes', 10, 1, 10080)), numeric: true, digits: $this->configuration->integerBetween('features.security_codes.settings.digits', 6, 4, 10), maxAttempts: $this->configuration->integerBetween('features.security_codes.settings.max_attempts', 5, 1, 100), subject: $subject, payload: $payload, locale: $locale);
     }
 
-    /** Native Auth operation.
+    /** Issue a passwordless-login email code bound to the requesting browser context.
      * @param  array<string, mixed>  $data
      * @return array{challenge: Challenge, secret: string, fallbackCode: string|null}|null
      */

@@ -17,7 +17,7 @@ For stateless password authentication, use `Authentication::loginWithToken()`: i
 
 Management requires an explicit actor and an AuthManagementAccess decision; system mutations require an explicit SystemMutationContext and configured SystemMutationAccess. Defaults deny. Ambient Request/Auth state is never management authority or audit metadata. Configure the principal model, attribute mapper and narrow identity adapters for host principals. The base User has no Sanctum or Permission traits; opt into those traits on a consumer subclass when selecting those adapters.
 
-Optional adapters retain Sanctum, Spatie Permission, Socialite, Google2FA and WebAuthn's audited engines. Install only selected engines and enable their feature flags. Bind SocialIdentityProviderFactory as a scoped host service before the Auth provider registers. Its make method must construct a fresh SocialiteIdentityProvider and SDK driver for every operation, obtaining the current Request and session at that time; the SDK validates OAuth state. Do not return cached Socialite manager drivers. Never fabricate a verified external identity from untrusted callback fields. For example, a GitHub-only host factory can construct a driver directly instead of using Socialite's cached manager:
+Optional adapters retain Sanctum, Spatie Permission, Socialite, Google2FA and WebAuthn's audited engines. Install only selected engines and enable their feature flags. Select the SocialIdentityProviderFactory with `nvl-auth.features.social_identities.services.provider_factory`, or bind it with `scoped()` in a host provider; a host `scopedIf` is ignored because the package default is already bound. Its make method must construct a fresh SocialiteIdentityProvider and SDK driver for every operation, obtaining the current Request and session at that time; the SDK validates OAuth state. Do not return cached Socialite manager drivers. Never fabricate a verified external identity from untrusted callback fields. For example, a GitHub-only host factory can construct a driver directly instead of using Socialite's cached manager:
 
 ```php
 use Laravel\Socialite\Two\GithubProvider;
@@ -40,7 +40,9 @@ final class GithubIdentityProviderFactory implements SocialIdentityProviderFacto
     }
 }
 
-$this->app->scopedIf(SocialIdentityProviderFactory::class, GithubIdentityProviderFactory::class);
+// In a host service provider's register(). Alternatively set
+// nvl-auth.features.social_identities.services.provider_factory to this class.
+$this->app->scoped(SocialIdentityProviderFactory::class, GithubIdentityProviderFactory::class);
 ```
 
 Native principal management accepts an explicit `extensions` array for host fields. Configure `features.principal_management.services.extension_mapper` with a `PrincipalExtensionMapper`; its `validateAndMap(PrincipalMutation $mutation, array $extensions, ?User $principal = null): array` validates logical fields and returns physical columns. Use a subclass of `Nvl\Auth\Models\User` with those columns explicitly fillable. The mapper runs inside the native mutation transaction and must not persist, issue credentials, mutate ownership or perform external effects. A consumer Action can compose complete native operations for related records. The default rejects nonempty extensions; input and output are limited to 16 KiB of JSON at depth 16. Native fields, mapped aliases, identity hashes, ownership and security columns remain protected.

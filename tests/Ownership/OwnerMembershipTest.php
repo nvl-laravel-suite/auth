@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
+use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Enums\MembershipStatus;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
@@ -11,6 +13,8 @@ use Nvl\Auth\Models\OwnerMembership;
 use Nvl\Auth\Models\PersonalAccessToken;
 use Nvl\Auth\Ownership\AuthOwnerAccess;
 use Nvl\Auth\Services\AuthMemberships;
+use Nvl\Auth\Services\AuthRbacReader;
+use Nvl\Auth\Services\AuthRoles;
 use Nvl\Auth\Services\AuthTokens;
 use Nvl\Auth\Services\AuthUsers;
 use Nvl\Auth\Tests\Fixtures\TestUser;
@@ -161,5 +165,112 @@ it('prevents relabeling an existing membership to a different principal', functi
         $membership = app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'immutable-subject'), SubjectReference::fromAuthenticatable($user));
         expect(fn () => $membership->getConnection()->table($membership->getTable())->where('id', $membership->id)->update(['subject_id' => 'foreign-principal']))
             ->toThrow(QueryException::class);
+    });
+});
+
+it('requires access management authority before enrollment grants or replaces member access', function (): void {
+    $admin = TestUser::factory()->create();
+    $member = TestUser::factory()->create();
+    $this->app->bind(AuthManagementAccess::class, static fn () => new class implements AuthManagementAccess
+    {
+        public function allows(Authenticatable $actor, string $ability, mixed $target = null): bool
+        {
+            return $ability !== 'nvl.auth.memberships.manageAccess';
+        }
+    });
+    app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), function () use ($admin, $member): void {
+        $memberships = app(AuthMemberships::class);
+        $system = new SystemMutationContext('bootstrap', 'manage-access');
+        $reference = SubjectReference::fromAuthenticatable($member);
+        $memberships->provision($system, SubjectReference::fromAuthenticatable($admin));
+        $role = app(AuthRoles::class)->create($admin, ['name' => 'tenant-admin']);
+
+        expect(fn () => $memberships->enroll($admin, $reference, [$role->id]))->toThrow(AuthException::class, 'not authorized')
+            ->and(OwnerMembership::query()->where('subject_id', $member->id)->exists())->toBeFalse();
+
+        $memberships->enroll($admin, $reference);
+        $memberships->enroll($system, $reference, [$role->id]);
+        expect($member->fresh()->hasRole('tenant-admin'))->toBeTrue()
+            ->and(fn () => $memberships->enroll($admin, $reference))->toThrow(AuthException::class, 'not authorized')
+            ->and(fn () => $memberships->enroll($admin, SubjectReference::fromAuthenticatable($admin), [$role->id]))->toThrow(AuthException::class, 'not authorized')
+            ->and($member->fresh()->hasRole('tenant-admin'))->toBeTrue()
+            ->and($admin->fresh()->hasRole('tenant-admin'))->toBeFalse();
+    });
+});
+
+it('does not restore owner administration when a revoked owner membership is reactivated', function (): void {
+    $first = TestUser::factory()->create();
+    $second = TestUser::factory()->create();
+    app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), function () use ($first, $second): void {
+        $memberships = app(AuthMemberships::class);
+        $system = new SystemMutationContext('bootstrap', 'revoked-owner');
+        $former = $memberships->provision($system, SubjectReference::fromAuthenticatable($first));
+        $memberships->provision($system, SubjectReference::fromAuthenticatable($second));
+        $revoked = $memberships->revoke($second, $former, $former->revision);
+        $reactivated = $memberships->setStatus($second, $revoked, MembershipStatus::Active, $revoked->revision);
+
+        expect($revoked->is_owner)->toBeFalse()
+            ->and($reactivated->status)->toBe(MembershipStatus::Active)
+            ->and($reactivated->is_owner)->toBeFalse();
+    });
+});
+
+it('refuses to transfer owner administration to a membership that is not active', function (MembershipStatus $status): void {
+    $owner = TestUser::factory()->create();
+    $recipient = TestUser::factory()->create();
+    app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), function () use ($owner, $recipient, $status): void {
+        $memberships = app(AuthMemberships::class);
+        $source = $memberships->provision(new SystemMutationContext('bootstrap', 'inactive-transfer'), SubjectReference::fromAuthenticatable($owner));
+        $target = $memberships->enroll($owner, SubjectReference::fromAuthenticatable($recipient));
+        $target = $memberships->setStatus($owner, $target, $status, $target->revision);
+
+        expect(fn () => $memberships->transfer($owner, $source, $target->id, $source->revision))->toThrow(AuthException::class, 'cannot be transferred')
+            ->and($memberships->find($owner, $target)->status)->toBe($status)
+            ->and($memberships->find($owner, $target)->is_owner)->toBeFalse()
+            ->and($memberships->find($owner, $source)->is_owner)->toBeTrue();
+    });
+})->with([MembershipStatus::Suspended, MembershipStatus::Revoked]);
+
+it('matches membership search text literally instead of as LIKE wildcards', function (): void {
+    $admin = TestUser::factory()->create();
+    $member = TestUser::factory()->create();
+    app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), function () use ($admin, $member): void {
+        $memberships = app(AuthMemberships::class);
+        $memberships->provision(new SystemMutationContext('bootstrap', 'search'), SubjectReference::fromAuthenticatable($admin));
+        $memberships->enroll($admin, SubjectReference::fromAuthenticatable($member));
+
+        expect($memberships->paginate($admin, substr($member->id, 0, 13))->total())->toBe(1)
+            ->and($memberships->paginate($admin, '%')->total())->toBe(0)
+            ->and($memberships->paginate($admin, '_')->total())->toBe(0);
+    });
+});
+
+it('refuses another owner roles and memberships in every membership mutation and RBAC read', function (): void {
+    $admin = TestUser::factory()->create();
+    $member = TestUser::factory()->create();
+    $system = new SystemMutationContext('bootstrap', 'cross-owner');
+    $runner = app(OwnershipRunner::class);
+    [$foreignRole, $foreignMembership] = $runner->run(Company::query()->findOrFail(8), Actor::query()->findOrFail(1), function () use ($admin, $member, $system): array {
+        app(AuthMemberships::class)->provision($system, SubjectReference::fromAuthenticatable($admin));
+
+        return [app(AuthRoles::class)->create($admin, ['name' => 'foreign-admin']), app(AuthMemberships::class)->enroll($admin, SubjectReference::fromAuthenticatable($member))];
+    });
+    $runner->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), function () use ($admin, $member, $system, $foreignRole, $foreignMembership): void {
+        $memberships = app(AuthMemberships::class);
+        $source = $memberships->provision($system, SubjectReference::fromAuthenticatable($admin));
+        $reader = app(AuthRbacReader::class);
+
+        expect(fn () => $memberships->enroll($admin, SubjectReference::fromAuthenticatable($member), [$foreignRole->id]))->toThrow(AuthException::class, 'assignment is invalid')
+            ->and(fn () => $memberships->enroll($admin, SubjectReference::fromAuthenticatable($member), ['foreign-admin']))->toThrow(AuthException::class, 'assignment is invalid')
+            ->and(OwnerMembership::query()->where('subject_id', $member->id)->exists())->toBeFalse()
+            ->and(fn () => $memberships->setStatus($admin, $foreignMembership->id, MembershipStatus::Suspended, $foreignMembership->revision))->toThrow(OwnershipViolation::class)
+            ->and(fn () => $memberships->revoke($admin, $foreignMembership->id, $foreignMembership->revision))->toThrow(OwnershipViolation::class)
+            ->and(fn () => $memberships->transfer($admin, $source, $foreignMembership->id, $source->revision))->toThrow(OwnershipViolation::class)
+            ->and($reader->roles($admin, 'foreign')->total())->toBe(0)
+            ->and($reader->roleOptions($admin, 'foreign'))->toHaveCount(0)
+            ->and(fn () => $reader->role($admin, $foreignRole->id))->toThrow(ModelNotFoundException::class);
+    });
+    $runner->run(Company::query()->findOrFail(8), Actor::query()->findOrFail(1), function () use ($admin, $foreignMembership): void {
+        expect(app(AuthMemberships::class)->find($admin, $foreignMembership->id)->status)->toBe(MembershipStatus::Active);
     });
 });

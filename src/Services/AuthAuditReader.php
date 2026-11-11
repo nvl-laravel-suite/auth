@@ -18,7 +18,7 @@ use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
  */
 final readonly class AuthAuditReader
 {
-    /** Native Auth operation. */
+    /** Create the authorized audit trail reader. */
     public function __construct(private FeatureGate $features, private ManagementAuthorizer $authorization, private OwnershipBoundary $boundary) {}
 
     /**

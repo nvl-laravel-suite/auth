@@ -104,7 +104,6 @@ return [
                 'session_containment' => LaravelPrincipalSessionContainment::class,
             ],
             'settings' => [
-                'use_as_auth_model' => true,
                 'default_locale' => env('APP_LOCALE', 'en'),
                 'default_timezone' => 'UTC',
                 'per_page' => 25,
@@ -142,7 +141,7 @@ return [
             'enabled' => env('NVL_AUTH_PASSWORD_ENABLED', true),
 
             'services' => ['updater' => null, 'policy' => null],
-            'settings' => ['reset_ttl_minutes' => 60],
+            'settings' => [],
         ],
         'email_verification' => [
             'enabled' => env('NVL_AUTH_EMAIL_VERIFICATION_ENABLED', false),
@@ -250,7 +249,6 @@ return [
             'settings' => [
                 'guard' => env('NVL_AUTH_RBAC_GUARD', 'web'),
                 'super_admin_role' => env('NVL_AUTH_SUPER_ADMIN_ROLE', 'super-admin'),
-                'use_package_storage' => true,
                 'role_option_limit' => 50,
                 'permission_option_limit' => 100,
                 'permission_group_limit' => 100,
@@ -296,7 +294,8 @@ return [
     ],
 
     'cleanup' => [
-        'retention_days' => env('NVL_AUTH_RETENTION_DAYS', 30),
+        // Environment values are strings; a non-integer value stays invalid and fails closed.
+        'retention_days' => filter_var(env('NVL_AUTH_RETENTION_DAYS', 30), FILTER_VALIDATE_INT),
         'batch_size' => 250,
     ],
 

@@ -220,3 +220,23 @@ it('serves the complete built-in registration and authentication HTTP flow', fun
         ->assertJsonPath('code', 'passkey_authenticated')
         ->assertJsonPath('data.subject.id', (string) $user->getKey());
 });
+
+it('discloses no registered credential through anonymous options and expires unfinished ceremonies', function (): void {
+    $user = $this->user();
+    $authenticator = new TestWebauthnAuthenticator;
+    $registration = app(AuthPasskeys::class)->beginRegistration($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    app(AuthPasskeys::class)->finishRegistration($user, ['ceremonyId' => $registration->ceremonyId, 'response' => $authenticator->registrationResponse($registration->options)], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $authentication = app(AuthPasskeys::class)->beginAuthentication(context: $this->authenticationContext());
+    $disclosed = json_encode($authentication->options, JSON_THROW_ON_ERROR);
+
+    expect($authentication->options['allowCredentials'] ?? [])->toBe([])
+        ->and($authentication->options)->not->toHaveKey('user')
+        ->and($disclosed)->not->toContain($authenticator->credentialId())
+        ->and($disclosed)->not->toContain($registration->options['user']['id'])
+        ->and($disclosed)->not->toContain($user->email);
+
+    $this->travel(301)->seconds();
+
+    expect(fn () => app(AuthPasskeys::class)->finishAuthentication(
+        ['ceremonyId' => $authentication->ceremonyId, 'response' => $authenticator->authenticationResponse($authentication->options, $registration->options['user']['id'])], sessionBinding: app('session.store')->getId()))->toThrow(AuthException::class, 'The passkey ceremony is invalid or expired.');
+});

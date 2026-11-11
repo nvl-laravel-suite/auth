@@ -12,6 +12,26 @@ use Nvl\Support\Config\PackageStorage;
 
 return new class extends Migration implements AuthSchemaMigration
 {
+    private const array PACKAGE_TABLES = [
+        'users' => AuthTables::Users,
+        'permissions' => AuthTables::Permissions,
+        'roles' => AuthTables::Roles,
+        'model_has_permissions' => AuthTables::ModelHasPermissions,
+        'model_has_roles' => AuthTables::ModelHasRoles,
+        'role_has_permissions' => AuthTables::RoleHasPermissions,
+        'personal_access_tokens' => AuthTables::PersonalAccessTokens,
+        'password_reset_tokens' => AuthTables::PasswordResetTokens,
+    ];
+
+    private const array CREATION_INDEXES = [
+        'users' => 'nvl_auth_users_active_deleted_index',
+        'permissions' => 'nvl_auth_permissions_name_guard_unique',
+        'roles' => 'nvl_auth_roles_name_guard_unique',
+        'model_has_permissions' => 'nvl_auth_model_permissions_model_index',
+        'model_has_roles' => 'nvl_auth_model_roles_model_index',
+        'personal_access_tokens' => 'nvl_auth_tokens_expiry_index',
+    ];
+
     /** Use the effective package connection for Laravel's migration transaction. */
     public function getConnection(): ?string
     {
@@ -161,16 +181,31 @@ return new class extends Migration implements AuthSchemaMigration
     }
 
     /**
-     * Drop the package-owned identity schema in dependency order.
+     * Drop, in dependency order, only the identity tables this migration created.
+     *
+     * up() adopts an existing configured table instead of creating it, so rollback must not drop
+     * a host table. A table is provably this migration's when it carries the package's own name
+     * or the named index up() creates with it.
      */
     public function down(): void
     {
         $schema = Schema::connection($this->connectionName());
-
         $tables = $this->tables();
+        $created = [];
 
-        foreach (array_reverse(array_values($tables)) as $table) {
-            $schema->dropIfExists($table);
+        foreach ($tables as $key => $table) {
+            $created[$key] = $schema->hasTable($table) && ($table === self::PACKAGE_TABLES[$key]
+                || in_array(self::CREATION_INDEXES[$key] ?? null, array_column($schema->getIndexes($table), 'name'), true));
+        }
+
+        // The permission pivot carries no named index on every engine; it joins the roles and permissions created here.
+        $created['role_has_permissions'] = $created['role_has_permissions']
+            || ($created['roles'] && $created['permissions'] && $schema->hasTable($tables['role_has_permissions']));
+
+        foreach (array_reverse($tables, true) as $key => $table) {
+            if ($created[$key]) {
+                $schema->drop($table);
+            }
         }
     }
 

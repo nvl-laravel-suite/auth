@@ -9,6 +9,12 @@ dry run reports required, existing, and missing tables. After review,
 `php artisan nvl:auth:schema --apply` creates and verifies only the missing
 feature-owned schema.
 
+Rolling the identity migration back drops only tables it created: a table under
+the package's own name, or one carrying the named index the migration creates
+with it. An existing host table adopted through `tables.*` is never dropped; a
+custom-named `password_reset_tokens` table carries no such index and is left in
+place.
+
 | Table | Purpose | Sensitive handling |
 |---|---|---|
 | `nvl_auth_principal_security_states` | central monotonic principal security revision | unique bounded subject pair; retained through soft delete/restore |

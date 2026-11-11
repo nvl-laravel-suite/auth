@@ -8,7 +8,9 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -16,6 +18,7 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\InvitationRecipientProof;
+use Nvl\Auth\Contracts\MembershipPrincipalResolver;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -28,6 +31,7 @@ use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Support\AuthInstantCast;
+use Nvl\Auth\Support\UniqueViolation;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
@@ -47,7 +51,7 @@ final readonly class AuthInvitations
 {
     private AuthCommittedAudit $committedAudits;
 
-    /** Native Auth operation. */
+    /** Create the invitation lifecycle service. */
     public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private MutationAuthorizer $mutations, private OwnerInvitations $owned, private SecretHasher $hasher, private InvitationRecipientProof $recipientProof, private Container $container, private OwnershipBoundary $boundary, private OwnerMembershipAssignments $assignments, private ManagementAuthorizer $authorization, private AuthPipeline $pipeline, private AuthAuditRecorder $audits, AuthCommittedAudit $committedAudits, private DomainEventDispatcher $domainEvents, private OwnershipContext $ownerContext, private AuthConfiguration $configuration, private OpaqueTokenFactory $tokens, private AuthModelRegistry $models, private PasswordValidationRules $passwordPolicy, private InvitationPrincipalResolver $principalResolver, private ?InvitationDeliveryMetadataPolicy $deliveryMetadata = null)
     {
         $this->committedAudits = $committedAudits->withRecorder($this->audits);
@@ -77,6 +81,7 @@ final readonly class AuthInvitations
                 $roles = is_array($invitation->roles) ? $invitation->roles : [];
                 $permissions = is_array($invitation->permissions) ? $invitation->permissions : [];
                 if ($roles !== [] || $permissions !== []) {
+                    $this->assertGrantsRemainAuthorized($invitation);
                     $this->container->make(RbacManager::class)->assign($subject, $roles, $permissions);
                 }
                 $acceptedAt = CarbonImmutable::now('UTC');
@@ -108,6 +113,9 @@ final readonly class AuthInvitations
         }
         if ($data['roles'] !== [] || $data['permissions'] !== []) {
             $this->features->assertAllowed(AuthFeature::Rbac, FeatureOperation::Update);
+            if ($nativeOwner === null) {
+                $this->mutations->authorize($authority, 'nvl.auth.users.manageAccess');
+            }
         }
         $recipient = PrincipalEmailIdentity::normalize($data['recipient']);
         $recipientHash = $this->hasher->hash('invitation-recipient', $recipient);
@@ -136,13 +144,35 @@ final readonly class AuthInvitations
 
                     return ['invitation' => $invitation, 'token' => $token];
                 }, 3);
-            } catch (QueryException $exception) {
-                if (in_array($exception->errorInfo[0] ?? null, ['23000', '23505'], true) && (str_contains($exception->getMessage(), 'nvl_auth_invitations_active_key_unique') || str_contains($exception->getMessage(), 'auth_invitations.active_key'))) {
+            } catch (UniqueConstraintViolationException $exception) {
+                if (UniqueViolation::columns($exception, (new Invitation)->getConnection(), (new Invitation)->getTable()) === ['active_key']) {
                     throw $this->createDuplicateInvitation($exception);
                 }
                 throw $exception;
             }
         });
+    }
+
+    /**
+     * Refuse stored grants once their recorded issuer can no longer manage principal access.
+     * Actorless invitations carry system authority that was approved when they were issued.
+     */
+    private function assertGrantsRemainAuthorized(Invitation $invitation): void
+    {
+        if ($invitation->inviter_type === null || $invitation->inviter_id === null) {
+            return;
+        }
+        $class = Relation::getMorphedModel($invitation->inviter_type) ?? $invitation->inviter_type;
+        $issuer = is_a($class, Model::class, true) ? $class::query()->find($invitation->inviter_id) : null;
+        try {
+            if (! $issuer instanceof Authenticatable) {
+                throw new AuthException('forbidden', 'The invitation issuer is unavailable.', 403);
+            }
+            $this->container->make(MembershipPrincipalResolver::class)->assertEligible($issuer);
+            $this->authorization->authorize($issuer, 'nvl.auth.users.manageAccess');
+        } catch (AuthException $exception) {
+            throw new AuthException('invitation_invalid', 'The invitation is invalid or expired.', 410, previous: $exception);
+        }
     }
 
     /**
@@ -340,6 +370,7 @@ final readonly class AuthInvitations
                     $roles = is_array($invitation->roles) ? $invitation->roles : [];
                     $permissions = is_array($invitation->permissions) ? $invitation->permissions : [];
                     if ($roles !== [] || $permissions !== []) {
+                        $this->assertGrantsRemainAuthorized($invitation);
                         $this->container->make(RbacManager::class)->assign($subject, $roles, $permissions);
                     }
                     $acceptedAt = CarbonImmutable::now('UTC');
@@ -352,8 +383,8 @@ final readonly class AuthInvitations
                     return ['invitation' => $invitation, 'subject' => $subject];
                 });
             }, 3);
-        } catch (QueryException $exception) {
-            if (in_array($exception->errorInfo[0] ?? null, ['23000', '23505'], true)) {
+        } catch (UniqueConstraintViolationException $exception) {
+            if (UniqueViolation::columns($exception, $principalConnection, (new $principalClass)->getTable()) !== null) {
                 throw new AuthException('invitation_principal_conflict', 'The invited principal already exists.', 409, previous: $exception);
             }
             throw $exception;
@@ -417,16 +448,16 @@ final readonly class AuthInvitations
     /**
      * Revoke an invitation idempotently.
      */
-    public function revoke(Invitation|string $invitation, Authenticatable $actor): Invitation
+    public function revoke(Invitation|string $invitation, Authenticatable|SystemMutationContext $authority): Invitation
     {
         $this->features->assertAllowed(AuthFeature::Invitations, FeatureOperation::Revoke);
         $identifier = $invitation instanceof Invitation ? $invitation->identifier() : $this->revokeIdentifier($invitation);
         $connection = $invitation instanceof Invitation ? $invitation->getConnectionName() : (new Invitation)->getConnectionName();
 
-        return DB::connection($connection)->transaction(function () use ($actor, $connection, $identifier): Invitation {
+        return DB::connection($connection)->transaction(function () use ($authority, $connection, $identifier): Invitation {
             /** @var Invitation $locked */
             $locked = $this->boundary->query(Invitation::query(), 'auth.invitations')->lockForUpdate()->findOrFail($identifier);
-            $this->authorization->authorize($actor, 'nvl.auth.invitations.revoke', $locked);
+            $actor = $this->mutations->authorize($authority, 'nvl.auth.invitations.revoke', $locked);
             if ($locked->revoked_at === null && $locked->accepted_at === null) {
                 $locked->forceFill(['active_key' => null, 'revoked_at' => CarbonImmutable::now('UTC')])->save();
                 $this->committedAudits->record(DB::connection($connection), 'invitation.revoked', actor: $actor, metadata: ['invitation_id' => $locked->identifier()]);
@@ -507,7 +538,7 @@ final readonly class AuthInvitations
         return $validated;
     }
 
-    /** Native Auth operation.
+    /** Require invitation grants to be a bounded list of strings.
      * @param  array<array-key, mixed>  $grants
      *
      * @phpstan-assert list<string> $grants
@@ -602,7 +633,7 @@ final readonly class AuthInvitations
         return $data;
     }
 
-    /** Native Auth operation.
+    /** Normalize an invitation type filter to at most twenty distinct trimmed values.
      * @param  array<array-key, mixed>|null  $types
      * @return list<string>|null
      */

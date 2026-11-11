@@ -7,9 +7,12 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Nvl\Auth\Contracts\SystemMutationAccess;
 use Nvl\Auth\Definitions\Tables\AuthTables;
+use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthMaintenance;
+use Nvl\Auth\Services\DenySystemMutationAccess;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /**
@@ -312,4 +315,36 @@ it('rejects missing, incomplete, or conflicting principal adoption source data',
 
     expect(fn (): array => $action->adoptPrincipals($manifest, new SystemMutationContext('Reviewed host adoption', 'principal-adoption-test')))
         ->toThrow(InvalidArgumentException::class, 'target already contains a source email');
+});
+
+it('denies adoption commands by default and changes nothing without an explicit apply', function (): void {
+    Schema::create('denied_users_source', function (Blueprint $table): void {
+        $table->uuid('id')->primary();
+    });
+    $manifest = principalAdoptionManifestForTest('denied_users_target', 0);
+    $manifest['staging'] = [['source_table' => 'denied_users_source', 'staging_table' => 'denied_users_target']];
+    $manifest['drop_sources'] = true;
+    $path = tempnam(sys_get_temp_dir(), 'nvl-auth-denied-adoption-');
+    file_put_contents($path, json_encode($manifest, JSON_THROW_ON_ERROR));
+
+    try {
+        app()->instance(SystemMutationAccess::class, new DenySystemMutationAccess);
+        expect(static fn (): int => Artisan::call('nvl:auth:adopt-principals', ['manifest' => $path, '--stage' => true, '--apply' => true]))
+            ->toThrow(AuthException::class, 'not authorized')
+            ->and(static fn (): int => Artisan::call('nvl:auth:adopt-principals', ['manifest' => $path]))
+            ->toThrow(AuthException::class, 'not authorized');
+
+        app()->instance(SystemMutationAccess::class, new class implements SystemMutationAccess
+        {
+            public function allows(SystemMutationContext $context, string $ability, mixed $target = null): bool
+            {
+                return $ability === 'nvl.auth.users.adopt';
+            }
+        });
+        expect(Artisan::call('nvl:auth:adopt-principals', ['manifest' => $path, '--stage' => true]))->toBe(0)
+            ->and(Schema::hasTable('denied_users_source'))->toBeTrue()
+            ->and(Schema::hasTable('denied_users_target'))->toBeFalse();
+    } finally {
+        unlink($path);
+    }
 });

@@ -63,6 +63,13 @@ Browser responses, adapter state, and returned option documents are bounded
 before persistence or response serialization. User verification is required by
 default, and the per-subject credential limit defaults to 20.
 
+`AuthPasskeys::beginAuthentication($subject)` returns that subject's credential
+identifiers in `allowCredentials`. Pass a subject only after the host has already
+authenticated it (second factor or reauthentication); for a sign-in page pass no
+subject, so the discoverable-credential options disclose nothing about an account.
+A signature counter that stops advancing, including a reset to zero after a
+non-zero value, is refused as `passkey_counter_regression`.
+
 Doctor requires the built-in or configured ceremony implementation to resolve,
 plus a configured subject resolver and valid RP, origin, timeout, resident-key, and
 user-verification policy before a passkey-enabled deployment is ready.

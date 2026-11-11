@@ -2,8 +2,12 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Hashing\HashManager;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Hash;
 use Nvl\Auth\Contracts\AuthAuditContextProvider;
 use Nvl\Auth\Events\AuthenticationAttempted;
 use Nvl\Auth\Events\AuthenticationRejected;
@@ -59,6 +63,55 @@ it('emits a transport-neutral rejection event and records through a host audit a
         static fn (AuthenticationRejected $event): bool => $event->reason === 'credentials_invalid'
             && $event->identifier === 'missing@example.test',
     );
+});
+
+it('spends one password hash and fails identically for unknown, passwordless and wrong-password logins', function (): void {
+    $this->user('known@example.test');
+    $this->user('passwordless@example.test')->update(['password' => null]);
+    $hasher = new class($this->app) extends HashManager
+    {
+        public int $operations = 0;
+
+        public function make(#[SensitiveParameter] $value, array $options = [])
+        {
+            $this->operations++;
+
+            return parent::make($value, $options);
+        }
+
+        public function check(#[SensitiveParameter] $value, $hashedValue, array $options = [])
+        {
+            $this->operations++;
+
+            return parent::check($value, $hashedValue, $options);
+        }
+    };
+    Hash::swap($hasher);
+    $attempt = function (string $identifier) use ($hasher): array {
+        $hasher->operations = 0;
+        try {
+            app(Authentication::class)->login(['identifier' => $identifier, 'password' => 'wrong-password'], [], auth()->guard('web'), app('session')->driver());
+        } catch (Throwable $exception) {
+            return [
+                'exception' => $exception::class,
+                'code' => $exception instanceof AuthException ? $exception->errorCode : null,
+                'status' => $exception instanceof AuthException ? $exception->status : null,
+                'message' => $exception->getMessage(),
+                'hashes' => $hasher->operations,
+            ];
+        }
+
+        return [];
+    };
+
+    $wrongPassword = $attempt('known@example.test');
+
+    expect($wrongPassword)->toMatchArray(['exception' => AuthException::class, 'code' => 'credentials_invalid', 'status' => 422, 'hashes' => 1])
+        ->and($attempt('missing@example.test'))->toBe($wrongPassword)
+        ->and($attempt('passwordless@example.test'))->toBe($wrongPassword);
+    $audits = AuthAudit::query()->get()->map(fn (AuthAudit $audit): array => [$audit->action, $audit->outcome, $audit->subject_id, $audit->metadata]);
+    expect($audits)->toHaveCount(3)
+        ->and($audits->unique()->all())->toBe([['authentication.failed', 'failure', null, ['reason' => 'credentials_invalid']]]);
 });
 
 it('bounds untrusted audit request context', function (): void {
@@ -141,3 +194,21 @@ it('authorizes audit detail access with decrypted metadata', function (): void {
     expect(app(AuthAuditReader::class)->find($user, $audit)->is($audit))->toBeTrue()
         ->and($audit->metadata)->toBeArray();
 });
+
+it('runs each Auth schema catalog probe once per password login', function (bool $managed): void {
+    config(['nvl-auth.features.managed_sessions.enabled' => $managed]);
+    $user = $this->user('catalog-probes@example.test');
+    $probes = [];
+    DB::listen(static function (QueryExecuted $query) use (&$probes): void {
+        $statement = $query->sql.' '.json_encode($query->bindings);
+        // Core's ownership marker probe belongs to another package and is not counted here.
+        if (preg_match('/sqlite_master|pragma_|information_schema|pg_catalog|pg_class|pg_index|pg_attribute/i', $statement) === 1 && ! str_contains($statement, 'nvl_ownership_resource_markers')) {
+            $probes[] = $statement;
+        }
+    });
+    app(Authentication::class)->login(['identifier' => $user->email, 'password' => 'correct-password'], [], auth()->guard('web'), app('session.store'));
+
+    expect(Auth::guard('web')->check())->toBeTrue()
+        ->and($probes)->not->toBeEmpty()
+        ->and(array_keys(array_filter(array_count_values($probes), static fn (int $count): bool => $count > 1)))->toBe([]);
+})->with(['Laravel sessions' => [false], 'managed sessions' => [true]]);

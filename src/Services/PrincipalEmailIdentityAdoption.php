@@ -9,6 +9,7 @@ use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Exceptions\AuthException;
+use Nvl\Auth\Models\User;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 
 /** Explicit retained-row adoption. Drain legacy workers and disable identity writes before planning/applying.
@@ -32,12 +33,28 @@ final readonly class PrincipalEmailIdentityAdoption
         if (! $schema->hasTable($model->getTable()) || ! $schema->hasColumn($model->getTable(), $column)) {
             return ['missing' => $schema->hasTable($model->getTable()) ? $connection->table($model->getTable())->count() : 0, 'collisions' => [], 'ready' => false];
         }
+        $scan = $this->scan($model, false);
+
+        return ['missing' => $scan['missing'], 'collisions' => array_values($scan['collisions']), 'ready' => $scan['missing'] === 0 && $scan['collisions'] === [] && PrincipalEmailIdentity::schemaReady($model)];
+    }
+
+    /**
+     * Stream retained identities once, reading only the key, address and stored identity key.
+     * Applying locks every row in that same statement and collects the keys still to be written.
+     *
+     * @return array{missing: int, collisions: array<string, array{key: string, subjectIds: list<string>}>, pending: array<int|string, string>}
+     */
+    private function scan(User $model, bool $apply): array
+    {
+        $column = $model->getEmailIdentityHashName();
         $email = $this->attributes->column(PrincipalAttribute::Email);
         $id = $model->getKeyName();
         $seen = [];
         $collisions = [];
+        $pending = [];
         $missing = 0;
-        foreach ($connection->table($model->getTable())->useWritePdo()->orderBy($id)->cursor() as $row) {
+        $query = $model->getConnection()->table($model->getTable())->useWritePdo()->select([$id, $email, $column])->orderBy($id);
+        foreach (($apply ? $query->lockForUpdate() : $query)->cursor() as $row) {
             $emailValue = $row->{$email};
             $subjectId = $row->{$id};
             if (! is_string($emailValue) || (! is_string($subjectId) && ! is_int($subjectId))) {
@@ -46,6 +63,9 @@ final readonly class PrincipalEmailIdentityAdoption
             $key = PrincipalEmailIdentity::key($emailValue);
             if ($row->{$column} !== $key) {
                 $missing++;
+                if ($apply) {
+                    $pending[$subjectId] = $key;
+                }
             }
             if (isset($seen[$key])) {
                 if (isset($collisions[$key]) || count($collisions) < 20) {
@@ -59,7 +79,7 @@ final readonly class PrincipalEmailIdentityAdoption
             }
         }
 
-        return ['missing' => $missing, 'collisions' => array_values($collisions), 'ready' => $missing === 0 && $collisions === [] && PrincipalEmailIdentity::schemaReady($model)];
+        return ['missing' => $missing, 'collisions' => $collisions, 'pending' => $pending];
     }
 
     /** Data commits before separately inspected DDL; MySQL DDL is never claimed rollbackable.
@@ -80,24 +100,15 @@ final readonly class PrincipalEmailIdentityAdoption
         if (! $connection->getSchemaBuilder()->hasColumn($model->getTable(), $column) || ! PrincipalEmailIdentity::indexReady($model)) {
             throw new AuthException('email_identity_unavailable', 'Run the forward email identity migration before adoption.', 503);
         }
-        $email = $this->attributes->column(PrincipalAttribute::Email);
         $id = $model->getKeyName();
-        $updated = $connection->transaction(function () use ($connection, $model, $column, $email, $id, $authority): int {
-            $rows = $connection->table($model->getTable())->orderBy($id)->lockForUpdate()->get();
-            if ($this->plan()['collisions'] !== []) {
+        $updated = $connection->transaction(function () use ($connection, $model, $column, $id, $authority): int {
+            $scan = $this->scan($model, true);
+            if ($scan['collisions'] !== []) {
                 throw new AuthException('email_identity_collision', 'Resolve retained email identity collisions explicitly before adoption.', 409);
             }
             $updated = 0;
-            foreach ($rows as $row) {
-                $emailValue = $row->{$email};
-                $subjectId = $row->{$id};
-                if (! is_string($emailValue) || (! is_string($subjectId) && ! is_int($subjectId))) {
-                    throw new AuthException('email_identity_unavailable', 'Retained identity has an unsupported email or subject reference.', 503);
-                }
-                $key = PrincipalEmailIdentity::key($emailValue);
-                if ($row->{$column} !== $key) {
-                    $updated += $connection->table($model->getTable())->where($id, $row->{$id})->update([$column => $key]);
-                }
+            foreach ($scan['pending'] as $subjectId => $key) {
+                $updated += $connection->table($model->getTable())->where($id, $subjectId)->update([$column => $key]);
             }
             $this->audits->record('email_identity.adopted', actor: $authority->actor, metadata: [...$authority->auditMetadata(), 'updated' => $updated]);
 

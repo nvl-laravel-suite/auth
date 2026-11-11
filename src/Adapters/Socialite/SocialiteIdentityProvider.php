@@ -56,7 +56,19 @@ final readonly class SocialiteIdentityProvider implements SocialIdentityProvider
             }
         }
 
-        return $driver->redirect()->getTargetUrl();
+        $url = $driver->redirect()->getTargetUrl();
+
+        if ($driver instanceof AbstractProvider) {
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+            if (! is_string($query['state'] ?? null) || $query['state'] === '') {
+                throw AuthException::invalidConfiguration(
+                    "Socialite provider [{$provider}] must bind authorization to SDK-managed OAuth state; stateless drivers are refused.",
+                );
+            }
+        }
+
+        return $url;
     }
 
     /**

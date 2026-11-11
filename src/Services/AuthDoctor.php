@@ -163,6 +163,7 @@ final class AuthDoctor
             $checks[] = $this->check('contract.password_policy', $this->integration($container, PasswordPolicy::class) instanceof PasswordPolicy, 'Password operations require a valid password policy.');
             $checks[] = $this->check('contract.password_reset_repository', $this->passwordResetRepositoryReady(), 'Password reset requires Laravel database token storage; its actual connection is checked against the principal and audit storage at runtime.');
             $checks[] = $this->check('contract.password_updater', $this->integration($container, PasswordUpdater::class) instanceof PasswordUpdater, 'Password operations require a valid password updater.');
+            $checks[] = $this->check('configuration.password_reset_ttl', $configuration->get('features.password.settings.reset_ttl_minutes') === null, 'Remove [features.password.settings.reset_ttl_minutes]: it is no longer read. Reset-token lifetime is Laravel\'s auth.passwords.<broker>.expire.', 'warning');
         }
         if ($configuration->featureEnabled(AuthFeature::Authentication)) {
             $checks[] = $this->check('contract.authentication_assurance', $this->integration($container, AuthenticationAssurancePolicy::class) instanceof AuthenticationAssurancePolicy, 'Authentication requires a valid assurance policy.');

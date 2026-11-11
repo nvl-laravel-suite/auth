@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Gate;
@@ -10,13 +11,16 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Nvl\Auth\Adapters\ApiTokens\SanctumApiTokenManager;
 use Nvl\Auth\Contracts\AuthManagementAccess;
+use Nvl\Auth\Contracts\ImpersonationAccess;
 use Nvl\Auth\Definitions\Tables\AuthTables;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Providers\AuthServiceProvider;
+use Nvl\Auth\Services\AuthDoctor;
 use Nvl\Auth\Services\AuthSchemaManager;
 use Nvl\Auth\Services\ConfiguredPolicyAuthManagementAccess;
 use Nvl\Auth\Services\LaravelGateAuthManagementAccess;
 use Nvl\Auth\Tests\Fixtures\EmbeddedRolePolicy;
+use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 
 it('reports the complete feature inventory in table and JSON formats', function (): void {
     $this->artisan('nvl:auth:features')->assertSuccessful();
@@ -323,4 +327,81 @@ it('includes and repairs the existing challenge store for stateful TOTP without 
     $result = $schemas->execute(apply: true);
     expect($result['created'])->toContain(AuthTables::Challenges)
         ->and(Schema::hasTable(AuthTables::Challenges))->toBeTrue();
+});
+
+it('fails readiness while impersonation keeps the denying default policy or managed sessions are not integrated', function (): void {
+    config([
+        'nvl-auth.features.managed_sessions.enabled' => true,
+        'nvl-auth.features.impersonation.enabled' => true,
+        'session.driver' => 'cookie',
+    ]);
+    $checks = collect(app(AuthDoctor::class)->inspect())->keyBy('name');
+
+    expect($checks['impersonation.access']['passed'])->toBeFalse()
+        ->and($checks['managed_sessions.admission']['passed'])->toBeFalse()
+        ->and($checks['managed_sessions.driver']['passed'])->toBeFalse();
+    $this->artisan('nvl:auth:doctor')->expectsOutputToContain('the default denies access')->assertFailed();
+
+    config(['nvl-auth.features.managed_sessions.settings.admission_integrated' => true, 'session.driver' => 'database']);
+    app()->instance(ImpersonationAccess::class, new class implements ImpersonationAccess
+    {
+        public function assertAllowed(Authenticatable $actor, Authenticatable $target, ?OwnerReference $owner): void {}
+    });
+    $checks = collect(app(AuthDoctor::class)->inspect())->keyBy('name');
+
+    expect($checks['impersonation.access']['passed'])->toBeTrue()
+        ->and($checks['managed_sessions.admission']['passed'])->toBeTrue()
+        ->and($checks['managed_sessions.driver']['passed'])->toBeTrue();
+});
+
+it('never prints configured secrets in readiness output', function (): void {
+    config([
+        'nvl-auth.features.passkeys.enabled' => true,
+        'nvl-auth.features.passkeys.settings.user_handle_key' => 'must-never-appear-user-handle-key-material',
+        'nvl-auth.features.social_identities.enabled' => true,
+        'nvl-auth.features.social_identities.settings.providers' => ['github' => ['client_id' => 'must-never-appear', 'client_secret' => 'must-never-appear']],
+        'services.github' => ['client_id' => 'must-never-appear', 'client_secret' => 'must-never-appear'],
+        'database.connections.'.config('database.default').'.password' => 'must-never-appear',
+    ]);
+
+    foreach (['text', 'json'] as $format) {
+        Artisan::call('nvl:auth:doctor', ['--strict' => true, '--format' => $format]);
+        expect(Artisan::output())->not->toContain('must-never-appear')->not->toContain((string) config('app.key'));
+    }
+});
+
+it('reports configuration drift as unavailable when the suite inspector fails', function (): void {
+    app()->bind('Nvl\Suite\Services\SuitePackageConfigurationInspector', static fn (): object => new class
+    {
+        /** @param list<string> $packages */
+        public function inspect(array $packages): never
+        {
+            throw new RuntimeException('inspection failed');
+        }
+    });
+
+    Artisan::call('nvl:auth:configuration', ['--format' => 'json']);
+    $report = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($report['configuration_drift'])->toBe(['available' => false, 'findings' => []]);
+})->skip(! class_exists('Nvl\Suite\Services\SuitePackageConfigurationInspector'), 'The suite inspector is not installed.');
+
+it('refuses configuration destinations that escape the application through traversal or symlinks', function (): void {
+    $outside = sys_get_temp_dir().'/nvl-auth-outside-'.bin2hex(random_bytes(6)).'.php';
+    $link = base_path('nvl-auth-link-'.bin2hex(random_bytes(6)).'.php');
+    file_put_contents($outside, "<?php\n\nreturn ['untouched' => true];\n");
+    symlink($outside, $link);
+    $options = ['--preset' => 'embedded-application', '--user-model' => Role::class, '--write' => true, '--force' => true];
+
+    try {
+        expect(Artisan::call('nvl:auth:configure', [...$options, '--path' => '../'.basename($outside)]))->toBe(2)
+            ->and(Artisan::call('nvl:auth:configure', [...$options, '--path' => 'config/../../'.basename($outside)]))->toBe(2)
+            ->and(Artisan::call('nvl:auth:configure', [...$options, '--path' => basename($link)]))->toBe(2)
+            ->and(file_get_contents($outside))->toBe("<?php\n\nreturn ['untouched' => true];\n")
+            ->and(is_link($link))->toBeTrue()
+            ->and(file_exists(dirname(base_path()).'/'.basename($outside)))->toBeFalse();
+    } finally {
+        unlink($link);
+        unlink($outside);
+    }
 });

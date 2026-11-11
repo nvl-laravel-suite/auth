@@ -20,7 +20,7 @@ use Nvl\Support\Ownership\Services\OwnershipScope;
  */
 final readonly class AuthIdentityChallenges
 {
-    /** Native Auth operation. */
+    /** Create the central identity challenge store. */
     public function __construct(private OwnershipReadiness $readiness) {}
 
     /** @return Builder<Challenge> */

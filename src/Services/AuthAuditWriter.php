@@ -25,7 +25,7 @@ use Nvl\Support\Ownership\Enums\OwnershipContextMode;
  */
 final readonly class AuthAuditWriter
 {
-    /** Native Auth operation. */
+    /** Create the audit row writer. */
     public function __construct(private AuthConfiguration $configuration, private AuthAuditContextProvider $request, private DomainEventDispatcher $domainEvents, private OwnershipReadiness $readiness, private AuthExecutionContext $execution) {}
 
     /** @param array<string, mixed> $metadata
@@ -87,7 +87,7 @@ final readonly class AuthAuditWriter
         return $record->newFromBuilder($record->getAttributes());
     }
 
-    /** Native Auth operation. */
+    /** Truncate an optional value to a maximum number of bytes. */
     private function bounded(?string $value, int $maximumBytes): ?string
     {
         return $value === null ? null : substr($value, 0, $maximumBytes);

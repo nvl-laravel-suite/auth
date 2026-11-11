@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
+use Nvl\Auth\Support\LiteralSearch;
 
 /**
  * Executes projection-only RBAC option queries after an Action admits the read.
@@ -29,10 +30,7 @@ final readonly class RbacOptionReadService
         $class = $this->models->roleClass();
         $query = $class::query()->select(['id', 'name', 'display_name', 'description', 'is_system']);
         if ($search !== null) {
-            $term = "%{$search}%";
-            $query->where(static function ($searchQuery) use ($term): void {
-                $searchQuery->where('name', 'like', $term)->orWhere('display_name', 'like', $term)->orWhere('description', 'like', $term);
-            });
+            LiteralSearch::contains($query, ['name', 'display_name', 'description'], $search);
         }
 
         return $query->orderByDesc('is_system')->orderBy('name')->orderBy('id')->limit($limit)->get();
@@ -48,10 +46,7 @@ final readonly class RbacOptionReadService
         $class = $this->models->permissionClass();
         $query = $class::query()->select(['id', 'name', 'display_name', 'description', 'group']);
         if ($search !== null) {
-            $term = "%{$search}%";
-            $query->where(static function ($searchQuery) use ($term): void {
-                $searchQuery->where('name', 'like', $term)->orWhere('display_name', 'like', $term)->orWhere('description', 'like', $term)->orWhere('group', 'like', $term);
-            });
+            LiteralSearch::contains($query, ['name', 'display_name', 'description', 'group'], $search);
         }
         if ($group !== null) {
             $this->applyGroupFilter($query, $group);

@@ -60,6 +60,8 @@ final readonly class AuthImpersonation
             }
             if ($existing !== null) {
                 $existing->update(['stopped_at' => now(), 'stop_reason' => 'expired', 'active_session_key' => null]);
+                $this->audits->record('impersonation.expired', subject: new SubjectReference($existing->effective_subject_type, $existing->effective_subject_id), actor: $actor, metadata: ['grant_id' => $existing->identifier()]);
+                $this->fact($existing, 'expired', $actor);
             }
             $created = $this->pipeline->run('impersonation_started', new AuthPipelineContext('impersonation_started', ['durationSeconds' => $data['durationSeconds']], SubjectReference::fromAuthenticatable($actor)), function () use ($actor, $target, $recentProof, $data, $context, $owner, $actorRevision, $targetRevision, $browser): Impersonation {
                 $this->assertAccess($actor, $target);
@@ -167,7 +169,7 @@ final readonly class AuthImpersonation
             $actor = $this->management->authorize($authority, 'nvl.auth.impersonations.revoke', $grant);
             if ($grant->stopped_at === null) {
                 $grant->update(['stopped_at' => now(), 'stop_reason' => 'administrative', 'active_session_key' => null]);
-                $this->audits->record('impersonation.revoked', actor: $actor, metadata: ['grant_id' => $grant->identifier(), 'owner' => $grant->owner_reference, 'reason' => $reason, ...$this->management->metadata($authority)]);
+                $this->audits->record('impersonation.revoked', subject: new SubjectReference($grant->effective_subject_type, $grant->effective_subject_id), actor: $actor, metadata: ['grant_id' => $grant->identifier(), 'impersonator_type' => $grant->actor_type, 'impersonator_id' => $grant->actor_id, 'owner' => $grant->owner_reference, 'reason' => $reason, ...$this->management->metadata($authority)]);
                 $this->fact($grant, 'revoked', $actor);
             }
 

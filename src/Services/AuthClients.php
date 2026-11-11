@@ -7,7 +7,7 @@ namespace Nvl\Auth\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use InvalidArgumentException;
@@ -20,6 +20,7 @@ use Nvl\Auth\Models\AuthClient;
 use Nvl\Auth\Models\AuthClientSession;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Support\AuthInstantCast;
+use Nvl\Auth\Support\UniqueViolation;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 
@@ -30,7 +31,7 @@ use Nvl\Auth\ValueObjects\SubjectReference;
  */
 final readonly class AuthClients
 {
-    /** Native Auth operation. */
+    /** Create the client registry service. */
     public function __construct(private FeatureGate $features, private ManagementAuthorizer $authorization, private AuthAuditRecorder $audits, private SecretHasher $hasher, private AuthPipeline $pipeline) {}
 
     /**
@@ -145,8 +146,8 @@ final readonly class AuthClients
 
                 return $session;
             }, 3);
-        } catch (QueryException $exception) {
-            if (in_array($exception->errorInfo[0] ?? null, ['23000', '23505'], true) && (str_contains($exception->getMessage(), 'nvl_auth_client_sessions_client_hash_unique') || str_contains($exception->getMessage(), 'auth_client_sessions.client_id'))) {
+        } catch (UniqueConstraintViolationException $exception) {
+            if (UniqueViolation::columns($exception, (new AuthClientSession)->getConnection(), (new AuthClientSession)->getTable()) === ['client_id', 'session_id_hash']) {
                 throw new AuthException('client_session_conflict', 'The client session is already being recorded.', 409, previous: $exception);
             }
             throw $exception;
@@ -294,7 +295,7 @@ final readonly class AuthClients
         return $data;
     }
 
-    /** Native Auth operation. */
+    /** Accept a credential-free http(s) URL, optionally restricted to a bare origin. */
     private static function validateStoreClientValidHttpUrl(string $url, bool $originOnly): bool
     {
         if (mb_strlen($url) > 2048 || filter_var($url, FILTER_VALIDATE_URL) === false) {
@@ -308,19 +309,19 @@ final readonly class AuthClients
         return ! $originOnly || ! isset($parts['path']) || $parts['path'] === '' || $parts['path'] === '/';
     }
 
-    /** Native Auth operation. */
+    /** Accept a same-site absolute path without control characters or backslashes. */
     private static function validateStoreClientValidReturnPath(mixed $path): bool
     {
         return is_string($path) && mb_strlen($path) <= 2048 && str_starts_with($path, '/') && ! str_starts_with($path, '//') && preg_match('/[\x00-\x1F\x7F\\\\]/', $path) !== 1;
     }
 
-    /** Native Auth operation. */
+    /** Accept a string that is a bare http(s) origin. */
     private static function validateStoreClientValidOrigin(mixed $origin): bool
     {
         return is_string($origin) && self::validateStoreClientValidHttpUrl($origin, true);
     }
 
-    /** Native Auth operation. */
+    /** Accept a lowercase flow identifier of at most 80 characters. */
     private static function validateStoreClientValidFlow(mixed $flow): bool
     {
         return is_string($flow) && preg_match('/\A[a-z][a-z0-9_.-]{0,79}\z/', $flow) === 1;
@@ -406,7 +407,7 @@ final readonly class AuthClients
         return $data;
     }
 
-    /** Native Auth operation. */
+    /** Accept a credential-free http(s) URL, optionally restricted to a bare origin. */
     private static function validateUpdateClientValidHttpUrl(string $url, bool $originOnly): bool
     {
         if (mb_strlen($url) > 2048 || filter_var($url, FILTER_VALIDATE_URL) === false) {
@@ -420,19 +421,19 @@ final readonly class AuthClients
         return ! $originOnly || ! isset($parts['path']) || $parts['path'] === '' || $parts['path'] === '/';
     }
 
-    /** Native Auth operation. */
+    /** Accept a same-site absolute path without control characters or backslashes. */
     private static function validateUpdateClientValidReturnPath(mixed $path): bool
     {
         return is_string($path) && mb_strlen($path) <= 2048 && str_starts_with($path, '/') && ! str_starts_with($path, '//') && preg_match('/[\x00-\x1F\x7F\\\\]/', $path) !== 1;
     }
 
-    /** Native Auth operation. */
+    /** Accept a string that is a bare http(s) origin. */
     private static function validateUpdateClientValidOrigin(mixed $origin): bool
     {
         return is_string($origin) && self::validateUpdateClientValidHttpUrl($origin, true);
     }
 
-    /** Native Auth operation. */
+    /** Accept a lowercase flow identifier of at most 80 characters. */
     private static function validateUpdateClientValidFlow(mixed $flow): bool
     {
         return is_string($flow) && preg_match('/\A[a-z][a-z0-9_.-]{0,79}\z/', $flow) === 1;

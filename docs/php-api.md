@@ -90,7 +90,7 @@ public function preview(string $token): Invitation;
 public function recordDeliveryOutcome(string $invitationId, string $messageId, InvitationDeliveryStatus $status, CarbonImmutable $occurredAt, ?string $failureCode = null): void;
 public function register(array $data, ?Authenticatable $authenticatedRecipient = null): array;
 public function resend(Invitation|string $invitation, Authenticatable|SystemMutationContext $authority, ?string $locale = null, ?InvitationIssuanceContext $context = null): array;
-public function revoke(Invitation|string $invitation, Authenticatable $actor): Invitation;
+public function revoke(Invitation|string $invitation, Authenticatable|SystemMutationContext $authority): Invitation;
 ```
 
 ## AuthUsers

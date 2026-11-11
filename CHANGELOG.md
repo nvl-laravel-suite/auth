@@ -5,6 +5,36 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- `NVL_AUTH_RETENTION_DAYS` is read as an integer, so setting it no longer makes `nvl:auth:prune` fail with an invalid-configuration error; a non-integer value still fails closed. Hosts that published the full configuration should apply the same `filter_var(..., FILTER_VALIDATE_INT)` read.
+- Security codes and magic-link fallback codes are redrawn when they collide with a retained challenge for the same recipient, instead of surfacing a database unique-constraint error; repeated collisions report `challenge_issue_conflict` (409).
+- Password-reset deliveries carry the expiry Laravel's password broker enforces (`auth.passwords.<broker>.expire`). `features.password.settings.reset_ttl_minutes` never changed the token lifetime, is no longer read and is removed from the default configuration; `nvl:auth:doctor` warns only while a host still sets it.
+- Role and permission create, update, delete, duplicate and template mutations flush the Spatie permission cache after their transaction, so a concurrent check can no longer leave a revoked grant cached.
+- API-token namespaces containing `_` match their exact prefix, so listing or revoking managed tokens no longer touches host tokens whose names merely resemble the namespace.
+- A pending two-factor login survives `session.serialization=json`; the continuation context is stored as plain data.
+- Pending email changes expire after `features.email_verification.settings.ttl_minutes` instead of a fixed 60 minutes.
+- Password login spends one password hash when the identifier is unknown or the account has no password, so response time no longer reveals whether an account exists; the failure stays `credentials_invalid` (422).
+- Password-reset requests honour `auth.passwords.<broker>.throttle`: a repeat request inside the window creates no token and sends nothing, returns as before, and is audited as `password.reset_rejected` with reason `password_reset_throttled`.
+- Role parent changes lock the guard's roles and re-read the ancestor chain inside the transaction, so two concurrent updates can no longer commit a hierarchy cycle.
+- Duplicate-key errors are translated by the unique index actually violated, read from the configured table, on SQLite, PostgreSQL, MySQL and MariaDB. Registration, invitation registration and email-change completion translate only their own identity uniqueness violation (`registration_unavailable`, `invitation_principal_conflict`, invalid change); any other constraint failure now surfaces as itself instead of as that conflict.
+- API-token namespaces are matched case-sensitively on every database, so on MySQL and MariaDB a host token named `ACME:…` is no longer treated as belonging to namespace `acme`.
+- The unread configuration keys `features.principal_management.settings.use_as_auth_model` and `features.rbac.settings.use_package_storage` are removed from the default and published configuration.
+- One login runs each of its schema catalog probes once instead of repeating the TOTP, challenge and managed-session probes up to twelve times.
+- With managed sessions, the browser that performs its own security action (TOTP, recovery codes, passkeys, social links, password, email change) stays signed in; every other browser and every remember credential still ends.
+- Rolling back the identity migration no longer drops a configured host table that the migration adopted instead of creating.
+- `AuthInvitations::revoke` accepts a `SystemMutationContext` like `create` and `resend`, and is refused while impersonating.
+- Passkey assertions reporting a zero signature counter after a non-zero one are rejected instead of resetting the stored counter.
+- A principal's unexpired authentication proofs share one five-attempt TOTP/recovery budget, so a new password proof no longer grants new factor guesses.
+- The Socialite adapter refuses OAuth2 drivers that issue no SDK-managed `state`.
+- Membership enrolment that grants or replaces access requires `nvl.auth.memberships.manageAccess`.
+- Revoking an owner membership ends its owner administration, and ownership transfer requires an active recipient.
+- Invitations carrying roles or permissions require `nvl.auth.users.manageAccess` when issued and a still-authorised issuer when accepted.
+- Impersonation revocation, expiry on restart and failed-transition stops are audited with both principals.
+- Management searches match `%` and `_` literally, and legacy role and permission page filters are length-bounded.
+- Email-identity adoption streams only the identity columns instead of loading every principal.
+- `nvl:auth:configuration` reports drift as unavailable when inspection fails instead of reporting no findings.
+
 ## [7.0.2] - 2026-11-10
 
 ### Changed

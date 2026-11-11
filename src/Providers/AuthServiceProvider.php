@@ -75,6 +75,7 @@ use Nvl\Auth\Services\AuthOwnerContextParticipant;
 use Nvl\Auth\Services\AuthOwnershipState;
 use Nvl\Auth\Services\AuthRememberCredentials;
 use Nvl\Auth\Services\AuthSchemaManager;
+use Nvl\Auth\Services\AuthSchemaProbes;
 use Nvl\Auth\Services\CentralIdentityAuditRecorder;
 use Nvl\Auth\Services\ConfiguredApiTokenAbilityProvider;
 use Nvl\Auth\Services\ConfiguredPasswordPolicy;
@@ -145,6 +146,7 @@ final class AuthServiceProvider extends ServiceProvider implements OwnershipInte
         $this->app->singleton(FeatureManifest::class);
         $this->app->scoped(FeatureGate::class);
         $this->app->scoped(AuthExecutionContext::class);
+        $this->app->scoped(AuthSchemaProbes::class);
         $this->app->scoped(PrincipalCreationGuard::class);
         $this->app->scoped(AuthOwnershipState::class);
         $this->app->scoped(RbacPrincipalTracker::class);

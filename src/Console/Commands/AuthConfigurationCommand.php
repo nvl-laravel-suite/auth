@@ -174,7 +174,7 @@ final class AuthConfigurationCommand extends Command
 
             return ['available' => true, 'findings' => is_array($findings) ? array_values($findings) : []];
         } catch (Throwable) {
-            return ['available' => true, 'findings' => []];
+            return ['available' => false, 'findings' => []];
         }
     }
 

@@ -7,12 +7,15 @@ use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
+use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\RecoveryCode;
 use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Services\AuthConfiguration;
+use Nvl\Auth\Services\Authentication;
 use Nvl\Auth\Services\AuthSecondFactor;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Tests\Fixtures\Consumer\FeatureManifest;
@@ -178,3 +181,117 @@ it('uses the configured auth guard for totp state without falling back to a diff
     'custom account middleware' => [['throttle:nvl.auth.account'], false],
     'explicit host guard' => [['auth:web', 'throttle:nvl.auth.account'], true],
 ]);
+
+it('shares one factor attempt budget across every unexpired proof of a principal', function (): void {
+    config()->set('nvl-auth.features.totp.enabled', true);
+    $user = $this->user();
+    $credential = TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
+    $credentials = ['identifier' => $user->email, 'password' => 'correct-password'];
+    $login = app(Authentication::class);
+    $guard = auth()->guard('web');
+    $session = app('session.store');
+    $this->freezeSecond();
+    $current = static fn (): string => app(Google2FA::class)->oathTotp($credential->secret, intdiv(now()->getTimestamp(), 30));
+    $wrong = collect(range(0, 9))->map(static fn (int $digit): string => str_repeat((string) $digit, 6))
+        ->first(static fn (string $code): bool => app(Google2FA::class)->verifyKey($credential->secret, $code, 2, intdiv(now()->getTimestamp(), 30)) === false);
+
+    for ($attempt = 1; $attempt <= 5; $attempt++) {
+        expect(fn () => $login->login($credentials, [], $guard, $session, ['code' => $wrong]))->toThrow(AuthException::class, 'The TOTP code is invalid.');
+    }
+
+    try {
+        $login->login($credentials, [], $guard, $session, ['code' => $current()]);
+        $this->fail('A sixth factor attempt was admitted through a fresh password proof.');
+    } catch (AuthException $exception) {
+        expect($exception->errorCode)->toBe('authentication_proof_invalid');
+    }
+
+    expect($guard->check())->toBeFalse()
+        ->and($credential->refresh()->last_accepted_timestep)->toBeNull()
+        ->and((int) Challenge::query()->where('type', 'authentication_proof')->sum('attempts'))->toBe(5);
+
+    $this->travel(301)->seconds();
+
+    expect($login->login($credentials, [], $guard, $session, ['code' => $current()])->getAuthIdentifier())->toBe($user->getKey());
+});
+
+it('accepts totp codes only inside the stored drift window and never at or before the accepted timestep', function (): void {
+    config()->set('nvl-auth.features.totp.enabled', true);
+    $user = $this->user();
+    $credential = TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
+    $this->freezeSecond();
+    $timestep = intdiv(now()->getTimestamp(), 30);
+    $code = static fn (int $step): string => app(Google2FA::class)->oathTotp($credential->secret, $step);
+    $verify = static fn (int $step): TotpCredential => app(AuthSecondFactor::class)->verify($user, ['code' => $code($step)]);
+
+    expect($credential->getRawOriginal('secret'))->not->toContain($credential->secret)
+        ->and(fn () => $verify($timestep - 2))->toThrow(AuthException::class, 'The TOTP code is invalid.')
+        ->and(fn () => $verify($timestep + 2))->toThrow(AuthException::class, 'The TOTP code is invalid.')
+        ->and($verify($timestep)->last_accepted_timestep)->toBe($timestep)
+        ->and(fn () => $verify($timestep))->toThrow(AuthException::class, 'The TOTP code is invalid.')
+        ->and(fn () => $verify($timestep - 1))->toThrow(AuthException::class, 'The TOTP code is invalid.')
+        ->and($verify($timestep + 1)->last_accepted_timestep)->toBe($timestep + 1);
+});
+
+it('stores only keyed recovery code hashes and scopes consumption to the owning principal', function (): void {
+    config()->set('nvl-auth.features.recovery_codes.enabled', true);
+    $user = $this->user();
+    $other = $this->user('recovery-other@example.test');
+    $generated = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $stored = json_encode(DB::table((new RecoveryCode)->getTable())->get(), JSON_THROW_ON_ERROR);
+
+    foreach ($generated->codes as $code) {
+        expect($stored)->not->toContain($code)
+            ->and($stored)->not->toContain(hash('sha256', $code));
+    }
+
+    expect(fn () => app(AuthSecondFactor::class)->consumeRecoveryCode($other, ['code' => $generated->codes[0]]))->toThrow(AuthException::class, 'The recovery code is invalid.')
+        ->and(app(AuthSecondFactor::class)->consumeRecoveryCode($user, ['code' => ' '.mb_strtolower($generated->codes[0]).' '])->used_at)->not->toBeNull()
+        ->and(RecoveryCode::query()->whereNotNull('used_at')->count())->toBe(1);
+
+    app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
+
+    expect(fn () => app(AuthSecondFactor::class)->consumeRecoveryCode($user, ['code' => $generated->codes[1]]))->toThrow(AuthException::class, 'The recovery code is invalid.');
+});
+
+it('never writes factor secrets or codes to the audit trail', function (): void {
+    config()->set('nvl-auth.features.totp.enabled', true);
+    config()->set('nvl-auth.features.recovery_codes.enabled', true);
+    $user = $this->user();
+    $this->freezeSecond();
+    $enrollment = app(AuthSecondFactor::class)->startEnrollment($user, ['accountName' => $user->email], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $timestep = intdiv(now()->getTimestamp(), 30);
+    $confirmation = app(Google2FA::class)->oathTotp($enrollment->secret, $timestep);
+    app(AuthSecondFactor::class)->confirmEnrollment($user, $enrollment->credential, ['code' => $confirmation], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $replayed = fn () => app(AuthSecondFactor::class)->verify($user, ['code' => $confirmation]);
+    $this->travel(30)->seconds();
+    $next = app(Google2FA::class)->oathTotp($enrollment->secret, intdiv(now()->getTimestamp(), 30));
+    $generated = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
+    app(AuthSecondFactor::class)->consumeRecoveryCode($user, ['code' => $generated->codes[0]]);
+
+    expect($replayed)->toThrow(AuthException::class);
+
+    $audits = AuthAudit::query()->get();
+    $trail = json_encode($audits->map(static fn (AuthAudit $audit): array => [$audit->action, $audit->outcome, $audit->metadata])->all(), JSON_THROW_ON_ERROR);
+
+    expect($audits->pluck('action')->all())->toContain('totp.enrolled', 'totp.failed', 'recovery_codes.regenerated', 'recovery_code.used');
+
+    foreach ([$enrollment->secret, $confirmation, $next, 'correct-password', $user->getAuthPassword(), ...$generated->codes] as $secret) {
+        expect($trail)->not->toContain($secret);
+    }
+});
+
+it('confirms only the owning principal pending enrollment with a valid code', function (): void {
+    config()->set('nvl-auth.features.totp.enabled', true);
+    $user = $this->user();
+    $other = $this->user('totp-other@example.test');
+    $this->freezeSecond();
+    $enrollment = app(AuthSecondFactor::class)->startEnrollment($user, ['accountName' => $user->email], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $code = app(Google2FA::class)->oathTotp($enrollment->secret, intdiv(now()->getTimestamp(), 30));
+
+    expect(fn () => app(AuthSecondFactor::class)->confirmEnrollment($other, $enrollment->credential, ['code' => $code], grant: $this->recentGrant($other, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext()))->toThrow(AuthException::class, 'The TOTP credential is unavailable.')
+        ->and(fn () => app(AuthSecondFactor::class)->confirmEnrollment($user, $enrollment->credential, ['code' => app(Google2FA::class)->oathTotp($enrollment->secret, intdiv(now()->getTimestamp(), 30) + 5)], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext()))->toThrow(AuthException::class, 'The TOTP code is invalid.')
+        ->and(fn () => app(AuthSecondFactor::class)->verify($user, ['code' => $code]))->toThrow(AuthException::class, 'The TOTP code is invalid.')
+        ->and($enrollment->credential->refresh()->confirmed_at)->toBeNull()
+        ->and(app(AuthSecondFactor::class)->confirmEnrollment($user, $enrollment->credential, ['code' => $code], grant: $this->recentGrant($user, RecentAuthenticationPurpose::FactorEnrollment, 'correct-password')->reveal(), context: $this->authenticationContext())->confirmed_at)->not->toBeNull();
+});

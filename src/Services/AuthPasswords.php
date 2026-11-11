@@ -49,7 +49,7 @@ use SensitiveParameter;
  */
 final readonly class AuthPasswords
 {
-    /** Native Auth operation. */
+    /** Create the password reset and change service. */
     public function __construct(private FeatureGate $features, private AuthDeliveryContext $deliveryContext, private Hasher $hasher, private AuthAuditRecorder $audits, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private PasswordBrokerManager $brokers, private AuthPipeline $pipeline, private AuthenticationEligibility $eligibility, private DomainEventDispatcher $domainEvents, private PasswordUpdater $passwords, private ConnectionCommitCallbacks $eventCommits, private CanonicalActorResolver $canonical, private PasswordValidationRules $policy, private PrincipalSecurity $security, private RecentAuthenticationProofs $recent, private PrincipalEmailIdentity $emails, private UsableAccountAuthenticationPolicy $nativeRemoval, private AccountAuthenticationPolicy $removalPolicy) {}
 
     /**
@@ -93,6 +93,9 @@ final readonly class AuthPasswords
     /**
      * Request a reset without revealing whether the identifier exists.
      *
+     * Laravel's password broker owns the token, so the delivered expiry is the broker's configured lifetime
+     * and its throttle silently suppresses a repeat request.
+     *
      * @param  array<string, mixed>  $data
      */
     public function requestReset(array $data, ?string $locale = null): void
@@ -129,8 +132,17 @@ final readonly class AuthPasswords
 
                 return;
             }
+            if ($broker->getRepository()->recentlyCreatedToken($subject)) {
+                $this->audits->record('password.reset_rejected', outcome: 'failure', subject: SubjectReference::fromAuthenticatable($subject), metadata: ['reason' => 'password_reset_throttled']);
+
+                return;
+            }
+            $expireMinutes = config('auth.passwords.'.(is_string($brokerName) ? $brokerName : $this->brokers->getDefaultDriver()).'.expire');
+            if (! is_numeric($expireMinutes)) {
+                throw AuthException::invalidConfiguration('The password broker must define a numeric token expiry.');
+            }
+            $expiresAt = CarbonImmutable::now('UTC')->startOfSecond()->addMinutes((int) $expireMinutes);
             $token = $broker->createToken($subject);
-            $expiresAt = CarbonImmutable::now('UTC')->addMinutes($this->configuration->integerBetween('features.password.settings.reset_ttl_minutes', 60, 1, 10080));
             $this->domainEvents->dispatch(new AuthDeliveryRequested(new AuthDeliveryRequest(messageId: (string) Str::uuid(), feature: AuthFeature::Password, type: AuthMessageType::PasswordReset, recipient: $subject->getEmailForPasswordReset(), payload: ['token' => $token, 'identifier' => $data['identifier']], expiresAt: $expiresAt, locale: $locale), $this->deliveryContext->capture(true)), (new AuthAudit)->getConnection());
             $reference = SubjectReference::fromAuthenticatable($subject);
             $this->audits->record('password.reset_requested', subject: $reference, metadata: ['matched' => true]);
@@ -266,7 +278,7 @@ final readonly class AuthPasswords
                 $this->passwords->update($subject, $data['password']);
                 $subject->setRememberToken(Str::random(60));
                 $subject->save();
-                $this->security->advance($subject, 'password_changed');
+                $this->security->advance($subject, 'password_changed', $context);
                 $this->audits->record('password.updated', subject: SubjectReference::fromAuthenticatable($subject), actor: $subject);
             });
         });
@@ -297,7 +309,7 @@ final readonly class AuthPasswords
                     throw new AuthException('password_already_set', 'A password already exists.', 422);
                 }
                 $this->passwords->update($fresh, $data['password']);
-                $this->security->advance($fresh, 'password_changed');
+                $this->security->advance($fresh, 'password_changed', $context);
                 $reference = SubjectReference::fromAuthenticatable($fresh);
                 $this->audits->record('password.established', subject: $reference, actor: $fresh);
                 $this->domainEvents->dispatch(new AccountSecurityChanged($reference, 'password_established'), $fresh->getConnection());
@@ -324,7 +336,7 @@ final readonly class AuthPasswords
                 $this->nativeRemoval->assertRemovalAllowed($fresh, 'password', 'password');
                 $fresh->setAttribute($fresh->getAuthPasswordName(), null);
                 $fresh->save();
-                $this->security->advance($fresh, 'password_changed');
+                $this->security->advance($fresh, 'password_changed', $context);
                 $reference = SubjectReference::fromAuthenticatable($fresh);
                 $this->audits->record('password.removed', subject: $reference, actor: $fresh);
                 $this->domainEvents->dispatch(new AccountSecurityChanged($reference, 'password_removed'), $fresh->getConnection());

@@ -50,7 +50,7 @@ use stdClass;
  */
 final readonly class AuthMaintenance
 {
-    /** Native Auth operation. */
+    /** Create the pruning and principal-adoption maintenance service. */
     public function __construct(private FeatureGate $features, private PrincipalAdoptionManifest $manifests, private PrincipalAttributeMapper $attributes, private AuthModelRegistry $models, private AuthConfiguration $configuration, private AuthAuditRecorder $audits, private MutationAuthorizer $mutations) {}
 
     /**
@@ -123,7 +123,7 @@ final readonly class AuthMaintenance
         return ['phase' => 'adoption', 'mode' => $apply ? 'apply' : 'plan', 'reconciliation' => ['principals' => ['expected' => $plan->principals->expectedCount, 'source' => count($principals), 'imported' => $apply ? count($principals) : 0, 'matched' => $apply ? count($principals) : 0], 'password_reset_tokens' => ['expected' => $expectedPasswordResets, 'source' => count($passwordResets), 'imported' => $apply ? count($passwordResets) : 0, 'matched' => $apply ? count($passwordResets) : 0]], 'extension_columns' => array_keys($plan->principals->extensionColumns), 'foreign_keys_restored' => $apply ? count($plan->foreignKeys) : 0, 'sources_dropped' => $apply && $plan->dropSources ? $this->adoptPrincipalsSourceTables($plan) : [], 'rollback' => 'Forward-only after source removal; restore a reviewed database backup for rollback.'];
     }
 
-    /** Native Auth operation. */
+    /** Require the adoption plan to use the configured principal connection. */
     private function adoptPrincipalsAssertConnection(PrincipalAdoptionPlan $plan): void
     {
         $class = $this->models->userClass();
@@ -313,7 +313,7 @@ final readonly class AuthMaintenance
         }
     }
 
-    /** Native Auth operation. */
+    /** Drop each planned host foreign key that is still present. */
     private function adoptPrincipalsDetachForeignKeys(SchemaBuilder $schema, PrincipalAdoptionPlan $plan): void
     {
         foreach ($plan->foreignKeys as $foreignKey) {
@@ -325,7 +325,7 @@ final readonly class AuthMaintenance
         }
     }
 
-    /** Native Auth operation. */
+    /** Recreate each planned host foreign key against the adopted principal table. */
     private function adoptPrincipalsRestoreForeignKeys(SchemaBuilder $schema, PrincipalAdoptionPlan $plan, string $target): void
     {
         $targetId = $this->attributes->column(PrincipalAttribute::Id);
@@ -364,7 +364,7 @@ final readonly class AuthMaintenance
         return $existing;
     }
 
-    /** Native Auth operation. */
+    /** Require a planned foreign key to name an existing host table and column. */
     private function adoptPrincipalsAssertForeignKeyTable(SchemaBuilder $schema, LegacyPrincipalForeignKey $foreignKey): void
     {
         if (! $schema->hasTable($foreignKey->table) || ! $schema->hasColumn($foreignKey->table, $foreignKey->column)) {
@@ -396,7 +396,7 @@ final readonly class AuthMaintenance
         return $source === null ? null : $row->{$source} ?? null;
     }
 
-    /** Native Auth operation. */
+    /** Return a trimmed non-empty scalar string or reject the adoption value. */
     private function adoptPrincipalsRequiredString(mixed $value, string $label): string
     {
         $value = $this->adoptPrincipalsNullableString($value);
@@ -407,7 +407,7 @@ final readonly class AuthMaintenance
         return $value;
     }
 
-    /** Native Auth operation. */
+    /** Return a required string no longer than the given character limit. */
     private function adoptPrincipalsBoundedRequiredString(mixed $value, int $maximum, string $label): string
     {
         $value = $this->adoptPrincipalsRequiredString($value, $label);
@@ -418,7 +418,7 @@ final readonly class AuthMaintenance
         return $value;
     }
 
-    /** Native Auth operation. */
+    /** Return an optional string no longer than the given character limit. */
     private function adoptPrincipalsBoundedString(mixed $value, int $maximum): ?string
     {
         $value = $this->adoptPrincipalsNullableString($value);
@@ -429,7 +429,7 @@ final readonly class AuthMaintenance
         return $value;
     }
 
-    /** Native Auth operation. */
+    /** Trim a scalar to a string, mapping empty and non-scalar values to null. */
     private function adoptPrincipalsNullableString(mixed $value): ?string
     {
         if (! is_scalar($value)) {
@@ -440,7 +440,7 @@ final readonly class AuthMaintenance
         return $value === '' ? null : $value;
     }
 
-    /** Native Auth operation. */
+    /** Accept a boolean or its 0/1 form, falling back to the default for null. */
     private function adoptPrincipalsBoolean(mixed $value, bool $default, string $label): bool
     {
         if ($value === null) {
@@ -458,7 +458,7 @@ final readonly class AuthMaintenance
         throw new InvalidArgumentException("Auth principal adoption {$label} must be boolean.");
     }
 
-    /** Native Auth operation. */
+    /** Return canonical JSON for an array or JSON document, or null when empty. */
     private function adoptPrincipalsEncodedJson(mixed $value, string $label): ?string
     {
         if ($value === null || $value === '') {
@@ -479,7 +479,7 @@ final readonly class AuthMaintenance
         return json_encode($value, JSON_THROW_ON_ERROR);
     }
 
-    /** Native Auth operation. */
+    /** Encrypt a non-empty scalar value for storage. */
     private function adoptPrincipalsEncryptedString(mixed $value): ?string
     {
         $value = $this->adoptPrincipalsNullableString($value);
@@ -487,7 +487,7 @@ final readonly class AuthMaintenance
         return $value === null ? null : Crypt::encryptString($value);
     }
 
-    /** Native Auth operation. */
+    /** Require legacy source tables to be staged under names other than the canonical targets. */
     private function adoptPrincipalsAssertSourcesDifferFromTargets(PrincipalAdoptionPlan $plan, string $target, string $passwordTarget): void
     {
         if ($plan->principals->table === $target || $plan->passwordResetTokens instanceof LegacyPasswordResetMapping && $plan->passwordResetTokens->table === $passwordTarget) {

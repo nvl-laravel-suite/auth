@@ -52,7 +52,7 @@ final readonly class AuthenticationSessions
     /**
      * Create the session establishment use case.
      */
-    public function __construct(private FeatureGate $features, private OwnerAuthenticationSelection $ownerSelection, private AuthPipeline $pipeline, private SuccessfulLoginMetadataRecorder $loginMetadata, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private AuthenticationProofs $proofs, private AuthManager $auth, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private StatefulAuthenticationBoundary $boundary, private AuthModelRegistry $models, private PrincipalSecurity $security, private SecretHasher $hasher, private AuthExecutionContext $execution) {}
+    public function __construct(private FeatureGate $features, private OwnerAuthenticationSelection $ownerSelection, private AuthPipeline $pipeline, private SuccessfulLoginMetadataRecorder $loginMetadata, private AuthAuditRecorder $audits, private AuthOperationBoundary $operations, private DomainEventDispatcher $domainEvents, private AuthenticationProofs $proofs, private AuthManager $auth, private AuthConfiguration $configuration, private PrincipalAttributeMapper $principalAttributes, private StatefulAuthenticationBoundary $boundary, private AuthModelRegistry $models, private PrincipalSecurity $security, private SecretHasher $hasher, private AuthExecutionContext $execution, private AuthSchemaProbes $probes) {}
 
     private const string PendingFactorLogin = 'nvl-auth.credential_login';
 
@@ -66,7 +66,7 @@ final readonly class AuthenticationSessions
             }
             $browser = new BrowserSession;
             $this->boundary->assertOutsideTransaction($browser->getConnection());
-            if (! $browser->getConnection()->getSchemaBuilder()->hasColumns($browser->getTable(), ['binding_hash', 'provider_hash', 'security_revision', 'absolute_expires_at'])) {
+            if (! $this->probes->once('managed-session-columns:'.$browser->getConnection()->getName().':'.$browser->getTable(), static fn (): bool => $browser->getConnection()->getSchemaBuilder()->hasColumns($browser->getTable(), ['binding_hash', 'provider_hash', 'security_revision', 'absolute_expires_at']))) {
                 throw AuthException::invalidConfiguration('Managed session schema is missing; run the forward migration before enabling.');
             }
         }
@@ -86,6 +86,12 @@ final readonly class AuthenticationSessions
     /** Consume a native browser capability, applying mandatory assurance before guard mutation. */
     public function establishFromProof(#[\SensitiveParameter] string $proof, StatefulGuard $guard, Session $session, AuthenticationRequestContext $context, bool $remember = false): Authenticatable
     {
+        return $this->probes->during(fn (): Authenticatable => $this->consumeProofIntoSession($proof, $guard, $session, $context, $remember));
+    }
+
+    /** Establish the session inside one probe-sharing operation. */
+    private function consumeProofIntoSession(#[\SensitiveParameter] string $proof, StatefulGuard $guard, Session $session, AuthenticationRequestContext $context, bool $remember): Authenticatable
+    {
         $this->features->assertAllowed(AuthFeature::Authentication, FeatureOperation::Use);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Use);
         $this->assertCanTransition();
@@ -103,7 +109,7 @@ final readonly class AuthenticationSessions
             $consumed = $this->proofs->consumeForFinalization($proof, AuthenticationDestination::Session, $context);
         } catch (AuthException $exception) {
             if ($exception->errorCode === 'second_factor_required') {
-                $session->put(self::PendingFactorLogin, ['proof' => $proof, 'requestContext' => $context, 'remember' => $remember]);
+                $session->put(self::PendingFactorLogin, ['proof' => $proof, 'requestContext' => $context->facts(), 'remember' => $remember]);
                 $guard->logout();
             } else {
                 $this->audits->record('authentication.rejected', outcome: 'failure', metadata: ['reason' => $exception->errorCode]);
@@ -229,7 +235,7 @@ final readonly class AuthenticationSessions
 
     }
 
-    /** Native Auth operation. */
+    /** Log the guard out through the logout pipeline, ending its managed browser session family. */
     public function logout(StatefulGuard $guard, Session $session, ?string $guardName = null): void
     {
         $this->features->assertAllowed(AuthFeature::Authentication, FeatureOperation::Revoke);
@@ -272,17 +278,25 @@ final readonly class AuthenticationSessions
         });
     }
 
-    /** @param array{code?: mixed, recoveryCode?: mixed} $factorProof */
+    /**
+     * The pending context is stored as plain facts so it survives PHP and JSON session serialization.
+     *
+     * @param  array{code?: mixed, recoveryCode?: mixed}  $factorProof
+     */
     public function completeSecondFactor(#[\SensitiveParameter] array $factorProof, StatefulGuard $guard, Session $session): Authenticatable
     {
         $this->features->assertAllowed(AuthFeature::Authentication, FeatureOperation::Use);
         $this->features->assertAllowed(AuthFeature::Sessions, FeatureOperation::Use);
         $this->assertCanTransition();
         $pending = $session->get(self::PendingFactorLogin);
-        if (! is_array($pending) || ! is_string($pending['proof'] ?? null) || ! ($pending['requestContext'] ?? null) instanceof AuthenticationRequestContext || ! is_bool($pending['remember'] ?? null)) {
+        if (! is_array($pending) || ! is_string($pending['proof'] ?? null) || ! is_array($pending['requestContext'] ?? null) || ! is_bool($pending['remember'] ?? null)) {
             throw new AuthException('login_challenge_invalid', 'The login continuation is unavailable.', 422);
         }
-        $context = $pending['requestContext'];
+        try {
+            $context = AuthenticationRequestContext::fromFacts($pending['requestContext']);
+        } catch (\InvalidArgumentException) {
+            throw new AuthException('login_challenge_invalid', 'The login continuation is unavailable.', 422);
+        }
         if ($context->sessionBinding !== $session->getId() || $this->auth->guard($context->guardName) !== $guard) {
             throw new AuthException('authentication_binding_invalid', 'The authentication browser binding does not match.', 422);
         }

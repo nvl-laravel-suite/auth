@@ -36,7 +36,7 @@ use Nvl\Support\Ownership\ValueObjects\OwnerReference;
  */
 final readonly class OwnerInvitations
 {
-    /** Native Auth operation. */
+    /** Create the owner invitation acceptance service. */
     public function __construct(private Container $container, private SecretHasher $hasher, private FeatureGate $features, private OwnershipReadiness $readiness, private OwnershipBoundary $boundary, private InvitationRecipientProof $proof, private MembershipPrincipalResolver $principals, private AuthMemberships $memberships, private AuthModelRegistry $models, private ManagementAuthorizer $authorization, private AuthPipeline $pipeline, private AuthCommittedAudit $audits, private DomainEventDispatcher $events, private ApiTokenManager $tokens, private InvitationPrincipalResolver $principalResolver) {}
 
     /** Return only public invitation context to its bearer, without entering any owner. */
@@ -178,7 +178,7 @@ final readonly class OwnerInvitations
         }
     }
 
-    /** Native Auth operation. */
+    /** Build the uniform invalid-or-expired invitation rejection. */
     private function invalid(): AuthException
     {
         return new AuthException('invitation_invalid', 'The invitation is invalid or expired.', 410);

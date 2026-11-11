@@ -2217,7 +2217,7 @@ public function update(Illuminate\Contracts\Auth\Authenticatable $actor, Nvl\Aut
 
 ```text
 final readonly class Nvl\Auth\Services\AuthEmailChanges
-public function __construct(Nvl\Auth\Services\FeatureGate $features, Nvl\Support\Auth\CanonicalActorResolver $canonical, Nvl\Auth\Services\PrincipalSecurity $security, Nvl\Auth\Services\RecentAuthenticationProofs $recent, Nvl\Auth\Services\SecretHasher $hasher, Nvl\Auth\Contracts\PrincipalAttributeMapper $attributes, Nvl\Auth\Pipelines\AuthPipeline $pipeline, Nvl\Auth\Contracts\AuthAuditRecorder $audits, Nvl\Support\Events\DomainEventDispatcher $events, Nvl\Auth\Services\AuthDeliveryContext $delivery): mixed
+public function __construct(Nvl\Auth\Services\FeatureGate $features, Nvl\Support\Auth\CanonicalActorResolver $canonical, Nvl\Auth\Services\PrincipalSecurity $security, Nvl\Auth\Services\RecentAuthenticationProofs $recent, Nvl\Auth\Services\SecretHasher $hasher, Nvl\Auth\Contracts\PrincipalAttributeMapper $attributes, Nvl\Auth\Pipelines\AuthPipeline $pipeline, Nvl\Auth\Contracts\AuthAuditRecorder $audits, Nvl\Support\Events\DomainEventDispatcher $events, Nvl\Auth\Services\AuthDeliveryContext $delivery, Nvl\Auth\Services\AuthConfiguration $configuration): mixed
 public function cancel(Illuminate\Contracts\Auth\Authenticatable $subject, string $changeId): void
 public function complete(Illuminate\Contracts\Auth\Authenticatable $subject, #[SensitiveParameter()] string $token, Nvl\Auth\ValueObjects\AuthenticationRequestContext $context): Nvl\Auth\Models\User
 public function request(Illuminate\Contracts\Auth\Authenticatable $subject, string $newEmail, #[SensitiveParameter()] string $recentProof, Nvl\Auth\ValueObjects\AuthenticationRequestContext $context): Nvl\Auth\Models\PendingEmailChange
@@ -2289,7 +2289,7 @@ public function registerSocial(#[SensitiveParameter()] string $invitationToken, 
 resolved @return array{invitation: Nvl\Auth\Models\Invitation, subject: Nvl\Auth\Models\User}
 public function resend(Nvl\Auth\Models\Invitation|string $invitation, Illuminate\Contracts\Auth\Authenticatable|Nvl\Auth\ValueObjects\SystemMutationContext $authority, ?string $locale=null, ?Nvl\Auth\ValueObjects\InvitationIssuanceContext $context=null): array
 @return array<string, mixed>
-public function revoke(Nvl\Auth\Models\Invitation|string $invitation, Illuminate\Contracts\Auth\Authenticatable $actor): Nvl\Auth\Models\Invitation
+public function revoke(Nvl\Auth\Models\Invitation|string $invitation, Illuminate\Contracts\Auth\Authenticatable|Nvl\Auth\ValueObjects\SystemMutationContext $authority): Nvl\Auth\Models\Invitation
 ```
 
 ## Nvl\Auth\Services\AuthMaintenance
@@ -2623,7 +2623,7 @@ public function updateProfile(Illuminate\Contracts\Auth\Authenticatable $subject
 
 ```text
 final readonly class Nvl\Auth\Services\Authentication
-public function __construct(Nvl\Auth\Services\FeatureGate $features, Nvl\Auth\Services\AuthConfiguration $configuration, Nvl\Auth\Contracts\PrincipalAttributeMapper $principalAttributes, Illuminate\Auth\AuthManager $auth, Nvl\Auth\Contracts\AuthAuditRecorder $audits, Nvl\Auth\Contracts\AuthenticationEligibility $eligibility, Nvl\Auth\Services\AuthOperationBoundary $operations, Nvl\Support\Events\DomainEventDispatcher $domainEvents, Nvl\Auth\Services\AuthTokens $tokens, Nvl\Auth\Services\SecretHasher $hasher, Nvl\Auth\Services\AuthIdentityChallenges $records, Nvl\Auth\Services\PrincipalSecurity $security, Nvl\Auth\Services\AuthenticationSessions $sessions, Nvl\Auth\Services\AuthenticationProofs $proofs, Nvl\Auth\Services\PrincipalEmailIdentity $emails): mixed
+public function __construct(Nvl\Auth\Services\FeatureGate $features, Nvl\Auth\Services\AuthConfiguration $configuration, Nvl\Auth\Contracts\PrincipalAttributeMapper $principalAttributes, Illuminate\Auth\AuthManager $auth, Nvl\Auth\Contracts\AuthAuditRecorder $audits, Nvl\Auth\Contracts\AuthenticationEligibility $eligibility, Nvl\Auth\Services\AuthOperationBoundary $operations, Nvl\Support\Events\DomainEventDispatcher $domainEvents, Nvl\Auth\Services\AuthTokens $tokens, Nvl\Auth\Services\SecretHasher $hasher, Nvl\Auth\Services\AuthIdentityChallenges $records, Nvl\Auth\Services\PrincipalSecurity $security, Nvl\Auth\Services\AuthenticationSessions $sessions, Nvl\Auth\Services\AuthenticationProofs $proofs, Nvl\Auth\Services\PrincipalEmailIdentity $emails, Nvl\Auth\Services\AuthSchemaProbes $probes): mixed
 public function completeSecondFactor(#[SensitiveParameter()] array $factorProof, Illuminate\Contracts\Auth\StatefulGuard $guard, Illuminate\Contracts\Session\Session $session): Illuminate\Contracts\Auth\Authenticatable
 @param array{code?: mixed, recoveryCode?: mixed} $factorProof
 public function hasPendingSecondFactor(Illuminate\Contracts\Session\Session $session): bool
@@ -2664,7 +2664,7 @@ resolved @return array{subject: (Illuminate\Database\Eloquent\Model & Illuminate
 
 ```text
 final readonly class Nvl\Auth\Services\AuthenticationSessions
-public function __construct(Nvl\Auth\Services\FeatureGate $features, Nvl\Auth\Services\OwnerAuthenticationSelection $ownerSelection, Nvl\Auth\Pipelines\AuthPipeline $pipeline, Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder $loginMetadata, Nvl\Auth\Contracts\AuthAuditRecorder $audits, Nvl\Auth\Services\AuthOperationBoundary $operations, Nvl\Support\Events\DomainEventDispatcher $domainEvents, Nvl\Auth\Services\AuthenticationProofs $proofs, Illuminate\Auth\AuthManager $auth, Nvl\Auth\Services\AuthConfiguration $configuration, Nvl\Auth\Contracts\PrincipalAttributeMapper $principalAttributes, Nvl\Auth\Services\StatefulAuthenticationBoundary $boundary, Nvl\Auth\Services\AuthModelRegistry $models, Nvl\Auth\Services\PrincipalSecurity $security, Nvl\Auth\Services\SecretHasher $hasher, Nvl\Auth\Services\AuthExecutionContext $execution): mixed
+public function __construct(Nvl\Auth\Services\FeatureGate $features, Nvl\Auth\Services\OwnerAuthenticationSelection $ownerSelection, Nvl\Auth\Pipelines\AuthPipeline $pipeline, Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder $loginMetadata, Nvl\Auth\Contracts\AuthAuditRecorder $audits, Nvl\Auth\Services\AuthOperationBoundary $operations, Nvl\Support\Events\DomainEventDispatcher $domainEvents, Nvl\Auth\Services\AuthenticationProofs $proofs, Illuminate\Auth\AuthManager $auth, Nvl\Auth\Services\AuthConfiguration $configuration, Nvl\Auth\Contracts\PrincipalAttributeMapper $principalAttributes, Nvl\Auth\Services\StatefulAuthenticationBoundary $boundary, Nvl\Auth\Services\AuthModelRegistry $models, Nvl\Auth\Services\PrincipalSecurity $security, Nvl\Auth\Services\SecretHasher $hasher, Nvl\Auth\Services\AuthExecutionContext $execution, Nvl\Auth\Services\AuthSchemaProbes $probes): mixed
 public function assertCanTransition(?Illuminate\Contracts\Auth\Authenticatable $subject=null): void
 public function completeSecondFactor(#[SensitiveParameter()] array $factorProof, Illuminate\Contracts\Auth\StatefulGuard $guard, Illuminate\Contracts\Session\Session $session): Illuminate\Contracts\Auth\Authenticatable
 @param array{code?: mixed, recoveryCode?: mixed} $factorProof
@@ -2677,6 +2677,7 @@ public function logout(Illuminate\Contracts\Auth\StatefulGuard $guard, Illuminat
 
 ```text
 final readonly class Nvl\Auth\Services\EnrolledFactorAssurancePolicy implements Nvl\Auth\Contracts\AuthenticationAssurancePolicy
+public function __construct(Nvl\Auth\Services\AuthSchemaProbes $probes=new \Nvl\Auth\Services\AuthSchemaProbes()): mixed
 public function assertSatisfied(Illuminate\Contracts\Auth\Authenticatable $subject, Nvl\Auth\ValueObjects\AuthenticationEvidence $evidence, Nvl\Auth\Enums\AuthenticationPurpose $purpose): void
 public function requiresSecondFactor(Illuminate\Contracts\Auth\Authenticatable $subject): bool
 ```

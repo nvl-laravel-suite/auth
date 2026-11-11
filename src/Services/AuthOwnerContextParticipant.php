@@ -57,7 +57,7 @@ final readonly class AuthOwnerContextParticipant implements OwnershipContextPart
         };
     }
 
-    /** Native Auth operation. */
+    /** Resolve the Spatie permission registrar, which RBAC requires. */
     private function registrar(): PermissionRegistrar
     {
         if (! class_exists(PermissionRegistrar::class)) {
