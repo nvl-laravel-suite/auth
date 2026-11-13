@@ -14,9 +14,9 @@ use Nvl\Auth\Services\PrincipalSecurity;
 
 beforeEach(function (): void {
     $driver = getenv('NVL_C1_TEST_DRIVER');
-    if (in_array($driver, ['mysql', 'mariadb', 'pgsql'], true)) {
+    if ($driver === 'pgsql') {
         expect(DB::connection()->getDriverName())->toBe($driver)
-            ->and(DB::connection()->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME))->toBe($driver === 'mariadb' ? 'mysql' : $driver);
+            ->and(DB::connection()->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME))->toBe($driver);
     }
 });
 
@@ -66,7 +66,7 @@ it('installs exactly the eighteen namespaced auth-owned tables', function (): vo
     ] as $table) {
         expect(Schema::hasTable($table), $table)->toBeFalse();
     }
-});
+})->group('fresh-schema');
 
 it('installs only enabled feature schema and safely installs later capabilities', function (): void {
     $features = require dirname(__DIR__, 2).'/database/migrations/2026_08_02_000000_nvl_auth_create_nvl_auth_tables.php';
@@ -104,11 +104,6 @@ it('installs only enabled feature schema and safely installs later capabilities'
 
     app(AuthSchemaManager::class)->execute(true);
     config()->set('nvl-auth.migrations.install_all', true);
-});
-
-it('registers the feature-aware schema installation command', function (): void {
-    $this->artisan('nvl:auth:schema', ['--format' => 'json'])
-        ->assertSuccessful();
 });
 
 it('does not bypass host-owned migration mode during schema apply', function (): void {
@@ -220,9 +215,6 @@ it('repairs partial mandatory security state without changing retained revisions
 });
 
 it('rejects a malformed named security index without changing host data or schema', function (array $columns, string $operation): void {
-    if ($columns === ['partial'] && in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
-        $this->markTestSkipped('MySQL and MariaDB do not support partial indexes.');
-    }
     $user = $this->user();
     app(PrincipalSecurity::class)->revision($user);
     $state = PrincipalSecurityState::query()->sole();

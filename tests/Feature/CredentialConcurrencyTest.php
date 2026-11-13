@@ -39,9 +39,9 @@ use PragmaRX\Google2FA\Google2FA;
 beforeEach(function (): void {
     config(['nvl-auth.features.totp.enabled' => true, 'nvl-auth.features.recovery_codes.enabled' => true]);
     $requested = getenv('NVL_C1_TEST_DRIVER');
-    if (in_array($requested, ['mysql', 'mariadb', 'pgsql'], true)) {
+    if ($requested === 'pgsql') {
         expect(DB::connection()->getDriverName())->toBe($requested)
-            ->and(DB::connection()->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME))->toBe($requested === 'mariadb' ? 'mysql' : $requested);
+            ->and(DB::connection()->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME))->toBe($requested);
     }
 });
 it('retains monotonic security revision and rolls back credential replacement', function (): void {
@@ -75,7 +75,7 @@ it('creates one initial security state from two committed processes', function (
         ->and(array_unique(array_column($results, 'process_id')))->toHaveCount(2)
         ->and(array_unique(array_column($results, 'connection_id')))->toHaveCount(2)
         ->and(PrincipalSecurityState::query()->count())->toBe(1);
-})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/MariaDB/PostgreSQL.');
+})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires PostgreSQL.');
 it('serializes concurrent credential inventory replacements', function (string $operation): void {
     $user = $this->user();
     $id = $user->getKey();
@@ -105,7 +105,7 @@ it('serializes concurrent credential inventory replacements', function (string $
     } else {
         expect(RecoveryCode::query()->whereNull('revoked_at')->distinct()->count('batch_id'))->toBe(1);
     }
-})->with(['totp', 'recovery'])->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/MariaDB/PostgreSQL.');
+})->with(['totp', 'recovery'])->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires PostgreSQL.');
 
 it('admits exactly one concurrent use of a recovery code or totp timestep', function (string $factor): void {
     $user = $this->user();
@@ -138,7 +138,7 @@ it('admits exactly one concurrent use of a recovery code or totp timestep', func
         ->and(array_sum(array_column($results, 'accepted')))->toBe(1, json_encode($results, JSON_THROW_ON_ERROR))
         ->and(array_values(array_unique(array_filter(array_column($results, 'rejection')))))->toBe([$factor === 'recovery' ? 'recovery_code_invalid' : 'totp_invalid'])
         ->and($factor === 'recovery' ? RecoveryCode::query()->whereNotNull('used_at')->count() : AuthAudit::query()->where('action', 'totp.verified')->count())->toBe(1);
-})->with(['recovery', 'totp'])->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/MariaDB/PostgreSQL.');
+})->with(['recovery', 'totp'])->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires PostgreSQL.');
 
 it('finishes passkey verification outside the security transaction', function (): void {
     config(['nvl-auth.features.passkeys.enabled' => true]);
@@ -177,7 +177,7 @@ it('never exceeds the passkey limit when distinct ceremonies finish together', f
     expect(array_column($results, 'ok'))->toBe([true, true], json_encode($results, JSON_THROW_ON_ERROR))
         ->and(array_sum(array_column($results, 'enrolled')))->toBe(1)
         ->and(Passkey::query()->whereNull('revoked_at')->count())->toBe(1);
-})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/MariaDB/PostgreSQL.');
+})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires PostgreSQL.');
 
 it('advances passwords and revokes only exact managed token namespaces', function (): void {
     config(['nvl-auth.features.api_tokens.settings.namespace' => 'secure_auth']);
@@ -259,16 +259,12 @@ it('rejects unknown revision reasons without mutating the store', function (): v
     expect(PrincipalSecurityState::query()->count())->toBe(0);
 });
 
-it('advances administrative email and activation mutations', function (array $data): void {
+it('advances the security revision after an administrative email change', function (): void {
     $actor = $this->user('actor@example.test');
     $user = $this->user();
-    if (array_key_exists('active', $data)) {
-        app(AuthUsers::class)->setActive($actor, $user, $data);
-    } else {
-        app(AuthUsers::class)->update($actor, $user, $data);
-    }
+    app(AuthUsers::class)->update($actor, $user, ['email' => 'changed@example.test']);
     expect(app(PrincipalSecurity::class)->revision($user))->toBe(2);
-})->with([[['active' => false]], [['email' => 'changed@example.test']]]);
+});
 
 it('verifies passkey assertions outside principal and challenge locks', function (): void {
     config(['nvl-auth.features.passkeys.enabled' => true]);

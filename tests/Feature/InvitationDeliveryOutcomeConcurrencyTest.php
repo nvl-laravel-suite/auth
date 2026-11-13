@@ -14,8 +14,8 @@ use Nvl\Auth\Services\AuthInvitations;
  */
 function authOutcomeConcurrencySkipReason(): ?string
 {
-    if (! in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb', 'pgsql'], true)) {
-        return 'The process concurrency gate runs in the PostgreSQL/MySQL/MariaDB matrix.';
+    if (DB::connection()->getDriverName() !== 'pgsql') {
+        return 'The process concurrency gate runs in the PostgreSQL matrix.';
     }
 
     if (! function_exists('pcntl_exec')
@@ -71,8 +71,8 @@ function authOutcomeRunWorkers(string $connectionName, array $workers): array
         throw new RuntimeException('The Auth concurrency database configuration is unavailable.');
     }
     $driver = DB::connection($connectionName)->getDriverName();
-    $pdoDriver = $driver === 'mariadb' ? 'mysql' : $driver;
-    if (! in_array($driver, ['mysql', 'mariadb', 'pgsql'], true)
+    $pdoDriver = $driver;
+    if ($driver !== 'pgsql'
         || DB::connection($connectionName)->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME) !== $pdoDriver) {
         throw new RuntimeException('The Auth concurrency source requires a supported native PDO driver.');
     }
@@ -123,7 +123,7 @@ function authOutcomeRunWorkers(string $connectionName, array $workers): array
                     || $connection->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME) !== $pdoDriver) {
                     throw new RuntimeException('An Auth outcome worker did not select an independent committed native source.');
                 }
-                $connectionId = $connection->scalar($driver === 'pgsql' ? 'SELECT pg_backend_pid()' : 'SELECT CONNECTION_ID()');
+                $connectionId = $connection->scalar('SELECT pg_backend_pid()');
                 file_put_contents($readyFiles[$workerIndex], 'ready');
                 $deadline = microtime(true) + 10;
 
@@ -149,7 +149,10 @@ function authOutcomeRunWorkers(string $connectionName, array $workers): array
                 json_encode($result, JSON_THROW_ON_ERROR),
             );
 
-            if (pcntl_exec(PHP_BINARY, ['-r', 'exit(0);']) === false) {
+            if (is_executable('/usr/bin/true')) {
+                pcntl_exec('/usr/bin/true');
+            }
+            if (pcntl_exec(PHP_BINARY, ['-n', '-r', 'exit(0);']) === false) {
                 exit(1);
             }
         }
@@ -276,5 +279,5 @@ it('records one result when duplicate delivery outcomes race', function (): void
     }
 })->skip(
     fn (): bool => authOutcomeConcurrencySkipReason() !== null,
-    'The process concurrency gate requires PostgreSQL/MySQL/MariaDB and pcntl.',
+    'The process concurrency gate requires PostgreSQL and pcntl.',
 );

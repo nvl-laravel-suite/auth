@@ -32,7 +32,7 @@ beforeEach(function (): void {
     config(['nvl-auth.features.registration.enabled' => true, 'nvl-auth.features.registration.settings.mode' => 'invitation_only']);
 });
 
-it('rejects a stale password after a broker reset for confirmation and replacement', function (): void {
+it('rejects stale password authority for confirmation replacement and account deletion after a broker reset', function (): void {
     $user = $this->user('stale-password@example.test');
     $stale = $user->fresh();
     app(AuthPasswords::class)->requestReset(['identifier' => $user->email]);
@@ -41,22 +41,10 @@ it('rejects a stale password after a broker reset for confirmation and replaceme
 
     expect(fn () => app(AuthPasswords::class)->confirm($stale, ['password' => 'correct-password'], app('session')->driver()))->toThrow(AuthException::class)
         ->and(fn () => app(AuthPasswords::class)->update($stale, ['password' => 'new-password-123', 'passwordConfirmation' => 'new-password-123'], grant: $this->recentGrant($stale, RecentAuthenticationPurpose::PasswordChange, 'correct-password')->reveal(), context: $this->authenticationContext()))->toThrow(AuthException::class)
-        ->and(Hash::check('replacement-password', $user->fresh()->password))->toBeTrue();
-});
-
-it('requires separate authority for credential edits', function (): void {
-    $actor = $this->user('management-actor@example.test');
-    $user = $this->user('management-subject@example.test');
-    app()->instance(AuthManagementAccess::class, new class implements AuthManagementAccess
-    {
-        public function allows(Authenticatable $actor, string $ability, mixed $target = null): bool
-        {
-            return $ability === 'nvl.auth.users.update';
-        }
-    });
-
-    expect(fn () => app(AuthUsers::class)->update($actor, $user, ['password' => 'new-password-123']))->toThrow(AuthException::class);
-    expect(fn () => app(AuthUsers::class)->update($actor, $user, ['emailVerified' => true]))->toThrow(AuthException::class);
+        ->and(fn () => app(AuthUsers::class)->deleteOwnAccount($stale, [], auth()->guard('web'), app('session')->driver(), grant: $this->recentGrant($stale, RecentAuthenticationPurpose::AccountDeletion, 'correct-password')->reveal(), context: $this->authenticationContext()))->toThrow(AuthException::class);
+    $stored = $user->fresh();
+    expect(Hash::check('replacement-password', $stored->password))->toBeTrue()
+        ->and($stored->trashed())->toBeFalse();
 });
 
 it('clears verification when an administrator changes an email', function (): void {
@@ -70,11 +58,13 @@ it('clears verification when an administrator changes an email', function (): vo
 
 it('enforces the password policy and bcrypt byte boundary for password changes', function (): void {
     $user = $this->user('password-policy@example.test');
-    $update = fn (string $password) => app(AuthPasswords::class)->update($user, ['password' => $password, 'passwordConfirmation' => $password], grant: $this->recentGrant($user, RecentAuthenticationPurpose::PasswordChange, 'correct-password')->reveal(), context: $this->authenticationContext());
+    $update = fn (string $password, string $current = 'correct-password') => app(AuthPasswords::class)->update($user, ['password' => $password, 'passwordConfirmation' => $password], grant: $this->recentGrant($user, RecentAuthenticationPurpose::PasswordChange, $current)->reveal(), context: $this->authenticationContext());
     expect(fn () => $update('12345678901'))->toThrow(ValidationException::class)
-        ->and(fn () => $update(str_repeat('x', 73)))->toThrow(ValidationException::class);
+        ->and(fn () => $update(str_repeat('a', 73)))->toThrow(ValidationException::class);
     $update('123456789012');
     expect(Hash::check('123456789012', $user->fresh()->password))->toBeTrue();
+    $update(str_repeat('a', 72), '123456789012');
+    expect(Hash::check(str_repeat('a', 72), $user->fresh()->password))->toBeTrue();
 });
 
 it('keeps the bcrypt byte limit with a replacement policy', function (): void {
@@ -90,16 +80,6 @@ it('keeps the bcrypt byte limit with a replacement policy', function (): void {
     expect(fn () => $change(str_repeat('😀', 19)))->toThrow(ValidationException::class);
     $change(str_repeat('😀', 18));
     expect(Hash::check(str_repeat('😀', 18), $user->fresh()->password))->toBeTrue();
-});
-
-it('rejects stale account deletion after a broker reset', function (): void {
-    $user = $this->user('stale-delete@example.test');
-    $stale = $user->fresh();
-    app(AuthPasswords::class)->requestReset(['identifier' => $user->email]);
-    $event = Event::dispatched(AuthDeliveryRequested::class)->first()[0];
-    app(AuthPasswords::class)->reset(['identifier' => $user->email, 'token' => $event->request->payload['token'], 'password' => 'replacement-password', 'passwordConfirmation' => 'replacement-password']);
-    expect(fn () => app(AuthUsers::class)->deleteOwnAccount($stale, [], auth()->guard('web'), app('session')->driver(), grant: $this->recentGrant($stale, RecentAuthenticationPurpose::AccountDeletion, 'correct-password')->reveal(), context: $this->authenticationContext()))->toThrow(AuthException::class)
-        ->and($user->fresh()->trashed())->toBeFalse();
 });
 
 it('passes the locked canonical principal to an injected updater and rotates remember credentials', function (): void {
@@ -132,14 +112,6 @@ it('continues to authenticate an existing short password', function (): void {
     expect($authenticated->getAuthIdentifier())->toBe($user->getAuthIdentifier());
 });
 
-it('accepts 72 ASCII bytes and rejects 73 for bcrypt', function (): void {
-    $user = $this->user('ascii-boundary@example.test');
-    $submit = fn (string $password) => app(AuthPasswords::class)->update($user, ['password' => $password, 'passwordConfirmation' => $password], grant: $this->recentGrant($user, RecentAuthenticationPurpose::PasswordChange, 'correct-password')->reveal(), context: $this->authenticationContext());
-    expect(fn () => $submit(str_repeat('a', 73)))->toThrow(ValidationException::class);
-    $submit(str_repeat('a', 72));
-    expect(Hash::check(str_repeat('a', 72), $user->fresh()->password))->toBeTrue();
-});
-
 it('allows argon passwords beyond 72 bytes while retaining the input limit', function (): void {
     $user = $this->user('argon-boundary@example.test');
     config()->set('hashing.driver', 'argon2id');
@@ -153,7 +125,7 @@ it('allows argon passwords beyond 72 bytes while retaining the input limit', fun
     expect($argon->check(str_repeat('a', 4096), $user->fresh()->password))->toBeTrue();
 });
 
-it('requires credential authority for explicit password removal', function (): void {
+it('requires separate authority for password changes and email verification during management edits', function (): void {
     $actor = $this->user('remove-actor@example.test');
     $user = $this->user('remove-target@example.test');
     $user->forceFill(['remember_token' => 'before-removal'])->save();
@@ -167,7 +139,9 @@ it('requires credential authority for explicit password removal', function (): v
         }
     };
     app()->instance(AuthManagementAccess::class, $access);
-    expect(fn () => app(AuthUsers::class)->update($actor, $user, ['password' => null]))->toThrow(AuthException::class)
+    expect(fn () => app(AuthUsers::class)->update($actor, $user, ['password' => 'new-password-123']))->toThrow(AuthException::class)
+        ->and(fn () => app(AuthUsers::class)->update($actor, $user, ['emailVerified' => true]))->toThrow(AuthException::class)
+        ->and(fn () => app(AuthUsers::class)->update($actor, $user, ['password' => null]))->toThrow(AuthException::class)
         ->and(Hash::check('correct-password', $user->fresh()->password))->toBeTrue();
     $access->credentials = true;
     $updated = app(AuthUsers::class)->update($actor, $user, ['password' => null]);
@@ -191,7 +165,6 @@ it('enforces the minimum on each new password operation', function (string $path
     $submit = function (string $password) use ($actor, $user, $path, $service, $token) {
         return match ($path) {
             'reset' => $service->reset(['identifier' => $user->email, 'token' => $token, 'password' => $password, 'passwordConfirmation' => $password]),
-            'update' => $service->update($user, ['password' => $password, 'passwordConfirmation' => $password], grant: $this->recentGrant($user, RecentAuthenticationPurpose::PasswordChange, 'correct-password')->reveal(), context: $this->authenticationContext()),
             'managed_create' => app(AuthUsers::class)->create($actor, ['name' => 'New user', 'email' => 'new-policy@example.test', 'password' => $password]),
             'managed_update' => app(AuthUsers::class)->update($actor, $user, ['password' => $password]),
             'invitation' => app(AuthInvitations::class)->register(['token' => $token, 'name' => 'Invited user', 'password' => $password, 'passwordConfirmation' => $password]),
@@ -205,7 +178,7 @@ it('enforces the minimum on each new password operation', function (string $path
         default => $user->fresh(),
     };
     expect(Hash::check('123456789012', $principal->password))->toBeTrue();
-})->with(['reset', 'update', 'managed_create', 'managed_update', 'invitation']);
+})->with(['reset', 'managed_create', 'managed_update', 'invitation']);
 
 it('composes the configured password alias with an injected updater', function (): void {
     $actor = $this->user('alias-actor@example.test');

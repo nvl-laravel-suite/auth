@@ -15,7 +15,7 @@ use Spatie\Permission\PermissionServiceProvider;
 
 require dirname(__DIR__, 6).'/vendor/autoload.php';
 $source = json_decode($argv[1], true, flags: JSON_THROW_ON_ERROR);
-if (! is_array($source) || ! in_array($source['driver'] ?? null, ['pgsql', 'mysql', 'mariadb'], true) || ! is_string($source['database'] ?? null)
+if (! is_array($source) || ($source['driver'] ?? null) !== 'pgsql' || ! is_string($source['database'] ?? null)
     || preg_match('/^nvl_own_test_[a-z0-9_]+$/D', $source['database']) !== 1) {
     throw new RuntimeException('Auth workers require an explicitly dedicated native source.');
 }

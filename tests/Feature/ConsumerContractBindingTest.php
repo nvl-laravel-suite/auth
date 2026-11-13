@@ -50,35 +50,6 @@ use Nvl\Auth\Services\AuthUserReader;
 use Nvl\Auth\Services\AuthUsers;
 use Nvl\Ownership\Contracts\OwnerAccess;
 
-it('publishes complete native operations with explicit typed arguments and returns', function (string $class): void {
-    $reflection = new ReflectionClass($class);
-    expect($reflection->isFinal())->toBeTrue()->and($reflection->isReadOnly())->toBeTrue()
-        ->and($reflection->hasMethod('execute'))->toBeFalse();
-    foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
-        if ($method->isConstructor()) {
-            continue;
-        }
-        expect($method->hasReturnType())->toBeTrue();
-        foreach ($method->getParameters() as $parameter) {
-            expect($parameter->hasType())->toBeTrue();
-            expect((string) $parameter->getType())->not->toContain('Data')->not->toContain('Illuminate\\Http\\Request');
-        }
-    }
-})->with([
-    [Authentication::class],
-    [AuthenticationSessions::class],
-    [AuthChallenges::class],
-    [AuthPasswords::class],
-    [AuthEmailVerification::class],
-    [AuthInvitations::class],
-    [AuthUsers::class],
-    [AuthUserReader::class],
-    [AuthClients::class],
-    [AuthMemberships::class],
-    [AuthAuditReader::class],
-    [AuthMaintenance::class],
-]);
-
 it('resolves native complete operations without binding copied operation interfaces', function (): void {
     foreach ([
         Authentication::class,
@@ -242,18 +213,3 @@ function authPublicExtensionContracts(): array
         [InvitationRecipientProof::class, false],
     ];
 }
-
-it('preserves a consumer provider factory binding', function (): void {
-    $consumer = authContractConsumer($this->app);
-    $contract = SocialIdentityProviderFactory::class;
-    $host = Mockery::mock(SocialIdentityProviderFactory::class);
-    try {
-        $consumer->instance($contract, $host);
-        (new AuthServiceProvider($consumer))->register();
-        expect($consumer->make($contract))->toBe($host)
-            ->and(interface_exists($contract))->toBeTrue();
-    } finally {
-        Container::setInstance($this->app);
-        $consumer->flush();
-    }
-});

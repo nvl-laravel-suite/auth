@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Auth\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Nvl\Auth\Contracts\AccountAuthenticationPolicy;
 use Nvl\Auth\Contracts\AuthAuditRecorder;
 use Nvl\Auth\Enums\AuthenticationDestination;
@@ -100,7 +101,13 @@ final readonly class AuthSocialLinks
                     throw new AuthException('social_identity_conflict', 'The social identity is unavailable for this operation.', 409);
                 }
                 $link ??= new SocialIdentity;
-                $link->fill(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'provider' => $identity->provider, 'provider_user_id' => $identity->providerUserId, 'provider_user_id_hash' => $hash, 'email' => $identity->email, 'profile' => ['name' => $identity->name, 'avatar' => $identity->avatar, 'issuer' => $identity->issuer, 'email_verified' => $identity->emailVerified, 'email_verification_source' => $identity->emailVerificationSource, 'connection_realm' => $this->configuration->get("features.social_identities.settings.providers.{$identity->provider}.realm")], 'last_used_at' => now(), 'revoked_at' => null])->save();
+                try {
+                    $link->getConnection()->transaction(function () use ($link, $reference, $identity, $hash): void {
+                        $link->fill(['subject_type' => $reference->type, 'subject_id' => $reference->identifier, 'provider' => $identity->provider, 'provider_user_id' => $identity->providerUserId, 'provider_user_id_hash' => $hash, 'email' => $identity->email, 'profile' => ['name' => $identity->name, 'avatar' => $identity->avatar, 'issuer' => $identity->issuer, 'email_verified' => $identity->emailVerified, 'email_verification_source' => $identity->emailVerificationSource, 'connection_realm' => $this->configuration->get("features.social_identities.settings.providers.{$identity->provider}.realm")], 'last_used_at' => now(), 'revoked_at' => null])->save();
+                    });
+                } catch (UniqueConstraintViolationException $exception) {
+                    throw new AuthException('social_identity_conflict', 'The social identity is unavailable for this operation.', 409, previous: $exception);
+                }
                 $this->security->advance($canonical, 'social_linked', $context);
                 $this->audits->record($purpose === SocialIntentPurpose::Link ? 'social_identity.linked' : 'social_identity.reconnected', subject: $reference, actor: $canonical, metadata: ['provider' => $identity->provider, 'social_identity_id' => $link->identifier()]);
 

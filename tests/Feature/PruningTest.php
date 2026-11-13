@@ -22,9 +22,9 @@ it('commits bounded retention batches using one cutoff and exact deletion counts
     $boundary = Invitation::factory()->create(['expires_at' => $cutoff]);
     $connection = (new Invitation)->getConnection();
     $driver = getenv('NVL_C1_TEST_DRIVER');
-    if (in_array($driver, ['pgsql', 'mysql', 'mariadb'], true)) {
+    if ($driver === 'pgsql') {
         expect($connection->getDriverName())->toBe($driver)
-            ->and($connection->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME))->toBe($driver === 'pgsql' ? 'pgsql' : 'mysql');
+            ->and($connection->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME))->toBe($driver);
     }
     expect($connection->transactionLevel())->toBe(0);
     $deletes = [];

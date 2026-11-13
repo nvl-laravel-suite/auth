@@ -27,6 +27,12 @@ RYf/wGQSBmBTBSaU+rRuRbuVAx2zexNCzQ==
 -----END EC PRIVATE KEY-----
 PEM;
 
+    private static ?OpenSSLAsymmetricKey $cachedPrivateKey = null;
+
+    private static ?string $cachedCredentialId = null;
+
+    private static ?string $cachedCredentialPublicKey = null;
+
     private readonly OpenSSLAsymmetricKey $privateKey;
 
     private readonly string $credentialId;
@@ -38,24 +44,30 @@ PEM;
      */
     public function __construct()
     {
-        $privateKey = openssl_pkey_get_private(self::PRIVATE_KEY);
+        if (self::$cachedPrivateKey === null || self::$cachedCredentialId === null || self::$cachedCredentialPublicKey === null) {
+            $privateKey = openssl_pkey_get_private(self::PRIVATE_KEY);
 
-        if (! $privateKey instanceof OpenSSLAsymmetricKey) {
-            throw new RuntimeException('The WebAuthn test private key could not be loaded.');
+            if (! $privateKey instanceof OpenSSLAsymmetricKey) {
+                throw new RuntimeException('The WebAuthn test private key could not be loaded.');
+            }
+
+            $details = openssl_pkey_get_details($privateKey);
+            $ellipticCurve = is_array($details) ? ($details['ec'] ?? null) : null;
+            $x = is_array($ellipticCurve) ? ($ellipticCurve['x'] ?? null) : null;
+            $y = is_array($ellipticCurve) ? ($ellipticCurve['y'] ?? null) : null;
+
+            if (! is_string($x) || ! is_string($y) || strlen($x) !== 32 || strlen($y) !== 32) {
+                throw new RuntimeException('The WebAuthn test public key is invalid.');
+            }
+
+            self::$cachedPrivateKey = $privateKey;
+            self::$cachedCredentialId = hash('sha256', 'nvl-auth-webauthn-test-credential', true);
+            self::$cachedCredentialPublicKey = U2FPublicKey::convertToCoseKey("\x04".$x.$y);
         }
 
-        $details = openssl_pkey_get_details($privateKey);
-        $ellipticCurve = is_array($details) ? ($details['ec'] ?? null) : null;
-        $x = is_array($ellipticCurve) ? ($ellipticCurve['x'] ?? null) : null;
-        $y = is_array($ellipticCurve) ? ($ellipticCurve['y'] ?? null) : null;
-
-        if (! is_string($x) || ! is_string($y) || strlen($x) !== 32 || strlen($y) !== 32) {
-            throw new RuntimeException('The WebAuthn test public key is invalid.');
-        }
-
-        $this->privateKey = $privateKey;
-        $this->credentialId = hash('sha256', 'nvl-auth-webauthn-test-credential', true);
-        $this->credentialPublicKey = U2FPublicKey::convertToCoseKey("\x04".$x.$y);
+        $this->privateKey = self::$cachedPrivateKey;
+        $this->credentialId = self::$cachedCredentialId;
+        $this->credentialPublicKey = self::$cachedCredentialPublicKey;
     }
 
     /**

@@ -12,6 +12,7 @@ use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
+use Nvl\Auth\Support\SubjectReferences;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\IssuedRecentAuthentication;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -68,7 +69,7 @@ final readonly class AuthReauthentication
         $consumed = $this->proofs->consumeForFinalization($secret, AuthenticationDestination::Reauthentication, $context);
         $verification = $consumed['verification'];
         $evidence = $verification->evidence;
-        if ($evidence->subject != SubjectReference::fromAuthenticatable($subject)
+        if (! SubjectReferences::same($evidence->subject, SubjectReference::fromAuthenticatable($subject))
             || $evidence->method !== (isset($proof['password']) ? AuthenticationMethod::Password : (isset($proof['socialProof']) ? AuthenticationMethod::Social : AuthenticationMethod::Passkey))
             || $evidence->method === AuthenticationMethod::Passkey && ! in_array('user_verified', $evidence->factors, true)) {
             throw new AuthException('authentication_proof_invalid', 'The authentication proof does not match the subject.', 422);

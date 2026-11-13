@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\OwnerMembership;
@@ -15,40 +16,72 @@ use Nvl\Auth\Tests\OwnerScopeTestCase;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Ownership\Contracts\OwnerAccess;
+use Nvl\Ownership\Services\OwnerIdentityResolver;
 use Nvl\Ownership\Services\OwnershipRunner;
 use Nvl\Ownership\Tests\Fixtures\Actor;
 use Nvl\Ownership\Tests\Fixtures\Company;
+use Nvl\Ownership\Tests\Fixtures\OptsIntoAdoptedSchemaReuse;
 use Nvl\Support\Ownership\Contracts\OwnershipContext;
 use Nvl\Support\Ownership\Enums\OwnershipContextMode;
+use Nvl\Support\Ownership\ValueObjects\OwnerReference;
 
-uses(OwnerScopeTestCase::class);
+uses(OwnerScopeTestCase::class, OptsIntoAdoptedSchemaReuse::class);
 
 beforeEach(function (): void {
     config(['nvl-auth.features.registration.enabled' => true, 'nvl-auth.features.registration.settings.mode' => 'invitation_only']);
 });
 
-it('accepts an owner invitation only for its verified recipient and canonical role grants', function (): void {
+it('accepts the verified recipient and canonical role grants in only the issuing owner', function (): void {
     $inviter = User::factory()->create();
     $recipient = User::factory()->create();
     $outsider = User::factory()->create();
-    $issued = app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), function () use ($inviter, $recipient) {
+    $company = Company::query()->findOrFail(7);
+    $foreign = Company::query()->findOrFail(8);
+    $resolver = app(OwnerIdentityResolver::class);
+    $owner = $resolver->reference($company);
+    $otherOwner = $resolver->reference($foreign);
+    $actor = Actor::query()->findOrFail(1);
+    $runner = app(OwnershipRunner::class);
+    $issued = $runner->run($company, $actor, function () use ($inviter, $recipient) {
         app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'invitation'), SubjectReference::fromAuthenticatable($inviter));
         $role = app(AuthRoles::class)->create($inviter, ['name' => 'invited-editor']);
 
         return app(AuthInvitations::class)->create(['recipient' => $recipient->email, 'roles' => [$role->id]], $inviter);
     });
+    $other = $runner->run($foreign, $actor, function () use ($inviter, $recipient) {
+        app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'other-invitation'), SubjectReference::fromAuthenticatable($inviter));
+
+        return app(AuthInvitations::class)->create(['recipient' => $recipient->email], $inviter);
+    });
     $this->app->bind(OwnerAccess::class, AuthOwnerAccess::class);
-    expect(app(AuthInvitations::class)->preview($issued['token'])->recipient)->toBe($recipient->email);
+    $preview = app(AuthInvitations::class)->preview($issued['token']);
+    $otherPreview = app(AuthInvitations::class)->preview($other['token']);
+    expect($preview->recipient)->toBe($recipient->email)
+        ->and($issued['invitation']->owner_scope_key)->toBe($owner->scopeKey())
+        ->and($other['invitation']->owner_scope_key)->toBe($otherOwner->scopeKey())
+        ->and(OwnerReference::fromJson($preview->owner_reference)->scopeKey())->toBe($owner->scopeKey())
+        ->and(OwnerReference::fromJson($otherPreview->owner_reference)->scopeKey())->toBe($otherOwner->scopeKey())
+        ->and(fn () => app(AuthInvitations::class)->preview('wrong-token'))->toThrow(AuthException::class);
     expect(fn () => app(AuthInvitations::class)->accept($issued['token'], $outsider))->toThrow(AuthException::class);
+    $invitation = $issued['invitation'];
+    $persisted = $invitation->getConnection()->table($invitation->getTable())
+        ->where($invitation->getKeyName(), $invitation->getKey())->sole(['accepted_at']);
+    expect($persisted->accepted_at)->toBeNull();
     $accepted = app(AuthInvitations::class)->accept($issued['token'], $recipient);
     expect($accepted->accepted_by_id)->toBe($recipient->id)
+        ->and($accepted->accepted_at)->not->toBeNull()
         ->and(fn () => app(AuthInvitations::class)->accept($issued['token'], $recipient))->toThrow(AuthException::class)
         ->and(app(OwnershipContext::class)->snapshot()->mode)->toBe(OwnershipContextMode::Unresolved);
-    app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), $recipient, function () use ($recipient): void {
+    $runner->run($company, $recipient, function () use ($recipient): void {
         expect($recipient->fresh()->hasRole('invited-editor'))->toBeTrue()
             ->and(OwnerMembership::query()->where('subject_id', $recipient->id)->count())->toBe(1);
     });
-    expect(fn () => app(OwnershipRunner::class)->run(Company::query()->findOrFail(8), $recipient, static fn () => true))->toThrow(AuthException::class);
+    expect(DB::table('nvl_auth_owner_memberships')->where('owner_scope_key', $otherOwner->scopeKey())
+        ->where('subject_id', $recipient->id)->exists())->toBeFalse()
+        ->and(fn () => $runner->run($foreign, $recipient, static fn () => true))->toThrow(AuthException::class);
+
+    $runner->run($foreign, $inviter, fn () => $other['invitation']->forceFill(['revoked_at' => now()])->save());
+    expect(fn () => app(AuthInvitations::class)->preview($other['token']))->toThrow(AuthException::class);
 });
 
 it('registers an invited new identity atomically and rejects replay', function (): void {

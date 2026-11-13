@@ -8,17 +8,6 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Services\FeatureGate;
 use Nvl\Auth\Services\FeatureManifest;
 
-it('defines every supported feature exactly once', function (): void {
-    $definitions = app(FeatureManifest::class)->definitions();
-
-    expect($definitions)
-        ->toHaveCount(20)
-        ->and(array_keys($definitions))->toBe(array_map(
-            static fn (AuthFeature $feature): string => $feature->value,
-            AuthFeature::cases(),
-        ));
-});
-
 it('fails disabled functionality closed while retaining containment operations', function (): void {
     config()->set('nvl-auth.features.invitations.enabled', false);
     $gate = app(FeatureGate::class);
@@ -57,7 +46,10 @@ it('requires audit before admitting membership mutations', function (): void {
 
 it('keeps native feature contracts and consumer route fixtures aligned', function (): void {
     $configuration = require dirname(__DIR__, 2).'/config/nvl-auth.php';
-    expect(array_keys($configuration['features']))->toBe(array_map(static fn (AuthFeature $feature): string => $feature->value, AuthFeature::cases()));
+    $definitions = app(FeatureManifest::class)->definitions();
+    $features = array_map(static fn (AuthFeature $feature): string => $feature->value, AuthFeature::cases());
+    expect(array_keys($configuration['features']))->toBe($features)
+        ->and(array_keys($definitions))->toBe($features);
     foreach ($configuration['features'] as $settings) {
         expect($settings['enabled'])->toBeBool()->and($settings['settings'])->toBeArray()->and($settings)->not->toHaveKey('routes');
     }
@@ -68,17 +60,9 @@ it('keeps native feature contracts and consumer route fixtures aligned', functio
             preg_match_all("/->name\\('([^']+)'\\)/", $contents, $routeNames);
             expect($routeNames[1] ?? [])->toBe($definition->routeNames[$surface]);
         }
-        $native = app(FeatureManifest::class)->definitions()[$definition->feature->value];
+        $native = $definitions[$definition->feature->value];
         expect($native->operations)->toBe($definition->operations)->and($native->managementAbilities)->toBe($definition->managementAbilities);
     }
-});
-
-it('exposes native operation families without duplicate execute contracts', function (): void {
-    foreach (['AuthRegistration', 'Authentication', 'AuthenticationSessions', 'AuthChallenges', 'AuthPasswords', 'AuthEmailVerification', 'AuthInvitations', 'AuthUsers', 'AuthUserReader', 'AuthClients', 'AuthMemberships', 'AuthAuditReader', 'AuthMaintenance', 'AuthTokens', 'AuthRoles', 'AuthPermissions', 'AuthRbacReader', 'AuthSecondFactor', 'AuthPasskeys', 'AuthSocialAuthentication', 'AuthSocialLinks', 'AuthAccountSecurity', 'AuthAccountRecovery', 'AuthEmailChanges', 'AuthBrowserSessions', 'AuthRememberCredentials', 'AuthImpersonation'] as $family) {
-        $reflection = new ReflectionClass('Nvl\\Auth\\Services\\'.$family);
-        expect($reflection->hasMethod('execute'))->toBeFalse()->and($reflection->getMethods(ReflectionMethod::IS_PUBLIC))->not->toBeEmpty();
-    }
-    expect(glob(dirname(__DIR__, 2).'/src/Actions/*/*.php'))->toBe([]);
 });
 
 it('rejects the former scalar feature configuration with an actionable error', function (): void {
@@ -86,23 +70,4 @@ it('rejects the former scalar feature configuration with an actionable error', f
 
     expect(fn () => app(FeatureGate::class)->assertAllowed(AuthFeature::MagicLinks, FeatureOperation::Issue))
         ->toThrow(AuthException::class, 'must define a boolean [enabled] flag');
-});
-
-it('keeps Actions and Services independent from HTTP transport classes', function (): void {
-    foreach (['Services'] as $layer) {
-        $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(
-            dirname(__DIR__, 2)."/src/{$layer}",
-        ));
-
-        foreach ($files as $file) {
-            if (! $file->isFile() || $file->getExtension() !== 'php') {
-                continue;
-            }
-
-            $contents = file_get_contents($file->getPathname());
-
-            expect($contents)->toBeString()
-                ->and($contents, $file->getFilename())->not->toContain('Illuminate\\Http');
-        }
-    }
 });

@@ -28,6 +28,7 @@ use Nvl\Auth\Events\AuthDeliveryRequested;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Support\AuthInstantCast;
+use Nvl\Auth\Support\SubjectReferences;
 use Nvl\Auth\Support\UniqueViolation;
 use Nvl\Auth\Traits\IssuesAuthenticationProofs;
 use Nvl\Auth\ValueObjects\AuthDeliveryRequest;
@@ -494,7 +495,7 @@ final readonly class AuthChallenges
         }
         $reference = new SubjectReference($snapshot->subject_type, $snapshot->subject_id);
         $subject = $this->subjects->resolve($reference);
-        if (! $subject instanceof Model || SubjectReference::fromAuthenticatable($subject) != $reference || $subject->getConnection() !== $snapshot->getConnection()) {
+        if (! $subject instanceof Model || ! SubjectReferences::same(SubjectReference::fromAuthenticatable($subject), $reference) || $subject->getConnection() !== $snapshot->getConnection()) {
             $this->recordNativeEmailFailure($method, $challengeId);
             throw new AuthException('challenge_invalid', 'The authentication challenge is invalid or expired.', 422);
         }

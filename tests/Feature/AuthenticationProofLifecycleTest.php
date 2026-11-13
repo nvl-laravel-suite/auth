@@ -133,6 +133,12 @@ it('spends one shared five-attempt factor budget and expires continuations exact
     config(['nvl-auth.features.totp.enabled' => true]);
     $user = $this->user();
     TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
+    $recoveryCode = null;
+    if ($mode === 'expiry') {
+        config(['nvl-auth.features.recovery_codes.enabled' => true]);
+        $grant = $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration);
+        $recoveryCode = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $grant->reveal(), context: $this->authenticationContext())->codes[0];
+    }
     $session = app('session.store');
     $guard = auth()->guard('web');
     $login = app(Authentication::class);
@@ -140,14 +146,17 @@ it('spends one shared five-attempt factor budget and expires continuations exact
     expect(fn () => $login->login(['identifier' => $user->email, 'password' => 'correct-password'], [], $guard, $session))->toThrow(AuthException::class, 'second factor');
     if ($mode === 'expiry') {
         $this->travel(300)->seconds();
-        expect(fn () => $login->completeSecondFactor(['code' => 'invalid'], $guard, $session))->toThrow(AuthException::class);
+        expect($login->hasPendingSecondFactor($session))->toBeFalse()
+            ->and(fn () => $login->completeSecondFactor(['recoveryCode' => $recoveryCode], $guard, $session))->toThrow(AuthException::class);
     } else {
         for ($attempt = 1; $attempt <= 5; $attempt++) {
             expect(fn () => $login->completeSecondFactor($attempt % 2 === 0 ? ['recoveryCode' => 'invalid'] : ['code' => 'invalid'], $guard, $session))->toThrow(AuthException::class);
         }
         expect(Challenge::query()->where('type', 'authentication_proof')->sole()->attempts)->toBe(5);
     }
-    expect($login->hasPendingSecondFactor($session))->toBeFalse()->and($guard->check())->toBeFalse();
+    expect($login->hasPendingSecondFactor($session))->toBeFalse()
+        ->and($guard->check())->toBeFalse()
+        ->and($user->fresh()->last_login_at)->toBeNull();
 })->with(['attempts', 'expiry']);
 
 it('does not disclose issued proof secrets through serialization or debugging', function (): void {

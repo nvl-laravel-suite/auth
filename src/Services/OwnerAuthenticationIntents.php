@@ -74,7 +74,7 @@ final readonly class OwnerAuthenticationIntents
             if (! is_string($row->expires_at) || ! is_string($row->owner_reference) || ! is_string($row->session_binding_hash)
                 || $row->consumed_at !== null || CarbonImmutable::parse($row->expires_at, 'UTC')->lessThanOrEqualTo(CarbonImmutable::now('UTC'))
                 || $row->purpose !== $purpose->value || $row->owner_scope_key !== $expectedOwner->scopeKey()
-                || OwnerReference::fromJson($row->owner_reference) != $expectedOwner
+                || OwnerReference::fromJson($row->owner_reference)->toArray() !== $expectedOwner->toArray()
                 || ! hash_equals($row->session_binding_hash, $this->hasher->hash('owner-authentication-session', $sessionBinding))
                 || $row->subject_type !== $subject?->type || $row->subject_id !== $subject?->identifier
                 || ! is_array($payload) || ($payload['provider'] ?? null) !== $provider || ($payload['generations'] ?? null) !== $this->installation->generations()) {

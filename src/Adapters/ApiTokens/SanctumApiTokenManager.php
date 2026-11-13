@@ -300,18 +300,16 @@ final class SanctumApiTokenManager implements ApiTokenManager, OwnerBoundApiToke
     }
 
     /**
-     * Compare the namespace prefix byte for byte: MySQL and MariaDB fold case in text comparisons,
-     * and a host column may carry a case-insensitive collation on PostgreSQL or SQLite.
+     * Compare the namespace prefix byte for byte even under a host case-insensitive collation.
      *
      * @return literal-string
      */
     private function managedNamePredicate(Connection $connection): string
     {
         return match ($connection->getDriverName()) {
-            'mysql', 'mariadb' => 'SUBSTR(name, 1, ?) = CAST(? AS BINARY)',
             'pgsql' => 'SUBSTR(name, 1, ?) = ? COLLATE "C"',
             'sqlite' => 'SUBSTR(name, 1, ?) = ? COLLATE BINARY',
-            default => 'SUBSTR(name, 1, ?) = ?',
+            default => throw AuthException::invalidConfiguration('Managed token namespace checks require SQLite or PostgreSQL.'),
         };
     }
 

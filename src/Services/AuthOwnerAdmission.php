@@ -52,7 +52,7 @@ final readonly class AuthOwnerAdmission
         $this->readiness->assertActive('auth.tokens');
         $tokens = $this->container->get(ApiTokenManager::class);
         $id = $token instanceof Model ? $token->getKey() : null;
-        if (! is_string($id) && ! is_int($id) || ! $tokens instanceof OwnerBoundApiTokenManager || $tokens->ownerForToken($principal, (string) $id) != $owner) {
+        if (! is_string($id) && ! is_int($id) || ! $tokens instanceof OwnerBoundApiTokenManager || $tokens->ownerForToken($principal, (string) $id)?->toArray() !== $owner->toArray()) {
             throw new AuthException('owner_token_invalid', 'The access token is unavailable for this owner.', 403);
         }
     }

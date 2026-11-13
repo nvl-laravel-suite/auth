@@ -14,6 +14,8 @@ use Nvl\Ownership\Tests\Fixtures\Actor;
 /** Host fixture for retained isolation and protocol scenarios on native ownership. */
 abstract class NativeOwnerScenarioTestCase extends OwnerScopeTestCase
 {
+    private static ?string $defaultPasswordHash = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -31,6 +33,8 @@ abstract class NativeOwnerScenarioTestCase extends OwnerScopeTestCase
 
     protected function user(string $email = 'user@example.test'): TestUser
     {
-        return TestUser::query()->create(['name' => 'Test user', 'email' => $email, 'password' => 'correct-password']);
+        self::$defaultPasswordHash ??= password_hash('correct-password', PASSWORD_BCRYPT, ['cost' => 4]);
+
+        return TestUser::query()->create(['name' => 'Test user', 'email' => $email, 'password' => self::$defaultPasswordHash]);
     }
 }

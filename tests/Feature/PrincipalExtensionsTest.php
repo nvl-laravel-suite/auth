@@ -23,11 +23,6 @@ use Nvl\Auth\Tests\Fixtures\TestPrincipalExtensionMapper;
 
 beforeEach(function (): void {
     expect(DB::transactionLevel())->toBe(0);
-    Schema::table(AuthTables::Users, function (Blueprint $table): void {
-        $table->string('job_title')->nullable();
-        $table->string('phone')->nullable();
-        $table->string('unfillable')->nullable();
-    });
     config()->set('nvl-auth.features.principal_management.models.user', ExtensionPrincipal::class);
     config()->set('auth.providers.users.model', ExtensionPrincipal::class);
     config()->set('nvl-auth.features.principal_management.services.extension_mapper', TestPrincipalExtensionMapper::class);
@@ -35,7 +30,17 @@ beforeEach(function (): void {
     app()->forgetInstance(PrincipalExtensionMapper::class);
 });
 
+function installPrincipalExtensionColumns(): void
+{
+    Schema::table(AuthTables::Users, static function (Blueprint $table): void {
+        $table->string('job_title')->nullable();
+        $table->string('phone')->nullable();
+        $table->string('unfillable')->nullable();
+    });
+}
+
 it('persists bounded host fields through complete management and sparse profile operations', function (): void {
+    installPrincipalExtensionColumns();
     $actor = $this->user();
     $user = app(AuthUsers::class)->create($actor, ['name' => 'Host', 'email' => 'host@example.test', 'password' => 'SecurePassword123', 'extensions' => ['jobTitle' => 'Engineer', 'phone' => '123']]);
     expect($user)->toBeInstanceOf(ExtensionPrincipal::class)
@@ -125,6 +130,7 @@ it('enforces fillable and overlap checks even with global unguarding', function 
 });
 
 it('rolls back native principal changes and emits no success when mapping fails', function (): void {
+    installPrincipalExtensionColumns();
     $actor = $this->user();
     Event::fake([PrincipalChanged::class]);
     $audits = AuthAudit::query()->count();
@@ -137,6 +143,7 @@ it('rolls back native principal changes and emits no success when mapping fails'
 });
 
 it('maps invited principal extensions inside the native acceptance transaction', function (): void {
+    installPrincipalExtensionColumns();
     config()->set('nvl-auth.features.invitations.enabled', true);
     config(['nvl-auth.features.registration.enabled' => true, 'nvl-auth.features.registration.settings.mode' => 'invitation_only']);
     $actor = $this->user();

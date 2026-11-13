@@ -27,7 +27,7 @@ use Symfony\Component\Process\Process;
 uses(OwnerScopeTestCase::class);
 
 it('serializes competing native last-owner removals on independent connections', function (): void {
-    if (! in_array(getenv('NVL_OWNERSHIP_TEST_DRIVER'), ['pgsql', 'mysql', 'mariadb'], true) || ! function_exists('pcntl_fork')) {
+    if (getenv('NVL_OWNERSHIP_TEST_DRIVER') !== 'pgsql' || ! function_exists('pcntl_fork')) {
         $this->markTestSkipped('Requires dedicated native sources and independent forked connections.');
     }
     $authority = new SystemMutationContext('race', 'native-last-owner');
@@ -46,7 +46,7 @@ it('serializes competing native last-owner removals on independent connections',
 });
 
 it('rechecks native membership before command restoration in a separate worker process', function (): void {
-    if (! in_array(getenv('NVL_OWNERSHIP_TEST_DRIVER'), ['pgsql', 'mysql', 'mariadb'], true)) {
+    if (getenv('NVL_OWNERSHIP_TEST_DRIVER') !== 'pgsql') {
         $this->markTestSkipped('Requires explicitly dedicated native persistence sources.');
     }
     QueueScenario::install();
@@ -67,7 +67,7 @@ it('rechecks native membership before command restoration in a separate worker p
         });
     }
     app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), $admin, fn () => app(AuthMemberships::class)->setStatus($admin, $memberships[7], MembershipStatus::Revoked, 1));
-    $process = new Process([PHP_BINARY, __DIR__.'/../Fixtures/Ownership/worker.php', json_encode(NativeDatabaseSource::capture(DB::connection('sqlite')), JSON_THROW_ON_ERROR)], timeout: 40);
+    $process = new Process([PHP_BINARY, '-d', 'opcache.enable_cli=1', __DIR__.'/../Fixtures/Ownership/worker.php', json_encode(NativeDatabaseSource::capture(DB::connection('sqlite')), JSON_THROW_ON_ERROR)], timeout: 40);
     $process->mustRun();
     expect($process->getOutput())->toBe('auth-worker-complete')
         ->and(DB::table('jobs')->count())->toBe(0)

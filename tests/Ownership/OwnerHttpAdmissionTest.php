@@ -12,8 +12,9 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Ownership\Services\OwnershipRunner;
 use Nvl\Ownership\Tests\Fixtures\Actor;
 use Nvl\Ownership\Tests\Fixtures\Company;
+use Nvl\Ownership\Tests\Fixtures\OptsIntoAdoptedSchemaReuse;
 
-uses(OwnerScopeTestCase::class);
+uses(OwnerScopeTestCase::class, OptsIntoAdoptedSchemaReuse::class);
 
 it('requires authenticated fresh owner admission on HTTP without inferring ownership from input', function (): void {
     Route::get('/native-owner-probe', static fn () => response()->json(['admitted' => true]))->middleware(EnsureAuthOwnerAccess::class);

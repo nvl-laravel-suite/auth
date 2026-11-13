@@ -82,7 +82,7 @@ final readonly class PrincipalEmailIdentityAdoption
         return ['missing' => $missing, 'collisions' => $collisions, 'pending' => $pending];
     }
 
-    /** Data commits before separately inspected DDL; MySQL DDL is never claimed rollbackable.
+    /** Data commits before separately inspected DDL.
      * Host-owned schema receives authorized data only and must finalize independently.
      *
      * @return array{updated: int, finalized: bool}

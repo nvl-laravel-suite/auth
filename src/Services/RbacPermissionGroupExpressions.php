@@ -6,9 +6,7 @@ namespace Nvl\Auth\Services;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Expression;
-use Illuminate\Database\Query\Grammars\MySqlGrammar;
 use Illuminate\Database\Query\Grammars\PostgresGrammar;
-use Illuminate\Database\Query\Grammars\SqlServerGrammar;
 use Nvl\Auth\Models\Permission;
 
 /**
@@ -61,14 +59,6 @@ final class RbacPermissionGroupExpressions
     {
         $grammar = $query->getQuery()->getGrammar();
 
-        if ($grammar instanceof MySqlGrammar) {
-            return "TRIM(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(`group`, ''), CHAR(9), ''), CHAR(10), ''), CHAR(11), ''), CHAR(13), ''))";
-        }
-
-        if ($grammar instanceof SqlServerGrammar) {
-            return "LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE([group], ''), CHAR(9), ''), CHAR(10), ''), CHAR(11), ''), CHAR(13), '')))";
-        }
-
         if ($grammar instanceof PostgresGrammar) {
             return "BTRIM(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(\"group\", ''), CHR(9), ''), CHR(10), ''), CHR(11), ''), CHR(13), ''))";
         }
@@ -97,18 +87,7 @@ final class RbacPermissionGroupExpressions
      */
     private function selectedSql(Builder $query): string
     {
-        $grammar = $query->getQuery()->getGrammar();
-        $normalized = $this->normalizedSql($query);
-
-        if ($grammar instanceof MySqlGrammar) {
-            return "{$normalized} AS `normalized_group`";
-        }
-
-        if ($grammar instanceof SqlServerGrammar) {
-            return "{$normalized} AS [normalized_group]";
-        }
-
-        return "{$normalized} AS \"normalized_group\"";
+        return "{$this->normalizedSql($query)} AS \"normalized_group\"";
     }
 
     public static function normalize(?string $group): ?string

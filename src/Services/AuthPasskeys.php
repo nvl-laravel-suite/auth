@@ -24,6 +24,7 @@ use Nvl\Auth\Events\AccountSecurityChanged;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\Passkey;
+use Nvl\Auth\Support\SubjectReferences;
 use Nvl\Auth\Support\UniqueViolation;
 use Nvl\Auth\Traits\IssuesAuthenticationProofs;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
@@ -173,7 +174,7 @@ final readonly class AuthPasskeys
                 throw new AuthException('passkey_invalid', 'The passkey credential is unavailable.', 422);
             }
             $principal = $this->subjects->resolve(new SubjectReference($candidate->subject_type, $candidate->subject_id));
-            if ($principal === null || SubjectReference::fromAuthenticatable($principal) != new SubjectReference($candidate->subject_type, $candidate->subject_id)) {
+            if ($principal === null || ! SubjectReferences::same(SubjectReference::fromAuthenticatable($principal), new SubjectReference($candidate->subject_type, $candidate->subject_id))) {
                 throw new AuthException('passkey_invalid', 'The passkey credential is unavailable.', 422);
             }
             $revision = $this->security->revisionSnapshot($principal);

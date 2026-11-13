@@ -1,6 +1,6 @@
 # Schema
 
-NVL Auth owns a possible inventory of 17 UUID-first tables. Both package
+NVL Auth owns a possible inventory of 22 core and account UUID-first tables (plus 3 optional native ownership tables). Package
 migrations are idempotent and create only the tables required by features
 enabled at migration time. Route switches never affect schema selection.
 

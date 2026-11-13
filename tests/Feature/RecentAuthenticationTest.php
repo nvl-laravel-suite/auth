@@ -53,7 +53,12 @@ it('keeps independently spent recovery proof spent when the sensitive mutation r
     TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
     $recovery = RecoveryCode::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass(), 'code_hash' => app(SecretHasher::class)->hash('recovery-code', 'ONCE-ONLY')]);
     $context = $this->authenticationContext();
-    $grant = app(AuthReauthentication::class)->confirm($user, ['password' => 'correct-password', 'recoveryCode' => 'ONCE-ONLY'], RecentAuthenticationPurpose::PasswordChange, $context);
+    $confirm = fn () => app(AuthReauthentication::class)->confirm($user, ['password' => 'correct-password', 'recoveryCode' => 'ONCE-ONLY'], RecentAuthenticationPurpose::PasswordChange, $context);
+    expect(fn () => $user->getConnection()->transaction($confirm))
+        ->toThrow(AuthException::class, 'enclosing source transaction');
+    expect($recovery->refresh()->used_at)->toBeNull();
+
+    $grant = $confirm();
     $data = ['password' => 'replacement-password', 'passwordConfirmation' => 'replacement-password'];
     expect(fn () => $user->getConnection()->transaction(function () use ($user, $grant, $context, $data): void {
         app(AuthPasswords::class)->update($user, $data, $grant->reveal(), $context);
@@ -64,15 +69,6 @@ it('keeps independently spent recovery proof spent when the sensitive mutation r
     app(AuthPasswords::class)->update($user, $data, $grant->reveal(), $context);
     expect(password_verify('replacement-password', $user->fresh()->getAuthPassword()))->toBeTrue();
     expect(fn () => app(AuthPasswords::class)->update($user, $data, $grant->reveal(), $context))->toThrow(AuthException::class);
-});
-
-it('rejects nested confirmation before spending a recovery proof', function (): void {
-    config(['nvl-auth.features.totp.enabled' => true, 'nvl-auth.features.recovery_codes.enabled' => true]);
-    $user = $this->user();
-    $recovery = RecoveryCode::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass(), 'code_hash' => app(SecretHasher::class)->hash('recovery-code', 'UNSPENT')]);
-    expect(fn () => $user->getConnection()->transaction(fn () => app(AuthReauthentication::class)->confirm($user, ['password' => 'correct-password', 'recoveryCode' => 'UNSPENT'], RecentAuthenticationPurpose::PasswordChange, $this->authenticationContext())))
-        ->toThrow(AuthException::class, 'enclosing source transaction');
-    expect($recovery->refresh()->used_at)->toBeNull();
 });
 
 it('confirms a passwordless principal with a destination-bound verified UV passkey', function (): void {

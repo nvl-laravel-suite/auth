@@ -18,6 +18,7 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\RememberCredential;
 use Nvl\Auth\Support\AuthInstantCast;
+use Nvl\Auth\Support\SubjectReferences;
 use Nvl\Auth\ValueObjects\AuthenticationEvidence;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthenticationVerification;
@@ -166,7 +167,7 @@ final readonly class AuthenticationProofs
         } catch (AuthorizationException $exception) {
             throw new AuthException('subject_unavailable', 'The authenticated subject is unavailable.', 404, previous: $exception);
         }
-        if (! $subject instanceof Model || SubjectReference::fromAuthenticatable($subject) != $evidence->subject
+        if (! $subject instanceof Model || ! SubjectReferences::same(SubjectReference::fromAuthenticatable($subject), $evidence->subject)
             || $subject->getConnection() !== (new Challenge)->getConnection()
             || $this->security->lock($subject)->revision !== $evidence->revision
             || $evidence->method === AuthenticationMethod::Password && ! $verification->matchesPasswordBinding($this->hasher->hash('native-password-proof', $subject->getAuthPassword()))) {
@@ -249,7 +250,7 @@ final readonly class AuthenticationProofs
         }
         $reference = new SubjectReference($challenge->subject_type, $challenge->subject_id);
         $subject = $this->subjects->resolve($reference);
-        if (! $subject instanceof Model || SubjectReference::fromAuthenticatable($subject) != $reference || $subject->getConnection() !== $challenge->getConnection()) {
+        if (! $subject instanceof Model || ! SubjectReferences::same(SubjectReference::fromAuthenticatable($subject), $reference) || $subject->getConnection() !== $challenge->getConnection()) {
             throw $this->invalid();
         }
 

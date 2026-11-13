@@ -19,7 +19,7 @@ abstract class TestCase extends AuthTestCase
     /** Rebuild instead of reusing a schema that another test migrated with different configuration. */
     protected function beforeRefreshingDatabase(): void
     {
-        if (self::$migratedConfiguration !== $this->migrationConfiguration()) {
+        if (self::$migratedConfiguration !== $this->migrationConfiguration() || in_array('fresh-schema', $this->groups(), true)) {
             RefreshDatabaseState::$migrated = false;
         }
     }

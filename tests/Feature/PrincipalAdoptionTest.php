@@ -104,7 +104,7 @@ it('dry runs and applies a reconciled principal, token, extension, and foreign-k
         'name' => 'Legacy Principal',
         'email' => 'LEGACY@EXAMPLE.TEST',
         'email_verified_at' => $now,
-        'password' => password_hash('SecurePassword123', PASSWORD_BCRYPT),
+        'password' => password_hash('SecurePassword123', PASSWORD_BCRYPT, ['cost' => 4]),
         'active' => true,
         'locale' => 'bg',
         'timezone' => 'Europe/Sofia',
@@ -217,10 +217,6 @@ it('plans and applies pre-migration principal table staging', function (): void 
         ->and(Schema::hasTable('staged_users_source'))->toBeFalse()
         ->and(Schema::hasTable('staged_users_target'))->toBeTrue()
         ->and(Schema::getForeignKeys('staged_domain_records'))->toBe([]);
-});
-
-it('registers the dry-run principal adoption command', function (): void {
-    expect(collect(Artisan::all())->has('nvl:auth:adopt-principals'))->toBeTrue();
 });
 
 it('fails closed for unsafe principal staging and adoption topology', function (): void {

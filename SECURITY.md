@@ -5,7 +5,7 @@ Submit reports through [this package's private vulnerability reporting form](htt
 Report vulnerabilities privately to the package maintainers. Do not open a
 public issue containing secrets, exploit details, or affected production data.
 
-This source targets the NVL Light `7.x` family, PHP `^8.4` and Laravel `^13.0`, as declared in Composer. Source changes and focused checks do not establish release certification. Production MySQL/PostgreSQL concurrency, Redis driver and clean distribution rehearsals require their own recorded release evidence; they were not rerun as part of the final focused implementation pass. No broader framework or database compatibility is implied.
+This source targets the NVL Light `7.x` family, PHP `^8.4` and Laravel `^13.0`, as declared in Composer. Source changes and focused checks do not establish release certification. Production PostgreSQL concurrency, Redis driver and clean distribution rehearsals require their own recorded release evidence; they were not rerun as part of the final focused implementation pass. No broader framework or database compatibility is implied.
 
 Security-sensitive design rules:
 

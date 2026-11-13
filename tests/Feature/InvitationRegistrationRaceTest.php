@@ -72,7 +72,7 @@ it('rejects a competing committed mailbox insert during invitation registration'
     } finally {
         unlink($gate);
     }
-})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/PostgreSQL.');
+})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires PostgreSQL.');
 
 it('rejects a cached recently-created principal returned without an in-operation creation receipt', function (): void {
     config(['nvl-auth.features.invitations.enabled' => true]);

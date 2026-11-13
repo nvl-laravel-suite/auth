@@ -152,7 +152,7 @@ Atomic password reset requires an Eloquent principal and Laravel's database toke
 
 Native password changes/resets, administrative credential reset, TOTP enrollment/restart/revocation, recovery replacement/revocation, passkey enrollment/revocation, new social links/revocation, email changes and principal disable/delete/restore advance a central monotonic revision. Initial principal creation starts at 1. Ordinary profile changes and idempotent revocations do not advance it. Revision, credentials, native challenge invalidation and committed facts obey enclosing transaction rollback. Consumers never submit a revision as proof or mutate this internal store.
 
-Mutations lock canonical principals in stable order, their security states, native challenges, then credentials. Passkey provider verification runs before these locks and the final write revalidates the stored ceremony, credential and revision. Both MySQL and PostgreSQL use current locking reads for unique state creation/reload.
+Mutations lock canonical principals in stable order, their security states, native challenges, then credentials. Passkey provider verification runs before these locks and the final write revalidates the stored ceremony, credential and revision. PostgreSQL uses current locking reads for unique state creation and reload.
 
 Current invalidation covers subject-bound `passkey_authentication`, `passkey_registration` and `credential_second_factor` challenges across owners. Generic magic-link/security-code business purposes retain their own lifecycle; they are not current-revision native authentication proofs. Remember tokens rotate on security changes. Password mutations revoke every package-managed API token across native owners while preserving unrelated token namespaces.
 

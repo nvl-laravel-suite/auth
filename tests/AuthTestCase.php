@@ -6,6 +6,7 @@ namespace Nvl\Auth\Tests;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Timebox;
 use Laravel\Sanctum\SanctumServiceProvider;
 use Nvl\Auth\Contracts\AuthManagementAccess;
 use Nvl\Auth\Contracts\AuthSubjectResolver;
@@ -14,7 +15,6 @@ use Nvl\Auth\Enums\RecentAuthenticationPurpose;
 use Nvl\Auth\Models\SocialIdentity;
 use Nvl\Auth\Models\TotpCredential;
 use Nvl\Auth\Providers\AuthServiceProvider;
-use Nvl\Auth\Services\AuthConfiguration;
 use Nvl\Auth\Services\AuthReauthentication;
 use Nvl\Auth\Services\AuthSocialAuthentication;
 use Nvl\Auth\Services\SecretHasher;
@@ -30,7 +30,6 @@ use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Providers\LocaleServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use PragmaRX\Google2FA\Google2FA;
-use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\PermissionServiceProvider;
 
 /**
@@ -38,6 +37,8 @@ use Spatie\Permission\PermissionServiceProvider;
  */
 abstract class AuthTestCase extends Orchestra
 {
+    private static ?string $defaultPasswordHash = null;
+
     /**
      * Register package integration providers.
      *
@@ -60,6 +61,8 @@ abstract class AuthTestCase extends Orchestra
      */
     protected function defineEnvironment($app): void
     {
+        $app['config']->set('hashing.bcrypt.rounds', 4);
+        $app['config']->set('auth.timebox_duration', 0);
         $app['config']->set('app.name', 'NVL Auth Test');
         $app['config']->set('app.url', 'https://auth-package.test');
         $app['config']->set('app.key', 'base64:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=');
@@ -69,6 +72,9 @@ abstract class AuthTestCase extends Orchestra
         $app['config']->set('auth.providers.users', ['driver' => 'eloquent', 'model' => TestUser::class]);
         $app['config']->set('auth.passwords.users', ['provider' => 'users', 'table' => 'nvl_auth_password_reset_tokens', 'expire' => 60, 'throttle' => 0]);
         $app['config']->set('nvl-auth.features.principal_management.models.user', TestUser::class);
+        $app['config']->set('nvl-auth.adoption.principal_model', ['enabled' => true, 'guard' => 'web', 'provider' => 'users']);
+        $app['config']->set('nvl-auth.adoption.password_broker', ['enabled' => true, 'broker' => 'users']);
+        $app['config']->set('nvl-auth.adoption.spatie_storage.enabled', true);
 
         $app['config']->set('nvl-auth.migrations.install_all', true);
         $app['config']->set('nvl-auth.features.rbac.enabled', true);
@@ -87,14 +93,11 @@ abstract class AuthTestCase extends Orchestra
     protected function setUp(): void
     {
         parent::setUp();
-        config([
-            'nvl-auth.adoption.principal_model' => ['enabled' => true, 'guard' => 'web', 'provider' => 'users'],
-            'nvl-auth.adoption.password_broker' => ['enabled' => true, 'broker' => 'users'],
-            'nvl-auth.adoption.spatie_storage.enabled' => true,
-        ]);
-        (new AuthServiceProvider($this->app))->boot($this->app->make(AuthConfiguration::class));
-        $this->app->make(PermissionRegistrar::class);
 
+        $this->app->bind(Timebox::class, static fn (): Timebox => new class extends Timebox
+        {
+            protected function usleep(int $microseconds): void {}
+        });
         $this->app->singleton(AuthManagementAccess::class, AllowAllManagementAccess::class);
         $this->app->singleton(AuthSubjectResolver::class, TestSubjectResolver::class);
         $this->app->singleton(SystemMutationAccess::class, AllowAllSystemMutationAccess::class);
@@ -154,10 +157,12 @@ abstract class AuthTestCase extends Orchestra
      */
     protected function user(string $email = 'user@example.test'): TestUser
     {
+        self::$defaultPasswordHash ??= password_hash('correct-password', PASSWORD_BCRYPT, ['cost' => 4]);
+
         return TestUser::query()->create([
             'name' => 'Test User',
             'email' => $email,
-            'password' => 'correct-password',
+            'password' => self::$defaultPasswordHash,
         ]);
     }
 }

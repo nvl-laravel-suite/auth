@@ -40,7 +40,7 @@ final readonly class AuthOwnerContextParticipant implements OwnershipContextPart
                 throw AuthException::invalidConfiguration('RBAC permission cache requires an explicit namespace.');
             }
             $this->registrar()->cacheKey = $cache.'.'.($next->owner?->scopeKey() ?? 'central');
-            $this->registrar()->forgetCachedPermissions();
+            $this->registrar()->clearPermissionsCollection();
             $this->registrar()->setPermissionsTeamId($next->owner?->scopeKey() ?? ($next->mode === OwnershipContextMode::Central ? 'central' : null));
         } catch (Throwable $exception) {
             $this->registrar()->setPermissionsTeamId($previous);

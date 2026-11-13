@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests;
 
+use Closure;
 use Illuminate\Contracts\Foundation\MaintenanceMode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -51,6 +52,8 @@ abstract class OwnerScopeTestCase extends OwnershipTestCase
         parent::defineEnvironment($app);
         $app['config']->set([
             'app.key' => 'base64:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=',
+            'hashing.bcrypt.rounds' => 4,
+            'auth.timebox_duration' => 0,
             'nvl-auth.ownership.scoped' => true,
             'nvl-auth.adoption.spatie_storage.enabled' => true,
             'nvl-auth.adoption.principal_model' => ['enabled' => true, 'guard' => 'web', 'provider' => 'users'],
@@ -72,11 +75,17 @@ abstract class OwnerScopeTestCase extends OwnershipTestCase
     protected function setUp(): void
     {
         $this->originalMorphMap = Relation::morphMap();
-        parent::setUp();
-        foreach (glob(__DIR__.'/../database/migrations/*.php') ?: [] as $path) {
-            (require $path)->up();
+        if (in_array('sqlite-trigger-removal', $this->groups(), true)
+            && getenv('NVL_OWNERSHIP_TEST_DRIVER') === 'pgsql') {
+            $this->markTestSkipped('SQLite trigger-removal path; native writes and race tests cover PostgreSQL.');
         }
-        (require __DIR__.'/../../ownership/database/migrations/ownership/2026_10_18_000001_nvl_ownership_create_adoption_tables.php')->up();
+        parent::setUp();
+        if (! $this->hasRetainedOwnershipSchema()) {
+            foreach (glob(__DIR__.'/../database/migrations/*.php') ?: [] as $path) {
+                (require $path)->up();
+            }
+            (require __DIR__.'/../../ownership/database/migrations/ownership/2026_10_18_000001_nvl_ownership_create_adoption_tables.php')->up();
+        }
         $this->app->bind(AuthManagementAccess::class, AllowAllManagementAccess::class);
         $this->app->bind(SystemMutationAccess::class, AllowAllSystemMutationAccess::class);
         $this->app->bind(OwnershipAdoptionAccess::class, static fn () => new class implements OwnershipAdoptionAccess
@@ -85,6 +94,15 @@ abstract class OwnerScopeTestCase extends OwnershipTestCase
         });
         $this->app->instance(MaintenanceMode::class, new AuthTestMaintenanceMode);
         $this->app->make(MaintenanceMode::class)->activate([]);
+        if (! $this->hasRetainedOwnershipSchema()) {
+            $this->adoptSchema();
+        }
+        $this->app->make(MaintenanceMode::class)->deactivate();
+        $this->allowOwners();
+    }
+
+    private function adoptSchema(): void
+    {
         $coordinator = $this->app->make(OwnershipAdoptionCoordinator::class);
         $operation = new OwnershipOperation('auth-adopt', 'operator', '1');
         $plan = $coordinator->prepare(['auth'], $this->adoptionMappings(), $operation);
@@ -92,8 +110,6 @@ abstract class OwnerScopeTestCase extends OwnershipTestCase
         while (! $coordinator->backfill($plan, 100, $operation)) {
         }
         $coordinator->activate($plan, $operation);
-        $this->app->make(MaintenanceMode::class)->deactivate();
-        $this->allowOwners();
     }
 
     /** Supply reviewed legacy records before the first native preparation.
@@ -102,5 +118,18 @@ abstract class OwnerScopeTestCase extends OwnershipTestCase
     protected function adoptionMappings(): array
     {
         return [];
+    }
+
+    /** @param array<string, mixed> $overrides */
+    protected function withFixtureConfiguration(array $overrides, Closure $assertion): void
+    {
+        $configuration = $this->app->make('config');
+        $original = $configuration->getMany(array_keys($overrides));
+        $configuration->set($overrides);
+        try {
+            $assertion();
+        } finally {
+            $configuration->set($original);
+        }
     }
 }

@@ -27,15 +27,17 @@ final class UniqueViolation
     {
         $detail = $exception->errorInfo[2] ?? null;
         $message = is_string($detail) ? $detail : $exception->getMessage();
-        $qualified = $connection->getTablePrefix().$table;
+        [$schema, $logicalTable] = $connection->getSchemaBuilder()->parseSchemaAndTable($table);
+        $unqualified = $connection->getTablePrefix().$logicalTable;
+        $qualified = ($schema === null ? '' : $schema.'.').$unqualified;
         foreach ($connection->getSchemaBuilder()->getIndexes($table) as $index) {
             if (! $index['unique']) {
                 continue;
             }
             $columns = $index['columns'];
-            // SQLite names the columns ("UNIQUE constraint failed: table.a, table.b"); PostgreSQL, MySQL and MariaDB name the index.
-            $sqlite = 'UNIQUE constraint failed: '.implode(', ', array_map(static fn (string $column): string => "{$qualified}.{$column}", $columns));
-            $named = '/(?<![\w$.])(?:'.preg_quote($qualified, '/').'\.)?'.preg_quote($index['name'], '/').'(?![\w$])/';
+            // SQLite names the columns ("UNIQUE constraint failed: table.a, table.b"); PostgreSQL names the index.
+            $sqlite = 'UNIQUE constraint failed: '.implode(', ', array_map(static fn (string $column): string => "{$unqualified}.{$column}", $columns));
+            $named = '/(?<![\w$.])(?:'.preg_quote($qualified, '/').'\.|'.preg_quote($unqualified, '/').'\.)?'.preg_quote($index['name'], '/').'(?![\w$])/';
             if ($connection->getDriverName() === 'sqlite' ? $message === $sqlite : preg_match($named, $message) === 1) {
                 return $columns;
             }

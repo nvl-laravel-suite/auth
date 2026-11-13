@@ -44,6 +44,8 @@ abstract class DisabledAuthProviderTestCase extends Orchestra
     protected function defineEnvironment($app): void
     {
         Sanctum::usePersonalAccessTokenModel(HostPersonalAccessToken::class);
+        $app['config']->set('hashing.bcrypt.rounds', 4);
+        $app['config']->set('auth.timebox_duration', 0);
         $app['config']->set('nvl-auth.enabled', false);
         $app['config']->set('auth.defaults.guard', 'web');
         $app['config']->set('auth.defaults.passwords', 'users');

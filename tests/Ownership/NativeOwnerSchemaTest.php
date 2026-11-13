@@ -52,7 +52,7 @@ it('preserves pivot foreign keys and owner uniqueness when replacing primary key
         $name = AuthTables::get($logical);
         $indexes = $schema->getIndexes($name);
         $leading = array_values(array_filter($indexes, static fn (array $index): bool => ! $index['primary'] && $index['columns'][0] === $foreign));
-        if (in_array($role->getConnection()->getDriverName(), ['mysql', 'mariadb'], true) || $existingIndex) {
+        if ($existingIndex) {
             expect($leading)->toHaveCount(1);
         }
         expect(array_column($schema->getForeignKeys($name), 'columns'))->toContain([$foreign])

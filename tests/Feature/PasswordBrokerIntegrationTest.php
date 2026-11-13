@@ -86,33 +86,29 @@ it('rejects a token repository using a different actual connection', function ()
     Event::assertNotDispatched(AuthDeliveryRequested::class);
 });
 
-it('defers reset events and rolls back reset tokens with an enclosing transaction', function (): void {
+it('rolls back reset credentials and defers reset events until the enclosing transaction commits', function (): void {
     Event::fake([AuthDeliveryRequested::class, PasswordReset::class]);
     $user = $this->user('outer-reset@example.test');
     app(AuthPasswords::class)->requestReset(['identifier' => $user->email]);
     $event = Event::dispatched(AuthDeliveryRequested::class)->first()[0];
     $token = $event->request->payload['token'];
+    $reset = fn () => app(AuthPasswords::class)->reset(['identifier' => $user->email, 'token' => $token, 'password' => 'replacement-password', 'passwordConfirmation' => 'replacement-password']);
     $connection = $user->getConnection();
     $connection->beginTransaction();
-    app(AuthPasswords::class)->reset(['identifier' => $user->email, 'token' => $token, 'password' => 'replacement-password', 'passwordConfirmation' => 'replacement-password']);
-    Event::assertNotDispatched(PasswordReset::class);
-    $connection->rollBack();
+    try {
+        $reset();
+        Event::assertNotDispatched(PasswordReset::class);
+    } finally {
+        $connection->rollBack();
+    }
     expect(Hash::check('correct-password', $user->fresh()->password))->toBeTrue()
         ->and(app('auth.password')->broker()->getRepository()->exists($user, $token))->toBeTrue();
     Event::assertNotDispatched(PasswordReset::class);
-});
-
-it('emits the password reset event only after the enclosing transaction commits', function (): void {
-    Event::fake([AuthDeliveryRequested::class, PasswordReset::class]);
-    $user = $this->user('outer-commit-reset@example.test');
-    app(AuthPasswords::class)->requestReset(['identifier' => $user->email]);
-    $event = Event::dispatched(AuthDeliveryRequested::class)->first()[0];
-    $connection = $user->getConnection();
-    $connection->beginTransaction();
-    app(AuthPasswords::class)->reset(['identifier' => $user->email, 'token' => $event->request->payload['token'], 'password' => 'replacement-password', 'passwordConfirmation' => 'replacement-password']);
-    Event::assertNotDispatched(PasswordReset::class);
-    $connection->commit();
-    Event::assertDispatched(PasswordReset::class);
+    $connection->transaction(function () use ($reset): void {
+        $reset();
+        Event::assertNotDispatched(PasswordReset::class);
+    });
+    Event::assertDispatchedTimes(PasswordReset::class, 1);
 });
 
 it('delivers the reset expiry Laravel\'s password broker enforces', function (): void {

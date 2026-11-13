@@ -133,4 +133,4 @@ it('serializes verification behind a racing committed administrative email chang
     } finally {
         unlink($gate);
     }
-})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/PostgreSQL.');
+})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires PostgreSQL.');

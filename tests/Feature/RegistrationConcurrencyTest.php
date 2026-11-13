@@ -26,4 +26,4 @@ it('reserves exactly one canonical principal under concurrent duplicate signup',
         ->and(array_values(array_filter(array_column($results, 'code'))))->toBe(['registration_unavailable'])
         ->and(User::query()->where('email', 'race@example.test')->count())->toBe(1)
         ->and(AuthAudit::query()->where('action', 'registration.completed')->count())->toBe(1);
-})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed signup race requires MySQL/PostgreSQL.');
+})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed signup race requires PostgreSQL.');

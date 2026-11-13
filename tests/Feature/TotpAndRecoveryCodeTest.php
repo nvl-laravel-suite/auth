@@ -55,6 +55,9 @@ it('returns recovery codes once and consumes each hash once', function (): void 
 it('reads subject scoped totp lifecycle counts without decrypting secrets or changing state', function (): void {
     config()->set('nvl-auth.features.totp.enabled', true);
     $user = $this->user();
+    expect(app(AuthSecondFactor::class)->state($user))
+        ->toBe(['confirmedCredentials' => 0, 'pendingEnrollments' => 0, 'revokedCredentials' => 0]);
+
     $other = $this->user('other@example.test');
     TotpCredential::factory()->forSubject($user)->state(['subject_type' => $user->getMorphClass()])->create();
     TotpCredential::factory()->forSubject($user)->state(['subject_type' => $user->getMorphClass()])->create(['confirmed_at' => null]);
@@ -80,12 +83,6 @@ it('reads subject scoped totp lifecycle counts without decrypting secrets or cha
     $credentialQueries = array_values(array_filter($queries, static fn (string $query): bool => str_contains($query, (new TotpCredential)->getTable())));
     expect($credentialQueries)->toHaveCount(1)
         ->and($credentialQueries[0])->not->toContain('secret', 'select *');
-});
-
-it('returns empty totp security state for an unenrolled principal', function (): void {
-    config()->set('nvl-auth.features.totp.enabled', true);
-    expect(app(AuthSecondFactor::class)->state($this->user()))
-        ->toBe(['confirmedCredentials' => 0, 'pendingEnrollments' => 0, 'revokedCredentials' => 0]);
 });
 
 it('denies totp security state when its feature or dependency is disabled', function (string $key): void {

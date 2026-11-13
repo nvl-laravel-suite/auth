@@ -21,8 +21,9 @@ use Nvl\Ownership\Services\OwnerIdentityResolver;
 use Nvl\Ownership\Services\OwnershipRunner;
 use Nvl\Ownership\Tests\Fixtures\Actor;
 use Nvl\Ownership\Tests\Fixtures\Company;
+use Nvl\Ownership\Tests\Fixtures\OptsIntoAdoptedSchemaReuse;
 
-uses(OwnerScopeTestCase::class);
+uses(OwnerScopeTestCase::class, OptsIntoAdoptedSchemaReuse::class);
 
 it('keeps same named roles and permission assignments in their admitted native owner', function (): void {
     $user = User::factory()->create();
@@ -68,20 +69,19 @@ it('limits permission inverse users and counts to active members of the current 
     }
 });
 
-it('rejects unpartitioned and foreign-role pivot writes at the database boundary', function (): void {
+it('rejects unpartitioned pivots and cross-owner role links at the database boundary', function (): void {
     $user = User::factory()->create();
-    $role = app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), fn () => Role::query()->create(['name' => 'locked', 'guard_name' => 'web']));
-    $owner = app(OwnerIdentityResolver::class)->reference(Company::query()->findOrFail(8));
+    $runner = app(OwnershipRunner::class);
+    $actor = Actor::query()->findOrFail(1);
+    $foreign = Company::query()->findOrFail(8);
+    $parent = $runner->run(Company::query()->findOrFail(7), $actor, fn () => Role::query()->create(['name' => 'parent', 'guard_name' => 'web']));
+    $child = $runner->run($foreign, $actor, fn () => Role::query()->create(['name' => 'child', 'guard_name' => 'web']));
+    $owner = app(OwnerIdentityResolver::class)->reference($foreign);
     foreach ([null, $owner->scopeKey()] as $scope) {
         expect(fn () => DB::table('nvl_auth_model_has_roles')->insert([
-            'role_id' => $role->id, 'model_type' => $user->getMorphClass(), 'model_id' => $user->id, 'owner_scope_key' => $scope,
+            'role_id' => $parent->id, 'model_type' => $user->getMorphClass(), 'model_id' => $user->id, 'owner_scope_key' => $scope,
         ]))->toThrow(QueryException::class);
     }
-});
-
-it('rejects a role hierarchy edge to a different owner at the database boundary', function (): void {
-    $parent = app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), fn () => Role::query()->create(['name' => 'parent', 'guard_name' => 'web']));
-    $child = app(OwnershipRunner::class)->run(Company::query()->findOrFail(8), Actor::query()->findOrFail(1), fn () => Role::query()->create(['name' => 'child', 'guard_name' => 'web']));
     expect(fn () => DB::table($child->getTable())->where('id', $child->id)->update(['parent_id' => $parent->id]))->toThrow(QueryException::class);
 });
 

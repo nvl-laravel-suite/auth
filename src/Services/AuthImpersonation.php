@@ -20,6 +20,7 @@ use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Models\BrowserSession;
 use Nvl\Auth\Models\Impersonation;
 use Nvl\Auth\Pipelines\AuthPipeline;
+use Nvl\Auth\Support\SubjectReferences;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -182,7 +183,7 @@ final readonly class AuthImpersonation
     {
         $actor = $this->canonical->resolve($actor);
         $target = $this->canonical->resolve($target);
-        if (! $actor instanceof Model || ! $target instanceof Model || $actor->getConnection() !== $target->getConnection() || $actor->getConnection() !== (new Impersonation)->getConnection() || $actor->getConnection() !== (new AuthAudit)->getConnection() || SubjectReference::fromAuthenticatable($actor) == SubjectReference::fromAuthenticatable($target)) {
+        if (! $actor instanceof Model || ! $target instanceof Model || $actor->getConnection() !== $target->getConnection() || $actor->getConnection() !== (new Impersonation)->getConnection() || $actor->getConnection() !== (new AuthAudit)->getConnection() || SubjectReferences::same(SubjectReference::fromAuthenticatable($actor), SubjectReference::fromAuthenticatable($target))) {
             throw $this->invalid();
         }
 

@@ -24,6 +24,7 @@ use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Results\IssuedApiToken;
+use Nvl\Auth\Support\SubjectReferences;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
@@ -77,7 +78,7 @@ final readonly class AuthTokens
                     $attributes['identifier_name'] = $this->principalAttributes->identifierColumn($this->configuration->string('identifier', 'email'));
                 }
                 $authenticated = $this->pipeline->run('login', new AuthPipelineContext('login', $attributes, $reference), fn (): Authenticatable => $principal);
-                if ($authenticated::class !== $principal::class || SubjectReference::fromAuthenticatable($authenticated) != $reference) {
+                if ($authenticated::class !== $principal::class || ! SubjectReferences::same(SubjectReference::fromAuthenticatable($authenticated), $reference)) {
                     throw new AuthException('login_rejected', 'The login pipeline changed the authenticated principal.', 422);
                 }
                 $principal = $this->proofs->recheck($verification);

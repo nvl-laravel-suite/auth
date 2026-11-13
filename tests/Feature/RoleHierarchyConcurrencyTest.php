@@ -54,4 +54,4 @@ it('admits only one of two concurrent parent changes that together would close a
 
     expect(count(array_filter(array_column($results, 'ok'))))->toBe(1, json_encode($results, JSON_THROW_ON_ERROR))
         ->and($steps)->toBeLessThan(8);
-})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires MySQL/MariaDB/PostgreSQL.');
+})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'Committed process race requires PostgreSQL.');

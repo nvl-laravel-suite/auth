@@ -90,17 +90,6 @@ it('keeps generic security-code HTTP proof host-managed and unauthenticated when
     expect(Challenge::query()->sole()->subject_id)->toBeNull();
 });
 
-it('commits failed challenge attempts instead of rolling them back with the response', function (): void {
-    config()->set('nvl-auth.features.security_codes.enabled', true);
-    $issued = app(AuthChallenges::class)->requestSecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login']);
-    $wrongCode = $issued['secret'] === '000000' ? '111111' : '000000';
-
-    expect(fn () => app(AuthChallenges::class)->verifySecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login', 'code' => $wrongCode]))
-        ->toThrow(AuthException::class);
-
-    expect(Challenge::query()->sole()->attempts)->toBe(1);
-});
-
 it('keeps one active challenge and caps committed attempts', function (): void {
     config()->set('nvl-auth.features.security_codes.enabled', true);
     config()->set('nvl-auth.features.security_codes.settings.max_attempts', 2);
@@ -112,13 +101,13 @@ it('keeps one active challenge and caps committed attempts', function (): void {
         ->and($first['challenge']->active_key)->toBeNull()
         ->and($second['challenge']->active_key)->not->toBeNull();
 
-    foreach ([1, 2, 3] as $attempt) {
+    foreach ([1, 2, 2] as $expectedAttempts) {
         expect(fn () => app(AuthChallenges::class)->verifySecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login', 'code' => $wrongCode]))
-            ->toThrow(AuthException::class);
+            ->toThrow(AuthException::class)
+            ->and($second['challenge']->refresh()->attempts)->toBe($expectedAttempts);
     }
 
-    expect($second['challenge']->refresh()->attempts)->toBe(2)
-        ->and($second['challenge']->active_key)->toBeNull()
+    expect($second['challenge']->active_key)->toBeNull()
         ->and(fn () => app(AuthChallenges::class)->verifySecurityCode(['recipient' => 'user@example.test', 'purpose' => 'login', 'code' => $second['secret']]))
         ->toThrow(AuthException::class);
 });

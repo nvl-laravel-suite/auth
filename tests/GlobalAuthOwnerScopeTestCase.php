@@ -21,6 +21,6 @@ abstract class GlobalAuthOwnerScopeTestCase extends OwnershipTestCase
     protected function defineEnvironment($app): void
     {
         parent::defineEnvironment($app);
-        $app['config']->set(['nvl-auth.ownership.scoped' => false, 'nvl-auth.migrations.enabled' => false]);
+        $app['config']->set(['hashing.bcrypt.rounds' => 4, 'auth.timebox_duration' => 0, 'nvl-auth.ownership.scoped' => false, 'nvl-auth.migrations.enabled' => false]);
     }
 }

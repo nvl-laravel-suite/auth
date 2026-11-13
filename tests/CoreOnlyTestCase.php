@@ -24,6 +24,8 @@ abstract class CoreOnlyTestCase extends TestCase
     {
         $app['config']->set([
             'app.key' => 'base64:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=',
+            'hashing.bcrypt.rounds' => 4,
+            'auth.timebox_duration' => 0,
             'auth.defaults.guard' => 'web',
             'auth.guards.web' => ['driver' => 'session', 'provider' => 'users'],
             'auth.providers.users' => ['driver' => 'eloquent', 'model' => User::class],

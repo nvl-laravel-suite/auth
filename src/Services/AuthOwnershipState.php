@@ -79,16 +79,21 @@ final class AuthOwnershipState
     {
         $schemas = [];
         foreach ($tables as $table) {
-            [$namespace, $name] = $connection->getSchemaBuilder()->parseSchemaAndTable($table, true);
-            $namespace ??= $connection->getDriverName() === 'sqlite' ? 'main' : $connection->getDatabaseName();
-            $schemas[$namespace][] = $connection->getTablePrefix().$name;
+            [$namespace, $name] = $connection->getSchemaBuilder()->parseSchemaAndTable($table, false);
+            $schemas[$namespace ?? ''][] = $connection->getTablePrefix().$name;
         }
         foreach ($schemas as $namespace => $names) {
             if ($connection->getDriverName() === 'sqlite') {
-                $catalog = $namespace.'.sqlite_master';
-                $partitioned = $connection->table($catalog)->useWritePdo()->where('type', 'table')->whereIn('name', $names)->where('sql', 'like', '%owner_scope_key%')->exists();
+                $catalog = $connection->getQueryGrammar()->wrap($namespace === '' ? 'main' : $namespace).'.sqlite_master';
+                $placeholders = implode(', ', array_fill(0, count($names), '?'));
+                $partitioned = $connection->selectOne("select 1 from {$catalog} where type = 'table' and name in ({$placeholders}) and sql like '%owner_scope_key%' limit 1", $names, false) !== null;
             } else {
-                $partitioned = $connection->table(self::ColumnMetadataCatalog)->useWritePdo()->where('table_schema', $namespace)->whereIn('table_name', $names)->where('column_name', 'owner_scope_key')->exists();
+                $query = $connection->table(self::ColumnMetadataCatalog)->useWritePdo()
+                    ->whereIn('table_name', $names)
+                    ->where('column_name', 'owner_scope_key');
+                $partitioned = ($namespace !== ''
+                    ? $query->where('table_schema', $namespace)
+                    : $query->whereRaw("table_schema = coalesce(current_schema(), 'public')"))->exists();
             }
             if ($partitioned) {
                 throw new OwnershipConfigurationInvalid('Physical Auth ownership requires its native deployment configuration.');

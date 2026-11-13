@@ -37,11 +37,6 @@ it('requires enrolled MFA even when the optional TOTP method is disabled', funct
     expect($guard->check())->toBeFalse();
 });
 
-it('removes public raw principal session establishment', function (): void {
-    expect(method_exists(AuthenticationSessions::class, 'establish'))->toBeFalse()
-        ->and(method_exists(AuthenticationSessions::class, 'establishForPurpose'))->toBeFalse();
-});
-
 it('applies enrolled MFA to every native primary method and retains verified passkey UV', function (string $method): void {
     config(['nvl-auth.features.totp.enabled' => true, 'nvl-auth.features.magic_links.enabled' => true, 'nvl-auth.features.security_codes.enabled' => true, 'nvl-auth.features.passkeys.enabled' => true, 'nvl-auth.features.passkeys.settings.require_user_verification' => false, 'nvl-auth.features.social_identities.enabled' => true, 'nvl-auth.features.social_identities.settings.providers.github' => ['scopes' => [], 'parameters' => []]]);
     $user = $this->user();

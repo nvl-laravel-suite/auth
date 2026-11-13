@@ -35,6 +35,7 @@ use Nvl\Auth\Models\Challenge;
 use Nvl\Auth\Models\RememberCredential;
 use Nvl\Auth\Pipelines\AuthPipeline;
 use Nvl\Auth\Support\AuthInstantCast;
+use Nvl\Auth\Support\SubjectReferences;
 use Nvl\Auth\ValueObjects\AuthenticationEvidence;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
@@ -144,7 +145,7 @@ final readonly class AuthenticationSessions
                     $attributes['identifier_name'] = $this->principalAttributes->identifierColumn($this->configuration->string('identifier', 'email'));
                 }
                 $authenticated = $this->pipeline->run('login', new AuthPipelineContext('login', $attributes, $reference), fn (): Authenticatable => $canonical);
-                if ($authenticated::class !== $canonical::class || SubjectReference::fromAuthenticatable($authenticated) != $reference) {
+                if ($authenticated::class !== $canonical::class || ! SubjectReferences::same(SubjectReference::fromAuthenticatable($authenticated), $reference)) {
                     throw new AuthException('login_rejected', 'The login pipeline changed the authenticated principal.', 422);
                 }
                 $canonical = $this->proofs->recheck($verification);

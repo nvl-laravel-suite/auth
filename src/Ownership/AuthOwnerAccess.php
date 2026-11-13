@@ -37,7 +37,7 @@ final readonly class AuthOwnerAccess implements OwnerAccess
             ->where('owner_scope_key', $reference->scopeKey())->where('subject_type', $subject->type)->where('subject_id', $subject->identifier)
             ->where('status', 'active')->first();
         $stored = $row?->owner_reference;
-        if (! is_string($stored) || OwnerReference::fromJson($stored) != $reference) {
+        if (! is_string($stored) || OwnerReference::fromJson($stored)->toArray() !== $reference->toArray()) {
             throw new AuthException('owner_membership_required', 'An active owner membership is required.', 403);
         }
     }

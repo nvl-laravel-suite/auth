@@ -20,27 +20,24 @@ use Nvl\Auth\ValueObjects\SystemMutationContext;
 use Nvl\Ownership\Services\OwnershipRunner;
 use Nvl\Ownership\Tests\Fixtures\Actor;
 use Nvl\Ownership\Tests\Fixtures\Company;
+use Nvl\Ownership\Tests\Fixtures\OptsIntoAdoptedSchemaReuse;
 use Nvl\Support\Ownership\Exceptions\OwnershipConfigurationInvalid;
 use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
 
-uses(ConfiguredOwnerScopeTestCase::class);
-
-it('uses the exact configured membership subclass in storage and workflows', function (): void {
-    $user = User::factory()->create();
-    $membership = app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), fn () => app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'configured'), SubjectReference::fromAuthenticatable($user)));
-    expect($membership)->toBeInstanceOf(ConfiguredOwnerMembership::class)
-        ->and($membership->getTable())->toBe('host_owner_memberships');
-});
+uses(ConfiguredOwnerScopeTestCase::class, OptsIntoAdoptedSchemaReuse::class);
 
 it('rejects a model replacement change after the ownership graph has been adopted', function (): void {
-    config(['nvl-auth.features.memberships.models.membership' => OwnerMembership::class]);
-    expect(fn () => app(AuthModelRegistry::class)->ownerMembershipClass())->toThrow(OwnershipConfigurationInvalid::class);
+    $this->withFixtureConfiguration(['nvl-auth.features.memberships.models.membership' => OwnerMembership::class], function (): void {
+        expect(fn () => app(AuthModelRegistry::class)->ownerMembershipClass())->toThrow(OwnershipConfigurationInvalid::class);
+    });
 });
 
-it('uses configured role token and global principal subclasses throughout native workflows', function (): void {
+it('uses configured membership role token and principal subclasses throughout native workflows', function (): void {
     $user = User::factory()->create();
     app(OwnershipRunner::class)->run(Company::query()->findOrFail(7), Actor::query()->findOrFail(1), function () use ($user): void {
-        app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'configured-workflows'), SubjectReference::fromAuthenticatable($user));
+        $membership = app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'configured-workflows'), SubjectReference::fromAuthenticatable($user));
+        expect($membership)->toBeInstanceOf(ConfiguredOwnerMembership::class)
+            ->and($membership->getTable())->toBe('host_owner_memberships');
         $role = app(AuthRoles::class)->create($user, ['name' => 'configured-editor']);
         $token = app(AuthTokens::class)->create($user, ['name' => 'configured-token', 'abilities' => ['profile:read']]);
         expect($role)->toBeInstanceOf(ConfiguredOwnerRole::class)

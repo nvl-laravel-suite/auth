@@ -18,10 +18,10 @@ final class SecurityRace
     public static function run(array $workers): array
     {
         $driver = DB::connection()->getDriverName();
-        if (! in_array($driver, ['mysql', 'mariadb', 'pgsql'], true) || DB::connection()->transactionLevel() !== 0) {
-            throw new RuntimeException('Races require committed MySQL/MariaDB/PostgreSQL.');
+        if ($driver !== 'pgsql' || DB::connection()->transactionLevel() !== 0) {
+            throw new RuntimeException('Races require committed PostgreSQL.');
         }
-        $pdoDriver = $driver === 'mariadb' ? 'mysql' : $driver;
+        $pdoDriver = $driver;
         if (DB::connection()->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME) !== $pdoDriver) {
             throw new RuntimeException('The native race source selected an incompatible PDO driver.');
         }
@@ -47,7 +47,7 @@ final class SecurityRace
                         || $connection->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME) !== $pdoDriver) {
                         throw new RuntimeException('Worker did not select committed production engine.');
                     }
-                    $connectionId = $connection->scalar($driver === 'pgsql' ? 'SELECT pg_backend_pid()' : 'SELECT CONNECTION_ID()');
+                    $connectionId = $connection->scalar('SELECT pg_backend_pid()');
                     file_put_contents("{$directory}/ready-{$index}", 'ready');
                     self::wait(static fn (): bool => is_file("{$directory}/go"));
                     $result = ['ok' => true, 'driver' => $driver, 'pdo_driver' => $pdoDriver, 'process_id' => getmypid(), 'connection_id' => $connectionId, ...$worker()];
@@ -55,7 +55,10 @@ final class SecurityRace
                     $result = ['ok' => false, 'error' => $exception::class, 'message' => $exception->getMessage()];
                 }
                 file_put_contents("{$directory}/result-{$index}", json_encode($result, JSON_THROW_ON_ERROR));
-                pcntl_exec(PHP_BINARY, ['-r', 'exit(0);']);
+                if (is_executable('/usr/bin/true')) {
+                    pcntl_exec('/usr/bin/true');
+                }
+                pcntl_exec(PHP_BINARY, ['-n', '-r', 'exit(0);']);
                 exit(1);
             }
             self::wait(static fn (): bool => count(glob("{$directory}/ready-*") ?: []) === count($workers));

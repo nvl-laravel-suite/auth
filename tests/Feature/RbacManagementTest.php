@@ -348,25 +348,31 @@ it('denies every RBAC consumer read before querying package storage', function (
         }
     });
     $reads = [
-        static fn () => app(AuthRbacReader::class)->roleOptions($actor)->map(RoleOptionData::fromModel(...)),
-        static fn () => app(AuthRbacReader::class)->suggestRoles($actor)->map(RoleOptionData::fromModel(...)),
-        static fn () => app(AuthRbacReader::class)->permissionOptions($actor)->map(PermissionOptionData::fromModel(...)),
-        static fn () => app(AuthRbacReader::class)->suggestPermissions($actor)->map(PermissionOptionData::fromModel(...)),
-        static fn () => app(AuthRbacReader::class)->permissionGroups($actor)->map(static fn (array $row) => PermissionGroupData::from($row)),
-        static fn () => app(AuthRbacReader::class)->roles($actor)->through(RoleListItemData::fromModel(...)),
-        static fn () => app(AuthRbacReader::class)->permissions($actor)->through(PermissionListItemData::fromModel(...)),
-        static fn () => app(AuthRbacReader::class)->roleCatalog($actor, [])->through(RoleListItemData::fromModel(...)),
-        static fn () => app(AuthRbacReader::class)->permissionCatalog($actor, [])->through(PermissionListItemData::fromModel(...)),
+        'roleOptions' => static fn () => app(AuthRbacReader::class)->roleOptions($actor)->map(RoleOptionData::fromModel(...)),
+        'suggestRoles' => static fn () => app(AuthRbacReader::class)->suggestRoles($actor)->map(RoleOptionData::fromModel(...)),
+        'permissionOptions' => static fn () => app(AuthRbacReader::class)->permissionOptions($actor)->map(PermissionOptionData::fromModel(...)),
+        'suggestPermissions' => static fn () => app(AuthRbacReader::class)->suggestPermissions($actor)->map(PermissionOptionData::fromModel(...)),
+        'permissionGroups' => static fn () => app(AuthRbacReader::class)->permissionGroups($actor)->map(static fn (array $row) => PermissionGroupData::from($row)),
+        'roles' => static fn () => app(AuthRbacReader::class)->roles($actor)->through(RoleListItemData::fromModel(...)),
+        'permissions' => static fn () => app(AuthRbacReader::class)->permissions($actor)->through(PermissionListItemData::fromModel(...)),
+        'roleCatalog' => static fn () => app(AuthRbacReader::class)->roleCatalog($actor, [])->through(RoleListItemData::fromModel(...)),
+        'permissionCatalog' => static fn () => app(AuthRbacReader::class)->permissionCatalog($actor, [])->through(PermissionListItemData::fromModel(...)),
+        'roleNameAvailability' => static fn () => RoleNameAvailabilityData::from(app(AuthRbacReader::class)->roleNameAvailability($actor, 'editor')),
+        'resolveRoles' => static fn () => app(AuthRbacReader::class)->resolveRoles($actor, ['editor'])->map(RoleOptionData::fromModel(...)),
+        'resolvePermissions' => static fn () => app(AuthRbacReader::class)->resolvePermissions($actor, ['content.read'])->map(PermissionOptionData::fromModel(...)),
+        'roleAnalytics' => static fn () => RoleAnalyticsData::from(app(AuthRbacReader::class)->roleAnalytics($actor, 'role-id')),
     ];
 
-    foreach ($reads as $read) {
+    foreach ($reads as $operation => $read) {
         DB::flushQueryLog();
         DB::enableQueryLog();
 
-        expect($read)->toThrow(AuthException::class, 'not authorized')
-            ->and(DB::getQueryLog())->toBe([]);
-
-        DB::disableQueryLog();
+        try {
+            expect($read)->toThrow(AuthException::class, 'not authorized', $operation)
+                ->and(DB::getQueryLog())->toBe([], $operation);
+        } finally {
+            DB::disableQueryLog();
+        }
     }
 });
 
@@ -629,31 +635,6 @@ it('rejects invalid, missing, ambiguous, duplicate, and cross-guard RBAC identif
         ->toThrow(AuthException::class, 'not found')
         ->and(fn () => app(AuthRbacReader::class)->resolveRoles($actor, array_fill(0, 101, 'role'))->map(RoleOptionData::fromModel(...)))
         ->toThrow(AuthException::class, '100');
-});
-
-it('denies RBAC availability and resolution before querying package storage', function (): void {
-    $actor = $this->user('rbac-resolution-denied@example.test');
-    app()->instance(AuthManagementAccess::class, new class implements AuthManagementAccess
-    {
-        public function allows(Authenticatable $actor, string $ability, mixed $target = null): bool
-        {
-            return false;
-        }
-    });
-
-    foreach ([
-        static fn () => RoleNameAvailabilityData::from(app(AuthRbacReader::class)->roleNameAvailability($actor, 'editor')),
-        static fn () => app(AuthRbacReader::class)->resolveRoles($actor, ['editor'])->map(RoleOptionData::fromModel(...)),
-        static fn () => app(AuthRbacReader::class)->resolvePermissions($actor, ['content.read'])->map(PermissionOptionData::fromModel(...)),
-    ] as $read) {
-        DB::flushQueryLog();
-        DB::enableQueryLog();
-
-        expect($read)->toThrow(AuthException::class, 'not authorized')
-            ->and(DB::getQueryLog())->toBe([]);
-
-        DB::disableQueryLog();
-    }
 });
 
 it('adds and synchronizes role permissions through atomic assignment seams', function (): void {
@@ -982,25 +963,6 @@ it('counts role descendants once when persisted hierarchy data contains a cycle'
     expect($analytics->children)->toBe(1)
         ->and($analytics->descendants)->toBe(2)
         ->and($analytics->parentName)->toBe('cycle-second');
-});
-
-it('denies per-role analytics before querying package storage', function (): void {
-    $actor = $this->user('rbac-role-analytics-denied@example.test');
-    app()->instance(AuthManagementAccess::class, new class implements AuthManagementAccess
-    {
-        public function allows(Authenticatable $actor, string $ability, mixed $target = null): bool
-        {
-            return false;
-        }
-    });
-    DB::flushQueryLog();
-    DB::enableQueryLog();
-
-    expect(fn () => RoleAnalyticsData::from(app(AuthRbacReader::class)->roleAnalytics($actor, 'role-id')))
-        ->toThrow(AuthException::class, 'not authorized')
-        ->and(DB::getQueryLog())->toBe([]);
-
-    DB::disableQueryLog();
 });
 
 /** @param list<array{query: string, bindings: array, time: float}> $queries

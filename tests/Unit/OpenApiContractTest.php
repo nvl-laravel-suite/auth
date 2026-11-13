@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Query\Grammars\MySqlGrammar;
 use Illuminate\Database\Query\Grammars\PostgresGrammar;
 use Illuminate\Database\Query\Grammars\SQLiteGrammar;
-use Illuminate\Database\Query\Grammars\SqlServerGrammar;
 use Illuminate\Support\Facades\DB;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\FeatureOperation;
@@ -192,10 +190,8 @@ it('builds portable permission group expressions for every supported database gr
     $originalGrammar = $connection->getQueryGrammar();
     $expressions = app(RbacPermissionGroupExpressions::class);
     $grammars = [
-        [new MySqlGrammar($connection), '`group`', 'CHAR'],
         [new PostgresGrammar($connection), '"group"', 'CHR'],
         [new SQLiteGrammar($connection), '"group"', 'CHAR'],
-        [new SqlServerGrammar($connection), '[group]', 'CHAR'],
     ];
 
     try {

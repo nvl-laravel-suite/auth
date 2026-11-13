@@ -152,7 +152,9 @@ final class AuthServiceProvider extends ServiceProvider implements OwnershipInte
         $this->app->scoped(RbacPrincipalTracker::class);
         $this->app->scoped(AuthOwnerContextParticipant::class);
         $this->app->booted(function (): void {
-            if (config('nvl-auth.ownership.scoped') === true) {
+            if (config('nvl-auth.enabled', true) === true
+                && config('nvl-auth.ownership.scoped') === true
+                && config('nvl-auth.features.rbac.enabled', true) === true) {
                 $this->app->make(OwnershipContextParticipants::class)->register(AuthOwnerContextParticipant::class);
             }
             $this->app->make(AuthResourceRegistrar::class)->register($this->app->make(OwnershipResourceRegistry::class));

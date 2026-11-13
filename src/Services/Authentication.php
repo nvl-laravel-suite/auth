@@ -25,6 +25,7 @@ use Nvl\Auth\Events\AuthenticationRejected;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\AuthAudit;
 use Nvl\Auth\Results\IssuedApiToken;
+use Nvl\Auth\Support\SubjectReferences;
 use Nvl\Auth\Traits\IssuesAuthenticationProofs;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
 use Nvl\Auth\ValueObjects\IssuedAuthenticationProof;
@@ -167,7 +168,7 @@ final readonly class Authentication
         try {
             $verified = $this->verifiedCredentials($credentials);
             $subject = $verified['subject'];
-            if ($expectedSubject !== null && SubjectReference::fromAuthenticatable($subject) != $expectedSubject) {
+            if ($expectedSubject !== null && ! SubjectReferences::same(SubjectReference::fromAuthenticatable($subject), $expectedSubject)) {
                 throw new AuthException('credentials_invalid', 'The supplied credentials are invalid.', 422);
             }
             $this->operations->central(AuthIdentityOperation::Login, $subject);

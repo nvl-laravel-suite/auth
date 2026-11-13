@@ -5,6 +5,11 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Compare `SubjectReference` and `OwnerReference` identities strictly across authentication, proofs, sessions, challenges, passkeys, tokens, impersonation, and invitations so numeric-looking string identifiers never coerce.
+- Avoid clearing shared permission caches on every owner scope entry, guard disabled RBAC and API-token features cleanly, resolve PostgreSQL active schemas via `coalesce(current_schema(), 'public')`, and map concurrent social-link and invitation unique races to `409` responses without poisoning transactions.
+
 ## [7.0.3] - 2026-11-11
 
 ### Fixed
@@ -19,8 +24,8 @@ All notable changes to `nvl/auth` are documented here.
 - Password login spends one password hash when the identifier is unknown or the account has no password, so response time no longer reveals whether an account exists; the failure stays `credentials_invalid` (422).
 - Password-reset requests honour `auth.passwords.<broker>.throttle`: a repeat request inside the window creates no token and sends nothing, returns as before, and is audited as `password.reset_rejected` with reason `password_reset_throttled`.
 - Role parent changes lock the guard's roles and re-read the ancestor chain inside the transaction, so two concurrent updates can no longer commit a hierarchy cycle.
-- Duplicate-key errors are translated by the unique index actually violated, read from the configured table, on SQLite, PostgreSQL, MySQL and MariaDB. Registration, invitation registration and email-change completion translate only their own identity uniqueness violation (`registration_unavailable`, `invitation_principal_conflict`, invalid change); any other constraint failure now surfaces as itself instead of as that conflict.
-- API-token namespaces are matched case-sensitively on every database, so on MySQL and MariaDB a host token named `ACME:…` is no longer treated as belonging to namespace `acme`.
+- Duplicate-key errors are translated by the unique index actually violated, read from the configured table, on SQLite and PostgreSQL. Registration, invitation registration and email-change completion translate only their own identity uniqueness violation (`registration_unavailable`, `invitation_principal_conflict`, invalid change); any other constraint failure now surfaces as itself instead of as that conflict.
+- API-token namespaces are matched case-sensitively. A host token named `ACME:…` is outside namespace `acme`.
 - The unread configuration keys `features.principal_management.settings.use_as_auth_model` and `features.rbac.settings.use_package_storage` are removed from the default and published configuration.
 - One login runs each of its schema catalog probes once instead of repeating the TOTP, challenge and managed-session probes up to twelve times.
 - With managed sessions, the browser that performs its own security action (TOTP, recovery codes, passkeys, social links, password, email change) stays signed in; every other browser and every remember credential still ends.

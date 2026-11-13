@@ -17,8 +17,8 @@ uses(NativeOwnerConcurrencyTestCase::class);
 
 it('serializes simultaneous owner removals and retains one active owner', function (): void {
     $driver = DB::connection()->getDriverName();
-    if (! in_array($driver, ['pgsql', 'mysql', 'mariadb'], true) || ! function_exists('pcntl_fork')) {
-        $this->markTestSkipped('The real owner race runs only in the PostgreSQL/MySQL/MariaDB matrix with pcntl.');
+    if ($driver !== 'pgsql' || ! function_exists('pcntl_fork')) {
+        $this->markTestSkipped('The real owner race runs only in the PostgreSQL matrix with pcntl.');
     }
     $scenario = new AuthOwnerScenario;
     $first = $this->user('race-first@example.test');
@@ -44,8 +44,8 @@ it('serializes simultaneous owner removals and retains one active owner', functi
 
 it('serializes direct acceptance against registration without a database deadlock', function (): void {
     $driver = DB::connection()->getDriverName();
-    if (! in_array($driver, ['pgsql', 'mysql', 'mariadb'], true) || ! function_exists('pcntl_fork')) {
-        $this->markTestSkipped('The real invitation race runs only in the PostgreSQL/MySQL/MariaDB matrix with pcntl.');
+    if ($driver !== 'pgsql' || ! function_exists('pcntl_fork')) {
+        $this->markTestSkipped('The real invitation race runs only in the PostgreSQL matrix with pcntl.');
     }
     $scenario = new AuthOwnerScenario;
     $owner = $this->user('race-inviter@example.test');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Auth\Tests;
 
+use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -14,7 +15,7 @@ abstract class NativeOwnerConcurrencyTestCase extends NativeOwnerScenarioTestCas
     {
         parent::defineEnvironment($app);
         $driver = getenv('NVL_C1_TEST_DRIVER') ?: getenv('DB_CONNECTION');
-        if (! in_array($driver, ['pgsql', 'mysql', 'mariadb'], true)) {
+        if ($driver !== 'pgsql') {
             return;
         }
         $database = getenv('DB_DATABASE');
@@ -30,16 +31,18 @@ abstract class NativeOwnerConcurrencyTestCase extends NativeOwnerScenarioTestCas
     {
         $this->afterApplicationCreated(function (): void {
             $connection = DB::connection();
-            if (in_array($connection->getDriverName(), ['pgsql', 'mysql', 'mariadb'], true)) {
+            if ($connection->getDriverName() === 'pgsql') {
                 $database = $connection->getDatabaseName();
                 if (preg_match('/^(?:nvl_auth_test_[a-f0-9]{8}_ci|nvl_light_auth_races)$/D', $database) !== 1) {
                     throw new RuntimeException('Native Auth fixture cleanup requires its dedicated Auth database.');
                 }
+                RefreshDatabaseState::$migrated = false;
                 $connection->getSchemaBuilder()->dropAllTables();
                 $this->beforeApplicationDestroyed(static function () use ($connection, $database): void {
                     if ($connection->getDatabaseName() !== $database) {
                         throw new RuntimeException('The native Auth fixture source changed before cleanup.');
                     }
+                    RefreshDatabaseState::$migrated = false;
                     $connection->getSchemaBuilder()->dropAllTables();
                 });
             }

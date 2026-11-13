@@ -27,5 +27,6 @@ it('uses a host admission policy without NVL membership or tenant tables', funct
     });
     $schema = (new User)->getConnection()->getSchemaBuilder();
     expect($schema->hasTable('nvl_auth_owner_memberships'))->toBeFalse()
-        ->and($schema->hasTable('nvl_auth_tenant_memberships'))->toBeFalse();
+        ->and($schema->hasTable('nvl_auth_tenant_memberships'))->toBeFalse()
+        ->and($schema->hasTable('nvl_tenancy_tenants'))->toBeFalse();
 });

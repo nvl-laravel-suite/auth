@@ -12,6 +12,7 @@ use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Enums\PrincipalAttribute;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
+use Nvl\Auth\Support\SubjectReferences;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Support\Auth\CanonicalActorResolver;
 
@@ -101,7 +102,7 @@ final readonly class InvitationPrincipalResolver
             throw $this->proofRequired();
         }
         $authenticated = $this->canonical->resolve($authenticated);
-        if ($authenticated::class !== $subject::class || SubjectReference::fromAuthenticatable($subject) != SubjectReference::fromAuthenticatable($authenticated)) {
+        if ($authenticated::class !== $subject::class || ! SubjectReferences::same(SubjectReference::fromAuthenticatable($subject), SubjectReference::fromAuthenticatable($authenticated))) {
             throw $this->proofRequired();
         }
         $this->proof->assertMatches($invitation, $authenticated);

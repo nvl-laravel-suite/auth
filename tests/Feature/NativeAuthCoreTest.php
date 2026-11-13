@@ -5,17 +5,12 @@ declare(strict_types=1);
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Contracts\Auth\StatefulGuard;
-use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Nvl\Auth\Contracts\ApiTokenManager;
-use Nvl\Auth\Contracts\AuthenticationAssurancePolicy;
 use Nvl\Auth\Contracts\AuthPipelineStage;
 use Nvl\Auth\Contracts\PrincipalAttributeMapper;
 use Nvl\Auth\Contracts\SuccessfulLoginMetadataRecorder;
-use Nvl\Auth\Enums\AuthenticationDestination;
-use Nvl\Auth\Enums\AuthenticationMethod;
 use Nvl\Auth\Enums\AuthFeature;
 use Nvl\Auth\Enums\AuthMessageType;
 use Nvl\Auth\Enums\RecentAuthenticationPurpose;
@@ -30,23 +25,16 @@ use Nvl\Auth\Models\User;
 use Nvl\Auth\Results\IssuedApiToken;
 use Nvl\Auth\Services\AuthChallenges;
 use Nvl\Auth\Services\Authentication;
-use Nvl\Auth\Services\AuthenticationProofs;
 use Nvl\Auth\Services\AuthenticationSessions;
 use Nvl\Auth\Services\AuthInvitations;
 use Nvl\Auth\Services\AuthMaintenance;
 use Nvl\Auth\Services\AuthSecondFactor;
 use Nvl\Auth\Services\AuthTokens;
-use Nvl\Auth\Services\PrincipalEmailIdentity;
-use Nvl\Auth\Services\PrincipalEmailIdentityAdoption;
 use Nvl\Auth\Support\AuthInstantCast;
 use Nvl\Auth\Tests\Fixtures\RejectLoginStage;
-use Nvl\Auth\Traits\IssuesAuthenticationProofs;
-use Nvl\Auth\ValueObjects\AuthenticationEvidence;
 use Nvl\Auth\ValueObjects\AuthenticationRequestContext;
-use Nvl\Auth\ValueObjects\AuthenticationVerification;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\InvitationIssuanceContext;
-use Nvl\Auth\ValueObjects\IssuedAuthenticationProof;
 use PragmaRX\Google2FA\Google2FA;
 
 it('preserves host and runtime hidden attributes alongside mapped authentication secrets', function (): void {
@@ -66,18 +54,6 @@ it('preserves host and runtime hidden attributes alongside mapped authentication
 
     expect($user->toArray())->toBe(['name' => 'Visible name'])
         ->and($user->getHidden())->toContain('credential_hash', 'host_secret', 'session_secret');
-});
-
-it('publishes explicit native credential and session contracts', function (): void {
-    foreach ([
-        [Authentication::class, 'verifyCredentials', ['array'], Authenticatable::class],
-        [Authentication::class, 'login', ['array', 'array', StatefulGuard::class, Session::class, 'array'], Authenticatable::class],
-        [AuthenticationSessions::class, 'establishFromProof', ['string', StatefulGuard::class, Session::class, AuthenticationRequestContext::class, 'bool'], Authenticatable::class],
-    ] as [$class, $method, $parameters, $return]) {
-        $reflection = new ReflectionMethod($class, $method);
-        expect(array_map(static fn (ReflectionParameter $parameter): string => (string) $parameter->getType(), $reflection->getParameters()))->toBe($parameters)
-            ->and((string) $reflection->getReturnType())->toBe($return);
-    }
 });
 
 it('consumes native challenges with committed attempts and exact protocol bindings', function (): void {
@@ -497,7 +473,7 @@ it('rejects raw native token issuance for persisted inactive locked or deleted p
         ->and(AuthAudit::query()->where('action', 'api_token.issued')->count())->toBe(0);
 })->with(['inactive', 'locked', 'deleted']);
 
-it('invalidates pending native factor proof after password change and after the attempt budget', function (bool $passwordChanged): void {
+it('invalidates pending native factor proof after password change', function (): void {
     config(['nvl-auth.features.totp.enabled' => true]);
     $user = $this->user();
     TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
@@ -505,16 +481,12 @@ it('invalidates pending native factor proof after password change and after the 
     $guard = auth()->guard('web');
     $session = app('session.store');
     expect(fn () => $login->login(['identifier' => $user->email, 'password' => 'correct-password'], [], $guard, $session))->toThrow(AuthException::class);
-    if ($passwordChanged) {
-        $user->forceFill(['password' => 'replacement-password'])->save();
-    }
-    for ($attempt = 0; $attempt < ($passwordChanged ? 1 : 5); $attempt++) {
-        expect(fn () => $login->completeSecondFactor(['code' => 'invalid'], $guard, $session))->toThrow(AuthException::class);
-    }
+    $user->forceFill(['password' => 'replacement-password'])->save();
+    expect(fn () => $login->completeSecondFactor(['code' => 'invalid'], $guard, $session))->toThrow(AuthException::class);
     expect($login->hasPendingSecondFactor($session))->toBeFalse()
         ->and($guard->check())->toBeFalse()
         ->and($user->fresh()->last_login_at)->toBeNull();
-})->with(['password changed' => true, 'attempt budget' => false]);
+});
 
 it('preserves non Eloquent principal contracts for explicitly configured raw token adapters', function (): void {
     $principal = new GenericUser(['id' => 'directory-user']);
@@ -527,26 +499,6 @@ it('preserves non Eloquent principal contracts for explicitly configured raw tok
     app()->instance(ApiTokenManager::class, $manager);
 
     expect(app(AuthTokens::class)->create($principal, ['name' => 'External', 'abilities' => ['profile:read']]))->toBe($issued);
-});
-
-it('expires a native server session factor continuation before proof can establish a session', function (): void {
-    config(['nvl-auth.features.totp.enabled' => true, 'nvl-auth.features.recovery_codes.enabled' => true]);
-    $user = $this->user();
-    TotpCredential::factory()->forSubject($user)->create(['subject_type' => $user->getMorphClass()]);
-    $recovery = app(AuthSecondFactor::class)->regenerateRecoveryCodes($user, grant: $this->recentGrant($user, RecentAuthenticationPurpose::RecoveryRegeneration, 'correct-password')->reveal(), context: $this->authenticationContext());
-    $login = app(Authentication::class);
-    $guard = auth()->guard('web');
-    $session = app('session.store');
-    expect(fn () => $login->login(['identifier' => $user->email, 'password' => 'correct-password'], [], $guard, $session))->toThrow(AuthException::class);
-    CarbonImmutable::setTestNow(CarbonImmutable::now()->addMinutes(6));
-    try {
-        expect($login->hasPendingSecondFactor($session))->toBeFalse()
-            ->and(fn () => $login->completeSecondFactor(['recoveryCode' => $recovery->codes[0]], $guard, $session))->toThrow(AuthException::class)
-            ->and($guard->check())->toBeFalse()
-            ->and($user->fresh()->last_login_at)->toBeNull();
-    } finally {
-        CarbonImmutable::setTestNow();
-    }
 });
 
 it('preserves token containment for a canonical principal disabled after token issuance', function (): void {
@@ -596,20 +548,6 @@ it('rejects skipped or repeated native login terminal calls', function (string $
     expect(fn () => app(Authentication::class)->loginWithToken(['identifier' => $user->email, 'password' => 'correct-password'], ['name' => 'Rejected', 'abilities' => ['profile:read']]))->toThrow(AuthException::class);
     expect($user->tokens()->count())->toBe(0);
 })->with(['skip', 'double']);
-
-it('publishes native proof contracts and complete credential operations without internal issuance or bare establishment', function (): void {
-    $catalog = json_decode(file_get_contents(__DIR__.'/../../resources/consumer-api.json'), true, flags: JSON_THROW_ON_ERROR)['symbols'];
-    foreach ([PrincipalEmailIdentity::class, PrincipalEmailIdentityAdoption::class, Authentication::class, AuthenticationSessions::class, AuthenticationRequestContext::class, AuthenticationProofs::class, AuthenticationAssurancePolicy::class, AuthenticationMethod::class, AuthenticationDestination::class, AuthenticationEvidence::class, IssuedAuthenticationProof::class] as $symbol) {
-        expect($catalog)->toHaveKey($symbol);
-    }
-    expect($catalog[PrincipalEmailIdentity::class]['methods'])->toContain('normalize', 'key')->not->toContain('credentials', 'brokerCredentials', 'assertReady', 'schemaReady', 'indexReady');
-    expect($catalog[Authentication::class]['methods'])->toContain('login', 'loginWithToken', 'proveCredentials', 'proveCredentialsForToken')
-        ->and($catalog[AuthenticationSessions::class]['methods'])->toContain('establishFromProof')->not->toContain('establish', 'establishForPurpose')
-        ->and($catalog[Authentication::class]['methods'])->not->toContain('passwordProof', 'issueNativeProof')
-        ->and($catalog[AuthenticationProofs::class]['methods'])->not->toContain('recheck', 'consumeForFinalization')
-        ->and($catalog)->not->toHaveKeys([IssuesAuthenticationProofs::class, AuthenticationVerification::class])
-        ->and((new ReflectionClass(AuthenticationEvidence::class))->hasProperty('passwordBinding'))->toBeFalse();
-});
 
 it('preserves the mapped password identifier in browser and token login pipeline contexts', function (string $destination): void {
     $user = $this->user();

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Nvl\Auth\Tests\AuthTestCase;
 use Nvl\Auth\Tests\DisabledAuthProviderTestCase;
 use Nvl\Auth\Tests\FreshAdoptedAuthProviderTestCase;
 use Nvl\Auth\Tests\HostAuthAdoptionTestCase;
@@ -9,7 +10,9 @@ use Nvl\Auth\Tests\NativeOwnerScenarioTestCase;
 use Nvl\Auth\Tests\SecurityConcurrencyTestCase;
 use Nvl\Auth\Tests\StatefulAuthTestCase;
 use Nvl\Auth\Tests\TestCase;
+use Nvl\Ownership\Tests\Fixtures\OptsIntoAdoptedSchemaReuse;
 use Nvl\Ownership\Tests\OwnershipTestCase;
+use PHPUnit\Framework\TestCase as UnitTestCase;
 
 $raceFiles = [__DIR__.'/Feature/RegistrationConcurrencyTest.php', __DIR__.'/Feature/EmailIdentityTest.php', __DIR__.'/Feature/EmailIdentityAdoptionTest.php', __DIR__.'/Feature/EmailVerificationSecurityTest.php', __DIR__.'/Feature/PasswordMutationSecurityTest.php', __DIR__.'/Feature/WebauthnPasskeyCeremonyTest.php', __DIR__.'/Feature/PasskeyLifecycleTest.php', __DIR__.'/Feature/TotpAndRecoveryCodeTest.php', __DIR__.'/Feature/PrincipalManagementTest.php', __DIR__.'/Feature/SocialIdentityLifecycleTest.php', __DIR__.'/Feature/NativeAuthCoreTest.php', __DIR__.'/Feature/RecentAuthenticationTest.php', __DIR__.'/Feature/SensitiveOperationAdmissionTest.php', __DIR__.'/Feature/AuthenticationProofLifecycleTest.php', __DIR__.'/Feature/AuthenticationAssuranceTest.php', __DIR__.'/Feature/CredentialConcurrencyTest.php', __DIR__.'/Feature/InvitationRegistrationRaceTest.php', __DIR__.'/Feature/SchemaOwnershipTest.php', __DIR__.'/Feature/RoleHierarchyConcurrencyTest.php', __DIR__.'/Feature/UniqueViolationTest.php'];
 uses(SecurityConcurrencyTestCase::class)->in(...$raceFiles);
@@ -18,17 +21,20 @@ $statefulFiles[] = __DIR__.'/Feature/PruningTest.php';
 uses(StatefulAuthTestCase::class)->in(...$statefulFiles);
 $legacyFeatureFiles = array_diff(glob(__DIR__.'/Feature/*Test.php') ?: [], $raceFiles, $statefulFiles);
 uses(TestCase::class)->in(...$legacyFeatureFiles);
-uses(TestCase::class)->in(__DIR__.'/Unit');
-$nativeOwnerScenarios = [__DIR__.'/Ownership/NativeImpersonationTest.php',
+uses(UnitTestCase::class)->in(__DIR__.'/Unit/AuthDeliveryRequestTest.php', __DIR__.'/Unit/OperationArchitectureTest.php');
+uses(AuthTestCase::class)->in(__DIR__.'/Unit/FeatureManifestTest.php');
+uses(TestCase::class)->in(__DIR__.'/Unit/ConsumerConfigurationTest.php', __DIR__.'/Unit/OpenApiContractTest.php');
+$reusableNativeOwnerScenarios = [
     __DIR__.'/Ownership/NativeMembershipLifecycleTest.php',
     __DIR__.'/Ownership/NativePrincipalBoundaryTest.php',
     __DIR__.'/Ownership/NativeAuthenticationIntentTest.php',
     __DIR__.'/Ownership/NativeInvitationAcceptanceTest.php',
     __DIR__.'/Ownership/NativeInvitationBootstrapTest.php',
+    __DIR__.'/Ownership/NativeImpersonationTest.php',
     __DIR__.'/Ownership/NativeQueuedDeliveryContextTest.php',
 ];
 if (class_exists(OwnershipTestCase::class)) {
-    uses(NativeOwnerScenarioTestCase::class)->in(...$nativeOwnerScenarios);
+    uses(NativeOwnerScenarioTestCase::class, OptsIntoAdoptedSchemaReuse::class)->in(...$reusableNativeOwnerScenarios);
 }
 
 $disabledProviderFiles = array_filter(

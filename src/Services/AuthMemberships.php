@@ -117,7 +117,7 @@ final readonly class AuthMemberships
             if ($status === MembershipStatus::Revoked) {
                 $principal = $this->principals->resolve(new SubjectReference($target->subject_type, $target->subject_id), true);
                 $this->assignments->sync($principal, [], []);
-                if (class_exists(PersonalAccessToken::class)) {
+                if ($this->configuration->featureEnabled(AuthFeature::ApiTokens) && class_exists(PersonalAccessToken::class)) {
                     $tokenClass = $this->models->personalAccessTokenClass();
                     $this->boundary->query($tokenClass::query(), 'auth.tokens')->where('tokenable_type', $target->subject_type)->where('tokenable_id', $target->subject_id)->delete();
                 }

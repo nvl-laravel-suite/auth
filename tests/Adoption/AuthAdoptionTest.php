@@ -15,47 +15,45 @@ use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
-it('preserves complete host auth and permission configuration on default installation', function (): void {
+it('preserves host auth and permission configuration with and without former adoption flags', function (): void {
     expect(config('auth'))->toBe($this->hostAuth)
         ->and(config('permission'))->toBe($this->hostPermission)
         ->and(config('nvl-auth.routes.enabled'))->toBeNull()
         ->and(config('nvl-auth.features.rbac.enabled'))->toBeFalse();
+
+    $adoption = config('nvl-auth.adoption');
+    $principal = ['enabled' => true, 'guard' => 'web', 'provider' => 'users'];
+    $broker = ['enabled' => true, 'broker' => 'users'];
+    foreach ([
+        'both flags' => ['principal_model' => $principal, 'password_broker' => $broker],
+        'broker only' => ['password_broker' => $broker],
+        'incomplete principal' => ['principal_model' => ['enabled' => true]],
+    ] as $scenario => $flags) {
+        config(['nvl-auth.adoption' => array_replace($adoption, $flags)]);
+        (new AuthServiceProvider(app()))->boot(app(AuthConfiguration::class));
+        expect(config('auth'))->toBe($this->hostAuth, $scenario)
+            ->and(config('permission'))->toBe($this->hostPermission, $scenario);
+    }
 });
 
-it('leaves principal and password broker configuration owned by the consumer', function (): void {
-    config(['nvl-auth.adoption.principal_model' => ['enabled' => true, 'guard' => 'web', 'provider' => 'users'], 'nvl-auth.adoption.password_broker' => ['enabled' => true, 'broker' => 'users']]);
+it('adopts Spatie storage independently and retains readiness only for the current scope', function (): void {
+    config(['nvl-auth.adoption.spatie_storage.enabled' => true]);
     (new AuthServiceProvider(app()))->boot(app(AuthConfiguration::class));
-    expect(config('auth'))->toBe($this->hostAuth)->and(config('permission'))->toBe($this->hostPermission);
-});
-
-it('preserves password storage when a former adoption flag is supplied', function (): void {
-    config(['nvl-auth.adoption.password_broker' => ['enabled' => true, 'broker' => 'users']]);
-    (new AuthServiceProvider(app()))->boot(app(AuthConfiguration::class));
-    expect(config('auth.passwords'))->toBe($this->hostAuth['passwords']);
-});
-
-it('does not infer a principal provider from an incomplete former adoption flag', function (): void {
-    config(['nvl-auth.adoption.principal_model.enabled' => true]);
-    (new AuthServiceProvider(app()))->boot(app(AuthConfiguration::class));
-    expect(config('auth'))->toBe($this->hostAuth);
-});
-
-it('adopts Spatie storage independently and memoizes readiness per scope', function (): void {
+    expect(config('auth'))->toBe($this->hostAuth)
+        ->and(config('permission.table_names.roles'))->toBe(AuthTables::get(AuthTables::Roles));
+    expect(fn () => app(PermissionRegistrar::class))->toThrow(AuthException::class);
     foreach ([AuthTables::Roles, AuthTables::Permissions, AuthTables::ModelHasRoles, AuthTables::ModelHasPermissions, AuthTables::RoleHasPermissions] as $table) {
         Schema::create(AuthTables::get($table), fn (Blueprint $blueprint) => $blueprint->uuid('id'));
     }
-    config(['nvl-auth.adoption.spatie_storage.enabled' => true]);
-    $provider = new AuthServiceProvider(app());
-    $provider->boot(app(AuthConfiguration::class));
-    expect(config('auth'))->toBe($this->hostAuth)
-        ->and(config('permission.table_names.roles'))->toBe(AuthTables::get(AuthTables::Roles));
+    expect(fn () => app(PermissionRegistrar::class))->toThrow(AuthException::class);
+    app()->forgetScopedInstances();
+
     DB::enableQueryLog();
-    app(PermissionRegistrar::class);
+    expect(app(PermissionRegistrar::class)->teams)->toBeFalse();
     $initialQueries = count(DB::getQueryLog());
-    for ($resolution = 0; $resolution < 18; $resolution++) {
-        app(PermissionRegistrar::class);
-    }
-    expect(count(DB::getQueryLog()))->toBe($initialQueries);
+    app(PermissionRegistrar::class);
+    app(PermissionRegistrar::class);
+    expect(DB::getQueryLog())->toHaveCount($initialQueries);
     app()->forgetScopedInstances();
     app(PermissionRegistrar::class);
     expect(count(DB::getQueryLog()))->toBeGreaterThan($initialQueries);
@@ -68,25 +66,6 @@ it('denies permission resolution when adopted storage readiness cannot be establ
     expect(config('permission.teams'))->toBeTrue();
 });
 
-it('recovers adopted readiness only after a lifecycle reset', function (): void {
-    config(['nvl-auth.adoption.spatie_storage.enabled' => true]);
-    (new AuthServiceProvider(app()))->boot(app(AuthConfiguration::class));
-    expect(fn () => app(PermissionRegistrar::class))->toThrow(AuthException::class);
-    foreach ([AuthTables::Roles, AuthTables::Permissions, AuthTables::ModelHasRoles, AuthTables::ModelHasPermissions, AuthTables::RoleHasPermissions] as $table) {
-        Schema::create(AuthTables::get($table), fn (Blueprint $blueprint) => $blueprint->uuid('id'));
-    }
-    expect(fn () => app(PermissionRegistrar::class))->toThrow(AuthException::class);
-    app()->forgetScopedInstances();
-    expect(app(PermissionRegistrar::class)->teams)->toBeFalse();
-});
-
-it('describes intentional host ownership without requiring a package auth provider', function (): void {
-    $checks = collect(app(AuthDoctor::class)->inspect())->keyBy('name');
-    expect($checks->has('configuration.auth_provider'))->toBeFalse()
-        ->and($checks->has('adoption.principal_model'))->toBeFalse()
-        ->and($checks['adoption.spatie_storage']['passed'])->toBeTrue();
-});
-
 it('ignores unselected adoption targets when reporting preserved host ownership', function (): void {
     config([
         'nvl-auth.adoption.principal_model.provider' => ['unused-host-value'],
@@ -94,8 +73,10 @@ it('ignores unselected adoption targets when reporting preserved host ownership'
     ]);
     $checks = collect(app(AuthDoctor::class)->inspect())->keyBy('name');
 
-    expect($checks->has('adoption.principal_model'))->toBeFalse()
+    expect($checks->has('configuration.auth_provider'))->toBeFalse()
+        ->and($checks->has('adoption.principal_model'))->toBeFalse()
         ->and($checks->has('adoption.password_broker'))->toBeFalse()
+        ->and($checks['adoption.spatie_storage']['passed'])->toBeTrue()
         ->and(config('auth'))->toBe($this->hostAuth);
 });
 

@@ -7,6 +7,7 @@ namespace Nvl\Auth\Services;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Laravel\Sanctum\TransientToken;
 use Nvl\Auth\Contracts\ApiTokenManager;
 use Nvl\Auth\Contracts\InvitationRecipientProof;
@@ -18,6 +19,7 @@ use Nvl\Auth\Events\InvitationAccepted;
 use Nvl\Auth\Exceptions\AuthException;
 use Nvl\Auth\Models\Invitation;
 use Nvl\Auth\Pipelines\AuthPipeline;
+use Nvl\Auth\Support\UniqueViolation;
 use Nvl\Auth\ValueObjects\AuthPipelineContext;
 use Nvl\Auth\ValueObjects\SubjectReference;
 use Nvl\Ownership\Contracts\OwnerAvailability;
@@ -100,31 +102,38 @@ final readonly class OwnerInvitations
             }
             $this->authorization->authorize($issuer, 'nvl.auth.invitations.create');
 
-            return $model->getConnection()->transaction(function () use ($model, $token, $subject, $issuer, $issuerReference, $registration, $candidate): array {
-                $this->principalResolver->lockExisting($candidate);
-                $this->memberships->lock();
-                $fresh = $this->boundary->query(Invitation::query(), 'auth.invitations')->where('token_hash', $this->hasher->hash('invitation-token', $token))->lockForUpdate()->first();
-                if (! $fresh instanceof Invitation || ! $fresh->isUsable() || $fresh->inviter_type !== $issuerReference->type || $fresh->inviter_id !== $issuerReference->identifier) {
-                    throw $this->invalid();
-                }
-                if ($registration !== null) {
-                    $subject = $this->resolveSubject($fresh, $registration, $subject);
-                } elseif ($subject !== null) {
-                    $this->proof->assertMatches($fresh, $subject);
-                }
-                $recipient = SubjectReference::fromAuthenticatable($subject);
-                $this->principals->resolve($recipient, true);
-                $this->authorization->authorize($issuer, 'nvl.auth.invitations.create', $fresh);
+            try {
+                return $model->getConnection()->transaction(function () use ($model, $token, $subject, $issuer, $issuerReference, $registration, $candidate): array {
+                    $this->principalResolver->lockExisting($candidate);
+                    $this->memberships->lock();
+                    $fresh = $this->boundary->query(Invitation::query(), 'auth.invitations')->where('token_hash', $this->hasher->hash('invitation-token', $token))->lockForUpdate()->first();
+                    if (! $fresh instanceof Invitation || ! $fresh->isUsable() || $fresh->inviter_type !== $issuerReference->type || $fresh->inviter_id !== $issuerReference->identifier) {
+                        throw $this->invalid();
+                    }
+                    if ($registration !== null) {
+                        $subject = $this->resolveSubject($fresh, $registration, $subject);
+                    } elseif ($subject !== null) {
+                        $this->proof->assertMatches($fresh, $subject);
+                    }
+                    $recipient = SubjectReference::fromAuthenticatable($subject);
+                    $this->principals->resolve($recipient, true);
+                    $this->authorization->authorize($issuer, 'nvl.auth.invitations.create', $fresh);
 
-                return $this->pipeline->run('invitation_accepted', new AuthPipelineContext('invitation_accepted', ['invitation_id' => $fresh->identifier()], $recipient), function () use ($fresh, $recipient, $subject, $issuer, $model): array {
-                    $membership = $this->memberships->enroll($issuer, $recipient, $fresh->roles ?? [], $fresh->permissions ?? []);
-                    $fresh->forceFill(['active_key' => null, 'accepted_by_type' => $recipient->type, 'accepted_by_id' => $recipient->identifier, 'accepted_at' => now()])->save();
-                    $this->audits->record($model->getConnection(), 'invitation.accepted', subject: $recipient, actor: $subject, metadata: ['invitation_id' => $fresh->identifier(), 'membership_id' => $membership->identifier()]);
-                    $this->events->dispatch(new InvitationAccepted($fresh->identifier(), $fresh->type, $fresh->purpose, $recipient, $fresh->accepted_at), $model->getConnection());
+                    return $this->pipeline->run('invitation_accepted', new AuthPipelineContext('invitation_accepted', ['invitation_id' => $fresh->identifier()], $recipient), function () use ($fresh, $recipient, $subject, $issuer, $model): array {
+                        $membership = $this->memberships->enroll($issuer, $recipient, $fresh->roles ?? [], $fresh->permissions ?? []);
+                        $fresh->forceFill(['active_key' => null, 'accepted_by_type' => $recipient->type, 'accepted_by_id' => $recipient->identifier, 'accepted_at' => now()])->save();
+                        $this->audits->record($model->getConnection(), 'invitation.accepted', subject: $recipient, actor: $subject, metadata: ['invitation_id' => $fresh->identifier(), 'membership_id' => $membership->identifier()]);
+                        $this->events->dispatch(new InvitationAccepted($fresh->identifier(), $fresh->type, $fresh->purpose, $recipient, $fresh->accepted_at), $model->getConnection());
 
-                    return ['invitation' => $fresh, 'subject' => $subject];
-                });
-            }, 3);
+                        return ['invitation' => $fresh, 'subject' => $subject];
+                    });
+                }, 3);
+            } catch (UniqueConstraintViolationException $exception) {
+                if (UniqueViolation::columns($exception, $principal->getConnection(), $principal->getTable()) !== null) {
+                    throw new AuthException('invitation_principal_conflict', 'The invited principal already exists.', 409, previous: $exception);
+                }
+                throw $exception;
+            }
         });
     }
 
@@ -173,7 +182,7 @@ final readonly class OwnerInvitations
             return;
         }
         $id = $token instanceof Model ? $token->getKey() : null;
-        if (! is_string($id) && ! is_int($id) || ! $this->tokens instanceof OwnerBoundApiTokenManager || $this->tokens->ownerForToken($subject, (string) $id) != $owner) {
+        if (! is_string($id) && ! is_int($id) || ! $this->tokens instanceof OwnerBoundApiTokenManager || $this->tokens->ownerForToken($subject, (string) $id)?->toArray() !== $owner->toArray()) {
             throw new AuthException('owner_token_invalid', 'The credential cannot accept an invitation for this owner.', 403);
         }
     }
