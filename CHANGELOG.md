@@ -5,6 +5,10 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Refresh owner permission caches on context entry and restoration so centrally renamed or deleted permissions cannot retain stale role-based grants, including after nested central operations.
+
 ## [7.0.4] - 2026-11-13
 
 ### Fixed

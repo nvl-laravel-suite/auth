@@ -23,7 +23,9 @@ final readonly class AuthOwnerContextParticipant implements OwnershipContextPart
     /** Retain the registrar and weakly tracked principals without retaining an owner. */
     public function __construct(private Container $rbacContainer, private RbacPrincipalTracker $principals, private AuthOwnershipState $state, private PermissionStorageReadiness $readiness) {}
 
-    /** Install the next team and restore cached principal relations on every exit.
+    /**
+     * Refresh each scope's permission map because the permission catalog can change centrally.
+     *
      * @return Closure(): void
      */
     public function enter(OwnershipSnapshot $next): Closure
@@ -40,12 +42,12 @@ final readonly class AuthOwnerContextParticipant implements OwnershipContextPart
                 throw AuthException::invalidConfiguration('RBAC permission cache requires an explicit namespace.');
             }
             $this->registrar()->cacheKey = $cache.'.'.($next->owner?->scopeKey() ?? 'central');
-            $this->registrar()->clearPermissionsCollection();
+            $this->registrar()->forgetCachedPermissions();
             $this->registrar()->setPermissionsTeamId($next->owner?->scopeKey() ?? ($next->mode === OwnershipContextMode::Central ? 'central' : null));
         } catch (Throwable $exception) {
             $this->registrar()->setPermissionsTeamId($previous);
             $this->registrar()->cacheKey = $previousCache;
-            $this->registrar()->clearPermissionsCollection();
+            $this->registrar()->forgetCachedPermissions();
             throw $exception;
         }
 
@@ -53,7 +55,7 @@ final readonly class AuthOwnerContextParticipant implements OwnershipContextPart
             $this->principals->clearRelations();
             $this->registrar()->setPermissionsTeamId($previous);
             $this->registrar()->cacheKey = $previousCache;
-            $this->registrar()->clearPermissionsCollection();
+            $this->registrar()->forgetCachedPermissions();
         };
     }
 

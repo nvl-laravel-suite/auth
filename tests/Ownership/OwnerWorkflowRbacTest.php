@@ -11,6 +11,7 @@ use Nvl\Auth\Models\Permission;
 use Nvl\Auth\Models\Role;
 use Nvl\Auth\Models\User;
 use Nvl\Auth\Services\AuthMemberships;
+use Nvl\Auth\Services\AuthPermissions;
 use Nvl\Auth\Services\AuthRoles;
 use Nvl\Auth\Services\EloquentRbacPrincipalAccess;
 use Nvl\Auth\Tests\OwnerScopeTestCase;
@@ -117,3 +118,53 @@ it('clears retained principal grants immediately when its membership is revoked'
         expect($member->hasPermissionTo('retained.read'))->toBeFalse();
     });
 });
+
+it('refreshes warmed owner permission maps after central catalog mutations', function (string $mutation, bool $nested): void {
+    $user = User::factory()->create();
+    $actor = Actor::query()->findOrFail(1);
+    $permission = Permission::query()->create(['name' => 'orders.read', 'guard_name' => 'web']);
+    $runner = app(OwnershipRunner::class);
+    config(['nvl-ownership.central_operations' => ['auth-rbac']]);
+    $this->app->bind(CentralAccess::class, static fn () => new class implements CentralAccess
+    {
+        public function assertCanRun(string $operation, Authenticatable $actor): void {}
+    });
+
+    foreach ([7, 8] as $key) {
+        $runner->run(Company::query()->findOrFail($key), $actor, function () use ($user, $key): void {
+            app(AuthMemberships::class)->provision(new SystemMutationContext('bootstrap', 'cache-'.$key), SubjectReference::fromAuthenticatable($user));
+            $role = app(AuthRoles::class)->create($user, ['name' => 'reader', 'permissions' => ['orders.read']]);
+            app(EloquentRbacPrincipalAccess::class)->assign($user, [$role->id], []);
+            expect($user->fresh()->checkPermissionTo('orders.read'))->toBeTrue();
+        });
+    }
+
+    $change = function () use ($runner, $actor, $user, $permission, $mutation): void {
+        $runner->central('auth-rbac', $actor, function () use ($user, $permission, $mutation): void {
+            if ($mutation === 'rename') {
+                app(AuthPermissions::class)->update($user, $permission, ['name' => 'orders.changed']);
+            } else {
+                app(AuthPermissions::class)->delete($user, $permission);
+            }
+        });
+    };
+
+    if ($nested) {
+        $runner->run(Company::query()->findOrFail(7), $actor, function () use ($user, $change): void {
+            expect($user->fresh()->checkPermissionTo('orders.read'))->toBeTrue();
+            $change();
+            expect($user->fresh()->checkPermissionTo('orders.read'))->toBeFalse();
+        });
+    } else {
+        $change();
+    }
+
+    foreach ([7, 8] as $key) {
+        $runner->run(Company::query()->findOrFail($key), $actor, function () use ($user, $mutation): void {
+            expect($user->fresh()->checkPermissionTo('orders.read'))->toBeFalse();
+            if ($mutation === 'rename') {
+                expect($user->fresh()->checkPermissionTo('orders.changed'))->toBeTrue();
+            }
+        });
+    }
+})->with(['rename', 'delete'])->with(['subsequent scope' => false, 'restored scope' => true]);
