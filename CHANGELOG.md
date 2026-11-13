@@ -5,10 +5,18 @@ All notable changes to `nvl/auth` are documented here.
 
 ## [Unreleased]
 
+## [7.0.4] - 2026-11-13
+
 ### Fixed
 
 - Compare `SubjectReference` and `OwnerReference` identities strictly across authentication, proofs, sessions, challenges, passkeys, tokens, impersonation, and invitations so numeric-looking string identifiers never coerce.
 - Avoid clearing shared permission caches on every owner scope entry, guard disabled RBAC and API-token features cleanly, resolve PostgreSQL active schemas via `coalesce(current_schema(), 'public')`, and map concurrent social-link and invitation unique races to `409` responses without poisoning transactions.
+
+<!-- NVL GENERATED CHANGES START -->
+### Changed
+
+- harden package runtime safety, PostgreSQL portability and test performance
+<!-- NVL GENERATED CHANGES END -->
 
 ## [7.0.3] - 2026-11-11
 
